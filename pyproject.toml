@@ -1,0 +1,138 @@
+[project]
+name = "toyomacro"
+version = "0.1.0"
+description = "XPS Peak Fitting Software - Python Edition"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Satoshi Toyoda" }
+]
+keywords = ["XPS", "spectroscopy", "peak fitting", "surface analysis"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core (everything in toyomacro.{core,lineshape,background,data,io,
+    # fitting,voigtfit}). Verified by import scan: these are the only
+    # third-party modules the codebase actually loads.
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "h5py>=3.9",
+    "matplotlib>=3.8",
+    "lmfit>=1.2",   # used by toyomacro.fitting.peak_model
+    "lz4>=4.0",     # used by toyomacro.io.compression + voigtfit.h5io
+    "psutil>=5.9",  # used by voigtfit.memory + h5io
+]
+
+[project.optional-dependencies]
+# Apple Silicon GPU backend for the Voigt solvers
+mlx = [
+    "mlx>=0.16",
+    "mlx-metal>=0.16",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+    "mypy>=1.5",
+    "pre-commit>=3.4",
+]
+# Numba-accelerated Shirley background (optional; pure-numpy fallback exists)
+fast = [
+    "numba>=0.59",
+]
+# MCP server for AI-agent access (python -m toyomacro.mcp_server)
+mcp = [
+    "mcp>=1.2",
+]
+# Everything
+all = [
+    "toyomacro[mlx,dev,fast,mcp]",
+]
+
+[project.scripts]
+toyomacro = "toyomacro.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/toyomacro"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    # The following are scheduled for a follow-up cleanup PR.
+    # They are flagged by ruff but do not represent bugs:
+    "B006",  # mutable-argument-default — legacy patterns in solvers
+    "B007",  # unused-loop-control-variable — sweep loops use _ or named index
+    "B008",  # function-call-in-default-argument — Path()/numpy defaults
+    "B023",  # function-uses-loop-variable — bound deliberately in benchmarks
+    "B028",  # no-explicit-stacklevel — warn() calls inside helpers
+    "B904",  # raise-without-from-inside-except — readability over chained
+    "E402",  # module-import-not-at-top — sys.path manipulation in scripts
+    "E712",  # true-false-comparison — `== True` reads clearer with sentinels
+    "E731",  # lambda-assignment — short anonymous helpers
+    "E741",  # ambiguous-variable-name — l, I, O appear in math conventions
+    "UP035", # deprecated-import — older typing.X kept for clarity
+    "F821",  # undefined-name — false positives from string / TYPE_CHECKING
+             # annotations; real undefined references are caught by tests
+    "F401",  # unused-import — common in __init__.py / TYPE_CHECKING blocks
+    "F841",  # unused-variable — intentional in benchmark sweep loops
+    "B905",  # zip-without-explicit-strict — adopted progressively
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["toyomacro"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files commonly carry intentional unused vars / loop counters /
+# conditional imports for capability detection. These rules add noise
+# without catching real bugs in this codebase.
+"tests/*.py" = ["F401", "F841", "B007", "B905"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+strict = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src/toyomacro/voigtfit/tests"]
+addopts = "-v --tb=short"
+markers = [
+    "gui: requires a desktop GUI environment; skipped in headless CI",
+]
+
+[tool.coverage.run]
+source = ["src/toyomacro"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

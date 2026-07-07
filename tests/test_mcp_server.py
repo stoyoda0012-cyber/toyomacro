@@ -1,0 +1,85 @@
+"""Tests for the MCP server tools (called directly, no MCP transport)."""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pytest
+
+pytest.importorskip("mcp")
+
+from toyomacro import mcp_server  # noqa: E402
+
+
+class TestReferenceDataTools:
+    def test_lookup_binding_energy(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))
+        assert out["binding_energy_eV"] == pytest.approx(99.0, abs=1.0)
+
+    def test_lookup_binding_energy_unknown(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Xx", "9z"))
+        assert "error" in out
+
+    def test_calculate_sensitivity(self):
+        out = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+        assert out["kinetic_energy_eV"] == pytest.approx(1486.6 - out["binding_energy_eV"])
+        assert out["cross_section"] > 0
+        assert out["imfp_nm"] > 0
+        assert out["sensitivity"] == pytest.approx(
+            out["cross_section"] * out["imfp_nm"])
+
+    def test_list_fitting_templates(self):
+        out = json.loads(mcp_server.list_fitting_templates())
+        names = [t["name"] for t in out]
+        assert "Si2p_oxide" in names
+        si = next(t for t in out if t["name"] == "Si2p_oxide")
+        assert si["element"] == "Si2p"
+        assert len(si["peaks"]) == 5
+
+
+class TestFitSpectrumFile:
+    def test_fit_two_column_txt(self, tmp_path):
+        # Synthetic Si 2p doublet pair as a plain two-column text file
+        from scipy.special import wofz
+
+        energy = np.linspace(96.0, 108.0, 301)
+
+        def voigt(c, s, g):
+            z = ((energy - c) + 1j * g) / (s * np.sqrt(2))
+            p = np.real(wofz(z))
+            return p / p.max()
+
+        intensity = 1000 * (voigt(99.3, 0.45, 0.1) + 0.5 * voigt(99.9, 0.45, 0.1))
+        intensity += 800 * (voigt(103.4, 0.6, 0.1) + 0.5 * voigt(104.0, 0.6, 0.1))
+        intensity += 50.0  # constant offset
+        f = tmp_path / "si2p.txt"
+        np.savetxt(f, np.column_stack([energy, intensity]))
+
+        out = json.loads(mcp_server.fit_spectrum_file(str(f), element="Si2p"))
+        assert out["success"]
+        assert out["r_squared"] > 0.99
+        centers = [c["center_eV"] for c in out["components"]]
+        assert min(abs(c - 99.3) for c in centers) < 0.3
+        assert min(abs(c - 103.4) for c in centers) < 0.3
+
+
+class TestGVRTTools:
+    def test_gvrt_run_demo(self, tmp_path):
+        png = tmp_path / "rt.png"
+        out = json.loads(mcp_server.gvrt_run(
+            size=64, noise="None", output_png=str(png),
+        ))
+        assert out["n_spectra"] == 64 * 64
+        assert out["psnr_dB"]["average"] > 15
+        assert png.exists()
+
+    def test_gvrt_sweep_monotonic(self):
+        out = json.loads(mcp_server.gvrt_sweep(
+            noise_levels="None,Strong", size=64,
+        ))
+        assert len(out) == 2
+        # More noise -> lower average PSNR
+        assert out[0]["psnr_dB"]["average"] > out[1]["psnr_dB"]["average"]

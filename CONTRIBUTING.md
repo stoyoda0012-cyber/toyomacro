@@ -1,0 +1,69 @@
+# Contributing to toyomacro
+
+Thank you for your interest in contributing! This project welcomes bug
+reports, feature suggestions, documentation improvements, and pull
+requests.
+
+## Reporting issues
+
+- Search [existing issues](../../issues) before opening a new one.
+- Include: a minimal reproducer, expected vs actual behavior, Python
+  version, OS, and relevant package versions (`pip list` excerpt).
+- For numerical / fitting issues, attach the input array shape, dtype,
+  and a small synthetic dataset (or describe how to generate one) so
+  the problem can be reproduced without your private data.
+
+## Development setup
+
+```bash
+git clone https://github.com/<your-fork>/toyomacro.git
+cd toyomacro
+uv sync --extra dev          # or: pip install -e ".[dev]"
+pytest                       # run the test suite
+```
+
+The Voigt-fitting engine (`toyomacro.voigtfit`) is intentionally
+lightweight: `numpy`, `scipy`, `h5py`, `matplotlib`, and optional
+`mlx` (Apple Silicon GPU). Desktop/web front-ends are separate
+closed-source companion tools and are not part of this repository
+(see the Scope section of the README).
+
+## Pull requests
+
+1. Fork the repository and create a topic branch from `main`.
+2. Make focused commits — one logical change per commit, present-tense
+   imperative subject line (e.g. `Fix Voigt amplitude overflow at
+   large gamma`).
+3. Add or update tests for the change. Existing tests must keep passing.
+4. Run `ruff check .` and `pytest` before pushing.
+5. Open a PR describing what changed and why; link any related issue.
+6. Be patient — review is best-effort, not real-time.
+
+## Style
+
+- Python: PEP 8 via `ruff` (configured in `pyproject.toml`,
+  line length 100).
+- Prefer small, composable functions. Avoid speculative abstraction.
+- New public APIs need a docstring and at least one test.
+- Performance-critical paths in `voigtfit` should include a benchmark
+  in `src/toyomacro/voigtfit/benchmarks/` when introducing new solvers.
+
+## Dev-log references
+
+Docstrings and comments occasionally cite `dev-log NN`. These refer to
+entries in the maintainer's (non-public) development log, recording
+when a numerical result, threshold, or design decision was
+established — read them like issue-tracker references: the number
+identifies the experiment, the surrounding text states its
+conclusion.
+
+## Code of Conduct
+
+This project adheres to the [Contributor Covenant
+v2.1](CODE_OF_CONDUCT.md). By participating, you agree to uphold its
+terms.
+
+## License
+
+By contributing, you agree that your contributions will be licensed
+under the [MIT License](LICENSE).
