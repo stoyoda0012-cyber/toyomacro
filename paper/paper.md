@@ -34,8 +34,8 @@ parabolic interpolation, and a multipeak alternating-projection
 routine — that trade precision for throughput along a single API.
 The fastest path, an **amplitude-only projection kernel** that
 reduces to a single `Y @ W` matmul against a precomputed weight
-matrix, sustains a measured median of **468 million spectrum-vector
-evaluations per second** (range 416–477 over nine repetitions) on an
+matrix, sustains a measured median of **478 million spectrum-vector
+evaluations per second** (range 453–490 over nine repetitions) on an
 Apple M3 Max with the MLX backend; the committed measurement record
 under `paper/figures/results/` pins the environment, problem size,
 and every individual timing. The Giga Voigt Round Trip (GVRT)
@@ -62,7 +62,7 @@ open-source route — `lmfit` [@lmfit] or `scipy.optimize.curve_fit`
 a Python-loop "one spectrum at a time" workload. On the benchmark
 problem shipped with this package (single Voigt peak, 151 channels,
 free amplitude, position, and width at peak-count SNR 10, bounded
-trust-region reflective), both sustain a measured **~820 spectra per
+trust-region reflective), both sustain a measured **~800 spectra per
 second** in their normal single-thread loop on an Apple M3 Max
 (committed record in
 `paper/figures/results/solver_comparison.json`).
@@ -71,7 +71,7 @@ Modern instrumentation produces datasets that defeat this model. A
 single experiment can now generate hundreds of millions of spectra:
 4K or 8K hyperspectral imaging, ARXPS depth profiling at sixteen
 emission angles × multiple elements × megapixel maps, or GVRT-class
-validation batches in the $10^9$ range. At 820 spectra/s, a single
+validation batches in the $10^9$ range. At 800 spectra/s, a single
 33-megapixel map is a twelve-hour job; the same fit recast
 batch-first completes in seconds. `voigtfit` is built around that
 recasting: amplitude recovery becomes a dense matrix product against
@@ -111,11 +111,12 @@ identical bounds, with accuracy scored on a common subset fitted by
 every solver. It is a workflow-versus-workflow comparison on one
 machine — the per-spectrum tools run their normal single-thread CPU
 loop (bounded trust-region reflective) while the batch solver uses
-the GPU. The recorded result is: `scipy.optimize.curve_fit` and
-`lmfit` at roughly **8×10² spectra/s** versus the voigtfit
-`dict2d_parabola` solver at several **million spectra/s** — three to
-four orders of magnitude — at matching accuracy (exact figures,
-per-parameter errors, and environment in the committed
+the GPU. The recorded result is: `scipy.optimize.curve_fit` at 798 and
+`lmfit` at 783 spectra/s versus the voigtfit `dict2d_parabola`
+solver at **6.5 million spectra/s** — a factor of about 8,000 — at
+matching accuracy on the common subset: mean absolute amplitude
+error 0.022 vs. 0.022, position error 0.013 vs. 0.013 eV (full
+per-parameter figures and environment in the committed
 `solver_comparison.json`). The amplitude-only projection kernel is
 reported separately because it solves a smaller problem (no
 position/width recovery). Multipeak
@@ -160,8 +161,8 @@ guarantee.
 
 \autoref{fig:bottleneck} places the measured kernel throughput
 against the hardware bounds of the test machine. The amplitude-only
-projection kernel sustains a median 468 M spectra/s — 73% of the
-645 M spectra/s memory-bandwidth bound and a factor of 30 below the
+projection kernel sustains a median 478 M spectra/s — 74% of the
+645 M spectra/s memory-bandwidth bound and a factor of 33 below the
 compute bound — confirming that the kernel is memory-bound. The
 end-to-end bar is a *projection* from the HDF5/SSD efficiency bound
 (about 9 M spectra/s); since that projected ceiling sits a factor of

@@ -10,29 +10,31 @@
     "warmup": 2,
     "repeats": 9,
     "timings_s": [
-      0.009605,
-      0.008415,
-      0.008552,
-      0.008412,
-      0.00839,
+      0.008366,
+      0.008358,
+      0.008372,
+      0.008719,
       0.008542,
-      0.009592,
-      0.009068,
-      0.008737
+      0.008839,
+      0.008193,
+      0.008167,
+      0.008254
     ],
     "aggregation": "median",
-    "throughput_spec_per_s_median": 467742820.5150405,
-    "throughput_spec_per_s_min": 416464205.8834356,
-    "throughput_spec_per_s_max": 476739121.3159343,
+    "throughput_spec_per_s_median": 478128094.33054876,
+    "throughput_spec_per_s_min": 452539879.2346781,
+    "throughput_spec_per_s_max": 489758480.20913815,
     "environment": {
-      "timestamp_utc": "2026-07-12T05:35:13+00:00",
+      "timestamp_utc": "2026-07-12T23:27:10+00:00",
       "os": "Darwin 25.5.0 (macOS 26.5.1)",
       "machine": "arm64",
       "python": "3.12.11",
       "numpy": "2.3.5",
       "mlx": "0.31.2",
       "cpu": "Apple M3 Max",
-      "git_commit": "edada2f"
+      "command": "paper/figures/make_figure1_bottleneck.py --measure",
+      "git_commit": "743c3798e5bf1e9c3a05626488aafa67a8466eb5",
+      "git_tracked_dirty": false
     }
   }
 }

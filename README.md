@@ -7,7 +7,7 @@
 > High-throughput Voigt-fitting for X-ray Photoelectron Spectroscopy (XPS).
 > The bundled engine [`toyomacro.voigtfit`](src/toyomacro/voigtfit/)
 > runs its **amplitude-only projection kernel** at a measured median
-> of **468 M spectrum-vectors per second** (range 416–477 over nine
+> of **478 M spectrum-vectors per second** (range 453–490 over nine
 > repetitions; full provenance record committed under
 > [`paper/figures/results/`](paper/figures/results/)) on an Apple
 > M3 Max with MLX, and previously completed the full GVRT 8K UHD
@@ -55,7 +55,7 @@ amplitudes (and δE / δσ, where applicable) for.
 
 | Solver | Output | Throughput |
 |---|---|---:|
-| **Amplitude-only projection** (`Y @ W` matmul kernel) | amplitude only, no shift/width recovery | **468 M spec/s** median, 416–477 range (memory-bandwidth bound; committed record) |
+| **Amplitude-only projection** (`Y @ W` matmul kernel) | amplitude only, no shift/width recovery | **478 M spec/s** median, 453–490 range (memory-bandwidth bound; committed record) |
 | 4-step Taylor residual projection | amp + δE + δσ | ~1.5 M spec/s |
 | `parabola` (Dict2D + parabolic refine) | amp + δE + δσ, no Jacobian | ~5 M spec/s |
 | `gamma_calibrated` (Dict3D → Dict2D γ-cal, warm cache) | amp + δE + δσ + γ correction | ~2 M spec/s |
@@ -80,12 +80,12 @@ Committed record (exact figures, input hash, environment):
 
 | Solver | Throughput | Notes |
 |---|---:|---|
-| voigtfit `dict2d_parabola` | ~5-6 M spec/s | MLX GPU batch |
-| `scipy.optimize.curve_fit` | ~8×10² spec/s | bounded TRF, single-thread CPU |
-| `lmfit` | ~8×10² spec/s | bounded, single-thread CPU |
+| voigtfit `dict2d_parabola` | **6.5 M spec/s** | MLX GPU batch |
+| `scipy.optimize.curve_fit` | 798 spec/s | bounded TRF, single-thread CPU |
+| `lmfit` | 783 spec/s | bounded, single-thread CPU |
 
-Matching accuracy on the common subset, three to four orders of
-magnitude in throughput — that ratio, not the kernel headline, is
+Matching accuracy on the common subset (MAE amplitude 0.022 vs
+0.022), a factor of about 8,000 in throughput — that ratio, not the kernel headline, is
 the relevant comparison with the conventional workflow.
 
 ### End-to-end image roundtrip
