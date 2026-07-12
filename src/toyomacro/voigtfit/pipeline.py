@@ -38,7 +38,9 @@ if TYPE_CHECKING:
 
 try:
     import mlx.core as mx
-    HAS_MLX = True
+
+    from ._mlx_support import mlx_usable as _mlx_usable
+    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 
@@ -75,7 +77,8 @@ def _shift_kernel_mlx(Y_mx, W, Phi_T, J_c_T, n_energy_inv):
 
 
 if HAS_MLX:
-    _shift_kernel_compiled = mx.compile(_shift_kernel_mlx)
+    from ._mlx_support import LazyCompiled
+    _shift_kernel_compiled = LazyCompiled(_shift_kernel_mlx)
 else:
     _shift_kernel_compiled = None
 
@@ -106,7 +109,7 @@ def _shift_width_kernel_mlx(Y_mx, W, Phi_T, J_c_T, J_s_T, n_energy_inv):
 
 
 if HAS_MLX:
-    _shift_width_kernel_compiled = mx.compile(_shift_width_kernel_mlx)
+    _shift_width_kernel_compiled = LazyCompiled(_shift_width_kernel_mlx)
 else:
     _shift_width_kernel_compiled = None
 
@@ -140,7 +143,7 @@ def _six_step_kernel_mlx(Y_mx, W, Phi_T, J_c_T, J_s_T, H_cc_T, n_energy_inv):
 
 
 if HAS_MLX:
-    _six_step_kernel_compiled = mx.compile(_six_step_kernel_mlx)
+    _six_step_kernel_compiled = LazyCompiled(_six_step_kernel_mlx)
 else:
     _six_step_kernel_compiled = None
 
@@ -213,7 +216,14 @@ class HybridPipeline:
         Args:
             cache: Weight matrix cache instance
             chi2_threshold: Anomaly detection threshold (in MAD units)
-            use_mlx: Use MLX for GPU acceleration (Stage 1)
+            use_mlx: Prefer MLX GPU acceleration for Stage 1.  This is
+                opportunistic: when MLX is not installed or no Metal
+                device can execute work (see ``_mlx_support.mlx_usable``),
+                the pipeline silently falls back to the NumPy backend,
+                which produces numerically identical results.  To assert
+                that the GPU path is actually in use, call
+                ``toyomacro.voigtfit.require_mlx()`` first — it raises an
+                actionable error otherwise.
             enable_stage2: Enable Stage 2 refinement
             stage2_mode: Stage 2 refinement mode
                 - 'light': center only (fastest, for charging correction)

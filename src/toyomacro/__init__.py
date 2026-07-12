@@ -4,7 +4,16 @@ Toyomacro - XPS Peak Fitting Software
 A Python implementation of the Toyomacro XPS analysis toolkit.
 """
 
-__version__ = "0.1.0"
+# Single version source: pyproject.toml [project] version, read from the
+# installed package metadata.  The fallback covers running from a source
+# checkout that has not been installed.
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
+    __version__ = _dist_version("toyomacro")
+except PackageNotFoundError:  # source tree without installation
+    __version__ = "0.0.0+unknown"
+
 __author__ = "Satoshi Toyoda"
 
 # Lazy imports for faster startup

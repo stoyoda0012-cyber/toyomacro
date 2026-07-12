@@ -104,11 +104,16 @@ class ParamRoundtripResult:
 
 
 def parse_noise_level(s: str) -> str:
-    """Parse noise level string, supporting lam notation.
+    """Parse noise level string, supporting 'lam' notation.
 
-    'lam3' -> 'Moderate' (10^3 = 1000)
+    'lamX' sets the dimensionless noise-severity *level* to 10^X.
+    Despite the historical name, this is NOT a Poisson mean: peak-count
+    SNR = 1e4/level and peak Poisson mean = (1e4/level)^2 (see
+    spectra_generator.level_to_peak_snr / level_to_peak_lambda).
+
+    'lam3' -> 'Moderate' (level 10^3 = 1000, peak SNR 10)
     'lam-1' -> level 0.1
-    'lam3.5' -> 'Custom_3162' (10^3.5 ≈ 3162)
+    'lam3.5' -> 'Custom_3162' (level 10^3.5 ≈ 3162)
     'None', 'Moderate', 'Strong' -> passthrough
     """
     if s.startswith('lam'):

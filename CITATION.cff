@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata below.
+  A Zenodo DOI will be added at the first tagged release; until then,
+  cite the repository URL and version.
+type: software
+title: >-
+  toyomacro.voigtfit: high-throughput Voigt-profile fitting for
+  X-ray photoelectron spectroscopy
+authors:
+  - family-names: Toyoda
+    given-names: Satoshi
+    orcid: 'https://orcid.org/0009-0007-1091-1579'
+    affiliation: >-
+      Advanced Equipment Division, Vacuum Products Corporation,
+      Tokyo, Japan
+version: 0.1.0
+license: MIT
+repository-code: 'https://github.com/stoyoda0012-cyber/toyomacro'
+keywords:
+  - XPS
+  - photoelectron spectroscopy
+  - Voigt profile
+  - peak fitting
+  - GPU
+  - Apple Silicon
+  - MLX

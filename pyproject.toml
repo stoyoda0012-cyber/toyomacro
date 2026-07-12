@@ -61,12 +61,46 @@ all = [
 [project.scripts]
 toyomacro = "toyomacro.cli:main"
 
+[project.urls]
+Repository = "https://github.com/stoyoda0012-cyber/toyomacro"
+Issues = "https://github.com/stoyoda0012-cyber/toyomacro/issues"
+Changelog = "https://github.com/stoyoda0012-cyber/toyomacro/blob/main/CHANGELOG.md"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Scope note: the quantification reference tables (toyomacro/data/_cache,
+# ~10 MB of JSON derived from published cross-section/IMFP compilations)
+# ship in the base wheel.  They are required by calculate_sensitivity,
+# the MCP tools, and examples/03; splitting them into an extra would
+# break `import toyomacro.data` on a default install for ~10 MB saved.
+# See docs/DATA_SOURCES.md for provenance and licensing rationale.
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/toyomacro"]
+# Belt-and-braces: these local development layers are .gitignore'd (and
+# therefore excluded by hatchling's VCS-based file selection), but list
+# them explicitly so a build from a non-git tree can never ship them.
+exclude = [
+    "src/toyomacro/gui",
+    "src/toyomacro/api",
+    "src/toyomacro/agent",
+    "src/toyomacro/piar",
+    "src/toyomacro/depth",
+    "src/toyomacro/outputs",
+]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "src/toyomacro/gui",
+    "src/toyomacro/api",
+    "src/toyomacro/agent",
+    "src/toyomacro/piar",
+    "src/toyomacro/depth",
+    "src/toyomacro/outputs",
+    "web",
+]
 
 [tool.ruff]
 target-version = "py311"

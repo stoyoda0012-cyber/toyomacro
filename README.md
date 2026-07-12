@@ -6,13 +6,14 @@
 
 > High-throughput Voigt-fitting for X-ray Photoelectron Spectroscopy (XPS).
 > The bundled engine [`toyomacro.voigtfit`](src/toyomacro/voigtfit/)
-> evaluates its **amplitude-only Stage 1 kernel** at roughly
-> **400 M spectrum-vectors per second** (a single
-> memory-bandwidth-limited `Y @ W` matmul) on an Apple M3 Max with
-> MLX, and completes the full GVRT 8K UHD round-trip — ≈265 M Voigt
-> fits across eight Poisson noise levels — in about ten minutes on
-> the same hardware. A pure-NumPy fallback runs the identical
-> algorithms anywhere CPython runs.
+> runs its **amplitude-only projection kernel** at a measured median
+> of **468 M spectrum-vectors per second** (range 416–477 over nine
+> repetitions; full provenance record committed under
+> [`paper/figures/results/`](paper/figures/results/)) on an Apple
+> M3 Max with MLX, and previously completed the full GVRT 8K UHD
+> round-trip — ≈265 M Voigt fits across eight shot-noise severities —
+> in about ten minutes on the same hardware. A pure-NumPy fallback
+> runs the identical algorithms anywhere CPython runs.
 >
 > See [How fast](#how-fast) below for what these numbers actually
 > measure and how the MLX and NumPy backends compare.
@@ -33,9 +34,13 @@ submission as a standalone tool.
 > A **"spectrum"** here means one 1-D intensity array of `n_energy`
 > floats — typically what is measured at a single pixel of an XPS
 > map for a single chemical element. Rates below are per such array,
-> processed in batch. All numbers were measured on an Apple
+> processed in batch. All numbers were recorded on an Apple
 > **M3 Max (128 GB)** with the **MLX** backend unless otherwise
-> noted; the pure-NumPy fallback runs the same algorithms with
+> noted — the kernel headline and the scipy/lmfit comparison carry
+> committed machine-readable provenance records
+> ([`paper/figures/results/`](paper/figures/results/)); the other
+> rows are previously recorded values, regenerable with the bundled
+> benchmarks. The pure-NumPy fallback runs the same algorithms with
 > numerically equivalent results (≲10⁻³ relative agreement on the
 > shared solver paths) at roughly **3–5× lower throughput**
 > on the same hardware (and 5–10× lower on a typical Linux x86_64
@@ -50,7 +55,7 @@ amplitudes (and δE / δσ, where applicable) for.
 
 | Solver | Output | Throughput |
 |---|---|---:|
-| **Stage 1 amplitude-only** (`Y @ W` matmul kernel) | amplitude only, no shift/width recovery | **~400 M spec/s** (memory-bandwidth bound) |
+| **Amplitude-only projection** (`Y @ W` matmul kernel) | amplitude only, no shift/width recovery | **468 M spec/s** median, 416–477 range (memory-bandwidth bound; committed record) |
 | 4-step Taylor residual projection | amp + δE + δσ | ~1.5 M spec/s |
 | `parabola` (Dict2D + parabolic refine) | amp + δE + δσ, no Jacobian | ~5 M spec/s |
 | `gamma_calibrated` (Dict3D → Dict2D γ-cal, warm cache) | amp + δE + δσ + γ correction | ~2 M spec/s |
@@ -60,6 +65,24 @@ amplitudes (and δE / δσ, where applicable) for.
 The amplitude-only kernel is essentially memory bandwidth on the
 GPU; it is **not** a full peak fit on its own. The other rows are
 full per-spectrum recoveries for the listed parameters.
+
+### Same problem, same hardware: vs scipy / lmfit
+
+`python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark`
+fits the identical dataset (single Voigt peak, 151 channels, free
+amplitude/position/width, peak-count SNR 10) with identical
+initialization and bounds. Committed record:
+[`paper/figures/results/solver_comparison.json`](paper/figures/results/solver_comparison.json).
+
+| Solver | Throughput | MAE amplitude | MAE position (eV) |
+|---|---:|---:|---:|
+| voigtfit `dict2d_parabola` | **5.8 M spec/s** | 0.022 | 0.014 |
+| `scipy.optimize.curve_fit` (LM) | 819 spec/s | 0.023 | 0.014 |
+| `lmfit` (LM) | 820 spec/s | 0.023 | 0.014 |
+
+Same accuracy class, roughly **7,000×** the throughput — that ratio,
+not the kernel headline, is the honest like-for-like comparison with
+the conventional workflow.
 
 ### End-to-end image roundtrip
 
@@ -207,35 +230,27 @@ Tools: `lookup_binding_energy`, `calculate_sensitivity`,
 `list_fitting_templates`, `fit_spectrum_file`, `gvrt_run`, `gvrt_sweep`.
 
 
-## Scope: what is and isn't in this repository
+## Scope: what this repository provides
 
-This repository contains the **public surface** of an XPS analysis
-stack developed at Vacuum Products Corporation. The Journal of Open
-Source Software submission targets exactly one component:
+Everything documented here installs and runs from this repository
+alone — `pip install`, the examples, the benchmarks, and the full
+test suite need no external tools or data.
 
-- **`toyomacro.voigtfit`** — the standalone Voigt-fitting engine.
-  All performance claims and benchmarks in the JOSS paper refer to
-  this package; the automated test suite spans both the engine
-  (701 tests) and the foundation layers it depends on (1,111
-  collected tests repository-wide).
-
-Everything else under `toyomacro.*` is an **integration layer** that
-shows how the engine plugs into the rest of an XPS workflow. These
-layers are MIT-licensed and free to study or extend, but they are
-not the paper's subject:
-
+- **`toyomacro.voigtfit`** — the batch-first Voigt-fitting engine.
+  This is the subject of the JOSS paper; all performance claims and
+  benchmarks refer to it.
 - `toyomacro.{core, lineshape, background, data, io}` — foundation
-  modules used by the engine.
+  modules the engine uses: lineshapes, backgrounds, quantification
+  reference tables, and file readers (PXT/VAMAS/NPL/two-column text).
 - `toyomacro.fitting` — high-level peak-fitting templates that wrap
-  voigtfit.
+  the engine for common XPS analyses.
 
-Desktop / web front-ends and the depth-profiling solver that consume
-this engine are separate, closed-source companion tools and are **not
-part of this repository**; `toyomacro.voigtfit.integration` documents
-the boundary they plug into.
-
+GUI front-ends and a depth-profiling solver built on this engine are
+maintained separately; nothing in this repository depends on them.
 If you are evaluating the JOSS submission, the entry point is
-`toyomacro.voigtfit` and the runnable examples above.
+`toyomacro.voigtfit` and the runnable examples above; the test
+inventory in [tests/README.md](tests/README.md) maps what each test
+file guards.
 
 ## Architecture
 
@@ -283,6 +298,14 @@ uv run ruff check src/ tests/                    # lint
 CI (GitHub Actions) runs the full suite on Ubuntu and macOS for
 Python 3.11 / 3.12 on every push. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+## Citing
+
+Citation metadata lives in [CITATION.cff](CITATION.cff) — GitHub's
+"Cite this repository" button renders it as BibTeX/APA. There is no
+DOI yet; the first tagged release will be archived on Zenodo and the
+DOI added here and to `CITATION.cff`. Release history is tracked in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

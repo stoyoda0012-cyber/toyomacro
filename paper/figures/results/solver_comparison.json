@@ -1,0 +1,102 @@
+{
+  "description": "Same-problem comparison: voigtfit solvers vs SciPy/lmfit LM fitting.",
+  "problem": {
+    "n_energy": 151,
+    "center": 0.0,
+    "sigma": 0.5,
+    "gamma": 0.2,
+    "dE_range_sigma": 0.3,
+    "dsigma_range_sigma": 0.1,
+    "noise_level": 1000.0,
+    "peak_snr": 10.0,
+    "seed": 0,
+    "dtype": "float32 spectra, float64 reference fits"
+  },
+  "results": [
+    {
+      "solver": "projection_amp_only",
+      "problem": "amplitude only (center/width fixed at nominal) \u2014 NOT comparable to full fits below",
+      "backend": "numpy (BLAS)",
+      "n_spectra": 200000,
+      "setup_s": 0.001,
+      "repeats": 5,
+      "timings_s": [
+        0.00397,
+        0.002111,
+        0.00179,
+        0.001704,
+        0.001742
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 111721481.713857,
+      "mae_amp": 0.03003828978320642,
+      "mae_dE": null,
+      "mae_dsigma": null
+    },
+    {
+      "solver": "dict2d_parabola",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "mlx-gpu",
+      "n_spectra": 200000,
+      "setup_s": 0.0046,
+      "repeats": 5,
+      "timings_s": [
+        0.05162,
+        0.040632,
+        0.034324,
+        0.030438,
+        0.031632
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 5826897.341337779,
+      "mae_amp": 0.021553581265831276,
+      "mae_dE": 0.013884267639717887,
+      "mae_dsigma": 0.01319806094480827
+    },
+    {
+      "solver": "scipy_curve_fit",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "scipy per-spectrum LM (single-thread loop)",
+      "n_spectra": 500,
+      "setup_s": 0.0,
+      "repeats": 1,
+      "timings_s": [
+        0.611
+      ],
+      "aggregation": "single pass",
+      "throughput_spec_per_s": 818.8512663317445,
+      "mae_amp": 0.022900049074278166,
+      "mae_dE": 0.013604245012717365,
+      "mae_dsigma": 0.01360821896655763
+    },
+    {
+      "solver": "lmfit",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "lmfit per-spectrum LM (single-thread loop)",
+      "n_spectra": 500,
+      "setup_s": 0.0,
+      "repeats": 1,
+      "timings_s": [
+        0.61
+      ],
+      "aggregation": "single pass",
+      "throughput_spec_per_s": 819.760994535519,
+      "mae_amp": 0.022899973525451627,
+      "mae_dE": 0.01360424295397809,
+      "mae_dsigma": 0.013608207447117398
+    }
+  ],
+  "environment": {
+    "timestamp_utc": "2026-07-12T06:29:39+00:00",
+    "os": "Darwin 25.5.0",
+    "machine": "arm64",
+    "python": "3.12.11",
+    "numpy": "2.3.5",
+    "cpu_count": 16,
+    "scipy": "1.17.0",
+    "lmfit": "1.3.4",
+    "mlx": "0.31.2",
+    "cpu": "Apple M3 Max",
+    "git_commit": "edada2f"
+  }
+}

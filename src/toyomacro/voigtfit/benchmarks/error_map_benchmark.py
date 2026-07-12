@@ -63,7 +63,11 @@ SOLVER_MAP = {
 
 
 def parse_noise_level(s: str) -> str:
-    """Parse noise level string, supporting lam notation."""
+    """Parse noise level string, supporting 'lam' notation.
+
+    'lamX' sets the dimensionless noise-severity *level* to 10^X (NOT a
+    Poisson mean; peak SNR = 1e4/level — see spectra_generator).
+    """
     if s.startswith('lam'):
         exp = float(s[3:])
         val = 10 ** exp

@@ -1,0 +1,38 @@
+{
+  "fit_only_kernel": {
+    "kind": "fit_only_kernel",
+    "description": "amplitude-only projection kernel (A = Y @ W, chi2 on 0.01% sample)",
+    "backend": "mlx-gpu",
+    "dtype": "float32",
+    "n_energy": 151,
+    "n_comp": 3,
+    "batch_spectra": 4000000,
+    "warmup": 2,
+    "repeats": 9,
+    "timings_s": [
+      0.009605,
+      0.008415,
+      0.008552,
+      0.008412,
+      0.00839,
+      0.008542,
+      0.009592,
+      0.009068,
+      0.008737
+    ],
+    "aggregation": "median",
+    "throughput_spec_per_s_median": 467742820.5150405,
+    "throughput_spec_per_s_min": 416464205.8834356,
+    "throughput_spec_per_s_max": 476739121.3159343,
+    "environment": {
+      "timestamp_utc": "2026-07-12T05:35:13+00:00",
+      "os": "Darwin 25.5.0 (macOS 26.5.1)",
+      "machine": "arm64",
+      "python": "3.12.11",
+      "numpy": "2.3.5",
+      "mlx": "0.31.2",
+      "cpu": "Apple M3 Max",
+      "git_commit": "edada2f"
+    }
+  }
+}

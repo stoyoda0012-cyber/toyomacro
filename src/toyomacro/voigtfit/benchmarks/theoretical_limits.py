@@ -97,12 +97,16 @@ def analyze_theoretical_limits():
         bottleneck = "compute"
         theoretical_max = compute_limited_rate
 
-    # === Actual vs Theoretical ===
-    print("\n[Actual vs Theoretical]")
-    actual_rate = 400e6  # ~400M spec/s fit-only
+    # === Recorded vs Theoretical ===
+    print("\n[Recorded vs Theoretical]")
+    # Previously recorded reference value (Apple M3 Max, amplitude-only
+    # projection kernel).  For a live measurement with full provenance
+    # run: python paper/figures/make_figure1_bottleneck.py --measure
+    actual_rate = 400e6
     efficiency = actual_rate / theoretical_max * 100
 
-    print(f"  Measured (fit-only): {actual_rate/1e6:.0f}M spec/s")
+    print(f"  Recorded reference (amplitude-only kernel): "
+          f"{actual_rate/1e6:.0f}M spec/s")
     print(f"  Theoretical max: {theoretical_max/1e6:.0f}M spec/s ({bottleneck} bound)")
     print(f"  Efficiency: {efficiency:.1f}%")
 
@@ -131,11 +135,11 @@ def analyze_theoretical_limits():
         ("SSD + HDF5", hdf5_limited_rate),
         ("Memory bandwidth", mem_limited_rate * 0.6),  # 60% efficiency
         ("GPU compute", compute_limited_rate),
-        ("Measured", actual_rate),
+        ("Recorded (reference)", actual_rate),
     ]
 
     for name, rate in sorted(bottlenecks, key=lambda x: x[1]):
-        marker = " ← Current" if name == "Measured" else ""
+        marker = " ← Current" if name == "Recorded (reference)" else ""
         print(f"    {name:<20}: {rate/1e6:>6.0f}M spec/s{marker}")
 
     # === Recommendations ===
@@ -192,8 +196,8 @@ def compare_with_full_pipeline():
     disk_time = data_size_gb / (ssd_bandwidth * hdf5_efficiency)
     print(f"\n  Disk read (HDF5): {disk_time:.2f}s")
 
-    # GPU processing time
-    gpu_rate = 400e6  # ~400M spec/s fit-only
+    # GPU processing time (recorded reference value, M3 Max kernel)
+    gpu_rate = 400e6
     gpu_time = n_spectra / gpu_rate
     print(f"  GPU processing: {gpu_time:.3f}s")
 
@@ -211,7 +215,7 @@ def compare_with_full_pipeline():
 
     # With pre-loading to memory
     print("\n  [Scenario: Pre-loaded to memory]")
-    mem_to_mlx_bandwidth = 54.7  # GB/s (measured)
+    mem_to_mlx_bandwidth = 54.7  # GB/s (previously recorded, M3 Max)
     mem_convert_time = data_size_gb / mem_to_mlx_bandwidth
     total_preloaded = mem_convert_time + gpu_time
     print(f"    Memory → MLX: {mem_convert_time:.3f}s")

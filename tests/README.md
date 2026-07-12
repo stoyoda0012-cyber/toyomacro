@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,111 automated tests** across **46 files**, in two
+This suite has **1,146 automated tests** across **50 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification | 18 | 410 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 22 | 445 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 28 | 701 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,10 +16,10 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (≈751 tests, 68%) — guarantee the library
+- **Contract / regression** (≈786 tests, 69%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion. Fast, deterministic.
-- **Paper reproduction** (≈360 tests, 32%) — reproduce the accuracy
+- **Paper reproduction** (≈360 tests, 31%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -38,7 +38,15 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (410)
+## Library body — `tests/` (445)
+
+### Claim guards — noise model, versions, backends, comparisons (35)
+| Tests | File | Guards |
+|--:|---|---|
+| 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
+| 9 | `test_mlx_support.py` | MLX absent / installed-but-unusable / usable; NumPy fallback end-to-end |
+| 4 | `test_solver_comparison.py` | Same-problem scipy/lmfit comparison benchmark stays runnable |
+| 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 
 ### Lineshape & background — physics core (52)
 | Tests | File | Guards |
@@ -58,8 +66,8 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 ### GVRT / synthetic — paper reproduction (169)
 | Tests | File | Guards |
 |--:|---|---|
-| 62 | `test_si2p_gvrt.py` | Si 2p doublet linear-encoder round trip |
-| 47 | `test_si2p_suboxide.py` | Si 2p five sub-oxide-state fit (headline real-data case) |
+| 62 | `test_si2p_gvrt.py` | Si 2p doublet linear-encoder round trip (synthetic) |
+| 47 | `test_si2p_suboxide.py` | Si 2p five sub-oxide-state fit — synthetic; a few tests additionally exercise a local measured map and **skip on a clean install** |
 | 26 | `test_synthetic.py` | Synthetic data generation |
 | 23 | `test_multi_image.py` | Multi-image GVRT generalization (smoke) |
 | 9 | `test_ncomp_scaling.py` | `n_comp` scaling benchmark (smoke) |

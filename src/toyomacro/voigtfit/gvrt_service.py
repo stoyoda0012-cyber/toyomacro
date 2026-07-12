@@ -40,7 +40,9 @@ GVRT_SOLVERS = {
     'dict2d_parabola': 'Dict2D + parabola (best quality)',
 }
 
-# Noise levels exposed to interactive callers (name -> Poisson lambda)
+# Noise levels exposed to interactive callers.  Each name maps to a
+# dimensionless noise-severity `level` (see spectra_generator.NOISE_LEVELS);
+# peak-count SNR = 1e4/level, peak Poisson mean = (1e4/level)^2.
 GVRT_NOISE_LEVELS = [
     'None', 'Subtle', 'Weak', 'Small', 'Moderate', 'Strong', 'Intense',
 ]
@@ -277,7 +279,9 @@ def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
 
 try:
     import mlx.core as mx
-    HAS_MLX = True
+
+    from ._mlx_support import mlx_usable as _mlx_usable
+    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 

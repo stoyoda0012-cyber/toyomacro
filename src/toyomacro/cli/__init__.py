@@ -3,6 +3,8 @@
 import argparse
 import sys
 
+from toyomacro import __version__
+
 
 def main():
     """Main CLI entry point."""
@@ -13,7 +15,7 @@ def main():
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version=f"%(prog)s {__version__}",
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

@@ -9,10 +9,12 @@
 #     - dict2d (shift + width):     0.8M spec/s (δE × δσ grid)
 #     - adaptive (quality-first):   0.4M spec/s (4-step + dict auto-selection)
 #
-# Performance (8K image = 33M spectra):
-#   Stage 1 fit-only: 33M @ 400M/s = ~0.08s
+# Performance (8K image = 33M spectra; recorded on Apple M3 Max):
+#   Stage 1 fit-only: 33M @ ~400M/s = ~0.08s
 #   Roundtrip E2E:    28M spec/s (gen + noise + fit + PSNR)
 
+# MLX capability API (always importable)
+from ._mlx_support import mlx_installed, mlx_usable, require_mlx
 from .benchmarks.benchmark_h5 import (
     BenchmarkH5,
     BenchmarkH5Config,
@@ -115,11 +117,14 @@ try:
         voigt_with_jacobian_mlx,
     )
     from .stage2_mlx import Stage2MLXConfig, Stage2MLXRefiner, Stage2MLXResult
-    HAS_MLX = True
+    HAS_MLX = mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 
-__version__ = "0.6.0"
+# voigtfit ships as part of the toyomacro distribution and shares its
+# version (single source: pyproject.toml, via toyomacro.__version__).
+from toyomacro import __version__  # noqa: E402
+
 __all__ = [
     # Pipeline
     "WeightMatrixCache",
@@ -211,8 +216,11 @@ __all__ = [
     "save_side_by_side_gif",
     "NOISE_LEVELS",
     "SpectralConfig",
-    # MLX availability flag
+    # MLX availability flag + capability API
     "HAS_MLX",
+    "mlx_installed",
+    "mlx_usable",
+    "require_mlx",
 ]
 
 # Add MLX exports if available

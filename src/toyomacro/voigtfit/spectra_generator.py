@@ -26,7 +26,9 @@ from .frame_io import open_frames
 # MLX for GPU-accelerated noise generation
 try:
     import mlx.core as mx
-    HAS_MLX = True
+
+    from ._mlx_support import mlx_usable as _mlx_usable
+    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 
@@ -325,6 +327,14 @@ class SpectralConfig:
 
 
 # Noise level presets for convenience
+# Named noise-severity levels.  The value is the dimensionless `level`
+# parameter of ``add_poisson_noise`` — it is NOT a Poisson mean.  The
+# physical interpretation is fixed by the conversions
+#
+#     SNR_peak    = 10^4 / level          (counting SNR at the signal max)
+#     lambda_peak = (10^4 / level)^2      (Poisson mean at the signal max)
+#
+# provided by :func:`level_to_peak_snr` / :func:`level_to_peak_lambda`.
 NOISE_LEVELS = {
     'None': 0,
     'Minimal': 1e-2,
@@ -343,6 +353,33 @@ NOISE_LEVELS = {
     'Heavy': 1e4,       # = Strong
     'VeryHeavy': 1e5,   # = Intense
 }
+
+#: Reference count scale of the noise model: level == NOISE_SCALE gives
+#: SNR_peak = 1 (peak counts equal to shot noise).
+NOISE_SCALE = 1e4
+
+
+def level_to_peak_snr(level: float) -> float:
+    """Peak-count SNR implied by a noise-severity ``level``.
+
+    ``SNR_peak = 10^4 / level`` — the counting signal-to-noise ratio at
+    the normalized signal maximum.  ``level=0`` (no noise) maps to
+    ``inf``.
+    """
+    if level <= 0:
+        return float('inf')
+    return NOISE_SCALE / level
+
+
+def level_to_peak_lambda(level: float) -> float:
+    """Peak Poisson mean implied by a noise-severity ``level``.
+
+    ``lambda_peak = (10^4 / level)^2`` — the Poisson mean assigned to
+    the normalized signal maximum, so that ``SNR = sqrt(lambda)``
+    reproduces :func:`level_to_peak_snr`.  ``level=0`` maps to ``inf``.
+    """
+    snr = level_to_peak_snr(level)
+    return snr * snr
 
 
 @dataclass
@@ -623,11 +660,15 @@ def _poisson_noise_cf_hetero_mlx(
     return noisy * (gmax_mx / ls)
 
 
-# Module-level compiled versions — JIT'd on first call, reused thereafter.
-# Fuses 8 element-wise ops into minimal GPU kernel launches (4-5x faster).
+# Module-level compiled versions — compilation is deferred to the first
+# call (LazyCompiled) so importing this module never touches the Metal
+# compiler.  Fuses 8 element-wise ops into minimal GPU kernel launches
+# (4-5x faster).
 if HAS_MLX:
-    _poisson_noise_cf_compiled = mx.compile(_poisson_noise_cf_mlx)
-    _poisson_noise_cf_hetero_compiled = mx.compile(_poisson_noise_cf_hetero_mlx)
+    from ._mlx_support import LazyCompiled
+    _poisson_noise_cf_compiled = LazyCompiled(_poisson_noise_cf_mlx)
+    _poisson_noise_cf_hetero_compiled = LazyCompiled(
+        _poisson_noise_cf_hetero_mlx)
 else:
     _poisson_noise_cf_compiled = None
     _poisson_noise_cf_hetero_compiled = None
