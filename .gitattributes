@@ -1,0 +1,5 @@
+# Normalize all text files to LF in the repository.
+# (One-time normalization of legacy CRLF files happened in 78bdab1.)
+* text=auto eol=lf
+*.png binary
+*.h5 binary

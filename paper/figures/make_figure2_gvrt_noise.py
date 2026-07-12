@@ -75,6 +75,18 @@ def _snr_label(name: str) -> str:
 
 
 def main() -> None:
+    # Seed every RNG the round trip can draw from.  On the MLX backend
+    # (the published configuration) noise comes from mx.random, so the
+    # figure regenerates deterministically; on the NumPy backend the
+    # Numba-parallel noise path keeps its own per-thread state and the
+    # PSNR values may vary by ~0.1 dB between runs.
+    np.random.seed(0)
+    try:
+        import mlx.core as mx
+        mx.random.seed(0)
+    except ImportError:
+        pass
+
     service = GVRTService()
     image = make_demo_image(IMAGE_SIZE)
 

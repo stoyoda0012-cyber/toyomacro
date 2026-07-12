@@ -29,7 +29,7 @@ def test_problem_generation(small_problem):
 
 def test_dict2d_recovers_parameters(small_problem):
     energy, Y, truth = small_problem
-    rec = bench_dict2d_parabola(energy, Y, truth, repeats=1)
+    rec = bench_dict2d_parabola(energy, Y, truth, n_common=100, repeats=1)
     # Loose sanity bounds — the committed JSON documents actual values.
     assert rec['mae_amp'] < 0.1
     assert rec['mae_dE'] < 0.05
@@ -55,3 +55,33 @@ def test_full_run_report_structure():
         assert 'timings_s' in r and len(r['timings_s']) >= 1
     env = report['environment']
     assert env['numpy'] and env['python']
+
+
+class TestReproducibility:
+    """The committed JSON must be regenerable from (n, seed) alone."""
+
+    def test_same_seed_same_spectra(self):
+        from toyomacro.voigtfit.benchmarks.solver_comparison_benchmark import (
+            input_sha256,
+        )
+        _, Y1, t1 = make_problem(500, seed=7)
+        _, Y2, t2 = make_problem(500, seed=7)
+        assert input_sha256(Y1) == input_sha256(Y2)
+        assert np.array_equal(t1['amp'], t2['amp'])
+
+    def test_different_seed_different_noise(self):
+        from toyomacro.voigtfit.benchmarks.solver_comparison_benchmark import (
+            input_sha256,
+        )
+        _, Y1, _ = make_problem(500, seed=7)
+        _, Y2, _ = make_problem(500, seed=8)
+        assert input_sha256(Y1) != input_sha256(Y2)
+
+    def test_seeded_rng_controls_poisson_noise(self):
+        from toyomacro.voigtfit.spectra_generator import add_poisson_noise
+        data = np.full((1000, 8), 500.0, dtype=np.float32)
+        a = add_poisson_noise(data, 1e3, rng=np.random.default_rng(3))
+        b = add_poisson_noise(data, 1e3, rng=np.random.default_rng(3))
+        c = add_poisson_noise(data, 1e3, rng=np.random.default_rng(4))
+        assert np.array_equal(a, b)
+        assert not np.array_equal(a, c)

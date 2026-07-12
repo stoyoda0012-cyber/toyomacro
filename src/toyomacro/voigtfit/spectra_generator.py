@@ -429,6 +429,7 @@ def add_poisson_noise(
     use_gaussian_approx: bool = True,
     gaussian_threshold: float = 20.0,
     global_max: float | None = None,
+    rng: np.random.Generator | None = None,
 ) -> np.ndarray:
     """
     Add Poisson (shot) noise.
@@ -465,6 +466,11 @@ def add_poisson_noise(
         gaussian_threshold: Use Gaussian when λ > threshold (default 20)
         global_max: If provided, use this as normalization maximum instead of
             per-call data_max. Enables heteroscedastic Poisson noise.
+        rng: Optional seeded numpy Generator for reproducible noise.
+            When provided, sampling uses this generator (bypassing the
+            Numba parallel path, which has its own uncontrollable RNG
+            state), so identical inputs + identical seed reproduce the
+            identical noisy output.
 
     Returns:
         Noisy data
@@ -475,7 +481,8 @@ def add_poisson_noise(
     if legacy_scale:
         # Original MATLAB-compatible scaling
         scaled = 1e4 * np.maximum(data, 0) / level
-        noisy = np.random.poisson(scaled).astype(np.float32)
+        _poisson = rng.poisson if rng is not None else np.random.poisson
+        noisy = _poisson(scaled).astype(np.float32)
         noisy[noisy == 0] = 1
         return noisy * level / 1e4
     else:
@@ -501,9 +508,11 @@ def add_poisson_noise(
         # Clip to avoid overflow (1e15 allows for very low noise levels)
         scaled = np.clip(scaled, 0, 1e15)
 
-        if HAS_NUMBA and data.ndim == 2:
+        if rng is None and HAS_NUMBA and data.ndim == 2:
             # Numba parallel: ~11x faster than NumPy for both
-            # Gaussian approx (large λ) and exact Poisson (small λ)
+            # Gaussian approx (large λ) and exact Poisson (small λ).
+            # Skipped when a seeded rng is requested — the Numba path's
+            # per-thread RNG state cannot be seeded reproducibly.
             noisy = np.empty_like(scaled, dtype=np.float32)
             use_gauss = (use_gaussian_approx
                          and lambda_scale > gaussian_threshold)
@@ -513,13 +522,14 @@ def add_poisson_noise(
             # Gaussian approximation: Poisson(λ) ≈ N(λ, √λ) for large λ
             # For λ > 20, the approximation error is < 1%
             std = np.sqrt(scaled)
-            rng = np.random.default_rng()
-            noisy = scaled + rng.standard_normal(
+            _rng = rng if rng is not None else np.random.default_rng()
+            noisy = scaled + _rng.standard_normal(
                 scaled.shape, dtype=np.float32) * std
             noisy = np.maximum(noisy, 0)
         else:
             # Exact Poisson sampling (slow for large arrays)
-            noisy = np.random.poisson(scaled).astype(np.float64)
+            _poisson = rng.poisson if rng is not None else np.random.poisson
+            noisy = _poisson(scaled).astype(np.float64)
 
         # Scale back to original range
         return (noisy / lambda_scale * norm_max).astype(np.float32)

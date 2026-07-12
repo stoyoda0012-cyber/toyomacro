@@ -58,11 +58,13 @@ array.
 XPS quantification reduces, at its core, to fitting overlapping
 Voigt profiles to each measured energy spectrum. The dominant
 open-source route — `lmfit` [@lmfit] or `scipy.optimize.curve_fit`
-[@scipy] wrapping Levenberg–Marquardt (LM) — assumes a Python-loop
-"one spectrum at a time" workload. On the benchmark problem shipped
-with this package (single Voigt peak, 151 channels, free amplitude,
-position, and width at peak-count SNR 10), both sustain a measured
-**~820 spectra per second** on an Apple M3 Max (committed record in
+[@scipy] wrapping per-spectrum least-squares optimization — assumes
+a Python-loop "one spectrum at a time" workload. On the benchmark
+problem shipped with this package (single Voigt peak, 151 channels,
+free amplitude, position, and width at peak-count SNR 10, bounded
+trust-region reflective), both sustain a measured **~820 spectra per
+second** in their normal single-thread loop on an Apple M3 Max
+(committed record in
 `paper/figures/results/solver_comparison.json`).
 
 Modern instrumentation produces datasets that defeat this model. A
@@ -103,15 +105,20 @@ without per-spectrum Python overhead. That design cannot be
 retrofitted onto a per-spectrum API, which re-evaluates the model
 and re-allocates the optimizer for each spectrum.
 
-The package ships a same-problem, same-hardware comparison
-benchmark. On identical data, identical initialization, and
-identical bounds, the recorded result is: `scipy.optimize.curve_fit`
-819 spectra/s and `lmfit` 820 spectra/s versus the voigtfit
-`dict2d_parabola` solver at **5.8 million spectra/s** — a factor of
-about 7,000 — with matching accuracy (mean absolute amplitude error
-0.022 vs. 0.023; position error 0.014 vs. 0.014 eV). The
-amplitude-only projection kernel is reported separately because it
-solves a smaller problem (no position/width recovery). Multipeak
+The package ships a same-problem comparison benchmark: identical
+seeded data (input hash committed), identical initialization, and
+identical bounds, with accuracy scored on a common subset fitted by
+every solver. It is a workflow-versus-workflow comparison on one
+machine — the per-spectrum tools run their normal single-thread CPU
+loop (bounded trust-region reflective) while the batch solver uses
+the GPU. The recorded result is: `scipy.optimize.curve_fit` and
+`lmfit` at roughly **8×10² spectra/s** versus the voigtfit
+`dict2d_parabola` solver at several **million spectra/s** — three to
+four orders of magnitude — at matching accuracy (exact figures,
+per-parameter errors, and environment in the committed
+`solver_comparison.json`). The amplitude-only projection kernel is
+reported separately because it solves a smaller problem (no
+position/width recovery). Multipeak
 throughputs of about 2 million spectra/s (two components) and 0.1
 million spectra/s (ten components) were previously recorded on the
 same hardware with the MLX [@mlx2023] backend.
@@ -157,9 +164,11 @@ projection kernel sustains a median 468 M spectra/s — 73% of the
 645 M spectra/s memory-bandwidth bound and a factor of 30 below the
 compute bound — confirming that the kernel is memory-bound. The
 end-to-end bar is a *projection* from the HDF5/SSD efficiency bound
-(about 9 M spectra/s): disk input, not the solver, sets the
-full-pipeline rate; the figure script measures it live when pointed
-at a real HDF5 file. \autoref{fig:gvrt} shows the bundled GVRT round
+(about 9 M spectra/s); since that projected ceiling sits a factor of
+50 below the measured kernel rate, disk input — not the solver — is
+expected to dominate the full pipeline. This is a bound-based
+argument, not a measurement; the figure script performs the live
+end-to-end measurement when pointed at a real HDF5 file. \autoref{fig:gvrt} shows the bundled GVRT round
 trip on a synthetic demo image across a shot-noise ladder spanning
 peak-count SNR $10^4$ to $10^{-1}$. The three parameter channels
 degrade in a reproducible order — width first, amplitude second,

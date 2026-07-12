@@ -76,3 +76,8 @@ tests/test_solve_pipeline.py
 tests/test_spatial_map.py
 tests/test_tab_auto_connect.py
 tests/test_viewer_4d.py
+
+# Local AI-agent working files (never ship)
+.codex/
+AGENTS.md
+docs/JOSS_IMPLEMENTATION_BRIEF.md

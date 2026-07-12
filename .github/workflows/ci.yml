@@ -51,3 +51,83 @@ jobs:
       - run: uv python install 3.12
       - run: uv sync --extra dev
       - run: uv run ruff check src/ tests/ examples/
+
+  build:
+    name: build + clean-install smoke + metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+
+      - name: Build sdist and wheel
+        run: uv build -o dist/
+
+      - name: Assert archives contain no private or local files
+        run: |
+          set -e
+          tar tzf dist/*.tar.gz > sdist_contents.txt
+          unzip -l dist/*.whl > wheel_contents.txt
+          # Private development layers must never ship
+          ! grep -E 'toyomacro/(gui|api|agent|piar|depth|outputs)/' sdist_contents.txt wheel_contents.txt
+          # Local agent/control files must never ship
+          ! grep -iE 'AGENTS\.md|\.codex/|JOSS_IMPLEMENTATION_BRIEF|CLAUDE' sdist_contents.txt wheel_contents.txt
+          echo "archive contents clean"
+
+      - name: Install built wheel into a clean env and smoke-test
+        run: |
+          uv venv /tmp/cleanenv
+          uv pip install --python /tmp/cleanenv/bin/python dist/*.whl
+          /tmp/cleanenv/bin/python -c "
+          import numpy as np
+          import toyomacro, toyomacro.voigtfit as vf
+          assert toyomacro.__version__ == vf.__version__
+          from toyomacro.voigtfit.weight_cache import WeightMatrixCache
+          from toyomacro.voigtfit.pipeline import HybridPipeline
+          cache = WeightMatrixCache()
+          Wt, Phi = cache.get_or_create('Si', '2p', np.linspace(-5, 5, 101),
+                                        np.array([0.0]), np.array([0.6]), 0.2)
+          pipe = HybridPipeline(cache=cache, use_mlx=True, enable_stage2=False)
+          Y = np.asarray(Phi) @ np.array([[7.0]])
+          A, chi2 = pipe.stage1_screening(Y, Wt, Phi)
+          assert abs(float(np.asarray(A)[0, 0]) - 7.0) < 1e-2
+          print('clean-install smoke OK, version', toyomacro.__version__)
+          "
+
+      - name: Validate CITATION.cff
+        run: uvx cffconvert --validate
+
+      - name: Regenerate Figure 1 from the committed measurement record
+        run: |
+          uv sync --extra dev
+          uv run python paper/figures/make_figure1_bottleneck.py
+          test -f paper/figures/figure1_bottleneck.png
+
+  mlx-disabled:
+    name: headless-Mac simulation (MLX installed, Metal disabled)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+      - name: Install with MLX extra
+        run: uv sync --extra dev --extra mcp --extra mlx
+      - name: Full suite with MLX force-disabled
+        env:
+          TOYOMACRO_DISABLE_MLX: "1"
+        run: uv run pytest -q
+
+  paper:
+    name: JOSS paper compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build draft PDF
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: paper/paper.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: joss-paper
+          path: paper/paper.pdf

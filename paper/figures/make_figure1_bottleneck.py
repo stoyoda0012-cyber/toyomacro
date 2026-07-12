@@ -84,13 +84,25 @@ def _environment() -> dict:
             capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
         env['cpu'] = platform.processor()
+    env['command'] = ' '.join(sys.argv)
+    repo = Path(__file__).parent
     try:
         env['git_commit'] = subprocess.run(
-            ['git', 'rev-parse', '--short', 'HEAD'],
+            ['git', 'rev-parse', 'HEAD'],
             capture_output=True, text=True, timeout=5,
-            cwd=Path(__file__).parent).stdout.strip() or None
+            cwd=repo).stdout.strip() or None
+        # Reproducible from git_commit only when no tracked file is
+        # modified (untracked files cannot affect the package).
+        dirty = subprocess.run(
+            ['git', 'status', '--porcelain', '--untracked-files=no'],
+            capture_output=True, text=True, timeout=5,
+            cwd=repo).stdout.strip()
+        env['git_tracked_dirty'] = bool(dirty)
+        if dirty:
+            env['git_dirty_files'] = dirty.splitlines()[:20]
     except Exception:
         env['git_commit'] = None
+        env['git_tracked_dirty'] = None
     return env
 
 

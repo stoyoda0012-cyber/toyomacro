@@ -92,6 +92,11 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.sdist]
+# NOTE: hatchling's default file selection excludes .gitignore'd paths
+# but INCLUDES untracked-yet-unignored files, so local working files
+# can leak into an sdist built from a development tree. Release builds
+# must run from a clean clone; the explicit excludes below are the
+# second line of defense, and CI asserts the archive contents.
 exclude = [
     "src/toyomacro/gui",
     "src/toyomacro/api",
@@ -100,6 +105,11 @@ exclude = [
     "src/toyomacro/depth",
     "src/toyomacro/outputs",
     "web",
+    ".codex",
+    "AGENTS.md",
+    "docs/JOSS_IMPLEMENTATION_BRIEF.md",
+    "CLAUDE.local.md",
+    "*.local.md",
 ]
 
 [tool.ruff]

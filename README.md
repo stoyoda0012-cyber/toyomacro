@@ -66,23 +66,27 @@ The amplitude-only kernel is essentially memory bandwidth on the
 GPU; it is **not** a full peak fit on its own. The other rows are
 full per-spectrum recoveries for the listed parameters.
 
-### Same problem, same hardware: vs scipy / lmfit
+### Same problem, same machine: vs scipy / lmfit
 
 `python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark`
-fits the identical dataset (single Voigt peak, 151 channels, free
-amplitude/position/width, peak-count SNR 10) with identical
-initialization and bounds. Committed record:
+fits the identical seeded dataset (single Voigt peak, 151 channels,
+free amplitude/position/width, peak-count SNR 10) with identical
+initialization and identical bounds; accuracy is scored on a common
+subset fitted by every solver. This is a workflow-vs-workflow
+comparison on one machine: the per-spectrum tools run their normal
+single-thread CPU loop, the batch solver uses the GPU when usable.
+Committed record (exact figures, input hash, environment):
 [`paper/figures/results/solver_comparison.json`](paper/figures/results/solver_comparison.json).
 
-| Solver | Throughput | MAE amplitude | MAE position (eV) |
-|---|---:|---:|---:|
-| voigtfit `dict2d_parabola` | **5.8 M spec/s** | 0.022 | 0.014 |
-| `scipy.optimize.curve_fit` (LM) | 819 spec/s | 0.023 | 0.014 |
-| `lmfit` (LM) | 820 spec/s | 0.023 | 0.014 |
+| Solver | Throughput | Notes |
+|---|---:|---|
+| voigtfit `dict2d_parabola` | ~5-6 M spec/s | MLX GPU batch |
+| `scipy.optimize.curve_fit` | ~8×10² spec/s | bounded TRF, single-thread CPU |
+| `lmfit` | ~8×10² spec/s | bounded, single-thread CPU |
 
-Same accuracy class, roughly **7,000×** the throughput — that ratio,
-not the kernel headline, is the honest like-for-like comparison with
-the conventional workflow.
+Matching accuracy on the common subset, three to four orders of
+magnitude in throughput — that ratio, not the kernel headline, is
+the relevant comparison with the conventional workflow.
 
 ### End-to-end image roundtrip
 
@@ -290,7 +294,7 @@ each layer can be imported in isolation.
 
 ```bash
 uv sync --extra dev --extra mlx
-uv run pytest                                    # 1,111 tests
+uv run pytest                                    # 1,146+ tests (see tests/README.md)
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check src/ tests/                    # lint
 ```

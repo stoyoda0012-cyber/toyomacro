@@ -16,8 +16,8 @@ GUI tools are characterized by architecture, not re-benchmarked.
 
 | Tool | Architecture | Measured on our benchmark problem |
 |---|---|---|
-| `scipy.optimize.curve_fit` | per-spectrum Levenberg-Marquardt | 819 spectra/s (M3 Max, committed JSON) |
-| `lmfit` | per-spectrum LM with parameter objects | 820 spectra/s (same) |
+| `scipy.optimize.curve_fit` | per-spectrum least squares (bounded runs use TRF) | ~8×10² spectra/s, single-thread CPU (M3 Max, committed JSON) |
+| `lmfit` | per-spectrum least squares with parameter objects | ~8×10² spectra/s (same) |
 
 Both are excellent at what they target: flexible per-spectrum models
 with rich constraint systems. Throughput is bounded by per-spectrum
@@ -37,8 +37,9 @@ Python dispatch and model re-evaluation, not by the optimizer math.
 Batch-first architecture: one shared peak configuration amortized as
 precomputed weight/dictionary matrices, all solver stages expressed
 as dense linear algebra (GPU or BLAS). Recorded same-problem result:
-`dict2d_parabola` at 5.8 M spectra/s vs. 819-820 spectra/s for the
-LM tools, at matching accuracy — see
+`dict2d_parabola` (GPU batch) three to four orders of magnitude
+faster than the per-spectrum tools' single-thread CPU loop, at
+matching accuracy on a common subset — see
 `paper/figures/results/solver_comparison.json` for the full record
 (environment, seeds, per-parameter MAE).
 
