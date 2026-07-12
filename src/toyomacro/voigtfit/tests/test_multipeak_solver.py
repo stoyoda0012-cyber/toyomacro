@@ -314,12 +314,13 @@ class TestOrthogonalProjection:
 # Test: Alternating Projection Solver
 # ============================================================================
 
-# Skip if MLX not available
-mlx_available = True
-try:
+# Skip if MLX not usable (installed alone is not enough: a headless
+# Mac imports mlx but cannot execute Metal work)
+from toyomacro.voigtfit._mlx_support import mlx_usable
+
+mlx_available = mlx_usable()
+if mlx_available:
     import mlx.core as mx
-except ImportError:
-    mlx_available = False
 
 requires_mlx = pytest.mark.skipif(not mlx_available, reason="MLX not available")
 

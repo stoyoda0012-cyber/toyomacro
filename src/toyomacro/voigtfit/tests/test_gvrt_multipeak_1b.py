@@ -25,7 +25,9 @@ import os
 import numpy as np
 import pytest
 
-HAS_MLX = importlib.util.find_spec("mlx") is not None
+from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
+
+HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 IN_CI = os.environ.get("CI") == "true"
 
 from toyomacro.voigtfit.benchmarks.bench_gvrt_multipeak_1b import (

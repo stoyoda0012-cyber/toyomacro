@@ -56,7 +56,9 @@ ENERGY_SI2P = np.linspace(97.5, 105.5, 161, dtype=np.float32)
 
 try:
     import mlx.core as mx
-    HAS_MLX = True
+
+    from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
+    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 

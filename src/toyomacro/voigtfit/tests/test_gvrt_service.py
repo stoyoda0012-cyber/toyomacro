@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
 from toyomacro.voigtfit.gvrt_service import (
     GVRT_NOISE_LEVELS,
     GVRT_SOLVERS,
@@ -183,6 +184,8 @@ class TestRoundtrip:
         with pytest.raises(ValueError, match='n_peaks'):
             next(service.iter_roundtrip(image, GVRTConfig(n_peaks=3)))
 
+    @pytest.mark.skipif(not _mlx_usable(),
+                        reason='compares the MLX exact-Voigt path against scipy')
     def test_exact_gen_mlx_matches_scipy(self, image):
         mlx = pytest.importorskip('mlx.core')  # noqa: F841
         from toyomacro.voigtfit.benchmarks.param_roundtrip_benchmark import (

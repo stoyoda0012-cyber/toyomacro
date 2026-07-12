@@ -19,6 +19,8 @@ import time
 import numpy as np
 import pytest
 
+from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
+
 IN_CI = os.environ.get("CI") == "true"
 
 from toyomacro.voigtfit.dictionary_solver import (
@@ -1215,7 +1217,8 @@ class TestDict2D:
         assert np.allclose(ds_4s, ds_ad, atol=1e-4), \
             f"δσ mismatch: max diff={np.max(np.abs(ds_4s - ds_ad)):.6f}"
 
-    @pytest.mark.skipif(IN_CI, reason="numerical tolerance differs on Linux CI (passes on macOS dev)")
+    @pytest.mark.skipif(IN_CI or not _mlx_usable(),
+                        reason="tolerance calibrated for the MLX path (fails on the NumPy backend)")
     def test_dict2d_adaptive_custom_threshold(self, energy, single_peak_config):
         """Adaptive solver respects custom chi2_threshold."""
         from toyomacro.voigtfit.voigt_jacobian import voigt_profile

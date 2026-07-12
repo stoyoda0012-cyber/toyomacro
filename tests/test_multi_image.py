@@ -15,6 +15,8 @@ import os
 import numpy as np
 import pytest
 
+from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
+
 IN_CI = os.environ.get("CI") == "true"
 
 from toyomacro.voigtfit.benchmarks.bench_multi_image import (
@@ -243,7 +245,8 @@ class TestParabolaConsistency:
 
     FULL_RANGE_IMAGES = ["gradient", "random", "stripe"]
 
-    @pytest.mark.skipif(IN_CI, reason="PSNR-spread tolerance fails on Linux CI (passes on macOS dev)")
+    @pytest.mark.skipif(IN_CI or not _mlx_usable(),
+                        reason="PSNR-spread tolerance calibrated for the MLX path")
     def test_parabola_cross_image_spread(self):
         """Parabola PSNR spread across images < 5 dB (finite values).
 

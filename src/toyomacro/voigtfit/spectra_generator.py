@@ -701,6 +701,12 @@ def add_poisson_noise_mlx_fused(
     if level <= 0:
         return data_mx
 
+    if _poisson_noise_cf_compiled is None:
+        raise RuntimeError(
+            'add_poisson_noise_mlx_fused requires a usable MLX backend '
+            '(none detected — headless macOS or TOYOMACRO_DISABLE_MLX). '
+            'Use add_poisson_noise (NumPy) instead.')
+
     level_mx = mx.array(level, dtype=mx.float32)
     if global_max is not None:
         gmax_mx = mx.array(global_max, dtype=mx.float32)

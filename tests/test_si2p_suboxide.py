@@ -61,7 +61,9 @@ SI2P_MAPTEST_PATH = (
 # Skip markers
 try:
     import mlx.core as mx
-    HAS_MLX = True
+
+    from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
+    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
 except ImportError:
     HAS_MLX = False
 
