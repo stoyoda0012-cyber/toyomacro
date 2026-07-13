@@ -61,8 +61,8 @@ open-source route — `lmfit` [@lmfit] or `scipy.optimize.curve_fit`
 [@scipy] wrapping per-spectrum least-squares optimization — assumes
 a Python-loop "one spectrum at a time" workload. On the benchmark
 problem shipped with this package (single Voigt peak, 151 channels,
-free amplitude, position, and width at peak-count SNR 10, bounded
-trust-region reflective), both sustain a measured **~800 spectra per
+free amplitude, position, and width at peak-count SNR 10), both
+sustain a measured **~800 spectra per
 second** in their normal single-thread loop on an Apple M3 Max
 (committed record in
 `paper/figures/results/solver_comparison.json`).
@@ -90,7 +90,7 @@ workflow well. KherveFitting [@KherveFitting2025] provides a full
 GUI application with background models and constraint systems;
 `lmfitxps` [@lmfitxps] extends `lmfit` with XPS-specific lineshapes
 and backgrounds (Tougaard, Shirley, slope); commercial suites ship
-analogous per-spectrum routines. All inherit the per-spectrum LM
+analogous per-spectrum routines. All inherit the per-spectrum optimizer
 architecture, which is the right tool for tens to thousands of
 spectra but not for hundreds of millions. A documented survey of
 related software is maintained in the repository
@@ -110,8 +110,8 @@ seeded data (input hash committed), identical initialization, and
 identical bounds, with accuracy scored on a common subset fitted by
 every solver. It is a workflow-versus-workflow comparison on one
 machine — the per-spectrum tools run their normal single-thread CPU
-loop (bounded trust-region reflective) while the batch solver uses
-the GPU. The recorded result is: `scipy.optimize.curve_fit` at 798 and
+loops (SciPy via bounded trust-region reflective, lmfit via its
+bounded `leastsq` workflow) while the batch solver uses the GPU. The recorded result is: `scipy.optimize.curve_fit` at 798 and
 `lmfit` at 783 spectra/s versus the voigtfit `dict2d_parabola`
 solver at **6.5 million spectra/s** — a factor of about 8,000 — at
 matching accuracy on the common subset: mean absolute amplitude

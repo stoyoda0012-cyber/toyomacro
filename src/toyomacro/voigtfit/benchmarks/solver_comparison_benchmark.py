@@ -88,7 +88,11 @@ def _environment() -> dict:
         'python': sys.version.split()[0],
         'numpy': np.__version__,
         'cpu_count': os.cpu_count(),
-        'command': ' '.join(sys.argv),
+        # Record a machine-independent invocation (argv[0] may be an
+        # absolute personal path when run via -m).
+        'command': ('python -m toyomacro.voigtfit.benchmarks.'
+                    'solver_comparison_benchmark '
+                    + ' '.join(sys.argv[1:])).strip(),
     }
     for dist in ('scipy', 'lmfit', 'mlx'):
         try:

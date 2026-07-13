@@ -84,7 +84,9 @@ def _environment() -> dict:
             capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
         env['cpu'] = platform.processor()
-    env['command'] = ' '.join(sys.argv)
+    # Machine-independent invocation (argv[0] may be an absolute path)
+    env['command'] = ('python paper/figures/make_figure1_bottleneck.py '
+                      + ' '.join(sys.argv[1:])).strip()
     repo = Path(__file__).parent
     try:
         env['git_commit'] = subprocess.run(

@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,146 automated tests** across **50 files**, in two
+This suite has **1,149 automated tests** across **50 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 22 | 445 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 22 | 448 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 28 | 701 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,7 +16,7 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (≈786 tests, 69%) — guarantee the library
+- **Contract / regression** (≈789 tests, 69%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion. Fast, deterministic.
 - **Paper reproduction** (≈360 tests, 31%) — reproduce the accuracy
@@ -38,14 +38,14 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (445)
+## Library body — `tests/` (448)
 
-### Claim guards — noise model, versions, backends, comparisons (35)
+### Claim guards — noise model, versions, backends, comparisons (38)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
 | 9 | `test_mlx_support.py` | MLX absent / installed-but-unusable / usable; NumPy fallback end-to-end |
-| 4 | `test_solver_comparison.py` | Same-problem scipy/lmfit comparison benchmark stays runnable |
+| 7 | `test_solver_comparison.py` | Same-problem scipy/lmfit comparison benchmark stays runnable + seed reproducibility |
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 
 ### Lineshape & background — physics core (52)
