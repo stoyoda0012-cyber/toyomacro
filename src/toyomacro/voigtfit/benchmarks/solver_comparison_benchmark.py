@@ -27,10 +27,12 @@ Fairness notes
   path uses the GPU when usable.  The comparison is workflow vs
   workflow on one machine, not core vs core — the JSON records both
   backends explicitly.
-- Bounded ``scipy.optimize.curve_fit`` uses the **trust-region
-  reflective (TRF)** algorithm, not Levenberg-Marquardt (LM cannot
-  handle bounds); lmfit's default ``leastsq`` wraps the same
-  least-squares machinery under bounds.  Labels record this.
+- The two per-spectrum solvers use different optimizers, recorded
+  separately in the JSON: bounded ``scipy.optimize.curve_fit`` runs
+  **trust-region reflective (TRF)** (LM cannot handle bounds), while
+  lmfit's default ``leastsq`` is MINPACK Levenberg-Marquardt with a
+  parameter transform that maps the bounds onto an unconstrained
+  problem.  They are not the same algorithm.
 
 Contenders
 ----------
