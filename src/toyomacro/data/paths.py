@@ -16,10 +16,14 @@ from pathlib import Path
 from typing import Any
 
 # Default Common/data/ path (relative to this file's location)
-# paths.py → data/ → toyomacro/ → src/ → toyomacro-python/ → SourceCode/ → Common/
+# paths.py → data/ → toyomacro/ → src/ → toyomacro/ → SourceCode/ → Common/
 _DEFAULT_COMMON_PATH = Path(__file__).parent.parent.parent.parent.parent / "Common"
 
-# Cache directory inside the package
+# Cache directory inside the package.
+# These JSON files are regenerable (see regenerate_cache()) from the source
+# CSV/Excel tables in the sibling Common/ and SESSAAnalyser/ repos, but are
+# committed here as a pre-generated cache so the package works offline without
+# those sources. Treat them as build artifacts, not hand-edited data.
 _CACHE_DIR = Path(__file__).parent / "_cache"
 
 
