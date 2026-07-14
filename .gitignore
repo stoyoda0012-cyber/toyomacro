@@ -17,8 +17,11 @@ CLAUDE.local.md
 # Diagnostic dumps
 _slsqp_diagnostic_*.npz
 
-# Generated outputs (benchmark results, images)
+# Generated outputs (benchmark results, images). ``outputs`` may be a
+# symlink to an external store (e.g. ~/Documents/ResearchOutputs/toyomacro),
+# so match it with and without a trailing slash.
 output/
+outputs
 outputs/
 
 # MATLAB Drive sync markers

@@ -25,6 +25,7 @@ import numpy as np
 import pytest
 from scipy.special import wofz
 
+from tests._testdata import fitting_dir
 from toyomacro.voigtfit.multipeak_config import ComponentConfig, MultiPeakConfig
 from toyomacro.voigtfit.multipeak_solver import (
     MultiPeakResult,
@@ -54,9 +55,7 @@ SI2P_STATES = {
 ENERGY_SI2P = np.linspace(97.0, 107.0, 101, dtype=np.float32)
 
 # Real data path
-SI2P_MAPTEST_PATH = (
-    Path.home() / "MATLAB-Drive" / "TestData" / "Fitting" / "maptest" / "Si2p_maptest.h5"
-)
+SI2P_MAPTEST_PATH = fitting_dir() / "maptest" / "Si2p_maptest.h5"
 
 # Skip markers
 try:
@@ -839,9 +838,7 @@ class TestNPeakRobustness:
 # ============================================================================
 
 # ARXPS data path
-SI2P_ARXPS_PATH = (
-    Path.home() / "MATLAB-Drive" / "TestData" / "Fitting" / "arpes" / "Si2p_arpes.txt"
-)
+SI2P_ARXPS_PATH = fitting_dir() / "arpes" / "Si2p_arpes.txt"
 
 needs_arxps = pytest.mark.skipif(
     not SI2P_ARXPS_PATH.exists(),

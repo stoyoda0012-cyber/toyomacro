@@ -38,8 +38,13 @@ def speedtest_dir() -> Path:
 
 
 def gazou_dir() -> Path:
-    """Override with ``VOIGTFIT_GAZOU_DIR`` env var."""
+    """Directory of sample images for GVRT demos.
+
+    Override with the ``VOIGTFIT_GAZOU_DIR`` environment variable; when
+    unset, defaults to ``~/xps-testdata/Gazou`` so the source carries no
+    machine-specific path.
+    """
     env = os.environ.get("VOIGTFIT_GAZOU_DIR")
     if env:
         return Path(env).expanduser()
-    return Path.home() / "MATLAB-Drive" / "TestData" / "Gazou"
+    return Path.home() / "xps-testdata" / "Gazou"

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import numpy as np
 import pytest
 
+from tests._testdata import fitting_dir
 from toyomacro.core.fitting_result import LineshapeType
 from toyomacro.core.spectrum import Spectrum
 from toyomacro.fitting.autofitter import AutoFitConfig, AutoFitter
@@ -297,9 +297,7 @@ class TestTemplateFitting:
 # Real data test (Si2p ARPES)
 # ------------------------------------------------------------------
 
-SI2P_ARPES_PATH = (
-    Path.home() / "MATLAB-Drive" / "TestData" / "Fitting" / "arpes" / "Si2p_arpes.txt"
-)
+SI2P_ARPES_PATH = fitting_dir() / "arpes" / "Si2p_arpes.txt"
 
 
 @pytest.mark.skipif(

@@ -1,19 +1,19 @@
 """
 Tests for XPS file format readers and import pipeline.
 
-Test data location: ~/MATLAB-Drive/TestData/Fitting/readtest/
-(override with the ``TOYOMACRO_TESTDATA`` environment variable)
+Test data lives under ``<TOYOMACRO_TESTDATA>/Fitting/readtest/``; set the
+``TOYOMACRO_TESTDATA`` environment variable to point at your local tree
+(see ``tests/_testdata.py``). Tests skip cleanly when the data is absent.
 """
 
 from __future__ import annotations
 
-# --- Test data paths ---
-import os
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from tests._testdata import fitting_dir
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
@@ -26,10 +26,7 @@ from toyomacro.io.readers.pxt_reader import PXTReader
 from toyomacro.io.readers.ses_reader import SESTxtReader
 from toyomacro.io.readers.vamas_reader import VAMASReader
 
-TESTDATA_ROOT = Path(os.environ.get(
-    "TOYOMACRO_TESTDATA",
-    str(Path.home() / "MATLAB-Drive" / "TestData" / "Fitting" / "readtest"),
-))
+TESTDATA_ROOT = fitting_dir() / "readtest"
 PXT_DIR = TESTDATA_ROOT / "pxt"
 IBW_DIR = TESTDATA_ROOT / "ibw"
 TXT_DIR = TESTDATA_ROOT / "txt"
