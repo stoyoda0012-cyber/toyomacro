@@ -160,7 +160,7 @@ the parameter gap is purely placement along the χ²-flat valley.
   (λ₀=1e-3, ×4/÷3); a trust-region or different schedule could shift the
   quantitative gap, though not the monotonic-vs-flat qualitative split.
 
-### 4.4 Hypotheses from the brief vs outcomes
+### 4.4 Prior hypotheses vs outcomes
 
 1. "1–2 comp with good dict2D init → differences small": **partially true**
    for final accuracy at ≥3.5σ separation, but kaufman/GP still cut the
@@ -201,8 +201,8 @@ The same structure would map to MLX matmuls if ever promoted.
   `fit_gamma`, `bg_degree≥0`, `quality_flags` (guarded by ValueError).
 * Success in the harness is SSR-based; on flat valleys a run can "succeed"
   with poor parameters — the matched RMSE columns carry that information,
-  and negative-amplitude rates are reported, not clipped (per the brief,
-  NNLS is out of scope).
+  and negative-amplitude rates are reported, not clipped (NNLS is
+  deliberately out of scope).
 * LM is the only globalization tested; a trust region could change the
   block-D/F balance for the projected modes.
 * fixed per-block seeds → paired but not exhaustive sampling (20 trials/cell).

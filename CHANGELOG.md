@@ -9,6 +9,17 @@ archived on Zenodo for a citable DOI.
 ## [Unreleased]
 
 ### Added
+- **Experimental** `newton_jacobian_mode` on the multipeak solver
+  (`"raw"` | `"kaufman"` | `"golub_pereyra"` | `"gp_lm"`): compact
+  Golub-Pereyra normal equations (no projector, no inverse; one
+  multi-RHS Gram solve) with a scaled-diagonal Levenberg-Marquardt
+  safeguard and per-spectrum accept/reject (`gp_lm`), plus a float64
+  QR-based Jacobian verification layer and diagnostics
+  (`MultiPeakResult.gp_diagnostics`). The default `"raw"` path is
+  unchanged and byte-identical; non-raw modes are experimental and
+  outside the public API stability guarantee — their names, defaults,
+  and diagnostics may change in any release. See
+  `src/toyomacro/voigtfit/benchmarks/GP_LM_HARDENING_REPORT.md`.
 - Machine-readable benchmark provenance records
   (`paper/figures/results/`): kernel throughput (median + range +
   environment + per-repetition timings) and a same-problem

@@ -1,5 +1,5 @@
 """
-GP-LM hardening benchmark (Full-GP brief §13) + Phase-7/auto experiments.
+GP-LM hardening benchmark + exact-basis / auto-routing experiments.
 =========================================================================
 
 Compares the post-AP Newton variants on identical AP seeds:

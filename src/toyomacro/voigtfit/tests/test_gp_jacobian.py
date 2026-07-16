@@ -7,7 +7,7 @@ residual r(theta) = y - Phi(theta) a*(theta), with a complete amplitude
 re-solve on both sides of every difference — no dictionary argmax, no step
 clipping, no frozen state enters the differencing.
 
-Covers (per the verification brief):
+Covers:
     * 1 peak: center and sigma columns
     * 2 peaks: all four columns, well-separated and strongly overlapped
     * spin-orbit doublet structured column

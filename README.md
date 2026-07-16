@@ -66,6 +66,13 @@ The amplitude-only kernel is essentially memory bandwidth on the
 GPU; it is **not** a full peak fit on its own. The other rows are
 full per-spectrum recoveries for the listed parameters.
 
+The multipeak solver additionally exposes an **experimental**
+`newton_jacobian_mode` flag (Kaufman / Golub-Pereyra / GP-LM
+safeguarded refinement with per-spectrum diagnostics). The default
+(`"raw"`) is the supported production path; the non-raw modes are
+research features outside the API stability guarantee — see
+`src/toyomacro/voigtfit/benchmarks/GP_LM_HARDENING_REPORT.md`.
+
 ### Same problem, same machine: vs scipy / lmfit
 
 `python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark`

@@ -1,7 +1,7 @@
 """
 Phase-3 tests: GP-LM safeguarded refine (frozen surrogate, CPU).
 
-Semantics under test (hardening brief §6):
+Semantics under test:
     * accepted steps never increase the surrogate objective
     * rejected spectra keep the incoming AP seed bit-for-bit
     * the condition gate keeps GP away from ill-conditioned spectra

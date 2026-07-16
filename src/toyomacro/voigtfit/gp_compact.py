@@ -2,9 +2,9 @@
 Compact Golub-Pereyra normal equations + LM safeguard (reference layer).
 ========================================================================
 
-Phase 1-3 of the Full-GP hardening brief. Builds the projected (Kaufman /
-full Golub-Pereyra) Gauss-Newton system WITHOUT materialising the projected
-Jacobian columns, from small matrices only:
+Builds the projected (Kaufman / full Golub-Pereyra) Gauss-Newton system
+WITHOUT materialising the projected Jacobian columns, from small matrices
+only:
 
     A ∈ R^{n_rows × n_L}   linear basis (peaks [| background])
     x* = argmin_x ||y - A x||²,     r = y - A x*

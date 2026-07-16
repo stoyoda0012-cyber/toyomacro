@@ -6,7 +6,7 @@ Reference: J from gp_reference.reduced_jacobian (J = −M, M the model-side
 projected column matrix), so H_explicit = JᵀJ = MᵀM and g_explicit = −Jᵀr.
 Compact: H = K − CᵀG⁻¹C (+ QᵀG⁻¹Q), g = Sᵀr from small matrices only.
 
-Battery (per the hardening brief §5): 1 comp, 2 comp separated, 2 comp
+Battery: 1 comp, 2 comp separated, 2 comp
 strongly overlapped, 5 comp, SO doublet, fixed background columns,
 non-zero residual, near-zero residual, small amplitude, zero amplitude,
 near-rank-deficient, Tikhonov augmented system.

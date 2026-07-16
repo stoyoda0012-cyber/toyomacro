@@ -2,7 +2,7 @@
 Raw vs Kaufman vs Golub-Pereyra Newton comparison (reference path).
 ===================================================================
 
-Phase-4 experiment harness of the GP Jacobian verification brief. Runs the
+Experiment harness for the GP Jacobian verification study. Runs the
 float64 reference Gauss-Newton (`gp_reference.run_newton`) on synthetic
 separable Voigt problems under identical initial values and an identical
 backtracking safeguard, and tabulates convergence / accuracy / cost per

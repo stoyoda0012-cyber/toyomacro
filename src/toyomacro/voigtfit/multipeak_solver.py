@@ -1854,7 +1854,7 @@ def _post_ap_newton_refine_numpy(
 
 
 # ---------------------------------------------------------------------------
-# GP-LM refine (Phase 3 of the Full-GP hardening brief): compact
+# GP-LM refine: compact
 # Golub-Pereyra Hessian + scaled-diagonal Levenberg-Marquardt with
 # accept/reject on the frozen grid-cell surrogate. CPU/numpy layer.
 # ---------------------------------------------------------------------------
@@ -1882,8 +1882,8 @@ def _gp_lm_chunk(
     (basis → joint LLS → residual) and per-spectrum accept/reject.
     Rejected spectra keep their incoming (amplitudes, δE, δσ, chi2) seed —
     the AP/parabola state — untouched. Trials are computed full-batch and
-    committed under masks (simplicity over rejected-subset recompute; see
-    brief §6.6).
+    committed under masks (a deliberate simplicity trade over
+    rejected-subset recompute).
 
     Returns (amp, dE, ds, chi2, bg, diag) — bg is None without bg_design.
     """
@@ -2101,7 +2101,7 @@ def _gp_lm_chunk_mlx(
     bg_design: np.ndarray | None = None,
     n_iter: int = 1,
 ):
-    """MLX-hybrid GP-LM chunk (Phase 4 of the hardening brief).
+    """MLX-hybrid GP-LM chunk.
 
     Division of labour: the O(batch·n_E) tensor work — surrogate basis
     evaluation, Gram/rhs, the compact reductions S/C/K/Q/g and the trial

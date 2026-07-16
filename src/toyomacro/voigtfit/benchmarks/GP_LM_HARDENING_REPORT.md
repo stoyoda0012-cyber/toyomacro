@@ -1,13 +1,15 @@
 # Full-GP hardening: compact Hessian + LM safeguard + MLX hybrid
 
-Phase report for the Full-GP MLX化・安全化 brief. Date: 2026-07-16,
-M3 Max. Production default (`raw`) unchanged and byte-identical; every
-non-raw path is opt-in via `newton_jacobian_mode` (internal experimental
-API, as instructed — no public API reshuffle yet).
+Phase report on hardening the full Golub-Pereyra (GP) Newton path of the
+multipeak solver: a compact-Hessian formulation, a Levenberg-Marquardt
+safeguard, and an MLX-hybrid batched layer. Date: 2026-07-16, M3 Max.
+Production default (`raw`) unchanged and byte-identical; every non-raw
+path is opt-in via `newton_jacobian_mode` (internal experimental API —
+no public API reshuffle yet).
 
 ## Deliverable map
 
-| brief item | artifact | status |
+| work item | artifact | status |
 |---|---|---|
 | Phase 0 audit | this report §1 | done |
 | compact Hessian reference | `gp_compact.py` | done |
@@ -68,8 +70,8 @@ clip, `ared` from a FULL re-evaluation (basis → joint LLS → residual),
 accept iff `pred>0 ∧ ared>0 ∧ ρ>η ∧ finite ∧ cond-gate`; λ ×4 on rejection
 / ρ<0.25, ÷3 on ρ>0.75; ≤ `max_retries`(3) escalations; rejected spectra
 keep the AP seed **bit-for-bit** (tested). Per-spectrum λ and accept masks;
-trials are evaluated full-batch and committed under masks (brief §6.6
-simplicity clause). All thresholds live in `GPLMConfig`, no magic numbers.
+trials are evaluated full-batch and committed under masks (a deliberate
+simplicity trade; see §9). All thresholds live in `GPLMConfig`, no magic numbers.
 
 Robustness: non-finite input spectra are quarantined before the batched
 LAPACK calls (they would otherwise poison the whole chunk), never accepted,
@@ -112,8 +114,8 @@ ceiling. Findings (full tables in §6):
   is per-retry stacked Faddeeva evaluations. Revisit if the routed tier
   is adopted and δσ accuracy on that tier becomes the binding constraint.
 
-**Phase 8** (`fit_gamma` + GP): not attempted, by the brief's own ordering
-— γ has no frozen-grid Jacobian, so GP-γ REQUIRES the exact path that
+**Phase 8** (`fit_gamma` + GP): not attempted, by the planned phase
+ordering — γ has no frozen-grid Jacobian, so GP-γ REQUIRES the exact path that
 Phase 7 declined to promote. The existing raw fit_gamma machinery (γ
 prior + χ² gate) remains the production route. Deferred, not failed.
 
@@ -266,7 +268,7 @@ The gplm-exact* rows are float64/QR/UNCLIPPED — quality ceiling only.
   and 5-comp cases (Block-G valley descent without clip) — see §5
   verdict.
 
-## 7. Answers required by the brief
+## 7. Design questions and answers
 
 1. **compact Hessian式は正しいか** — yes: ≤1e-9 vs explicit MᵀM (float64),
    float32 production layer ≤2e-3, PSD/zero-residual identities hold.
@@ -302,14 +304,14 @@ The gplm-exact* rows are float64/QR/UNCLIPPED — quality ceiling only.
    the thresholds are dataset-dependent. Keep as an experiment recipe;
    revisit with real anomaly-tier data.
 
-## 8. Non-negotiables checklist (brief §2)
+## 8. Non-negotiables checklist
 
 raw default unchanged / no extra cost when unused (mode flag branch only)
 / no unconditional GP / no amplitude clipping, nothing called NNLS / no
 explicit projector or inverse anywhere / correctness before optimization
 (Phases 1-3 gated Phase 4) / rejected LM steps never adopted / objective
 increase never reported as convergence / high-cond spectra gated out, not
-forced / fit_gamma not attempted first / no commits made.
+forced / fit_gamma not attempted first.
 
 ## 9. Known limitations
 
@@ -322,7 +324,7 @@ forced / fit_gamma not attempted first / no commits made.
   GP throughput.
 * Trials are recomputed full-batch during retries (accepted spectra are
   masked out of commits but still computed) — a deliberate simplicity
-  trade (brief §6.6).
+  trade.
 * The exact-GP experiment is float64/unclipped: its weak-amplitude failure
   overstates what a clipped exact tier would do.
 * `param_std` is NOT computed by GP-LM; `cond_hessian`/`soft` reliability
