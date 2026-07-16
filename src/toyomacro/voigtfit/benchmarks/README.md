@@ -28,6 +28,8 @@ maintainer's development log; see CONTRIBUTING.md.
 | `bench_split_encoder_e2e`, `bench_jitter_limits`, `bench_nonuniform_grid` | Encoder / grid robustness studies |
 | `poisson_benchmark` | Poisson noise-injection kernel (spec: `poisson_benchmark_spec.md`) |
 | `chunk_optimization_benchmark` | Chunk-size tuning for the MLX pipeline |
+| `gp_newton_comparison` | Post-AP Newton Jacobian study: raw vs Kaufman vs Golub–Pereyra (report: `GP_JACOBIAN_VERIFICATION.md`) |
+| `bench_gp_lm` | Compact GP + LM safeguard: solver comparison, assembly micro-bench, auto-routing (report: `GP_LM_HARDENING_REPORT.md`) |
 
 ## Data-driven (require external images/HDF5 via `VOIGTFIT_DATA_ROOT`)
 
