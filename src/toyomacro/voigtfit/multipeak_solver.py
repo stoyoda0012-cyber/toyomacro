@@ -48,6 +48,13 @@ from .dictionary_solver import (
     build_dictionary,
     parabola_refine_2d,
 )
+from .gp_compact import (
+    GPLMConfig,
+    GPLMDiagnostics,
+    lm_scale_diag,
+    lm_step,
+    predicted_reduction,
+)
 from .grids import is_uniform, precompute_grid_spacings, uniform_grid
 from .multipeak_config import ComponentConfig, MultiPeakConfig
 
@@ -108,6 +115,7 @@ class MultiPeakResult:
     soft_std: np.ndarray | None = None
     background: np.ndarray | None = None  # (batch, n_bg) BG coeffs when bg_degree>=0
     delta_gamma: np.ndarray | None = None  # (batch, n_comp) δγ when fit_gamma=True
+    gp_diagnostics: object = None  # GPLMDiagnostics when newton_jacobian_mode="gp_lm"
 
 
 @dataclass
@@ -1549,6 +1557,7 @@ def _post_ap_newton_refine_chunk(
     delta_sigma: np.ndarray,
     amplitudes: np.ndarray,
     clip_step_ratio: float,
+    jacobian_mode: str = "raw",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Single-chunk Newton step — float32, no (batch, n_E, n_params) intermediates.
 
@@ -1556,6 +1565,32 @@ def _post_ap_newton_refine_chunk(
     over the energy axis, never materialising the 4-column Jacobian tensor.
     For 2 peaks this means 10 H entries + 4 g entries, each a single
     np.sum(A * B, axis=1). Memory peak ≈ batch · n_E · float32 per array.
+
+    jacobian_mode (EXPERIMENTAL, default "raw" = existing behavior):
+        "raw":           model-side columns S_p = a_k·J (amplitude variation
+                         ignored) — the production step, byte-identical.
+                         NOTE: "raw" names the JACOBIAN approximation (the
+                         a*(θ) dependence is ignored), not the un-regularized
+                         Hessian that the MLX diagnostics path captures as
+                         ``H_raw`` (= H before the Tikhonov load) — the two
+                         "raw"s are unrelated. Since Φ̂ᵀR = 0 at the LLS
+                         optimum, all three modes share the same gradient
+                         (columns)ᵀR; they differ ONLY in the Gauss-Newton
+                         curvature H.
+        "kaufman":       variable-projection columns (I−P_Φ)S_p, where P_Φ is
+                         the projector onto the span of the current surrogate
+                         bases Φ̂. Amplitudes are RE-SOLVED on Φ̂ first so that
+                         Φ̂ᵀR = 0 (the VarPro identities require a = a*(θ);
+                         the incoming ``amplitudes`` are ignored).
+        "golub_pereyra": full reduced-residual Jacobian, adding the second GP
+                         term (Φ̂⁺)ᵀ(∂_pΦ̂)ᵀR to the Kaufman columns.
+    All modes share the sign system H·Δ = g with g = (columns)ᵀR and are
+    evaluated within the frozen grid-cell Taylor surrogate (Φ̂ linear in θ,
+    J frozen), so kaufman/golub_pereyra here verify the projection term only
+    — NOT the exact-basis curvature (see gp_reference for the exact-model
+    float64 comparison). The extra cost is one batched (n×n) Gram solve with
+    2·n_params (+n_params for GP) right-hand sides plus 2 (GP: 3) batched
+    (n_E×n) matmuls per column.
     """
     batch, n_E = Y.shape
     n_comp = len(dicts)
@@ -1596,21 +1631,75 @@ def _post_ap_newton_refine_chunk(
         ds_step_per[k] = (float(dc.dsigma_grid[1] - dc.dsigma_grid[0])
                           if len(dc.dsigma_grid) > 1 else 1.0)
 
-    # Predicted spectrum + residual (memory-tight: no broadcast tensor)
-    amp32 = amplitudes.astype(np.float32, copy=False)
-    Y_pred = amp32[:, 0:1] * Phi_hat[:, :, 0]
-    for k in range(1, n_comp):
-        Y_pred = Y_pred + amp32[:, k:k + 1] * Phi_hat[:, :, k]
-    R = Y - Y_pred  # (batch, n_E) float32
+    if jacobian_mode == "raw":
+        # Predicted spectrum + residual (memory-tight: no broadcast tensor)
+        amp32 = amplitudes.astype(np.float32, copy=False)
+        Y_pred = amp32[:, 0:1] * Phi_hat[:, :, 0]
+        for k in range(1, n_comp):
+            Y_pred = Y_pred + amp32[:, k:k + 1] * Phi_hat[:, :, k]
+        R = Y - Y_pred  # (batch, n_E) float32
 
-    # Jacobian columns evaluated lazily: S_(2k) = a_k * Jc_k, S_(2k+1) = a_k * Js_k.
-    # We assemble H[i,j] = sum_e S_i * S_j and g[i] = sum_e S_i * R entry by entry,
-    # avoiding the materialisation of the (batch, n_E, 4) S tensor.
-    def jac_col(p: int):
-        k, axis = divmod(p, 2)
-        a = amp32[:, k:k + 1]
-        J = Jc_per[:, :, k] if axis == 0 else Js_per[:, :, k]
-        return a * J
+        # Jacobian columns evaluated lazily: S_(2k) = a_k * Jc_k,
+        # S_(2k+1) = a_k * Js_k. We assemble H[i,j] = sum_e S_i * S_j and
+        # g[i] = sum_e S_i * R entry by entry, avoiding the materialisation
+        # of the (batch, n_E, 4) S tensor.
+        def jac_col(p: int):
+            k, axis = divmod(p, 2)
+            a = amp32[:, k:k + 1]
+            J = Jc_per[:, :, k] if axis == 0 else Js_per[:, :, k]
+            return a * J
+    elif jacobian_mode in ("kaufman", "golub_pereyra"):
+        # VarPro identities need a = a*(θ) on the CURRENT surrogate basis:
+        # re-solve the joint LLS so Φ̂ᵀR = 0, then build the projected
+        # columns without ever forming the (n_E × n_E) projector —
+        # (I−P)S = S − Φ̂ G⁻¹(Φ̂ᵀS), (Φ̂⁺)ᵀq = Φ̂ G⁻¹q.
+        PhT = Phi_hat.transpose(0, 2, 1)      # (batch, n_comp, n_E) view
+        G = PhT @ Phi_hat                     # (batch, n_comp, n_comp)
+        G[:, np.arange(n_comp), np.arange(n_comp)] += np.float32(1e-10)
+        rhs_a = (PhT @ Y[:, :, None])[:, :, 0]
+        amp32 = np.linalg.solve(
+            G, rhs_a[:, :, None].astype(G.dtype),
+        )[:, :, 0].astype(np.float32)
+        R = Y - (Phi_hat @ amp32[:, :, None])[:, :, 0]
+
+        S_cols = []
+        for p in range(n_params):
+            k, axis = divmod(p, 2)
+            J = Jc_per[:, :, k] if axis == 0 else Js_per[:, :, k]
+            S_cols.append(amp32[:, k:k + 1] * J)
+
+        # One batched Gram solve for all projection coefficients:
+        # columns [Φ̂ᵀS_p | q_p], q_p = e_k · Σ_e(J_p · R).
+        U = np.stack(
+            [(PhT @ S[:, :, None])[:, :, 0] for S in S_cols], axis=2,
+        )
+        if jacobian_mode == "golub_pereyra":
+            Qm = np.zeros((batch, n_comp, n_params), dtype=U.dtype)
+            for p in range(n_params):
+                k, axis = divmod(p, 2)
+                J = Jc_per[:, :, k] if axis == 0 else Js_per[:, :, k]
+                Qm[:, k, p] = np.sum(J * R, axis=1)
+            coef = np.linalg.solve(G, np.concatenate([U, Qm], axis=2))
+        else:
+            coef = np.linalg.solve(G, U)
+
+        M_cols = []
+        for p in range(n_params):
+            col = S_cols[p] - (Phi_hat @ coef[:, :, p:p + 1])[:, :, 0]
+            if jacobian_mode == "golub_pereyra":
+                col = col + (
+                    Phi_hat @ coef[:, :, n_params + p:n_params + p + 1]
+                )[:, :, 0]
+            M_cols.append(col.astype(np.float32))
+        del S_cols, U, coef
+
+        def jac_col(p: int, _M=M_cols):
+            return _M[p]
+    else:
+        raise ValueError(
+            f"jacobian_mode must be 'raw', 'kaufman' or 'golub_pereyra', "
+            f"got {jacobian_mode!r}"
+        )
 
     H = np.empty((batch, n_params, n_params), dtype=np.float32)
     g = np.empty((batch, n_params), dtype=np.float32)
@@ -1685,6 +1774,7 @@ def _post_ap_newton_refine_numpy(
     amplitudes: np.ndarray,
     clip_step_ratio: float = 0.5,
     chunk_size: int = 200_000,
+    jacobian_mode: str = "raw",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """One Gauss-Newton step refining (δE_k, δσ_k) jointly across all peaks.
 
@@ -1725,6 +1815,11 @@ def _post_ap_newton_refine_numpy(
         chunk_size: Process at most this many spectra at once. Caps peak
             memory at ≈ chunk_size · n_E · float32 · 5 arrays (Phi_hat,
             Jc, Js, Y_pred, R). 200K × 125 × 4 B × 5 ≈ 500 MB.
+        jacobian_mode: EXPERIMENTAL — "raw" (default, existing behavior),
+            "kaufman" or "golub_pereyra". See
+            :func:`_post_ap_newton_refine_chunk`. Non-raw modes materialise
+            2·n_comp extra (chunk, n_E) column arrays; reduce chunk_size
+            accordingly for large n_comp.
 
     Returns:
         amplitudes_new, delta_E_new, delta_sigma_new, chi2_new — all float32.
@@ -1748,6 +1843,7 @@ def _post_ap_newton_refine_numpy(
             delta_sigma[s:e],
             amplitudes[s:e],
             clip_step_ratio,
+            jacobian_mode=jacobian_mode,
         )
         amp_out[s:e] = amp_c
         dE_out[s:e] = dE_c
@@ -1755,6 +1851,550 @@ def _post_ap_newton_refine_numpy(
         chi2_out[s:e] = chi2_c
 
     return amp_out, dE_out, ds_out, chi2_out
+
+
+# ---------------------------------------------------------------------------
+# GP-LM refine (Phase 3 of the Full-GP hardening brief): compact
+# Golub-Pereyra Hessian + scaled-diagonal Levenberg-Marquardt with
+# accept/reject on the frozen grid-cell surrogate. CPU/numpy layer.
+# ---------------------------------------------------------------------------
+
+
+def _gp_lm_chunk(
+    Y: np.ndarray,
+    dicts: list[DictionaryCache],
+    best_idx: np.ndarray,
+    delta_E: np.ndarray,
+    delta_sigma: np.ndarray,
+    amplitudes: np.ndarray,
+    chi2_in: np.ndarray,
+    config: GPLMConfig,
+    bg_design: np.ndarray | None = None,
+    n_iter: int = 1,
+    debug_out: dict | None = None,
+):
+    """Single-chunk GP-LM refine on the frozen surrogate.
+
+    Compact system per spectrum (no projected columns, no projector):
+        A = [Φ̂ | B],  G = AᵀA,  C = AᵀS,  K = SᵀS,  Q sparse (peak rows),
+        H = K − CᵀG⁻¹C + QᵀG⁻¹Q,  g = SᵀR
+    then bounded scaled-diagonal LM with a FULL trial re-evaluation
+    (basis → joint LLS → residual) and per-spectrum accept/reject.
+    Rejected spectra keep their incoming (amplitudes, δE, δσ, chi2) seed —
+    the AP/parabola state — untouched. Trials are computed full-batch and
+    committed under masks (simplicity over rejected-subset recompute; see
+    brief §6.6).
+
+    Returns (amp, dE, ds, chi2, bg, diag) — bg is None without bg_design.
+    """
+    batch, n_E = Y.shape
+    n_comp = len(dicts)
+    n_params = 2 * n_comp
+    n_bg = 0 if bg_design is None else bg_design.shape[1]
+    n_lin = n_comp + n_bg
+
+    # Non-finite input spectra would poison the BATCHED LAPACK calls
+    # (np.linalg.solve raises for the whole batch, eigvalsh may not
+    # converge). Zero them for the computation, never accept a step on
+    # them, and report fallback_reason=3 (nonfinite); their outputs stay
+    # the untouched seed.
+    bad_input = ~np.isfinite(Y).all(axis=1)
+    if bad_input.any():
+        Y = Y.copy()
+        Y[bad_input] = 0.0
+
+    # ---- gather frozen grid-cell bases/Jacobians ----
+    Phi_g = np.empty((batch, n_E, n_comp), dtype=np.float32)
+    Jc = np.empty_like(Phi_g)
+    Js = np.empty_like(Phi_g)
+    dE_grid_val = np.empty((batch, n_comp), dtype=np.float32)
+    ds_grid_val = np.empty((batch, n_comp), dtype=np.float32)
+    clip_box = np.empty(n_params, dtype=np.float64)
+    for k, dc in enumerate(dicts):
+        n_ds_k = dc.grid_shape[1]
+        idx = best_idx[:, k]
+        dE_grid_val[:, k] = dc.dE_grid[idx // n_ds_k]
+        ds_grid_val[:, k] = dc.dsigma_grid[idx % n_ds_k]
+        Phi_g[:, :, k] = dc.Phi_per_grid[idx, :, 0]
+        Jc[:, :, k] = dc.Jc_per_grid[idx, :, 0]
+        Js[:, :, k] = dc.Jsigma_per_grid[idx, :, 0]
+        dE_step = (float(dc.dE_grid[1] - dc.dE_grid[0])
+                   if len(dc.dE_grid) > 1 else 1.0)
+        ds_step = (float(dc.dsigma_grid[1] - dc.dsigma_grid[0])
+                   if len(dc.dsigma_grid) > 1 else 1.0)
+        clip_box[2 * k] = config.clip_step_ratio * dE_step
+        clip_box[2 * k + 1] = config.clip_step_ratio * ds_step
+
+    B_b = None
+    if bg_design is not None:
+        B_b = np.broadcast_to(
+            bg_design.astype(np.float32)[None], (batch, n_E, n_bg),
+        )
+
+    def basis_at(dE, ds):
+        Phi_hat = (Phi_g
+                   + (dE - dE_grid_val)[:, None, :] * Jc
+                   + (ds - ds_grid_val)[:, None, :] * Js)
+        if B_b is None:
+            return Phi_hat
+        return np.concatenate([Phi_hat, B_b], axis=2)
+
+    lin_idx = np.arange(n_lin)
+
+    def joint_lls(A):
+        AT = A.transpose(0, 2, 1)
+        G = AT @ A
+        G[:, lin_idx, lin_idx] += np.float32(config.gram_jitter)
+        x = np.linalg.solve(G, AT @ Y[:, :, None])[:, :, 0]
+        R = Y - (A @ x[:, :, None])[:, :, 0]
+        return G, x, R
+
+    # ---- mutable state (seed preserved until an accept commits) ----
+    dE_cur = delta_E.astype(np.float32).copy()
+    ds_cur = delta_sigma.astype(np.float32).copy()
+    amp_out = amplitudes.astype(np.float32).copy()
+    chi2_out = chi2_in.astype(np.float32).copy()
+    bg_out = np.zeros((batch, n_bg), dtype=np.float32) if n_bg else None
+    lam = np.full(batch, config.lambda0, dtype=np.float64)
+    accepted_ever = np.zeros(batch, dtype=bool)
+    retry_count = np.zeros(batch, dtype=np.int32)
+    step_clipped = np.zeros(batch, dtype=bool)
+    fallback = np.zeros(batch, dtype=np.int8)
+    last_pred = np.full(batch, np.nan, dtype=np.float64)
+    last_ared = np.full(batch, np.nan, dtype=np.float64)
+    last_rho = np.full(batch, np.nan, dtype=np.float64)
+    cond_gram_out = np.zeros(batch, dtype=np.float32)
+    cond_hess_out = np.zeros(batch, dtype=np.float32)
+    n_basis_evals = 0
+
+    for _ in range(max(1, n_iter)):
+        A = basis_at(dE_cur, ds_cur)
+        G, x, R = joint_lls(A)
+        n_basis_evals += 1
+        if bg_out is not None and not accepted_ever.any():
+            bg_out[:] = x[:, n_comp:]  # seed-basis bg for never-accepted
+        F0 = 0.5 * np.sum(
+            R.astype(np.float64) * R.astype(np.float64), axis=1,
+        )
+
+        # ---- compact GP system ----
+        S = np.empty((batch, n_E, n_params), dtype=np.float32)
+        Q = np.zeros((batch, n_lin, n_params), dtype=np.float32)
+        for p in range(n_params):
+            k, axis = divmod(p, 2)
+            Jcol = Jc[:, :, k] if axis == 0 else Js[:, :, k]
+            S[:, :, p] = x[:, k:k + 1] * Jcol
+            Q[:, k, p] = np.sum(Jcol * R, axis=1)
+        AT = A.transpose(0, 2, 1)
+        ST = S.transpose(0, 2, 1)
+        C = AT @ S
+        K = ST @ S
+        g = (ST @ R[:, :, None])[:, :, 0]
+        sol = np.linalg.solve(G, np.concatenate([C, Q], axis=2))
+        H = (K - C.transpose(0, 2, 1) @ sol[:, :, :n_params]
+             + Q.transpose(0, 2, 1) @ sol[:, :, n_params:])
+        H = 0.5 * (H + H.transpose(0, 2, 1))
+
+        H64 = H.astype(np.float64)
+        g64 = g.astype(np.float64)
+        if debug_out is not None and "H" not in debug_out:
+            debug_out["H"] = H64.copy()
+            debug_out["g"] = g64.copy()
+            debug_out["x"] = x.copy()
+            debug_out["R"] = R.copy()
+
+        # ---- condition gate (cheap: n_lin, n_params are tiny) ----
+        evG = np.linalg.eigvalsh(G.astype(np.float64))
+        cond_gram = evG[:, -1] / np.maximum(evG[:, 0], 1e-300)
+        evH = np.linalg.eigvalsh(H64)
+        cond_hess = evH[:, -1] / np.maximum(evH[:, 0], 1e-300)
+        cond_gram_out = np.minimum(cond_gram, 3e38).astype(np.float32)
+        cond_hess_out = np.minimum(cond_hess, 3e38).astype(np.float32)
+        gate = (np.isfinite(cond_gram) & (cond_gram < config.cond_gate)
+                & ~bad_input)
+        fallback[bad_input] = 3
+        fallback[~gate & ~bad_input & ~accepted_ever] = 1
+
+        d = lm_scale_diag(H64, config.diag_eps)
+        pending = gate.copy()
+
+        for _retry in range(config.max_retries + 1):
+            if not pending.any():
+                break
+            delta = lm_step(H64, g64, lam, d)
+            clipped = np.any(np.abs(delta) > clip_box, axis=1)
+            delta = np.clip(delta, -clip_box, clip_box)
+            pred = predicted_reduction(g64, H64, delta)
+
+            dE_try = dE_cur + delta[:, 0::2].astype(np.float32)
+            ds_try = ds_cur + delta[:, 1::2].astype(np.float32)
+            A_try = basis_at(dE_try, ds_try)
+            _, x_try, R_try = joint_lls(A_try)
+            n_basis_evals += 1
+            F1 = 0.5 * np.sum(
+                R_try.astype(np.float64) * R_try.astype(np.float64), axis=1,
+            )
+            ared = F0 - F1
+            rho = ared / np.where(pred > 0, pred, 1.0)
+            finite = (np.isfinite(F1) & np.all(np.isfinite(delta), axis=1)
+                      & np.all(np.isfinite(x_try), axis=1))
+            fallback[pending & ~finite & ~accepted_ever] = 3
+            ok = (pending & finite & (pred > 0) & (ared > 0)
+                  & (rho > config.eta_accept))
+
+            last_pred[pending] = pred[pending]
+            last_ared[pending] = ared[pending]
+            last_rho[pending] = rho[pending]
+
+            if ok.any():
+                dE_cur[ok] = dE_try[ok]
+                ds_cur[ok] = ds_try[ok]
+                amp_out[ok] = x_try[ok, :n_comp]
+                if bg_out is not None:
+                    bg_out[ok] = x_try[ok, n_comp:]
+                chi2_out[ok] = (2.0 * F1[ok] / n_E).astype(np.float32)
+                F0[ok] = F1[ok]
+                accepted_ever |= ok
+                step_clipped |= ok & clipped
+
+            rejected = pending & ~ok
+            lam = np.where(ok & (rho > config.rho_good),
+                           lam * config.lambda_down, lam)
+            lam = np.where(rejected | (ok & (rho < config.rho_bad)),
+                           lam * config.lambda_up, lam)
+            retry_count[rejected] += 1
+            pending = rejected & (lam <= config.lambda_max)
+            newly_dead = rejected & (lam > config.lambda_max) & ~accepted_ever
+            fallback[newly_dead & (fallback == 0)] = 2
+
+    # never-accepted spectra whose retries simply ran out
+    exhausted = ~accepted_ever & (fallback == 0)
+    fallback[exhausted] = 2
+
+    diag = GPLMDiagnostics(
+        cond_gram=cond_gram_out,
+        cond_hessian=cond_hess_out,
+        lm_lambda=lam.astype(np.float32),
+        predicted_reduction=last_pred.astype(np.float32),
+        actual_reduction=last_ared.astype(np.float32),
+        reduction_ratio=last_rho.astype(np.float32),
+        step_accepted=accepted_ever.copy(),
+        retry_count=retry_count,
+        step_clipped=step_clipped,
+        min_amplitude=amp_out.min(axis=1),
+        negative_amplitude_fraction=float(np.mean(np.any(amp_out < 0, axis=1))),
+        fallback_reason=fallback,
+        n_basis_evals=n_basis_evals,
+    )
+    return amp_out, dE_cur, ds_cur, chi2_out, bg_out, diag
+
+
+def _gp_lm_chunk_mlx(
+    Y: np.ndarray,
+    dicts: list[DictionaryCache],
+    best_idx: np.ndarray,
+    delta_E: np.ndarray,
+    delta_sigma: np.ndarray,
+    amplitudes: np.ndarray,
+    chi2_in: np.ndarray,
+    config: GPLMConfig,
+    bg_design: np.ndarray | None = None,
+    n_iter: int = 1,
+):
+    """MLX-hybrid GP-LM chunk (Phase 4 of the hardening brief).
+
+    Division of labour: the O(batch·n_E) tensor work — surrogate basis
+    evaluation, Gram/rhs, the compact reductions S/C/K/Q/g and the trial
+    residual sums — runs on the GPU as batched matmuls; the small (n_lin)
+    and (n_params) linear algebra plus the LM accept/reject bookkeeping
+    stays on CPU float64 (identical logic to :func:`_gp_lm_chunk`), so only
+    (batch × small-matrix) buffers cross the device boundary. No projected
+    Jacobian columns and no explicit projector are ever materialised.
+
+    Semantics match `_gp_lm_chunk`; float32 GPU reductions may flip
+    accept decisions on razor-edge spectra (documented tolerance in the
+    parity test).
+    """
+    batch, n_E = Y.shape
+    n_comp = len(dicts)
+    n_params = 2 * n_comp
+    n_bg = 0 if bg_design is None else bg_design.shape[1]
+    n_lin = n_comp + n_bg
+
+    bad_input = ~np.isfinite(Y).all(axis=1)
+    if bad_input.any():
+        Y = Y.copy()
+        Y[bad_input] = 0.0
+
+    for dc in dicts:
+        dc.to_mlx()
+
+    Y_mx = mx.array(np.ascontiguousarray(Y, dtype=np.float32))
+    Phi_g_l, Jc_l, Js_l = [], [], []
+    dE_grid_val = np.empty((batch, n_comp), dtype=np.float32)
+    ds_grid_val = np.empty((batch, n_comp), dtype=np.float32)
+    clip_box = np.empty(n_params, dtype=np.float64)
+    for k, dc in enumerate(dicts):
+        n_ds_k = dc.grid_shape[1]
+        idx = best_idx[:, k]
+        dE_grid_val[:, k] = dc.dE_grid[idx // n_ds_k]
+        ds_grid_val[:, k] = dc.dsigma_grid[idx % n_ds_k]
+        idx_mx = mx.array(idx.astype(np.int32))
+        Phi_g_l.append(dc._Phi_mx[idx_mx, :, 0])
+        Jc_l.append(dc._Jc_mx[idx_mx, :, 0])
+        Js_l.append(dc._Jsigma_mx[idx_mx, :, 0])
+        dE_step = (float(dc.dE_grid[1] - dc.dE_grid[0])
+                   if len(dc.dE_grid) > 1 else 1.0)
+        ds_step = (float(dc.dsigma_grid[1] - dc.dsigma_grid[0])
+                   if len(dc.dsigma_grid) > 1 else 1.0)
+        clip_box[2 * k] = config.clip_step_ratio * dE_step
+        clip_box[2 * k + 1] = config.clip_step_ratio * ds_step
+
+    B_mx = (mx.broadcast_to(
+        mx.array(bg_design.astype(np.float32))[None],
+        (batch, n_E, n_bg)) if bg_design is not None else None)
+    eye_jit = np.float32(config.gram_jitter) * mx.eye(n_lin)
+
+    def basis_at(dE_np, ds_np):
+        cols = []
+        dE_off = mx.array(dE_np - dE_grid_val)
+        ds_off = mx.array(ds_np - ds_grid_val)
+        for k in range(n_comp):
+            cols.append(Phi_g_l[k]
+                        + dE_off[:, k:k + 1] * Jc_l[k]
+                        + ds_off[:, k:k + 1] * Js_l[k])
+        A = mx.stack(cols, axis=2)
+        if B_mx is not None:
+            A = mx.concatenate([A, B_mx], axis=2)
+        return A
+
+    def gram_rhs(A):
+        AT = mx.transpose(A, (0, 2, 1))
+        G = AT @ A + eye_jit
+        rhs = (AT @ Y_mx[:, :, None])[:, :, 0]
+        return G, rhs
+
+    def residual_F(A, x_np):
+        x_mx = mx.array(x_np.astype(np.float32))
+        R = Y_mx - (A @ x_mx[:, :, None])[:, :, 0]
+        F = 0.5 * mx.sum(R * R, axis=1)
+        return R, F
+
+    # ---- state (identical bookkeeping to the numpy chunk) ----
+    dE_cur = delta_E.astype(np.float32).copy()
+    ds_cur = delta_sigma.astype(np.float32).copy()
+    amp_out = amplitudes.astype(np.float32).copy()
+    chi2_out = chi2_in.astype(np.float32).copy()
+    bg_out = np.zeros((batch, n_bg), dtype=np.float32) if n_bg else None
+    lam = np.full(batch, config.lambda0, dtype=np.float64)
+    accepted_ever = np.zeros(batch, dtype=bool)
+    retry_count = np.zeros(batch, dtype=np.int32)
+    step_clipped = np.zeros(batch, dtype=bool)
+    fallback = np.zeros(batch, dtype=np.int8)
+    last_pred = np.full(batch, np.nan)
+    last_ared = np.full(batch, np.nan)
+    last_rho = np.full(batch, np.nan)
+    cond_gram_out = np.zeros(batch, dtype=np.float32)
+    cond_hess_out = np.zeros(batch, dtype=np.float32)
+    n_basis_evals = 0
+
+    for _ in range(max(1, n_iter)):
+        A = basis_at(dE_cur, ds_cur)
+        G_mx, rhs_mx = gram_rhs(A)
+        mx.eval(G_mx, rhs_mx)
+        G_np = np.asarray(G_mx).astype(np.float64)
+        x = np.linalg.solve(G_np, np.asarray(rhs_mx)[..., None])[..., 0]
+        R_mx, F_mx = residual_F(A, x)
+        n_basis_evals += 1
+
+        # compact reductions on GPU
+        S_cols = []
+        q_cols = []
+        for p in range(n_params):
+            k, axis = divmod(p, 2)
+            Jcol = Jc_l[k] if axis == 0 else Js_l[k]
+            S_cols.append(mx.array(x[:, k].astype(np.float32))[:, None] * Jcol)
+            q_cols.append(mx.sum(Jcol * R_mx, axis=1))
+        S = mx.stack(S_cols, axis=2)                     # (b, n_E, p)
+        ST = mx.transpose(S, (0, 2, 1))
+        C_mx = mx.transpose(A, (0, 2, 1)) @ S            # (b, n_lin, p)
+        K_mx = ST @ S                                    # (b, p, p)
+        g_mx = (ST @ R_mx[:, :, None])[:, :, 0]          # (b, p)
+        qmat_mx = mx.stack(q_cols, axis=1)               # (b, p)
+        mx.eval(C_mx, K_mx, g_mx, qmat_mx, F_mx)
+
+        C = np.asarray(C_mx).astype(np.float64)
+        K = np.asarray(K_mx).astype(np.float64)
+        g64 = np.asarray(g_mx).astype(np.float64)
+        F0 = np.asarray(F_mx).astype(np.float64)
+        Q = np.zeros((batch, n_lin, n_params))
+        qv = np.asarray(qmat_mx).astype(np.float64)
+        for p in range(n_params):
+            Q[:, p // 2, p] = qv[:, p]
+        if bg_out is not None and not accepted_ever.any():
+            bg_out[:] = x[:, n_comp:].astype(np.float32)
+
+        sol = np.linalg.solve(G_np, np.concatenate([C, Q], axis=2))
+        H64 = (K - C.transpose(0, 2, 1) @ sol[:, :, :n_params]
+               + Q.transpose(0, 2, 1) @ sol[:, :, n_params:])
+        H64 = 0.5 * (H64 + H64.transpose(0, 2, 1))
+
+        evG = np.linalg.eigvalsh(G_np)
+        cond_gram = evG[:, -1] / np.maximum(evG[:, 0], 1e-300)
+        evH = np.linalg.eigvalsh(H64)
+        cond_hess = evH[:, -1] / np.maximum(evH[:, 0], 1e-300)
+        cond_gram_out = np.minimum(cond_gram, 3e38).astype(np.float32)
+        cond_hess_out = np.minimum(cond_hess, 3e38).astype(np.float32)
+        gate = (np.isfinite(cond_gram) & (cond_gram < config.cond_gate)
+                & ~bad_input)
+        fallback[bad_input] = 3
+        fallback[~gate & ~bad_input & ~accepted_ever] = 1
+
+        d = lm_scale_diag(H64, config.diag_eps)
+        pending = gate.copy()
+
+        for _retry in range(config.max_retries + 1):
+            if not pending.any():
+                break
+            delta = lm_step(H64, g64, lam, d)
+            clipped = np.any(np.abs(delta) > clip_box, axis=1)
+            delta = np.clip(delta, -clip_box, clip_box)
+            pred = predicted_reduction(g64, H64, delta)
+
+            dE_try = dE_cur + delta[:, 0::2].astype(np.float32)
+            ds_try = ds_cur + delta[:, 1::2].astype(np.float32)
+            A_try = basis_at(dE_try, ds_try)
+            G_t_mx, rhs_t_mx = gram_rhs(A_try)
+            mx.eval(G_t_mx, rhs_t_mx)
+            G_t = np.asarray(G_t_mx).astype(np.float64)
+            x_try = np.linalg.solve(
+                G_t, np.asarray(rhs_t_mx)[..., None])[..., 0]
+            _R_t, F_t_mx = residual_F(A_try, x_try)
+            mx.eval(F_t_mx)
+            F1 = np.asarray(F_t_mx).astype(np.float64)
+            n_basis_evals += 1
+
+            ared = F0 - F1
+            rho = ared / np.where(pred > 0, pred, 1.0)
+            finite = (np.isfinite(F1) & np.all(np.isfinite(delta), axis=1)
+                      & np.all(np.isfinite(x_try), axis=1))
+            fallback[pending & ~finite & ~accepted_ever] = 3
+            ok = (pending & finite & (pred > 0) & (ared > 0)
+                  & (rho > config.eta_accept))
+
+            last_pred[pending] = pred[pending]
+            last_ared[pending] = ared[pending]
+            last_rho[pending] = rho[pending]
+
+            if ok.any():
+                dE_cur[ok] = dE_try[ok]
+                ds_cur[ok] = ds_try[ok]
+                amp_out[ok] = x_try[ok, :n_comp].astype(np.float32)
+                if bg_out is not None:
+                    bg_out[ok] = x_try[ok, n_comp:].astype(np.float32)
+                chi2_out[ok] = (2.0 * F1[ok] / n_E).astype(np.float32)
+                F0[ok] = F1[ok]
+                accepted_ever |= ok
+                step_clipped |= ok & clipped
+
+            rejected = pending & ~ok
+            lam = np.where(ok & (rho > config.rho_good),
+                           lam * config.lambda_down, lam)
+            lam = np.where(rejected | (ok & (rho < config.rho_bad)),
+                           lam * config.lambda_up, lam)
+            retry_count[rejected] += 1
+            pending = rejected & (lam <= config.lambda_max)
+            newly_dead = rejected & (lam > config.lambda_max) & ~accepted_ever
+            fallback[newly_dead & (fallback == 0)] = 2
+
+    exhausted = ~accepted_ever & (fallback == 0)
+    fallback[exhausted] = 2
+
+    diag = GPLMDiagnostics(
+        cond_gram=cond_gram_out,
+        cond_hessian=cond_hess_out,
+        lm_lambda=lam.astype(np.float32),
+        predicted_reduction=last_pred.astype(np.float32),
+        actual_reduction=last_ared.astype(np.float32),
+        reduction_ratio=last_rho.astype(np.float32),
+        step_accepted=accepted_ever.copy(),
+        retry_count=retry_count,
+        step_clipped=step_clipped,
+        min_amplitude=amp_out.min(axis=1),
+        negative_amplitude_fraction=float(np.mean(np.any(amp_out < 0, axis=1))),
+        fallback_reason=fallback,
+        n_basis_evals=n_basis_evals,
+    )
+    return amp_out, dE_cur, ds_cur, chi2_out, bg_out, diag
+
+
+def _post_ap_gp_lm_refine_numpy(
+    Y: np.ndarray,
+    dicts: list[DictionaryCache],
+    best_idx: np.ndarray,
+    delta_E: np.ndarray,
+    delta_sigma: np.ndarray,
+    amplitudes: np.ndarray,
+    chi2_in: np.ndarray,
+    n_iter: int = 1,
+    config: GPLMConfig | None = None,
+    bg_design: np.ndarray | None = None,
+    chunk_size: int = 50_000,
+    use_mlx: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+           np.ndarray | None, GPLMDiagnostics]:
+    """Chunked GP-LM post-AP refine (frozen surrogate).
+
+    See :func:`_gp_lm_chunk`. chunk_size defaults lower than the raw path
+    because the compact assembly materialises S (chunk, n_E, 2·n_comp).
+    use_mlx=True routes the tensor work through :func:`_gp_lm_chunk_mlx`
+    (requires MLX; falls back to CPU silently when unavailable).
+    """
+    config = config or GPLMConfig()
+    chunk_fn = _gp_lm_chunk_mlx if (use_mlx and HAS_MLX) else _gp_lm_chunk
+    Y = np.ascontiguousarray(Y, dtype=np.float32)
+    batch = Y.shape[0]
+    n_comp = len(dicts)
+    n_bg = 0 if bg_design is None else bg_design.shape[1]
+
+    amp_out = np.empty((batch, n_comp), dtype=np.float32)
+    dE_out = np.empty((batch, n_comp), dtype=np.float32)
+    ds_out = np.empty((batch, n_comp), dtype=np.float32)
+    chi2_out = np.empty(batch, dtype=np.float32)
+    bg_out = np.empty((batch, n_bg), dtype=np.float32) if n_bg else None
+    diags = []
+
+    for s in range(0, batch, chunk_size):
+        e = min(s + chunk_size, batch)
+        amp_c, dE_c, ds_c, chi2_c, bg_c, diag_c = chunk_fn(
+            Y[s:e], dicts, best_idx[s:e], delta_E[s:e], delta_sigma[s:e],
+            amplitudes[s:e], chi2_in[s:e], config,
+            bg_design=bg_design, n_iter=n_iter,
+        )
+        amp_out[s:e] = amp_c
+        dE_out[s:e] = dE_c
+        ds_out[s:e] = ds_c
+        chi2_out[s:e] = chi2_c
+        if bg_out is not None:
+            bg_out[s:e] = bg_c
+        diags.append(diag_c)
+
+    if len(diags) == 1:
+        diag = diags[0]
+    else:
+        n_tot = sum(d.step_accepted.shape[0] for d in diags)
+        diag = GPLMDiagnostics(
+            **{f: np.concatenate([getattr(d, f) for d in diags])
+               for f in ("cond_gram", "cond_hessian", "lm_lambda",
+                          "predicted_reduction", "actual_reduction",
+                          "reduction_ratio", "step_accepted", "retry_count",
+                          "step_clipped", "min_amplitude", "fallback_reason")},
+            negative_amplitude_fraction=float(sum(
+                d.negative_amplitude_fraction * d.step_accepted.shape[0]
+                for d in diags) / n_tot),
+            n_basis_evals=sum(d.n_basis_evals for d in diags),
+        )
+    return amp_out, dE_out, ds_out, chi2_out, bg_out, diag
 
 
 # ---------------------------------------------------------------------------
@@ -1770,6 +2410,7 @@ def _solve_alternating_projection_numpy(
     parabola_ds: bool = False,
     apply_newton: bool = False,
     bg_degree: int = -1,
+    newton_jacobian_mode: str = "raw",
 ) -> MultiPeakResult:
     """CPU/numpy implementation of the alternating-projection multipeak
     solver. Used when MLX is unavailable (Linux x86_64, Windows, Intel
@@ -1882,17 +2523,34 @@ def _solve_alternating_projection_numpy(
     timing["lls"] = time.perf_counter() - t0
 
     # ---- Phase 3 (optional): post-AP Newton refinement ----
+    gp_diag = None
     if apply_newton:
-        if bg_degree >= 0:
+        if bg_degree >= 0 and newton_jacobian_mode != "gp_lm":
             raise NotImplementedError(
                 "apply_newton with bg_degree>=0 is only implemented on the MLX "
-                "path; the numpy fallback supports background only in the "
-                "Phase-2 joint LLS (set apply_newton=False)."
+                "path (or newton_jacobian_mode='gp_lm'); the numpy fallback "
+                "supports background only in the Phase-2 joint LLS (set "
+                "apply_newton=False)."
             )
         t0 = time.perf_counter()
-        amplitudes, delta_E, delta_sigma, chi2 = _post_ap_newton_refine_numpy(
-            Y, dicts, best_np, delta_E, delta_sigma, amplitudes,
-        )
+        if newton_jacobian_mode == "gp_lm":
+            bg_design = (build_bg_design(dicts[0].energy, bg_degree)
+                         if bg_degree >= 0 else None)
+            (amplitudes, delta_E, delta_sigma, chi2, bg_new,
+             gp_diag) = _post_ap_gp_lm_refine_numpy(
+                Y, dicts, best_np, delta_E, delta_sigma, amplitudes, chi2,
+                bg_design=bg_design,
+            )
+            if bg_new is not None and background is not None:
+                acc = gp_diag.step_accepted
+                background = np.where(acc[:, None], bg_new,
+                                      background).astype(np.float32)
+        else:
+            amplitudes, delta_E, delta_sigma, chi2 = (
+                _post_ap_newton_refine_numpy(
+                    Y, dicts, best_np, delta_E, delta_sigma, amplitudes,
+                    jacobian_mode=newton_jacobian_mode,
+                ))
         timing["newton"] = time.perf_counter() - t0
 
     timing["total"] = sum(v for v in timing.values() if isinstance(v, (int, float)))
@@ -1907,6 +2565,7 @@ def _solve_alternating_projection_numpy(
         best_indices=best_np,
         timing=timing,
         background=background,
+        gp_diagnostics=gp_diag,
     )
 
 
@@ -1924,6 +2583,7 @@ def solve_alternating_projection(
     fit_gamma: bool = False,
     gamma_chi2_gate: bool = True,
     gamma_chi2_margin: float = 0.01,
+    newton_jacobian_mode: str = "raw",
 ) -> MultiPeakResult:
     """Multi-peak solver using Alternating Projection.
 
@@ -1995,6 +2655,27 @@ def solve_alternating_projection(
             ``chi2_gamma < chi2_nogamma · (1 − gamma_chi2_margin)``. A small
             positive margin prevents noise-only χ² wiggles from flipping the
             gate on γ-correct spectra. Ignored unless gamma_chi2_gate is active.
+        newton_jacobian_mode: EXPERIMENTAL (default "raw" = existing
+            behavior, byte-identical fast path). "kaufman" and
+            "golub_pereyra" replace the post-AP Newton Jacobian with the
+            variable-projection / full Golub–Pereyra reduced-residual
+            Jacobian, evaluated on the frozen grid-cell surrogate basis.
+            "gp_lm" runs the compact-Hessian Golub–Pereyra step under a
+            scaled-diagonal Levenberg–Marquardt safeguard with per-spectrum
+            accept/reject (rejected spectra keep the AP seed untouched;
+            condition-gated); its per-spectrum diagnostics are returned in
+            ``result.gp_diagnostics`` (GPLMDiagnostics).
+            "raw" here names the Jacobian approximation (S = a·J with the
+            amplitude-vs-θ coupling ignored — the current production step);
+            it is unrelated to the pre-Tikhonov ``H_raw`` Hessian in the
+            quality_flags diagnostics. All modes share the same gradient
+            and differ only in the Gauss-Newton curvature.
+            Non-raw modes run on CPU/numpy (the MLX Newton kernel is
+            bypassed; ``newton_iter`` repeated single steps) and are
+            incompatible with ``newton_exact``, ``fit_gamma``,
+            ``quality_flags`` diagnostics and ``bg_degree>=0`` (ValueError).
+            See gp_reference.py and benchmarks/gp_newton_comparison.py for
+            the verification study behind this flag.
 
     Returns:
         MultiPeakResult with amplitudes, delta_E, delta_sigma, chi2 (and, when
@@ -2009,6 +2690,25 @@ def solve_alternating_projection(
         raise ValueError(
             "fit_gamma=True requires apply_newton=True and newton_exact=True."
         )
+    if newton_jacobian_mode not in ("raw", "kaufman", "golub_pereyra",
+                                    "gp_lm"):
+        raise ValueError(
+            "newton_jacobian_mode must be 'raw', 'kaufman', "
+            f"'golub_pereyra' or 'gp_lm', got {newton_jacobian_mode!r}"
+        )
+    if newton_jacobian_mode != "raw" and apply_newton:
+        if newton_exact or fit_gamma or quality_flags:
+            raise ValueError(
+                "newton_jacobian_mode != 'raw' is an experimental path and "
+                "does not support newton_exact, fit_gamma or quality_flags."
+            )
+        if bg_degree >= 0 and newton_jacobian_mode != "gp_lm":
+            raise ValueError(
+                "bg_degree>=0 with an experimental newton_jacobian_mode is "
+                "only supported by 'gp_lm' (fixed polynomial background in "
+                "the joint projection); 'kaufman'/'golub_pereyra' do not "
+                "support it."
+            )
     if not HAS_MLX:
         if fit_gamma:
             raise NotImplementedError(
@@ -2022,7 +2722,7 @@ def solve_alternating_projection(
             )
         return _solve_alternating_projection_numpy(
             Y, dicts, n_iterations, parabola_dE, parabola_ds, apply_newton,
-            bg_degree=bg_degree,
+            bg_degree=bg_degree, newton_jacobian_mode=newton_jacobian_mode,
         )
 
     Y = np.asarray(Y, dtype=np.float32)
@@ -2217,7 +2917,41 @@ def solve_alternating_projection(
     # the first dict for re-use across chunks.
     diag = None
     delta_gamma = None
-    if apply_newton:
+    gp_diag = None
+    if apply_newton and newton_jacobian_mode == "gp_lm":
+        # EXPERIMENTAL: compact-Hessian GP with LM accept/reject.
+        # Rejected spectra keep the AP/parabola seed untouched (including
+        # their Phase-2 background coefficients when bg_degree >= 0).
+        # Background scope: FIXED polynomial design only — data-dependent
+        # backgrounds (Shirley/Tougaard) are NOT part of this projection.
+        t0 = time.perf_counter()
+        bg_design = (build_bg_design(dicts[0].energy, bg_degree)
+                     if bg_degree >= 0 else None)
+        (amplitudes, delta_E, delta_sigma, chi2, bg_new,
+         gp_diag) = _post_ap_gp_lm_refine_numpy(
+            Y, dicts, best_np, delta_E, delta_sigma, amplitudes, chi2,
+            n_iter=newton_iter, bg_design=bg_design, use_mlx=True,
+        )
+        if bg_new is not None and background is not None:
+            acc = gp_diag.step_accepted
+            background = np.where(acc[:, None], bg_new,
+                                  background).astype(np.float32)
+        timing["newton"] = time.perf_counter() - t0
+    elif apply_newton and newton_jacobian_mode != "raw":
+        # EXPERIMENTAL: projected-Jacobian (Kaufman / Golub–Pereyra) Newton.
+        # Runs the frozen-surrogate single step on CPU newton_iter times;
+        # the MLX Newton kernel and its Hessian cache are bypassed. The
+        # parameter guards at the top of this function keep this path away
+        # from bg/γ/exact/diagnostics interactions.
+        t0 = time.perf_counter()
+        for _ in range(max(1, newton_iter)):
+            amplitudes, delta_E, delta_sigma, chi2 = (
+                _post_ap_newton_refine_numpy(
+                    Y, dicts, best_np, delta_E, delta_sigma, amplitudes,
+                    jacobian_mode=newton_jacobian_mode,
+                ))
+        timing["newton"] = time.perf_counter() - t0
+    elif apply_newton:
         t0 = time.perf_counter()
         # The grid-cell Hessian cache is only valid for the frozen surrogate;
         # exact_jacobian re-derives H from the freshly evaluated Jacobians.
@@ -2293,6 +3027,7 @@ def solve_alternating_projection(
         soft_std=diag["soft_std"] if diag else None,
         background=background,
         delta_gamma=delta_gamma,
+        gp_diagnostics=gp_diag,
     )
 
 
