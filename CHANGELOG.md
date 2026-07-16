@@ -39,6 +39,16 @@ archived on Zenodo for a citable DOI.
   `CITATION.cff`, and this changelog.
 
 ### Changed
+- Public CLI surface reduced to implemented, distributed commands:
+  `gui` (private companion layer, not installed by this package) and
+  `fit` (placeholder) are no longer registered; `import` and `convert`
+  are unchanged. Running `toyomacro` with no arguments now prints help
+  and exits successfully instead of attempting to launch a GUI. This is
+  a public-boundary decision, not a feature removal: fitting remains
+  fully available through the Python APIs (`AutoFitter`, `BatchFitter`,
+  `FastVoigtFitter`, `VarProFitter`); a `fit` command may return once
+  its data schema is defined, and a `gui` command if a distributable
+  companion product exists.
 - Single version source: `pyproject.toml` — `toyomacro.__version__`,
   `toyomacro.voigtfit.__version__`, and the CLI `--version` all
   derive from package metadata (previously the voigtfit subpackage

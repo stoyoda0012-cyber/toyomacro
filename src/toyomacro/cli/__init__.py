@@ -20,15 +20,10 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # GUI command
-    gui_parser = subparsers.add_parser("gui", help="Launch the GUI application")
-    gui_parser.add_argument("file", nargs="?", help="File to open")
-
-    # Fit command
-    fit_parser = subparsers.add_parser("fit", help="Fit a spectrum file")
-    fit_parser.add_argument("input", help="Input spectrum file")
-    fit_parser.add_argument("-o", "--output", help="Output file")
-    fit_parser.add_argument("-e", "--element", help="Element (e.g., Si2p)")
+    # Public command surface: only implemented, distributed functionality.
+    # `gui` (private companion layer, not installed by the public package)
+    # and `fit` (placeholder pending a data schema; fitting is available
+    # through the Python APIs) are intentionally not registered.
 
     # Convert command (HDF5 compression)
     convert_parser = subparsers.add_parser(
@@ -111,17 +106,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "gui":
-        try:
-            from toyomacro.gui import main as gui_main
-        except ImportError:
-            print("The desktop GUI is not part of this distribution "
-                  "(toyomacro.gui is not installed).")
-            sys.exit(1)
-        gui_main()
-    elif args.command == "fit":
-        print(f"Fitting: {args.input} (not yet implemented)")
-    elif args.command == "convert":
+    if args.command == "convert":
         from toyomacro.io.compression import convert_folder
         convert_folder(
             input_folder=args.input_folder,
@@ -177,13 +162,8 @@ def main():
             print(f"Error: {input_path} not found")
             sys.exit(1)
     else:
-        # Default: launch the GUI when available, otherwise show help.
-        try:
-            from toyomacro.gui import main as gui_main
-        except ImportError:
-            parser.print_help()
-            return
-        gui_main()
+        # No subcommand: show help and exit successfully.
+        parser.print_help()
 
 
 if __name__ == "__main__":
