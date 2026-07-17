@@ -293,6 +293,29 @@ def test_single_exact_fit_neg_inf_wins_without_nan():
     assert any("dominates" in w for w in sel.warnings)
 
 
+def test_nan_statistics_are_rejected_before_selection():
+    """A finite candidate + a NaN candidate must not re-inject NaN into
+    deltas: NaN is rejected at scoring time, not propagated."""
+    with pytest.raises(ValueError, match="NaN"):
+        gaussian_ic(rss=math.nan, n=100, k=3)
+    with pytest.raises(ValueError, match="NaN"):
+        poisson_ic(loglik=math.nan, n=100, k=3)
+    with pytest.raises(ValueError, match="NaN"):
+        score_candidate(
+            model_k(1, variance_estimated=True),
+            CandidateFit(n_points=100, rss=math.nan),
+        )
+    with pytest.raises(ValueError, match="NaN"):
+        score_candidate(
+            model_k(1), CandidateFit(n_points=100, loglik=math.nan), "poisson"
+        )
+    with pytest.raises(ValueError, match=r"\+inf"):
+        poisson_ic(loglik=math.inf, n=100, k=3)
+    # -inf loglik (zero-probability data) is allowed -> +inf criteria
+    aic, aicc, bic, _ = poisson_ic(loglik=-math.inf, n=100, k=3)
+    assert aic == math.inf and bic == math.inf
+
+
 def test_poisson_deviance_validates_shape_and_negative_y():
     with pytest.raises(ValueError, match="same shape"):
         poisson_deviance(np.array([1.0, 2.0]), np.array([1.0]))

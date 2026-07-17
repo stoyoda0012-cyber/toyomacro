@@ -219,6 +219,11 @@ def gaussian_ic(rss: float, n: int, k: int) -> tuple[float, float, float, list[s
     Reference formulas of the frozen design §2.5 — RSS-based, so the
     Gaussian constant terms are dropped consistently across candidates.
     """
+    if math.isnan(rss):
+        raise ValueError(
+            "rss is NaN: refusing to score — a NaN candidate would poison "
+            "delta comparisons downstream"
+        )
     if rss < 0:
         raise ValueError(f"rss must be non-negative, got {rss}")
     if n <= 0:
@@ -278,7 +283,14 @@ def poisson_deviance(y: np.ndarray, mu: np.ndarray) -> float:
 
 
 def poisson_ic(loglik: float, n: int, k: int) -> tuple[float, float, float, list[str]]:
-    """(AIC, AICc, BIC, warnings) from an exact Poisson log-likelihood."""
+    """(AIC, AICc, BIC, warnings) from an exact Poisson log-likelihood.
+
+    ``loglik = -inf`` (zero-probability data) is allowed and yields
+    ``+inf`` criteria; NaN and ``+inf`` are rejected (a log-likelihood
+    cannot be ``+inf``, and NaN would poison delta comparisons).
+    """
+    if math.isnan(loglik) or loglik == math.inf:
+        raise ValueError(f"loglik must not be NaN or +inf, got {loglik}")
     if n <= 0:
         raise ValueError(f"n must be positive, got {n}")
     aic = -2.0 * loglik + 2.0 * k
