@@ -271,6 +271,37 @@ def test_non_monotonic_energy_axis_is_rejected():
         run_exact_k(bad, y, cfg, sigma_std=NOISE_STD)
 
 
+# ------------------------------------------------- S5: residual structure
+
+
+def test_S5_truncated_k_max_leaves_structured_residual_and_blocks_supported():
+    """True K=3, but k_max=2: the best candidate necessarily leaves an
+    unmodeled peak in the residual. A low IC alone must not yield
+    'supported' (S5) — the lag-1 autocorrelation gate catches it."""
+    y = synth(
+        [5.0, 5.0 + 2 * FWHM, 5.0 + 4 * FWHM], [2.0, 1.8, 1.6],
+        seed=11, noise=0.02,
+    )
+    cfg = ExactKConfig(sigma_init=0.5, gamma=GAMMA, k_max=2, n_starts=3)
+    r = run_exact_k(ENERGY, y, cfg, sigma_std=0.02)
+
+    best = r.candidates[-1]
+    assert best.residual_diagnostics["structured"] is True
+    assert abs(best.residual_diagnostics["z"]) > cfg.residual_acf_z_threshold
+    assert r.verdict != "supported"
+    assert any(
+        "residual" in reason or "disagree" in reason
+        for reason in r.verdict_reasons
+    )
+
+
+def test_correct_model_has_unstructured_residual(report_separated):
+    """Counterpart: the exact-model K=2 candidate leaves white residual."""
+    k2 = report_separated.candidates[1]
+    assert k2.residual_diagnostics["structured"] is False
+    assert report_separated.verdict == "supported"
+
+
 # ------------------------------------------------- Phase 3b: plug-in bg
 
 

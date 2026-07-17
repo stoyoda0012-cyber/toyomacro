@@ -99,6 +99,11 @@ class ExactKConfig:
     shirley_max_iter: int = 50
     shirley_tol: float = 1e-5
     tougaard_c: float = 1643.0
+    # S5 residual-structure gate: whitened-residual lag-1 autocorrelation
+    # is ~ N(0, 1/n) under a correct model; |acf1|·sqrt(n) beyond this
+    # z-threshold marks systematic residual structure and blocks a
+    # "supported" verdict (low IC alone is never "sufficient").
+    residual_acf_z_threshold: float = 4.0
 
     def __post_init__(self) -> None:
         if self.plugin_background is not None and self.bg_degree is not None:
@@ -124,6 +129,7 @@ class ExactKConfig:
             "shirley_max_iter": self.shirley_max_iter,
             "shirley_tol": self.shirley_tol,
             "tougaard_c": self.tougaard_c,
+            "residual_acf_z_threshold": self.residual_acf_z_threshold,
         }
 
 
@@ -143,6 +149,7 @@ class CandidateResult:
     start_converged: tuple[bool, ...]
     chosen_start: int | None
     boundary_flags: tuple[str, ...]
+    residual_diagnostics: dict[str, Any]
     warnings: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -158,6 +165,7 @@ class CandidateResult:
             "rss_per_start": list(self.rss_per_start),
             "start_converged": list(self.start_converged),
             "chosen_start": self.chosen_start,
+            "residual_diagnostics": self.residual_diagnostics,
             "boundary_flags": list(self.boundary_flags),
             "warnings": list(self.warnings),
         }
@@ -305,7 +313,11 @@ def _initial_center_sets(
     Start 0: greedy peak picking on the offset-removed, lightly smoothed
     data (returned in pick order — typically NOT energy-ordered, which
     exercises the canonical-ordering guarantee downstream). Start 1:
-    equally spaced interior points. Starts 2+: seeded jitters of start 0.
+    signal-mass quantiles — centers at the 1/(K+1)..K/(K+1) quantiles of
+    the offset-removed intensity mass, so clustered peaks get clustered
+    starts (a full-window equal spacing loses tight clusters; measured
+    as the dominant S1 failure mode on the Gate 4 grid). Starts 2+:
+    seeded jitters of start 0.
     """
     fwhm = voigt_fwhm_approx(cfg.sigma_init, cfg.gamma)
     de = float(np.median(np.diff(energy)))
@@ -322,9 +334,17 @@ def _initial_center_sets(
     pick_arr = np.array(picks)
 
     lo, hi = float(energy[0]), float(energy[-1])
-    equal = lo + (hi - lo) * (np.arange(1, k + 1) / (k + 1))
+    mass = np.cumsum(np.maximum(yy, 0.0))
+    if mass[-1] > 0:
+        q = np.arange(1, k + 1) / (k + 1)
+        idx = np.clip(
+            np.searchsorted(mass, q * mass[-1]), 0, energy.size - 1
+        )
+        quantile_start = energy[idx]
+    else:
+        quantile_start = lo + (hi - lo) * (np.arange(1, k + 1) / (k + 1))
 
-    starts = [pick_arr, equal]
+    starts = [pick_arr, quantile_start]
     for j in range(2, cfg.n_starts):
         rng = np.random.default_rng(j)
         jitter = pick_arr + rng.uniform(-0.5, 0.5, size=k) * fwhm
@@ -340,7 +360,10 @@ def _fit_one_candidate(
     w_sqrt: np.ndarray,
     bg: np.ndarray,
     cfg: ExactKConfig,
-) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, tuple, tuple, int | None, bool, str]:
+) -> tuple[
+    np.ndarray, float, np.ndarray, np.ndarray, np.ndarray,
+    tuple, tuple, int | None, bool, str,
+]:
     """Inner VARPRO problem for exactly K components, multi-start.
 
     The winner is the minimum-RSS start AMONG CONVERGED STARTS only
@@ -349,8 +372,8 @@ def _fit_one_candidate(
     fails only when no start converges.
 
     Returns (sorted centers, sigma, amplitudes, bg coefficients,
-    rss_per_start, start_converged, chosen_start, success,
-    termination_reason).
+    final whitened residual, rss_per_start, start_converged,
+    chosen_start, success, termination_reason).
     """
     lo, hi = float(energy[0]), float(energy[-1])
     lb = np.array([lo] * k + [cfg.sigma_bounds[0]])
@@ -385,6 +408,7 @@ def _fit_one_candidate(
         )
         return (
             np.array([]), cfg.sigma_init, np.array([]), np.array([]),
+            np.array([]),
             tuple(rss_per_start), tuple(start_converged), None, False,
             f"no start converged ({message})",
         )
@@ -396,13 +420,36 @@ def _fit_one_candidate(
     order = np.argsort(theta_best[:k])
     centers_sorted = theta_best[:k][order]
     theta_sorted = np.append(centers_sorted, theta_best[k])
-    _, amplitudes, bg_coef = _varpro_solve(
+    residual, amplitudes, bg_coef = _varpro_solve(
         theta_sorted, k, energy, yw, w_sqrt, bg, cfg
     )
     return (
-        centers_sorted, float(theta_best[k]), amplitudes, bg_coef,
+        centers_sorted, float(theta_best[k]), amplitudes, bg_coef, residual,
         tuple(rss_per_start), tuple(start_converged), best_idx, True, message,
     )
+
+
+def _residual_diagnostics(residual: np.ndarray, z_threshold: float) -> dict[str, Any]:
+    """Whitened-residual structure check (S5): lag-1 autocorrelation.
+
+    Under a correct model the whitened residual is white noise and
+    ``acf1 ~ N(0, 1/n)``; ``|z| = |acf1|*sqrt(n)`` beyond the threshold
+    marks systematic structure (an unmodeled peak, background error, …).
+    """
+    n = residual.size
+    if n < 3:
+        return {"lag1_autocorr": 0.0, "z": 0.0, "structured": False, "n": n}
+    denom = float(residual @ residual)
+    if denom == 0.0:
+        return {"lag1_autocorr": 0.0, "z": 0.0, "structured": False, "n": n}
+    acf1 = float(residual[:-1] @ residual[1:]) / denom
+    z = acf1 * math.sqrt(n)
+    return {
+        "lag1_autocorr": acf1,
+        "z": z,
+        "structured": bool(abs(z) > z_threshold),
+        "n": n,
+    }
 
 
 def _boundary_flags(
@@ -471,6 +518,13 @@ def _verdict(
             f"the supported candidate K={k_star} carries negative "
             f"amplitudes ({ev['negative_amplitudes']}) under unconstrained "
             "LS — not claiming 'supported' on an unphysical solution"
+        )
+        return "ambiguous", reasons
+    if ev.get("residual_structured"):
+        reasons.append(
+            f"the supported candidate K={k_star} leaves systematic "
+            f"residual structure (lag-1 autocorr z={ev.get('residual_z'):.1f}) "
+            "— a low IC alone is not sufficiency (S5)"
         )
         return "ambiguous", reasons
     if ev["rank_supported"]:
@@ -560,9 +614,8 @@ def run_exact_k(
     candidates: list[CandidateResult] = []
     scores: list[CandidateScore] = []
     for k in range(1, cfg.k_max + 1):
-        centers, sigma, amps, bg_coef, rss_starts, starts_ok, chosen, ok, reason = (
-            _fit_one_candidate(k, energy, y, yw, w_sqrt, bg, cfg)
-        )
+        (centers, sigma, amps, bg_coef, residual, rss_starts, starts_ok,
+         chosen, ok, reason) = _fit_one_candidate(k, energy, y, yw, w_sqrt, bg, cfg)
         cand_warnings: list[str] = []
 
         conv_rss = [
@@ -606,6 +659,16 @@ def run_exact_k(
                 scales=shared_scales, thresholds=thresholds,
                 include_gamma=False, shared_sigma=True,
             )
+            res_diag = _residual_diagnostics(
+                residual, cfg.residual_acf_z_threshold
+            )
+            if res_diag["structured"]:
+                cand_warnings.append(
+                    f"whitened residual shows systematic structure "
+                    f"(lag-1 autocorr z={res_diag['z']:.1f} > "
+                    f"{cfg.residual_acf_z_threshold}): the model is not "
+                    "sufficient regardless of its IC value"
+                )
             neg = [f for f in flags if f.startswith("negative_amplitude")]
             if neg:
                 cand_warnings.append(
@@ -628,6 +691,7 @@ def run_exact_k(
             diag = None
             centers, sigma = np.array([]), cfg.sigma_init
             amps, bg_coef = np.array([]), np.array([])
+            res_diag = {}
 
         score = score_candidate(model, fit, "gaussian")
         scores.append(score)
@@ -639,7 +703,9 @@ def run_exact_k(
                 bg_coefficients=tuple(float(b) for b in bg_coef),
                 rss_per_start=rss_starts, start_converged=starts_ok,
                 chosen_start=chosen,
-                boundary_flags=tuple(flags), warnings=tuple(cand_warnings),
+                boundary_flags=tuple(flags),
+                residual_diagnostics=res_diag,
+                warnings=tuple(cand_warnings),
             )
         )
 
@@ -677,6 +743,10 @@ def run_exact_k(
                 "negative_amplitudes": [
                     f for f in cand.boundary_flags if f.startswith("negative_amplitude")
                 ],
+                "residual_structured": bool(
+                    cand.residual_diagnostics.get("structured", False)
+                ),
+                "residual_z": cand.residual_diagnostics.get("z"),
                 "multistart_warning": any(
                     "local minima" in w for w in cand.warnings
                 ),

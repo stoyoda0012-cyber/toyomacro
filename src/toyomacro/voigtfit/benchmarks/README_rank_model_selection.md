@@ -281,6 +281,22 @@ output contract.
   symptom (observed: AICc chasing noise with a negative-amplitude
   extra component while BIC rejects it) and is labelled `ambiguous`,
   not `unsupported`.
+- 2026-07-17 (Phase 4): (a) the §5 output contract's
+  `residual_diagnostics` implemented — whitened-residual lag-1
+  autocorrelation with a z-gate (default 4.0, echoed in config); a
+  selected candidate leaving structured residual is `ambiguous`, never
+  `supported` (S5). (b) `bench_rank_model_selection.py` runs the
+  frozen grid (`--mode smoke|full|slice3b|sliceso`); the committed
+  record is `results_rank_model_selection.json`; CI runs only the
+  smoke subset. (c) The naive full-window equal-spacing start lost
+  clustered peaks and was replaced by signal-mass quantile placement
+  (measured on the grid: true-K-in-supported at K=3/1-FWHM/high-SNR
+  went 5/60 → 30/60; overall S1 77.2 % → 82.5 %). Gate 4 outcome:
+  S2/S3/S5/P1-P3 met; S4 99.55 % (7/1560 overfit claims, all
+  low-SNR); S1 at 82.5 % vs the 90 % target — dominated by SO cells
+  and 1-FWHM spacing, with 62/63 failures reporting `ambiguous`
+  (honest refusals, not wrong claims). Recorded as a miss with
+  analysis, per the Gate 4 contract.
 
 ## 9. Non-goals (frozen)
 

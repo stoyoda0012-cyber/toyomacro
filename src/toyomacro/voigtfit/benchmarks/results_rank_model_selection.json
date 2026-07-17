@@ -1,0 +1,121 @@
+{
+ "date": "2026-07-17",
+ "environment": "Apple M3 Max, Python 3.12.11, NumPy 2.3.5, SciPy 1.17.0 (SciPy/NumPy reference implementation)",
+ "code_state": "post Gate-3-core close + Phase 3b + quantile-mass initialization",
+ "note": "Aggregates only; per-cell rows live in outputs/rank_model_selection/ (not tracked). Regenerate with: python -m toyomacro.voigtfit.benchmarks.bench_rank_model_selection --mode <mode>",
+ "smoke": {
+  "aggregate": {
+   "n_cells": 12,
+   "S1_true_k_in_supported_at_sep>=1FWHM_snr>=100": {
+    "n": 2,
+    "rate": 1.0
+   },
+   "S1_including_k1": {
+    "n": 4,
+    "rate": 1.0
+   },
+   "S2_no_overfit_supported_claim_at_0.25FWHM": {
+    "n": 0,
+    "rate": null
+   },
+   "S2_verdict_distribution_at_0.25FWHM": {},
+   "S4_no_overfit_supported_claim_overall": {
+    "n": 12,
+    "rate": 1.0
+   },
+   "underfit_supported_claims_among_supported": {
+    "n": 10,
+    "rate": 0.2
+   },
+   "verdict_distribution": {
+    "supported": 10,
+    "ambiguous": 2,
+    "unsupported": 0
+   },
+   "negative_amplitude_cells": 11,
+   "wall_time_s": {
+    "total": 2.4729440419905586,
+    "per_cell_median": 0.1765121665011975,
+    "per_cell_max": 0.32841691699286457
+   }
+  },
+  "wall_s": 2.5
+ },
+ "full": {
+  "aggregate": {
+   "n_cells": 1560,
+   "S1_true_k_in_supported_at_sep>=1FWHM_snr>=100": {
+    "n": 360,
+    "rate": 0.825
+   },
+   "S1_including_k1": {
+    "n": 420,
+    "rate": 0.830952380952381
+   },
+   "S2_no_overfit_supported_claim_at_0.25FWHM": {
+    "n": 360,
+    "rate": 1.0
+   },
+   "S2_verdict_distribution_at_0.25FWHM": {
+    "supported": 199,
+    "ambiguous": 161
+   },
+   "S4_no_overfit_supported_claim_overall": {
+    "n": 1560,
+    "rate": 0.9955128205128205
+   },
+   "underfit_supported_claims_among_supported": {
+    "n": 1010,
+    "rate": 0.3346534653465347
+   },
+   "verdict_distribution": {
+    "supported": 1010,
+    "ambiguous": 550,
+    "unsupported": 0
+   },
+   "negative_amplitude_cells": 1270,
+   "wall_time_s": {
+    "total": 417.10490081302123,
+    "per_cell_median": 0.21927216699987184,
+    "per_cell_max": 3.133140624995576
+   }
+  },
+  "wall_s": 417.4
+ },
+ "sliceso": {
+  "aggregate": {
+   "n": 10,
+   "S3_structured_not_disfavored_rate": 1.0
+  },
+  "wall_s": 0.2
+ },
+ "slice3b": {
+  "aggregate": {
+   "matched_shirley": {
+    "n": 36,
+    "true_in_supported_rate": 0.19444444444444445,
+    "mean_k_bias_bic": 1.2777777777777777,
+    "overfit_supported_claims": 0
+   },
+   "mismatched_shirley_on_linear": {
+    "n": 36,
+    "true_in_supported_rate": 0.027777777777777776,
+    "mean_k_bias_bic": 1.8611111111111112,
+    "overfit_supported_claims": 0
+   },
+   "tougaard_on_shirley_like": {
+    "n": 36,
+    "true_in_supported_rate": 0.0,
+    "mean_k_bias_bic": 2.0,
+    "overfit_supported_claims": 0
+   },
+   "tougaard_on_linear": {
+    "n": 36,
+    "true_in_supported_rate": 0.0,
+    "mean_k_bias_bic": 2.0,
+    "overfit_supported_claims": 0
+   }
+  },
+  "wall_s": 40.2
+ }
+}
