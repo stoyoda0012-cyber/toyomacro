@@ -318,6 +318,35 @@ def test_svd_report_zero_matrix_is_rank_0_with_inf_condition():
     assert math.isinf(r.condition_number)
 
 
+def test_entropy_rank_uses_squared_singular_value_weights():
+    """erank = exp(-Σ p ln p) with p_i = s_i²/Σs_j² (Fisher-eigenvalue weights).
+
+    diag(2, 1): p = (4/5, 1/5) → erank = exp(0.8·ln(5/4) + 0.2·ln 5)
+    ≈ 1.649385. The s_i/Σs_j weighting would give ≈ 1.889882 instead.
+    """
+    r = svd_report(np.diag([2.0, 1.0]), RankThresholds())
+    p = np.array([0.8, 0.2])
+    expected = float(np.exp(-np.sum(p * np.log(p))))
+    assert r.entropy_rank == pytest.approx(expected, rel=1e-12)
+    assert r.entropy_rank != pytest.approx(1.889882, rel=1e-3)
+
+
+def test_wide_matrix_condition_number_is_inf():
+    """n_cols > n_rows ⇒ a parameter-space null space exists ⇒ inf.
+
+    The stored min(m, n) singular values alone would yield a finite
+    ratio; as an identifiability diagnostic the matrix is singular.
+    """
+    rng = np.random.default_rng(1)
+    wide = rng.standard_normal((3, 5))
+    r = svd_report(wide, RankThresholds())
+    assert math.isinf(r.condition_number)
+    assert len(r.singular_values) == 3
+    # tall full-rank control stays finite
+    tall = rng.standard_normal((5, 3))
+    assert math.isfinite(svd_report(tall, RankThresholds()).condition_number)
+
+
 def test_rank_deficient_linear_basis_emits_projector_warning():
     d = diag([comp(10.0), comp(10.0)], [1.0, 1.0])
     assert any("rank-deficient" in w for w in d.warnings)

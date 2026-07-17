@@ -52,8 +52,12 @@ nonlinear parameters (centers, widths).
 
 Persist all of: full singular-value vector; effective rank at relative
 threshold `s_i/s_1 > 1e-2`; reference rank at `> 1e-3`; entropy
-effective rank; condition number; Fisher eigenvalues and CRLB where
-computable. Threshold ranks are never treated as ground truth; absolute
+effective rank `exp(-Σ p_i ln p_i)` with **Fisher-eigenvalue weights
+`p_i = s_i² / Σ_j s_j²`** (consistent with the M5 identity
+`λ_i(Fisher) = s_i²`); condition number (`inf` whenever
+`n_cols > n_rows` — a wide matrix always has a parameter-space null
+space, so it is singular as an identifiability diagnostic); Fisher
+eigenvalues and CRLB where computable. Threshold ranks are never treated as ground truth; absolute
 detectability claims use CRLB / physically scaled Fisher eigenvalues
 (uniform-variance whitening only rescales singular values uniformly, so
 SNR does not move relative ranks).
@@ -234,6 +238,13 @@ output contract.
   the linear layer too: `rank(W^(1/2)[Phi|B])` is computed on scaled
   columns; the unscaled mix of 1/energy-unit peak columns with
   dimensionless background columns is intrinsically unit-dependent.
+- 2026-07-17 (Gate 1 review): (a) entropy effective rank fixed to
+  Fisher-eigenvalue weighting `p_i = s_i²/Σs_j²` (was `s_i/Σs_j`);
+  formula now stated in §2.3, docstring, and tests. (b) condition
+  number defined as `inf` for wide matrices (`n_cols > n_rows`).
+  (c) Phase 3 handoff: candidate models K = 1..Kmax must share ONE
+  `ParameterScales` instance — per-candidate auto-derived scales would
+  shift rank layers and make them incomparable across K.
 
 ## 9. Non-goals (frozen)
 

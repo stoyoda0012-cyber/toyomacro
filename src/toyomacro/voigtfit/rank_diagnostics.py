@@ -312,7 +312,17 @@ def whitener(
 
 
 def svd_report(matrix: np.ndarray, thresholds: RankThresholds) -> SVDReport:
-    """Full singular-value spectrum + threshold/entropy ranks + condition."""
+    """Full singular-value spectrum + threshold/entropy ranks + condition.
+
+    Entropy effective rank uses Fisher-eigenvalue weights (Gate 1 review):
+    ``erank = exp(-sum p_i ln p_i)`` with ``p_i = s_i^2 / sum_j s_j^2`` —
+    consistent with the M5 identity ``lambda_i(Fisher) = s_i^2``.
+
+    Condition number is ``inf`` whenever ``n_cols > n_rows``: a wide
+    matrix necessarily has a null space in parameter directions, so as an
+    identifiability diagnostic it is singular regardless of the stored
+    ``min(m, n)`` singular values.
+    """
     matrix = np.asarray(matrix, dtype=np.float64)
     s = np.linalg.svd(matrix, compute_uv=False)
     n_rows, n_cols = matrix.shape
@@ -329,10 +339,13 @@ def svd_report(matrix: np.ndarray, thresholds: RankThresholds) -> SVDReport:
     rel = s / s[0]
     rank_primary = int(np.sum(rel > thresholds.rel_primary))
     rank_reference = int(np.sum(rel > thresholds.rel_reference))
-    p = s / s.sum()
+    p = s * s / np.sum(s * s)
     entropy = -float(np.sum(p * np.log(p, where=p > 0, out=np.zeros_like(p))))
     entropy_rank = float(np.exp(entropy))
-    condition = float(s[0] / s[-1]) if s[-1] > 0 else math.inf
+    if n_cols > n_rows or s[-1] == 0.0:
+        condition = math.inf
+    else:
+        condition = float(s[0] / s[-1])
     return SVDReport(
         singular_values=tuple(float(x) for x in s),
         rank_primary=rank_primary,
@@ -380,6 +393,12 @@ def compute_rank_diagnostics(
     Voigt FWHM) and records the derivation in the result.
     ``data_matrix`` is an optional (n_energy, n_spectra) stack Y for the
     data-matrix rank layer.
+
+    Candidate-model comparison (Phase 3 handoff): when ranking candidate
+    models K = 1..Kmax against each other, build ONE ``ParameterScales``
+    from the shared problem and pass it to every candidate explicitly —
+    per-candidate auto-derived representative scales would shift the
+    rank layers and make them incomparable across K.
     """
     energy = np.asarray(energy, dtype=np.float64)
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
