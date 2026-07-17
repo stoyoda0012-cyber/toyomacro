@@ -18,7 +18,12 @@ NumPy/OpenBLAS) beats the GPU at 0.66 TFLOP/s.
 Two oddities that may help localize it:
 
 1. **TF32-on is *slower* than TF32-off** in this microbench, consistent
-   with a mis-selected tensor-core code path on this arch.
+   with a mis-selected tensor-core code path on this arch. Note the
+   TF32-off row was measured with driver-level `NVIDIA_TF32_OVERRIDE=0`,
+   i.e. the driver forcing fp32 *under* MLX's default
+   `CUBLAS_COMPUTE_32F_FAST_TF32` request (`MLX_ENABLE_TF32` defaults
+   to 1 in `mlx/utils.h`); the MLX-native `MLX_ENABLE_TF32=0` path,
+   which requests `CUBLAS_COMPUTE_32F` outright, may behave differently.
 2. During the slow runs `nvidia-smi` reports 2805 MHz (near max), P0,
    100 % GPU utilization — at only **40 W**. The SMs are busy executing
    very low-efficiency code, not idle and not throttled.
@@ -70,6 +75,12 @@ matmul to cuBLASLt on archs without tuned CUTLASS kernels.
 - Python 3.12.3, NumPy 2.3.5, CuPy 14.1.1 (control only)
 
 ## Additional context
+
+Possibly related: #3056 ("Better support consumer CUDA GPUs") extended
+CUDA-graph limits that were tuned for data-center GPUs and could not
+saturate consumer Blackwell — same theme of consumer-arch parameters,
+though that PR addressed graph limits, not the GEMM kernel selection
+itself.
 
 Found while porting an MLX-based (Metal-first) XPS spectral-fitting
 engine to CUDA. Correctness parity with the NumPy reference passes

@@ -425,8 +425,25 @@ dictionaries are constant across the batch loop.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
 6. **File upstream MLX issues** — drafts ready in `docs/upstream-issues/`:
    (1) batched-GEMV batch>65,535 crash (one-line repro); (2) `sm_120` matmul
-   ~36× under cuBLAS; (3) TF32-by-default with no opt-out API; (4) `[cuda13]`
+   ~36× under cuBLAS; (3) TF32-by-default, undocumented; (4) `[cuda13]`
    extra missing runtime/CCCL headers. Deduped against the tracker 2026-07-17
    (related closed: mlx#2267, #3659, #2724).
+
+   **Second dedup pass (2026-07-17, Mac side, tracker + source):** MLX
+   *does* have a native opt-out — `MLX_ENABLE_TF32` (`mlx/utils.h`,
+   default `1`) gates `CUBLAS_COMPUTE_32F_FAST_TF32` vs
+   `CUBLAS_COMPUTE_32F` in `cublas_gemm.cpp`. It is undocumented (only
+   `utils.h` + `mlx_tests.py`), which is why we missed it; draft 3 was
+   rewritten around "undocumented bad default", its original "no
+   opt-out API" claim was wrong. Because the flag is read lazily on
+   first use, setting `os.environ["MLX_ENABLE_TF32"]="0"` at
+   backend-init time works in-process — follow-up 1 is implementable
+   without the process-wide driver var. **Re-measure the precision
+   table with `MLX_ENABLE_TF32=0` before filing draft 3** (expected
+   equivalent to `NVIDIA_TF32_OVERRIDE=0` by code inspection; verify).
+   Also folded into the drafts: #3666 (same gridDim class, fixed for
+   binary/copy/unary but not batched GEMV) → draft 1; #3056 (consumer
+   Blackwell graph limits) → draft 2; #2906/#2842/#2357/#2382 (header
+   search exists but misses the `nvidia/cu13` layout) → draft 4.
 7. Chunk `solve_alternating_projection` batches to ≤ 65,535 on the CUDA path
    (existing chunked infrastructure applies).

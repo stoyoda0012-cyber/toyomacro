@@ -61,10 +61,12 @@ shape-limit error at trace time.
 
 ## Additional context
 
-Looks like the same class as the (fixed) #2267 (`mx.random.uniform`
-large-size launch failure), #3659 (rope `cudaGraphAddKernelNode`), and
-#2724 (CUDA random large sizes) — one more kernel with an untiled
-grid-dimension mapping.
+Looks like the same class as the (fixed) #3666 ("fix grid for large
+uncontiguous input" — the identical `gridDim.y <= 65,535` limit, fixed
+for binary/copy/unary ops in June 2026 but evidently not for batched
+GEMV), #2267 (`mx.random.uniform` large-size launch failure), #3659
+(rope `cudaGraphAddKernelNode`), and #2724 (CUDA random large sizes) —
+one more kernel with an untiled grid-dimension mapping.
 
 Found while validating an XPS spectral-fitting engine (per-spectrum
 4-component Gram solve over 10⁵–10⁶ spectra); the workaround is

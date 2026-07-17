@@ -54,6 +54,14 @@ Suggested fixes, any of:
 2. Vendor the needed headers in the `mlx-cuda-13` wheel.
 3. At minimum, extend the error message to name the pip packages.
 
+Note there is prior art for exactly this: #2906 (closing #2842) added a
+search of `../../nvidia/cuda_runtime/include` for the `cuda-toolkit`
+pip package's layout, and #2357/#2382 addressed CCCL discovery. The
+cu13-generation wheels install to a different layout
+(`site-packages/nvidia/cu13/include`), which that search does not
+cover — so the existing mechanism just needs the new path (and the
+`[cuda13]` extra needs to pull the two packages).
+
 ## Desktop
 
 - OS: Windows 11 + WSL2 (Ubuntu 24.04); no system CUDA toolkit installed

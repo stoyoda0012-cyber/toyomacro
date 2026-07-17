@@ -1,11 +1,20 @@
-# [BUG] [CUDA] float32 matmul silently uses TF32; no API to opt out, diverges from Metal
+# [BUG] [CUDA] fp32 matmul silently defaults to TF32 (`MLX_ENABLE_TF32=1`); undocumented, diverges from Metal
 
 ## Describe the bug
 
 On the CUDA backend, fp32 `mx.matmul` runs in TF32 (10-bit mantissa)
-by default. There is no warning, no documentation of the behavior, and
-no MLX API to disable it — the only opt-out we found is NVIDIA's
-driver-level `NVIDIA_TF32_OVERRIDE=0` environment variable.
+by default: `enable_tf32()` in `mlx/utils.h` defaults `MLX_ENABLE_TF32`
+to `1`, and `dtype_to_compute_type()` in
+`mlx/backend/cuda/gemms/cublas_gemm.cpp` then selects
+`CUBLAS_COMPUTE_32F_FAST_TF32` for `float32` (and `complex64`) inputs.
+
+The switch exists, but nothing tells the user about it: there is no
+warning, and `MLX_ENABLE_TF32` appears nowhere in the documentation —
+the only occurrences in the repo are `mlx/utils.h` and
+`python/tests/mlx_tests.py`. We spent a full-pipeline bisection tracing
+a ~9 dB accuracy regression before finding it, and initially worked
+around it with NVIDIA's driver-level `NVIDIA_TF32_OVERRIDE=0` because
+we could not find any MLX-side control.
 
 Relative Frobenius error of a 512×512 fp32 GEMM against a float64
 reference:
@@ -19,6 +28,11 @@ reference:
 | MLX CUDA + `NVIDIA_TF32_OVERRIDE=0` | 2.1e-07 |
 
 ~1000× the error of fp32 — the expected TF32 mantissa signature.
+(The table was measured with the driver-level override before we found
+the MLX flag; by code inspection `MLX_ENABLE_TF32=0` selects
+`CUBLAS_COMPUTE_32F` and should be equivalent.
+<!-- TODO before filing: re-run the repro with MLX_ENABLE_TF32=0 and
+replace "should be equivalent" with the measured number. -->)
 
 The practical problem is the **silent divergence from Metal**: the same
 MLX program produces fp32-accurate results on Apple silicon and
@@ -49,11 +63,17 @@ print(f"rel Frobenius err: {err:.1e}")   # ~3e-04 default; ~2e-07 with NVIDIA_TF
 
 Any of these would resolve it (in order of preference):
 
-1. Default to true fp32 for fp32 inputs, matching Metal and NumPy
-   semantics; make TF32 opt-in.
+1. Default `MLX_ENABLE_TF32` to `0` — true fp32 for fp32 inputs,
+   matching Metal and NumPy semantics — and make TF32 opt-in.
 2. Expose a runtime switch (analogous to
-   `torch.backends.cuda.matmul.allow_tf32`).
-3. At minimum, document the behavior prominently for the CUDA backend.
+   `torch.backends.cuda.matmul.allow_tf32`) instead of a
+   read-once-at-first-use environment variable.
+3. At minimum, document `MLX_ENABLE_TF32` and the TF32-by-default
+   behavior prominently for the CUDA backend.
+
+(Related: #3235 asked what `MLX_ENABLE_TF32` actually does on the
+Metal/NAX path — the flag is doing double duty across backends, which
+is another reason to document it.)
 
 Notably, TF32 wasn't even buying speed in our measurements on sm_120
 (TF32-on was *slower* than TF32-off in a 4096³ GEMM microbench —
