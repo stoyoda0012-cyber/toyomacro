@@ -303,6 +303,33 @@ def test_result_is_json_serializable_and_complete():
         )
 
 
+def test_shared_sigma_jacobian_is_single_summed_column():
+    """shared_sigma=True diagnoses the K+1 directions of a shared-width
+    model: df/d(sigma_shared) = sum_k df/d(sigma_k) (Gate 3 review)."""
+    comps = [comp(5.0), comp(5.0 + 3 * FWHM)]
+    amps = np.array([2.0, 1.5])
+    s_ind, names_ind = structured_jacobian(
+        ENERGY, comps, amps, include_gamma=False
+    )
+    s_sh, names_sh = structured_jacobian(
+        ENERGY, comps, amps, include_gamma=False, shared_sigma=True
+    )
+    assert names_ind == ["center_0", "sigma_0", "center_1", "sigma_1"]
+    assert names_sh == ["center_0", "center_1", "sigma_shared"]
+    np.testing.assert_allclose(
+        s_sh[:, 2], s_ind[:, 1] + s_ind[:, 3], rtol=1e-14
+    )
+    np.testing.assert_allclose(s_sh[:, 0], s_ind[:, 0], rtol=1e-14)
+    np.testing.assert_allclose(s_sh[:, 1], s_ind[:, 2], rtol=1e-14)
+
+    d = diag(comps, amps, include_gamma=False, shared_sigma=True)
+    assert d.column_names["nonlinear"] == ["center_0", "center_1", "sigma_shared"]
+    assert d.profiled_nonlinear.n_cols == 3
+    # independent-sigma diagnosis stays the default
+    d_default = diag(comps, amps, include_gamma=False)
+    assert d_default.column_names["nonlinear"] == names_ind
+
+
 def test_structured_jacobian_names_and_shapes():
     s, names = structured_jacobian(
         ENERGY, [comp(6.0)], np.array([1.5]), include_gamma=False

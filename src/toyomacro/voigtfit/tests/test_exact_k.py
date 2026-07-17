@@ -110,14 +110,15 @@ def test_well_separated_peaks_supported_range_is_2(report_separated):
     assert all(a > 0 for a in k2.amplitudes)
 
 
-def test_close_peaks_are_not_forced_to_k2(report_close):
-    """S2 criterion: at 0.25 FWHM the success condition is reporting
-    non-identifiability/ambiguity, NOT recovering K=2."""
+def test_close_peaks_yield_ambiguous_on_ic_disagreement(report_close):
+    """S2 + Gate 3 review: at 0.25 FWHM AICc and BIC name different best
+    K, so the frozen rule demands `ambiguous` — even though the
+    both-deltas support range is the single K=1."""
     r = report_close
-    forced_unique_k2 = r.verdict == "supported" and r.supported_k == (2,)
-    assert not forced_unique_k2
-    assert r.verdict in ("supported", "ambiguous", "unsupported")
-    assert r.verdict_reasons  # the verdict always carries its evidence
+    assert r.selection.best_by["aicc"] != r.selection.best_by["bic"]
+    assert r.verdict == "ambiguous"
+    assert any("disagree" in reason for reason in r.verdict_reasons)
+    assert not (r.verdict == "supported" and r.supported_k == (2,))
 
 
 # ------------------------------------------------- review point: label order
@@ -135,10 +136,15 @@ def test_centers_are_reported_in_canonical_ascending_order(report_separated):
 def test_multistart_bookkeeping_is_recorded(report_separated):
     for cand in report_separated.candidates:
         assert len(cand.rss_per_start) == CFG.n_starts
-        finite = [r for r in cand.rss_per_start if r is not None]
-        assert finite
+        assert len(cand.start_converged) == CFG.n_starts
+        conv = [
+            r for r, c in zip(cand.rss_per_start, cand.start_converged)
+            if c and r is not None
+        ]
+        assert conv
         if cand.chosen_start is not None:
-            assert cand.rss_per_start[cand.chosen_start] == min(finite)
+            assert cand.start_converged[cand.chosen_start]
+            assert cand.rss_per_start[cand.chosen_start] == min(conv)
 
 
 # ------------------------------------------------- review point: fixed bg
@@ -162,6 +168,11 @@ def test_negative_amplitude_is_flagged_and_collected_as_nnls_evidence(report_neg
     assert any("NNLS" in w for w in r.warnings)
     # the flag also reaches the per-candidate IC warnings via boundary_flags
     assert any("regularity" in w for w in k2.score.warnings)
+    # Gate 3 review: a selected candidate with negative amplitudes is
+    # never claimed as "supported"
+    if r.supported_k == (2,):
+        assert r.verdict == "ambiguous"
+        assert any("negative" in reason for reason in r.verdict_reasons)
 
 
 # ------------------------------------------------- review point: range, not argmin
@@ -179,6 +190,85 @@ def test_report_returns_supported_range_and_evidence_not_bare_argmin(report_sepa
         }
     # threshold is echoed, not hidden
     assert r.config["delta_ic_threshold"] == CFG.delta_ic_threshold
+
+
+# ------------------------------------------------- review: converged starts
+
+
+class _FakeResult:
+    def __init__(self, cost, x, status, message):
+        self.cost, self.x, self.status, self.message = cost, x, status, message
+
+
+def test_nonconverged_start_with_lowest_rss_is_not_chosen(monkeypatch):
+    """A non-converged start reporting the smallest RSS must lose to a
+    converged start; its RSS stays recorded for the report."""
+    calls = {"n": 0}
+
+    def fake_ls(fun, x0, bounds=None):
+        i = calls["n"]
+        calls["n"] += 1
+        if i == 0:
+            return _FakeResult(0.001, np.array([9.0, 0.45]), 0, "max iterations")
+        return _FakeResult(10.0 + i, np.array([10.0 + 0.01 * i, 0.5]), 1, "converged")
+
+    monkeypatch.setattr(exact_k_module, "least_squares", fake_ls)
+    y = synth([10.0], [2.0], seed=3)
+    cfg = ExactKConfig(sigma_init=0.5, gamma=GAMMA, k_max=1, bg_degree=None, n_starts=3)
+    r = run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+
+    cand = r.candidates[0]
+    assert cand.score.success
+    assert cand.start_converged == (False, True, True)
+    assert cand.chosen_start == 1  # min RSS among CONVERGED starts
+    assert cand.rss_per_start[0] == pytest.approx(0.002)  # recorded, not chosen
+    assert cand.score.rss == pytest.approx(2.0 * 11.0)
+    assert any("did not converge" in w for w in cand.warnings)
+
+
+def test_candidate_fails_only_when_no_start_converges(monkeypatch):
+    def fake_ls(fun, x0, bounds=None):
+        return _FakeResult(1.0, np.array([9.0, 0.45]), 0, "max iterations")
+
+    monkeypatch.setattr(exact_k_module, "least_squares", fake_ls)
+    y = synth([10.0], [2.0], seed=3)
+    cfg = ExactKConfig(sigma_init=0.5, gamma=GAMMA, k_max=1, bg_degree=None, n_starts=2)
+    r = run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+
+    cand = r.candidates[0]
+    assert not cand.score.success
+    assert cand.start_converged == (False, False)
+    assert cand.chosen_start is None
+    assert "no start converged" in cand.score.termination_reason
+    assert r.verdict == "unsupported"
+
+
+# ------------------------------------------------- review: descending axis
+
+
+def test_descending_energy_axis_is_equivalent_to_ascending():
+    """XPS binding-energy axes are often descending; the report must be
+    identical after internal normalization."""
+    y = synth([6.0, 6.0 + 3 * FWHM], [2.0, 1.6], seed=4)
+    cfg = ExactKConfig(sigma_init=0.5, gamma=GAMMA, k_max=2, bg_degree=None, n_starts=2)
+    r_asc = run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+    r_desc = run_exact_k(ENERGY[::-1], y[::-1], cfg, sigma_std=NOISE_STD)
+
+    assert r_desc.supported_k == r_asc.supported_k
+    assert r_desc.verdict == r_asc.verdict
+    for c_asc, c_desc in zip(r_asc.candidates, r_desc.candidates):
+        np.testing.assert_allclose(c_desc.centers, c_asc.centers, atol=1e-9)
+        np.testing.assert_allclose(c_desc.amplitudes, c_asc.amplitudes, rtol=1e-9)
+        assert c_desc.score.rss == pytest.approx(c_asc.score.rss, rel=1e-12)
+
+
+def test_non_monotonic_energy_axis_is_rejected():
+    y = synth([10.0], [2.0], seed=5)
+    bad = ENERGY.copy()
+    bad[5] = bad[3]
+    cfg = ExactKConfig(sigma_init=0.5, gamma=GAMMA, k_max=1)
+    with pytest.raises(ValueError, match="monotonic"):
+        run_exact_k(bad, y, cfg, sigma_std=NOISE_STD)
 
 
 def test_report_is_json_serializable(report_separated):

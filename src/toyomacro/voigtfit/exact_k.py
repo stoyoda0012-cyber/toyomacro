@@ -116,6 +116,7 @@ class CandidateResult:
     amplitudes: tuple[float, ...]
     bg_coefficients: tuple[float, ...]
     rss_per_start: tuple[float | None, ...]
+    start_converged: tuple[bool, ...]
     chosen_start: int | None
     boundary_flags: tuple[str, ...]
     warnings: tuple[str, ...]
@@ -131,6 +132,7 @@ class CandidateResult:
             "amplitudes": list(self.amplitudes),
             "bg_coefficients": list(self.bg_coefficients),
             "rss_per_start": list(self.rss_per_start),
+            "start_converged": list(self.start_converged),
             "chosen_start": self.chosen_start,
             "boundary_flags": list(self.boundary_flags),
             "warnings": list(self.warnings),
@@ -248,11 +250,17 @@ def _fit_one_candidate(
     w_sqrt: np.ndarray,
     bg: np.ndarray,
     cfg: ExactKConfig,
-) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, tuple, int | None, bool, str]:
+) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, tuple, tuple, int | None, bool, str]:
     """Inner VARPRO problem for exactly K components, multi-start.
 
+    The winner is the minimum-RSS start AMONG CONVERGED STARTS only
+    (Gate 3 review): a non-converged start with a lower RSS must not
+    fail the candidate when a converged solution exists. The candidate
+    fails only when no start converges.
+
     Returns (sorted centers, sigma, amplitudes, bg coefficients,
-    rss_per_start, chosen_start, success, termination_reason).
+    rss_per_start, start_converged, chosen_start, success,
+    termination_reason).
     """
     lo, hi = float(energy[0]), float(energy[-1])
     lb = np.array([lo] * k + [cfg.sigma_bounds[0]])
@@ -262,7 +270,8 @@ def _fit_one_candidate(
         return _varpro_solve(theta, k, energy, yw, w_sqrt, bg, cfg)[0]
 
     rss_per_start: list[float | None] = []
-    solutions: list[tuple[float, np.ndarray, str, bool]] = []
+    start_converged: list[bool] = []
+    solutions: list[tuple[float, np.ndarray, str]] = []
     for centers0 in _initial_center_sets(energy, y, k, cfg):
         theta0 = np.clip(
             np.append(centers0, cfg.sigma_init), lb + 1e-12, ub - 1e-12
@@ -270,19 +279,29 @@ def _fit_one_candidate(
         try:
             res = least_squares(residual_fn, theta0, bounds=(lb, ub))
             rss = float(2.0 * res.cost)
+            ok = bool(res.status > 0) and math.isfinite(rss)
             rss_per_start.append(rss)
-            solutions.append((rss, res.x, res.message, res.status > 0))
+            start_converged.append(ok)
+            solutions.append((rss, res.x, res.message))
         except Exception as exc:  # noqa: BLE001 — record, never hide, a failed start
             rss_per_start.append(None)
-            solutions.append((math.inf, theta0, f"start raised: {exc}", False))
+            start_converged.append(False)
+            solutions.append((math.inf, theta0, f"start raised: {exc}"))
 
-    best_idx = int(np.argmin([s[0] for s in solutions]))
-    rss_best, theta_best, message, converged = solutions[best_idx]
-    if not math.isfinite(rss_best):
+    converged_idx = [i for i, ok in enumerate(start_converged) if ok]
+    if not converged_idx:
+        message = "; ".join(
+            f"start {i}: {solutions[i][2]}" for i in range(len(solutions))
+        )
         return (
             np.array([]), cfg.sigma_init, np.array([]), np.array([]),
-            tuple(rss_per_start), None, False, message,
+            tuple(rss_per_start), tuple(start_converged), None, False,
+            f"no start converged ({message})",
         )
+
+    best_idx = min(converged_idx, key=lambda i: solutions[i][0])
+    rss_best, theta_best, message = solutions[best_idx]
+    del rss_best
 
     order = np.argsort(theta_best[:k])
     centers_sorted = theta_best[:k][order]
@@ -292,7 +311,7 @@ def _fit_one_candidate(
     )
     return (
         centers_sorted, float(theta_best[k]), amplitudes, bg_coef,
-        tuple(rss_per_start), best_idx, converged, message,
+        tuple(rss_per_start), tuple(start_converged), best_idx, True, message,
     )
 
 
@@ -321,9 +340,17 @@ def _verdict(
     evidence: list[dict[str, Any]],
     supported: list[int],
 ) -> tuple[str, list[str]]:
-    """Frozen §6 wording: the verdict carries reasons, never a bare K."""
+    """Frozen §6 wording: the verdict carries reasons, never a bare K.
+
+    ``supported`` additionally requires (Gate 3 review): AICc and BIC
+    must name the SAME best K — a criterion disagreement is `ambiguous`
+    even when the both-deltas-within-threshold range is a single K —
+    and the selected candidate must be free of negative amplitudes.
+    """
     reasons: list[str] = []
-    if selection.best_by["aicc"] is None and selection.best_by["bic"] is None:
+    best_aicc = selection.best_by["aicc"]
+    best_bic = selection.best_by["bic"]
+    if best_aicc is None and best_bic is None:
         reasons.append("no successful candidate selectable by any criterion")
         return "unsupported", reasons
     if not supported:
@@ -337,6 +364,20 @@ def _verdict(
         return "ambiguous", reasons
     k_star = supported[0]
     ev = next(e for e in evidence if e["k"] == k_star)
+    if best_aicc != best_bic:
+        reasons.append(
+            f"information criteria disagree (AICc best K={best_aicc}, "
+            f"BIC best K={best_bic}) — frozen rule: IC disagreement is "
+            "ambiguous even for a single-K support range"
+        )
+        return "ambiguous", reasons
+    if ev["negative_amplitudes"]:
+        reasons.append(
+            f"the supported candidate K={k_star} carries negative "
+            f"amplitudes ({ev['negative_amplitudes']}) under unconstrained "
+            "LS — not claiming 'supported' on an unphysical solution"
+        )
+        return "ambiguous", reasons
     if ev["rank_supported"]:
         reasons.append(
             f"ICs agree on K={k_star} and the local rank supports the "
@@ -371,6 +412,16 @@ def run_exact_k(
     y = np.asarray(y, dtype=np.float64)
     if energy.shape != y.shape:
         raise ValueError("energy and y must have the same shape")
+    # XPS binding-energy axes are often descending: normalize to ascending
+    # internally (Gate 3 review); non-monotonic axes are rejected outright.
+    d_energy = np.diff(energy)
+    if np.all(d_energy < 0):
+        energy = energy[::-1].copy()
+        y = y[::-1].copy()
+        if np.ndim(sigma_std) > 0:
+            sigma_std = np.asarray(sigma_std)[::-1].copy()
+    elif not np.all(d_energy > 0):
+        raise ValueError("energy axis must be strictly monotonic")
     thresholds = thresholds or RankThresholds()
     warnings: list[str] = []
 
@@ -394,20 +445,27 @@ def run_exact_k(
     candidates: list[CandidateResult] = []
     scores: list[CandidateScore] = []
     for k in range(1, cfg.k_max + 1):
-        centers, sigma, amps, bg_coef, rss_starts, chosen, ok, reason = (
+        centers, sigma, amps, bg_coef, rss_starts, starts_ok, chosen, ok, reason = (
             _fit_one_candidate(k, energy, y, yw, w_sqrt, bg, cfg)
         )
         cand_warnings: list[str] = []
 
-        finite_rss = [r for r in rss_starts if r is not None]
-        if ok and len(finite_rss) > 1:
-            spread = (max(finite_rss) - min(finite_rss)) / max(min(finite_rss), 1e-300)
+        conv_rss = [
+            r for r, c in zip(rss_starts, starts_ok) if c and r is not None
+        ]
+        if ok and len(conv_rss) > 1:
+            spread = (max(conv_rss) - min(conv_rss)) / max(min(conv_rss), 1e-300)
             if spread > cfg.multistart_spread_rel_tol:
                 cand_warnings.append(
                     f"multi-start RSS spread {spread:.3g} exceeds "
                     f"{cfg.multistart_spread_rel_tol}: local minima present — "
                     "this K's evidence is initialization-dependent"
                 )
+        if ok and not all(starts_ok):
+            cand_warnings.append(
+                f"{starts_ok.count(False)}/{len(starts_ok)} starts did not "
+                "converge; winner chosen among converged starts only"
+            )
 
         if ok:
             flags = _boundary_flags(centers, sigma, amps, energy, cfg)
@@ -419,16 +477,19 @@ def run_exact_k(
                 gammas_free=False,
                 variance_estimated=True,
             )
-            rss = float(min(finite_rss))
+            rss = float(min(conv_rss))
             fit = CandidateFit(
                 n_points=n, rss=rss, success=True,
                 termination_reason=reason, boundary_flags=tuple(flags),
             )
+            # shared_sigma=True: diagnose the K+1 nonlinear directions the
+            # fit actually optimizes (K centers + one shared width), not
+            # 2K independent ones (Gate 3 review).
             diag = compute_rank_diagnostics(
                 energy, list(model.components), amps,
                 bg_degree=cfg.bg_degree, sigma_std=sigma_std,
                 scales=shared_scales, thresholds=thresholds,
-                include_gamma=False,
+                include_gamma=False, shared_sigma=True,
             )
             neg = [f for f in flags if f.startswith("negative_amplitude")]
             if neg:
@@ -461,7 +522,8 @@ def run_exact_k(
                 centers=tuple(float(c) for c in centers), sigma=float(sigma),
                 amplitudes=tuple(float(a) for a in amps),
                 bg_coefficients=tuple(float(b) for b in bg_coef),
-                rss_per_start=rss_starts, chosen_start=chosen,
+                rss_per_start=rss_starts, start_converged=starts_ok,
+                chosen_start=chosen,
                 boundary_flags=tuple(flags), warnings=tuple(cand_warnings),
             )
         )

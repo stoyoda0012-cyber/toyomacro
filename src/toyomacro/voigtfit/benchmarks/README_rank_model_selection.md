@@ -255,6 +255,18 @@ output contract.
   reported, not resolved; a single `-inf` wins with delta 0 / `+inf`;
   NaN is never produced. (c) `poisson_deviance` validates shape and
   `y >= 0` like `poisson_loglik`.
+- 2026-07-17 (Gate 3 review): (a) rank diagnostics gained
+  `shared_sigma=True` — a shared-width fit is diagnosed on its actual
+  K + 1 nonlinear directions (`df/d(sigma_shared) = Σ_k df/d(sigma_k)`),
+  not 2K independent ones; the independent-sigma diagnosis stays the
+  default. (b) verdict rules tightened: `best_by["aicc"] !=
+  best_by["bic"]` is `ambiguous` even for a single-K support range, and
+  a selected candidate carrying negative amplitudes is `ambiguous`,
+  never `supported`. (c) the multi-start winner is the minimum-RSS
+  CONVERGED start; per-start convergence is recorded; a candidate fails
+  only when no start converges. (d) descending (binding-energy) axes
+  are normalized to ascending internally; non-monotonic axes are
+  rejected.
 
 ## 9. Non-goals (frozen)
 

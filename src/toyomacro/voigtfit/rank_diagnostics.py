@@ -219,6 +219,7 @@ def structured_jacobian(
     components: list[ComponentConfig],
     amplitudes: np.ndarray,
     include_gamma: bool = True,
+    shared_sigma: bool = False,
 ) -> tuple[np.ndarray, list[str]]:
     """Nonlinear Jacobian ``S = d(Phi(theta) a)/d(theta)`` and column names.
 
@@ -226,6 +227,13 @@ def structured_jacobian(
     optionally ``gamma_k``. Doublet partners share sigma/gamma and shift
     rigidly with the main line, so their derivatives are summed into the
     same column (weighted ``1 / branch_ratio``).
+
+    ``shared_sigma=True`` diagnoses a model with ONE Gaussian width for
+    all components (Gate 3 review): the per-component sigma columns are
+    summed into a single ``sigma_shared`` column,
+    ``df/d(sigma_shared) = sum_k df/d(sigma_k)``, giving K + 1 nonlinear
+    directions instead of 2K (for ``include_gamma=False``). The
+    independent-sigma diagnosis remains the default.
     """
     energy = np.asarray(energy, dtype=np.float64)
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
@@ -234,6 +242,7 @@ def structured_jacobian(
 
     cols: list[np.ndarray] = []
     names: list[str] = []
+    sigma_shared_col = np.zeros_like(energy)
     for k, comp in enumerate(components):
         _, d_dc, d_ds, d_dg = voigt_with_jacobian(
             energy, comp.center, comp.sigma, comp.gamma
@@ -249,11 +258,17 @@ def structured_jacobian(
         a_k = amplitudes[k]
         cols.append(a_k * d_dc)
         names.append(f"center_{k}")
-        cols.append(a_k * d_ds)
-        names.append(f"sigma_{k}")
+        if shared_sigma:
+            sigma_shared_col = sigma_shared_col + a_k * d_ds
+        else:
+            cols.append(a_k * d_ds)
+            names.append(f"sigma_{k}")
         if include_gamma:
             cols.append(a_k * d_dg)
             names.append(f"gamma_{k}")
+    if shared_sigma:
+        cols.append(sigma_shared_col)
+        names.append("sigma_shared")
     return np.column_stack(cols), names
 
 
@@ -384,6 +399,7 @@ def compute_rank_diagnostics(
     scales: ParameterScales | None = None,
     thresholds: RankThresholds | None = None,
     include_gamma: bool = True,
+    shared_sigma: bool = False,
     data_matrix: np.ndarray | None = None,
 ) -> RankDiagnostics:
     """All rank layers for one structured-Voigt problem (frozen design §2.2).
@@ -449,7 +465,8 @@ def compute_rank_diagnostics(
     linear = svd_report(wa * d_linear[None, :], thresholds)
 
     s_mat, names_nl = structured_jacobian(
-        energy, components, amplitudes, include_gamma=include_gamma
+        energy, components, amplitudes,
+        include_gamma=include_gamma, shared_sigma=shared_sigma,
     )
     ws = w_sqrt[:, None] * s_mat
     d_nl = np.array(
