@@ -387,7 +387,9 @@ on the table without touching voigtfit code.
 
 ### Operating guidance for this machine (RTX 5070 Laptop, WSL2)
 
-- Always: `NVIDIA_TF32_OVERRIDE=0` and AP batch chunks ≤ 65,535.
+- Always: `MLX_ENABLE_TF32=0` (MLX-native; measured equivalent to the
+  driver-level `NVIDIA_TF32_OVERRIDE=0`, and settable in-process via
+  `os.environ` before the first kernel call) and AP batch chunks ≤ 65,535.
 - Streaming / amp-only paths: **stay on NumPy** — the Ryzen wins today.
 - Multipeak AP / dict2d at scale: CUDA is already a real 4–6× win.
 - Re-benchmark on each MLX release; the 36× GEMM gap is the number to watch.
@@ -438,9 +440,14 @@ dictionaries are constant across the batch loop.
    opt-out API" claim was wrong. Because the flag is read lazily on
    first use, setting `os.environ["MLX_ENABLE_TF32"]="0"` at
    backend-init time works in-process — follow-up 1 is implementable
-   without the process-wide driver var. **Re-measure the precision
-   table with `MLX_ENABLE_TF32=0` before filing draft 3** (expected
-   equivalent to `NVIDIA_TF32_OVERRIDE=0` by code inspection; verify).
+   without the process-wide driver var. ~~Re-measure the precision
+   table with `MLX_ENABLE_TF32=0` before filing draft 3~~ — **done
+   (2026-07-17, CUDA box):** `MLX_ENABLE_TF32=0` measures 2.08e-07
+   (identical to the driver override), GEMM perf 421 ms vs 420 ms
+   (identical — the 36× gap is not an artifact of the disable method),
+   the in-process `os.environ` set works (2.08e-07), and the four
+   formerly TF32-failing tests pass with the MLX flag alone. Drafts 2
+   and 3 updated with the measured numbers; all four are ready to file.
    Also folded into the drafts: #3666 (same gridDim class, fixed for
    binary/copy/unary but not batched GEMV) → draft 1; #3056 (consumer
    Blackwell graph limits) → draft 2; #2906/#2842/#2357/#2382 (header

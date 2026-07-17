@@ -18,12 +18,13 @@ NumPy/OpenBLAS) beats the GPU at 0.66 TFLOP/s.
 Two oddities that may help localize it:
 
 1. **TF32-on is *slower* than TF32-off** in this microbench, consistent
-   with a mis-selected tensor-core code path on this arch. Note the
-   TF32-off row was measured with driver-level `NVIDIA_TF32_OVERRIDE=0`,
-   i.e. the driver forcing fp32 *under* MLX's default
-   `CUBLAS_COMPUTE_32F_FAST_TF32` request (`MLX_ENABLE_TF32` defaults
-   to 1 in `mlx/utils.h`); the MLX-native `MLX_ENABLE_TF32=0` path,
-   which requests `CUBLAS_COMPUTE_32F` outright, may behave differently.
+   with a mis-selected tensor-core code path on this arch. Measured
+   both off-paths: MLX-native `MLX_ENABLE_TF32=0` (requests
+   `CUBLAS_COMPUTE_32F` outright) gives 421 ms and driver-level
+   `NVIDIA_TF32_OVERRIDE=0` (driver forcing fp32 under the default
+   `CUBLAS_COMPUTE_32F_FAST_TF32` request) gives 420 ms — identical, so
+   the 36× gap is not an artifact of how TF32 is disabled. The default
+   TF32 path is 734 ms (0.19 TFLOP/s) either way.
 2. During the slow runs `nvidia-smi` reports 2805 MHz (near max), P0,
    100 % GPU utilization — at only **40 W**. The SMs are busy executing
    very low-efficiency code, not idle and not throttled.

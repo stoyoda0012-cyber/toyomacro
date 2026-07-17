@@ -24,15 +24,16 @@ reference:
 | NumPy fp32 | 2.9e-07 |
 | MLX CPU stream | 4.1e-07 |
 | MLX Metal (M-series) | fp32-class |
-| **MLX CUDA (default)** | **2.9e-04** |
-| MLX CUDA + `NVIDIA_TF32_OVERRIDE=0` | 2.1e-07 |
+| **MLX CUDA (default, `MLX_ENABLE_TF32=1`)** | **2.9e-04** |
+| MLX CUDA + `MLX_ENABLE_TF32=0` | 2.1e-07 |
+| MLX CUDA + `NVIDIA_TF32_OVERRIDE=0` (driver-level) | 2.1e-07 |
 
 ~1000× the error of fp32 — the expected TF32 mantissa signature.
-(The table was measured with the driver-level override before we found
-the MLX flag; by code inspection `MLX_ENABLE_TF32=0` selects
-`CUBLAS_COMPUTE_32F` and should be equivalent.
-<!-- TODO before filing: re-run the repro with MLX_ENABLE_TF32=0 and
-replace "should be equivalent" with the measured number. -->)
+`MLX_ENABLE_TF32=0` is measured equivalent to the driver-level
+override (2.08e-07 vs 2.077e-07 on the same seed). Because the flag is
+read lazily on first use, `os.environ["MLX_ENABLE_TF32"] = "0"` before
+the first kernel call also works in-process (measured: 2.08e-07) —
+useful, but only if the user knows the flag exists.
 
 The practical problem is the **silent divergence from Metal**: the same
 MLX program produces fp32-accurate results on Apple silicon and
@@ -56,7 +57,7 @@ ref = A.astype(np.float64) @ B.astype(np.float64)
 
 g = np.array(mx.matmul(mx.array(A), mx.array(B)))
 err = np.linalg.norm(g.astype(np.float64) - ref) / np.linalg.norm(ref)
-print(f"rel Frobenius err: {err:.1e}")   # ~3e-04 default; ~2e-07 with NVIDIA_TF32_OVERRIDE=0
+print(f"rel Frobenius err: {err:.1e}")   # ~3e-04 default; ~2e-07 with MLX_ENABLE_TF32=0
 ```
 
 ## Expected behavior
