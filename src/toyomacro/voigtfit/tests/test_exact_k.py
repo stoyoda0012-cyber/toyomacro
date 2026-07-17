@@ -372,6 +372,45 @@ def test_plugin_tougaard_records_universal_c():
     assert r.background["settings"] == {"C": 1643.0, "universal": True}
 
 
+def test_plugin_and_polynomial_background_are_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        ExactKConfig(
+            sigma_init=0.5, gamma=GAMMA,
+            plugin_background="shirley", bg_degree=1,
+        )
+
+
+def test_tougaard_universal_flag_reflects_actual_c():
+    y = synth([10.0], [2.0], seed=9, noise=0.02)
+    cfg = ExactKConfig(
+        sigma_init=0.5, gamma=GAMMA, k_max=1, n_starts=2,
+        plugin_background="tougaard", tougaard_c=2000.0,
+    )
+    r = run_exact_k(ENERGY, y, cfg, sigma_std=0.02)
+    assert r.background["settings"] == {"C": 2000.0, "universal": False}
+
+
+def test_plugin_curve_shape_and_finiteness_are_validated(monkeypatch):
+    from toyomacro.background import Shirley
+
+    y = synth([10.0], [2.0], seed=8)
+    cfg = ExactKConfig(
+        sigma_init=0.5, gamma=GAMMA, k_max=1, n_starts=2,
+        plugin_background="shirley",
+    )
+    monkeypatch.setattr(
+        Shirley, "calculate", lambda self, *a, **kw: np.zeros(7)
+    )
+    with pytest.raises(ValueError, match="shape"):
+        run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+
+    bad = np.zeros_like(ENERGY)
+    bad[3] = np.nan
+    monkeypatch.setattr(Shirley, "calculate", lambda self, *a, **kw: bad)
+    with pytest.raises(ValueError, match="non-finite"):
+        run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+
+
 def test_no_plugin_records_polynomial_or_none_mode(report_separated, report_close):
     assert report_separated.background == {"mode": "polynomial", "bg_degree": 1}
     assert report_close.background == {"mode": "none", "bg_degree": None}

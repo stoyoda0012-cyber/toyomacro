@@ -100,6 +100,14 @@ class ExactKConfig:
     shirley_tol: float = 1e-5
     tougaard_c: float = 1643.0
 
+    def __post_init__(self) -> None:
+        if self.plugin_background is not None and self.bg_degree is not None:
+            raise ValueError(
+                "plugin_background and bg_degree are mutually exclusive: "
+                "the background family is fixed to ONE mechanism per "
+                "comparison (Phase 3b contract)"
+            )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "sigma_init": self.sigma_init,
@@ -224,7 +232,13 @@ def _plugin_background_curve(
         curve = Tougaard().calculate(energy, y, C=cfg.tougaard_c)
         record = {
             "mode": "plugin_tougaard",
-            "settings": {"C": cfg.tougaard_c, "universal": True},
+            # "universal" reflects the ACTUAL C: a user-fixed non-universal
+            # C is still fixed-during-comparison (what 3b requires is no
+            # joint B/C estimation), but must never be mislabelled.
+            "settings": {
+                "C": cfg.tougaard_c,
+                "universal": bool(cfg.tougaard_c == 1643.0),
+            },
             "convergence": "non-iterative",
         }
     else:
@@ -233,6 +247,16 @@ def _plugin_background_curve(
             "(expected 'shirley' or 'tougaard')"
         )
     curve = np.asarray(curve, dtype=np.float64)
+    if curve.shape != y.shape:
+        raise ValueError(
+            f"plug-in background returned shape {curve.shape}, "
+            f"expected {y.shape}"
+        )
+    if not np.all(np.isfinite(curve)):
+        raise ValueError(
+            "plug-in background contains non-finite values — refusing to "
+            "subtract it silently"
+        )
     record["curve_summary"] = {
         "min": float(np.min(curve)),
         "max": float(np.max(curve)),
