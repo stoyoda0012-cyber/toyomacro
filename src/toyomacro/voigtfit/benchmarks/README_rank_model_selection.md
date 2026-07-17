@@ -222,7 +222,20 @@ output contract.
   SciPy 1.17.0, MLX 0.31.2 (Metal; irrelevant to the SciPy/NumPy
   reference implementation but recorded for completeness).
 
-## 8. Non-goals (frozen)
+## 8. Change history (clarifications only — criteria unchanged)
+
+- 2026-07-17 (Phase 1, M6-driven): two clarifications of §2.4, found by
+  the unit-invariance test before any acceptance criterion changed.
+  (a) The background coefficient scale defaults to the typical-height
+  proxy `amplitude_scale / representative_fwhm` — background columns
+  are dimensionless normalized monomials (counts), NOT area-unit
+  amplitude columns (counts·energy), so reusing the amplitude scale
+  would break unit invariance. (b) "scaled before any SVD" applies to
+  the linear layer too: `rank(W^(1/2)[Phi|B])` is computed on scaled
+  columns; the unscaled mix of 1/energy-unit peak columns with
+  dimensionless background columns is intrinsically unit-dependent.
+
+## 9. Non-goals (frozen)
 
 - SVD rank is never reported as "the number of chemical states".
 - Minimum AIC/BIC alone never fixes the physical model.
