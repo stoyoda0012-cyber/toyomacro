@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -87,6 +87,18 @@ class ExactKConfig:
     n_starts: int = 3
     delta_ic_threshold: float = 2.0
     multistart_spread_rel_tol: float = 0.01
+    # Phase 3b — plug-in background (Shirley/Tougaard). The curve is
+    # estimated from the OBSERVED spectrum ONCE before the K loop, then
+    # held fixed for every candidate; it is neither a linear column nor
+    # a free parameter. Shirley runs with fixed endpoints (auto_range
+    # deliberately off); Tougaard uses the universal C, no B/C joint
+    # estimation. Joint/iterative peak-background estimation is a
+    # separate research phase (the background would depend on theta and
+    # the inner problem would no longer be a plain VARPRO projection).
+    plugin_background: Literal["shirley", "tougaard"] | None = None
+    shirley_max_iter: int = 50
+    shirley_tol: float = 1e-5
+    tougaard_c: float = 1643.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -100,6 +112,10 @@ class ExactKConfig:
             "n_starts": self.n_starts,
             "delta_ic_threshold": self.delta_ic_threshold,
             "multistart_spread_rel_tol": self.multistart_spread_rel_tol,
+            "plugin_background": self.plugin_background,
+            "shirley_max_iter": self.shirley_max_iter,
+            "shirley_tol": self.shirley_tol,
+            "tougaard_c": self.tougaard_c,
         }
 
 
@@ -159,6 +175,7 @@ class ExactKReport:
     negative_amplitude_k: tuple[int, ...]
     parameter_scales: dict[str, Any]
     config: dict[str, Any]
+    background: dict[str, Any] = field(default_factory=dict)
     warnings: tuple[str, ...] = field(default=())
 
     def to_dict(self) -> dict[str, Any]:
@@ -172,8 +189,57 @@ class ExactKReport:
             "negative_amplitude_k": list(self.negative_amplitude_k),
             "parameter_scales": self.parameter_scales,
             "config": self.config,
+            "background": self.background,
             "warnings": list(self.warnings),
         }
+
+
+def _plugin_background_curve(
+    energy: np.ndarray, y: np.ndarray, cfg: ExactKConfig
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Estimate the plug-in background ONCE from the observed spectrum.
+
+    Imports are lazy so ``voigtfit`` stays importable standalone when no
+    plug-in background is requested.
+    """
+    if cfg.plugin_background == "shirley":
+        from toyomacro.background import Shirley
+
+        curve = Shirley().calculate(
+            energy, y, max_iter=cfg.shirley_max_iter, tol=cfg.shirley_tol,
+            auto_range=False,
+        )
+        record: dict[str, Any] = {
+            "mode": "plugin_shirley",
+            "settings": {
+                "max_iter": cfg.shirley_max_iter,
+                "tol": cfg.shirley_tol,
+                "auto_range": False,
+            },
+            "convergence": "not exposed by Shirley.calculate; settings recorded",
+        }
+    elif cfg.plugin_background == "tougaard":
+        from toyomacro.background import Tougaard
+
+        curve = Tougaard().calculate(energy, y, C=cfg.tougaard_c)
+        record = {
+            "mode": "plugin_tougaard",
+            "settings": {"C": cfg.tougaard_c, "universal": True},
+            "convergence": "non-iterative",
+        }
+    else:
+        raise ValueError(
+            f"unknown plugin_background {cfg.plugin_background!r} "
+            "(expected 'shirley' or 'tougaard')"
+        )
+    curve = np.asarray(curve, dtype=np.float64)
+    record["curve_summary"] = {
+        "min": float(np.min(curve)),
+        "max": float(np.max(curve)),
+        "first": float(curve[0]),
+        "last": float(curve[-1]),
+    }
+    return curve, record
 
 
 def _components(centers: np.ndarray, sigma: float, cfg: ExactKConfig) -> list[ComponentConfig]:
@@ -353,6 +419,18 @@ def _verdict(
     if best_aicc is None and best_bic is None:
         reasons.append("no successful candidate selectable by any criterion")
         return "unsupported", reasons
+    if best_aicc != best_bic:
+        # Checked before the support-set size: when the criteria agree,
+        # their common best K has both deltas 0 and the support set
+        # cannot be empty — so an empty set IS a disagreement symptom
+        # (e.g. AICc chasing noise with an extra component while BIC
+        # rejects it), and the frozen rule labels that ambiguous.
+        reasons.append(
+            f"information criteria disagree (AICc best K={best_aicc}, "
+            f"BIC best K={best_bic}) — frozen rule: IC disagreement is "
+            "ambiguous regardless of the support-set size"
+        )
+        return "ambiguous", reasons
     if not supported:
         reasons.append("no candidate inside the IC support threshold")
         return "unsupported", reasons
@@ -364,13 +442,6 @@ def _verdict(
         return "ambiguous", reasons
     k_star = supported[0]
     ev = next(e for e in evidence if e["k"] == k_star)
-    if best_aicc != best_bic:
-        reasons.append(
-            f"information criteria disagree (AICc best K={best_aicc}, "
-            f"BIC best K={best_bic}) — frozen rule: IC disagreement is "
-            "ambiguous even for a single-K support range"
-        )
-        return "ambiguous", reasons
     if ev["negative_amplitudes"]:
         reasons.append(
             f"the supported candidate K={k_star} carries negative "
@@ -424,6 +495,26 @@ def run_exact_k(
         raise ValueError("energy axis must be strictly monotonic")
     thresholds = thresholds or RankThresholds()
     warnings: list[str] = []
+
+    # Phase 3b: the plug-in background is estimated once from the
+    # observed spectrum, subtracted, and held fixed for EVERY candidate.
+    # It is not a linear column and contributes nothing to the degrees
+    # of freedom.
+    if cfg.plugin_background is not None:
+        bg_curve, background_record = _plugin_background_curve(energy, y, cfg)
+        y = y - bg_curve
+        warnings.append(
+            f"{background_record['mode']}: information criteria are "
+            "heuristics conditioned on a background estimated from the "
+            "data; the background estimation is NOT counted in the "
+            "degrees of freedom, and ICs must not be compared across "
+            "background families"
+        )
+    else:
+        background_record = {
+            "mode": "polynomial" if cfg.bg_degree is not None else "none",
+            "bg_degree": cfg.bg_degree,
+        }
 
     n = energy.shape[0]
     w_sqrt, _ = whitener(n, sigma_std=sigma_std)
@@ -590,5 +681,6 @@ def run_exact_k(
         negative_amplitude_k=neg_k,
         parameter_scales=shared_scales.to_dict(),
         config=cfg.to_dict(),
+        background=background_record,
         warnings=tuple(warnings),
     )

@@ -271,6 +271,112 @@ def test_non_monotonic_energy_axis_is_rejected():
         run_exact_k(bad, y, cfg, sigma_std=NOISE_STD)
 
 
+# ------------------------------------------------- Phase 3b: plug-in bg
+
+
+def shirley_like_step(y0: np.ndarray, height: float) -> np.ndarray:
+    """Shirley-shaped step: proportional to the integrated peak
+    intensity at higher energies (high at the low-energy end)."""
+    tail = np.cumsum(y0[::-1])[::-1]
+    return height * tail / tail[0]
+
+
+@pytest.fixture(scope="module")
+def report_plugin_shirley():
+    y0 = sum(
+        a * voigt_profile(ENERGY, c, SIGMA_TRUE, GAMMA)
+        for c, a in zip([6.0, 6.0 + 3 * FWHM], [2.0, 1.6])
+    )
+    rng = np.random.default_rng(7)
+    y = y0 + shirley_like_step(y0, 0.3) + rng.normal(0.0, NOISE_STD, ENERGY.shape)
+    cfg = ExactKConfig(
+        sigma_init=0.5, gamma=GAMMA, k_max=3, bg_degree=None,
+        n_starts=3, plugin_background="shirley",
+    )
+    return run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+
+
+def test_plugin_background_computed_once_and_shared(monkeypatch):
+    """Plan 3b item 1-2: the curve is estimated ONCE before the K loop
+    and the same curve serves every candidate."""
+    from toyomacro.background import Shirley
+
+    calls = {"n": 0}
+    orig = Shirley.calculate
+
+    def counting(self, *a, **kw):
+        calls["n"] += 1
+        return orig(self, *a, **kw)
+
+    monkeypatch.setattr(Shirley, "calculate", counting)
+    y = synth([10.0], [2.0], seed=8)
+    cfg = ExactKConfig(
+        sigma_init=0.5, gamma=GAMMA, k_max=3, n_starts=2,
+        plugin_background="shirley",
+    )
+    run_exact_k(ENERGY, y, cfg, sigma_std=NOISE_STD)
+    assert calls["n"] == 1
+
+
+def test_plugin_background_not_counted_as_free_parameter(report_plugin_shirley):
+    """Plan 3b item 3: no linear column, no dof contribution — the
+    parameter count equals the no-background model's."""
+    for cand in report_plugin_shirley.candidates:
+        k = cand.k_structured
+        # K amplitudes + K centers + 1 shared sigma + 1 variance
+        assert cand.model.n_free_parameters == 2 * k + 2
+        assert cand.model.bg_degree is None
+        assert cand.bg_coefficients == ()
+        assert cand.diagnostics.column_names["linear"] == [
+            f"amplitude_{i}" for i in range(k)
+        ]
+
+
+def test_plugin_background_mode_settings_and_heuristic_warning(report_plugin_shirley):
+    """Plan 3b items 4-6: mode + settings recorded; IC-heuristic and
+    no-cross-family-comparison warnings present."""
+    bg = report_plugin_shirley.background
+    assert bg["mode"] == "plugin_shirley"
+    assert bg["settings"] == {"max_iter": 50, "tol": 1e-5, "auto_range": False}
+    assert "curve_summary" in bg
+    assert any(
+        "heuristic" in w and "families" in w
+        for w in report_plugin_shirley.warnings
+    )
+
+
+def test_plugin_shirley_end_to_end_recovers_two_peaks(report_plugin_shirley):
+    """K=2 is recovered through the plug-in background. BIC names K=2
+    robustly; AICc may chase noise with a (negative-amplitude) third
+    component, in which case the criteria disagree and the verdict must
+    be ambiguous — never a silent unsupported/overfit claim."""
+    r = report_plugin_shirley
+    assert r.selection.best_by["bic"] == 2
+    assert r.verdict in ("supported", "ambiguous")
+    if r.verdict == "ambiguous":
+        assert any("disagree" in reason for reason in r.verdict_reasons)
+    else:
+        assert r.supported_k == (2,)
+    k2 = r.candidates[1]
+    np.testing.assert_allclose(k2.centers, [6.0, 6.0 + 3 * FWHM], atol=0.06)
+
+
+def test_plugin_tougaard_records_universal_c():
+    y = synth([10.0], [2.0], seed=9, noise=0.02)
+    cfg = ExactKConfig(
+        sigma_init=0.5, gamma=GAMMA, k_max=1, n_starts=2,
+        plugin_background="tougaard",
+    )
+    r = run_exact_k(ENERGY, y, cfg, sigma_std=0.02)
+    assert r.background["mode"] == "plugin_tougaard"
+    assert r.background["settings"] == {"C": 1643.0, "universal": True}
+
+
+def test_no_plugin_records_polynomial_or_none_mode(report_separated, report_close):
+    assert report_separated.background == {"mode": "polynomial", "bg_degree": 1}
+    assert report_close.background == {"mode": "none", "bg_degree": None}
+
+
 def test_report_is_json_serializable(report_separated):
     blob = json.dumps(report_separated.to_dict())
     back = json.loads(blob)

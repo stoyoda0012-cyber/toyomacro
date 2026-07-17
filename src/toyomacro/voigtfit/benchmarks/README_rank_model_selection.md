@@ -267,6 +267,20 @@ output contract.
   only when no start converges. (d) descending (binding-energy) axes
   are normalized to ascending internally; non-monotonic axes are
   rejected.
+- 2026-07-17 (Phase 3b): plug-in Shirley/Tougaard backgrounds per the
+  plan — estimated ONCE from the observed spectrum before the K loop,
+  subtracted and held fixed for every candidate, never a linear column
+  or a free parameter; `background_mode` + settings + curve summary
+  recorded; the report warns that ICs are heuristics conditioned on a
+  data-estimated background and must not be compared across background
+  families. Shirley is fixed-endpoint (`auto_range=False`); Tougaard
+  uses the universal `C = 1643 eV²`. Also generalized during 3b
+  testing: the AICc/BIC-disagreement check now runs BEFORE the
+  support-set-size check — when the criteria agree their common best K
+  has both deltas 0, so an empty support set is itself a disagreement
+  symptom (observed: AICc chasing noise with a negative-amplitude
+  extra component while BIC rejects it) and is labelled `ambiguous`,
+  not `unsupported`.
 
 ## 9. Non-goals (frozen)
 
