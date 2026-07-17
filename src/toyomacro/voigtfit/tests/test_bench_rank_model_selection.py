@@ -22,8 +22,12 @@ def test_smoke_grid_is_fast_and_never_overclaims():
 
     agg = aggregate(rows)
     assert wall < 60.0, f"P2 violated: smoke took {wall:.1f}s"
-    # S4/S2 spirit: no confident claim of MORE structure than the truth
-    assert agg["S4_no_overfit_supported_claim_overall"]["rate"] == 1.0
+    # no confident claim of MORE structure than the truth
+    assert agg["no_confident_overfit_claim_rate"]["rate"] == 1.0
+    # frozen S4, direct: IC/rank disagreement never yields a single-K
+    # assertion (None when the subset is empty)
+    s4 = agg["S4_no_single_K_assertion_under_IC_rank_disagreement"]
+    assert s4["rate"] in (None, 1.0)
     # S1 on the smoke subset (well-separated, high SNR, K>1)
     s1 = agg["S1_true_k_in_supported_at_sep>=1FWHM_snr>=100"]
     assert s1["n"] >= 1 and s1["rate"] == 1.0

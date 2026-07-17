@@ -1,7 +1,7 @@
 {
  "date": "2026-07-17",
  "environment": "Apple M3 Max, Python 3.12.11, NumPy 2.3.5, SciPy 1.17.0 (SciPy/NumPy reference implementation)",
- "code_state": "post Gate-3-core close + Phase 3b + quantile-mass initialization",
+ "code_state": "Gate 4 closed (S1 miss accepted per adjudication); direct frozen-S4 metric; nominal-shirley-like 3b naming",
  "note": "Aggregates only; per-cell rows live in outputs/rank_model_selection/ (not tracked). Regenerate with: python -m toyomacro.voigtfit.benchmarks.bench_rank_model_selection --mode <mode>",
  "smoke": {
   "aggregate": {
@@ -19,7 +19,11 @@
     "rate": null
    },
    "S2_verdict_distribution_at_0.25FWHM": {},
-   "S4_no_overfit_supported_claim_overall": {
+   "S4_no_single_K_assertion_under_IC_rank_disagreement": {
+    "n": 2,
+    "rate": 1.0
+   },
+   "no_confident_overfit_claim_rate": {
     "n": 12,
     "rate": 1.0
    },
@@ -34,12 +38,12 @@
    },
    "negative_amplitude_cells": 11,
    "wall_time_s": {
-    "total": 2.4729440419905586,
-    "per_cell_median": 0.1765121665011975,
-    "per_cell_max": 0.32841691699286457
+    "total": 3.657936960007646,
+    "per_cell_median": 0.26609075049782405,
+    "per_cell_max": 0.4944317920017056
    }
   },
-  "wall_s": 2.5
+  "wall_s": 3.7
  },
  "full": {
   "aggregate": {
@@ -52,6 +56,40 @@
     "n": 420,
     "rate": 0.830952380952381
    },
+   "S1_breakdown_by_spacing_and_so_at_snr>=100": {
+    "spacing=0.25FWHM,so=False": {
+     "n": 90,
+     "rate": 0.13333333333333333
+    },
+    "spacing=0.25FWHM,so=True": {
+     "n": 90,
+     "rate": 0.2111111111111111
+    },
+    "spacing=0.5FWHM,so=False": {
+     "n": 90,
+     "rate": 0.4444444444444444
+    },
+    "spacing=0.5FWHM,so=True": {
+     "n": 90,
+     "rate": 0.34444444444444444
+    },
+    "spacing=1.0FWHM,so=False": {
+     "n": 90,
+     "rate": 0.8777777777777778
+    },
+    "spacing=1.0FWHM,so=True": {
+     "n": 90,
+     "rate": 0.4888888888888889
+    },
+    "spacing=2.0FWHM,so=False": {
+     "n": 90,
+     "rate": 0.9333333333333333
+    },
+    "spacing=2.0FWHM,so=True": {
+     "n": 90,
+     "rate": 1.0
+    }
+   },
    "S2_no_overfit_supported_claim_at_0.25FWHM": {
     "n": 360,
     "rate": 1.0
@@ -60,7 +98,11 @@
     "supported": 199,
     "ambiguous": 161
    },
-   "S4_no_overfit_supported_claim_overall": {
+   "S4_no_single_K_assertion_under_IC_rank_disagreement": {
+    "n": 491,
+    "rate": 1.0
+   },
+   "no_confident_overfit_claim_rate": {
     "n": 1560,
     "rate": 0.9955128205128205
    },
@@ -75,35 +117,36 @@
    },
    "negative_amplitude_cells": 1270,
    "wall_time_s": {
-    "total": 417.10490081302123,
-    "per_cell_median": 0.21927216699987184,
-    "per_cell_max": 3.133140624995576
+    "total": 508.0282774469233,
+    "per_cell_median": 0.26622033300373005,
+    "per_cell_max": 3.5444207079999615
    }
   },
-  "wall_s": 417.4
+  "wall_s": 508.4
  },
  "sliceso": {
   "aggregate": {
    "n": 10,
    "S3_structured_not_disfavored_rate": 1.0
   },
-  "wall_s": 0.2
+  "wall_s": 0.3
  },
  "slice3b": {
   "aggregate": {
-   "matched_shirley": {
+   "note": "generated backgrounds are NOMINAL shapes: 'shirley_like' is the tail-cumsum of the clean peaks, NOT the self-consistent fixed point of the Shirley estimator; truly matched Shirley and matched Tougaard generation are unevaluated",
+   "shirley_on_nominal_shirley_like": {
     "n": 36,
     "true_in_supported_rate": 0.19444444444444445,
     "mean_k_bias_bic": 1.2777777777777777,
     "overfit_supported_claims": 0
    },
-   "mismatched_shirley_on_linear": {
+   "shirley_on_linear": {
     "n": 36,
     "true_in_supported_rate": 0.027777777777777776,
     "mean_k_bias_bic": 1.8611111111111112,
     "overfit_supported_claims": 0
    },
-   "tougaard_on_shirley_like": {
+   "tougaard_on_nominal_shirley_like": {
     "n": 36,
     "true_in_supported_rate": 0.0,
     "mean_k_bias_bic": 2.0,
@@ -116,6 +159,6 @@
     "overfit_supported_claims": 0
    }
   },
-  "wall_s": 40.2
+  "wall_s": 59.7
  }
 }

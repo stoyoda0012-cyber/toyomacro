@@ -125,6 +125,19 @@ def run_cell(cell: Cell, k_max: int = 5, n_starts: int = 3) -> dict[str, Any]:
             r.verdict == "supported" and supported and max(supported) < cell.true_k
         ),
         "supported_equals_truth": bool(supported == [cell.true_k]),
+        "ic_criteria_disagree": bool(
+            r.selection.best_by["aicc"] != r.selection.best_by["bic"]
+        ),
+        "rank_deficit_at_ic_best": bool(
+            next(
+                (
+                    not e["rank_supported"]
+                    for e in r.evidence
+                    if e["k"] == r.selection.best_by["bic"]
+                ),
+                False,
+            )
+        ),
         "negative_amplitude_k": list(r.negative_amplitude_k),
         "residual_structured_at_best": bool(
             next(
@@ -177,22 +190,49 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     for r in rows:
         if r["spacing_fwhm"] == 0.25 and r["true_k"] > 1:
             s2_verdicts[r["verdict"]] = s2_verdicts.get(r["verdict"], 0) + 1
-    # Overclaiming structure is the failure mode; a confident
-    # supported-K BELOW truth is a legitimate diagnostic statement
-    # ("the data support only K directions"), inventoried separately.
-    s4 = rate(lambda r: True, lambda r: not r["overfit_supported_claim"])
+    # Frozen S4, measured DIRECTLY: among cells where the IC layer and
+    # the rank layer disagree (criteria name different best K, or the
+    # IC-best K lacks nominal-dof rank support), the report must not
+    # assert a single K (verdict != "supported").
+    def _s4_disagreement(r):
+        return r["ic_criteria_disagree"] or r["rank_deficit_at_ic_best"]
+
+    s4_direct = rate(
+        _s4_disagreement, lambda r: r["verdict"] != "supported"
+    )
+    # Confident-overfit rate is a DIFFERENT indicator (not frozen S4):
+    # a "supported" claim with more structure than the truth.
+    no_overfit = rate(lambda r: True, lambda r: not r["overfit_supported_claim"])
     underfit = rate(
         lambda r: r["verdict"] == "supported",
         lambda r: r["underfit_supported_claim"],
     )
+    # Gate 4 adjudication: S1 stays as frozen (miss preserved); the
+    # spacing x SO breakdown is reported alongside because "is 1 FWHM
+    # well-separated?" is the dominant factor, not the population.
+    s1_breakdown = {}
+    for spacing in sorted({r["spacing_fwhm"] for r in rows}):
+        for so in (False, True):
+            cellsel = rate(
+                lambda r, s=spacing, o=so: (
+                    r["spacing_fwhm"] == s and r["so"] == o
+                    and r["snr"] >= 100 and r["true_k"] > 1
+                ),
+                lambda r: r["true_in_supported"],
+            )
+            if cellsel["n"]:
+                s1_breakdown[f"spacing={spacing}FWHM,so={so}"] = cellsel
+
     times = [r["elapsed_s"] for r in rows]
     return {
         "n_cells": len(rows),
         "S1_true_k_in_supported_at_sep>=1FWHM_snr>=100": s1,
         "S1_including_k1": s1_incl_k1,
+        "S1_breakdown_by_spacing_and_so_at_snr>=100": s1_breakdown,
         "S2_no_overfit_supported_claim_at_0.25FWHM": s2,
         "S2_verdict_distribution_at_0.25FWHM": s2_verdicts,
-        "S4_no_overfit_supported_claim_overall": s4,
+        "S4_no_single_K_assertion_under_IC_rank_disagreement": s4_direct,
+        "no_confident_overfit_claim_rate": no_overfit,
         "underfit_supported_claims_among_supported": underfit,
         "verdict_distribution": {
             v: sum(1 for r in rows if r["verdict"] == v)
@@ -265,9 +305,10 @@ def _shirley_like_step(y0: np.ndarray, height: float) -> np.ndarray:
 
 def run_slice_3b(seeds=range(3)) -> dict[str, Any]:
     """Plan 3b slice: K={1,2,3} x spacing {0.5,1.0} FWHM x SNR {30,100},
-    per background estimator, with MATCHED (Shirley-like generated bg)
-    and MISMATCHED (linear generated bg) generation — reporting the K
-    bias a background-model error induces."""
+    per background estimator, over NOMINAL generated backgrounds
+    (shirley-like tail-cumsum vs linear ramp) — reporting the K bias a
+    background-model error induces. Self-consistent matched generation
+    (for either estimator) is deliberately not claimed or evaluated."""
     rows = []
     for true_k, spacing, snr, gen_bg, plugin, seed in itertools.product(
         [1, 2, 3], [0.5, 1.0], [30, 100],
@@ -298,7 +339,7 @@ def run_slice_3b(seeds=range(3)) -> dict[str, Any]:
             {
                 "true_k": true_k, "spacing_fwhm": spacing, "snr": snr,
                 "gen_bg": gen_bg, "plugin": plugin, "seed": seed,
-                "matched": (gen_bg == "shirley_like" and plugin == "shirley"),
+                "nominal_match": (gen_bg == "shirley_like" and plugin == "shirley"),
                 "verdict": r.verdict,
                 "supported_k": list(r.supported_k),
                 "best_bic": r.selection.best_by["bic"],
@@ -325,11 +366,17 @@ def run_slice_3b(seeds=range(3)) -> dict[str, Any]:
         }
 
     return {
-        "matched_shirley": agg(lambda r: r["matched"]),
-        "mismatched_shirley_on_linear": agg(
+        "note": (
+            "generated backgrounds are NOMINAL shapes: 'shirley_like' is "
+            "the tail-cumsum of the clean peaks, NOT the self-consistent "
+            "fixed point of the Shirley estimator; truly matched Shirley "
+            "and matched Tougaard generation are unevaluated"
+        ),
+        "shirley_on_nominal_shirley_like": agg(lambda r: r["nominal_match"]),
+        "shirley_on_linear": agg(
             lambda r: r["plugin"] == "shirley" and r["gen_bg"] == "linear"
         ),
-        "tougaard_on_shirley_like": agg(
+        "tougaard_on_nominal_shirley_like": agg(
             lambda r: r["plugin"] == "tougaard" and r["gen_bg"] == "shirley_like"
         ),
         "tougaard_on_linear": agg(

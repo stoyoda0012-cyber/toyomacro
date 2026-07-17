@@ -297,6 +297,22 @@ output contract.
   and 1-FWHM spacing, with 62/63 failures reporting `ambiguous`
   (honest refusals, not wrong claims). Recorded as a miss with
   analysis, per the Gate 4 contract.
+- 2026-07-17 (Gate 4 adjudication + report corrections): decision (a) —
+  the S1 miss is ACCEPTED and preserved as-is; no SO-exclusion
+  redefinition (the dominant factor is whether 1 FWHM counts as
+  "well-separated": at SNR≥100, 87.8 % no-SO vs 48.9 % SO at 1 FWHM,
+  93.3 %/100 % at 2 FWHM); AICc scan-statistic correction deferred to
+  future work. Three report corrections, rules unchanged: (1) frozen
+  S4 is now measured DIRECTLY
+  (`S4_no_single_K_assertion_under_IC_rank_disagreement`); the former
+  99.55 % metric is renamed `no_confident_overfit_claim_rate` — it is
+  a different indicator. (2) The overfit-claim note "all low-SNR" was
+  wrong: six at SNR 30, one at SNR 100 (SO, 1 FWHM). (3) The 3b slice
+  generation is a NOMINAL Shirley-like shape (tail cumsum of clean
+  peaks), not self-consistent with the estimator — aggregates renamed
+  (`shirley_on_nominal_shirley_like` etc.) and matched Shirley/Tougaard
+  generation explicitly marked unevaluated. S1 is additionally
+  reported broken down by spacing × SO.
 
 ## 9. Non-goals (frozen)
 
