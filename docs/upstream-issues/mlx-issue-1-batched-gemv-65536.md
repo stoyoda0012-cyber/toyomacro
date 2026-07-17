@@ -1,5 +1,7 @@
 # [BUG] [CUDA] Batched matrix-vector product crashes when batch > 65,535 (gridDim limit)
 
+> **Filed 2026-07-17 as [ml-explore/mlx#3858](https://github.com/ml-explore/mlx/issues/3858).** This file is the archived draft; the live discussion is upstream.
+
 ## Describe the bug
 
 On the CUDA backend, a batched matrix-vector `matmul` crashes with

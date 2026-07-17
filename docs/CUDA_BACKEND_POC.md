@@ -425,7 +425,17 @@ dictionaries are constant across the batch loop.
 3. Fold the header install + `CUDA_HOME` into the setup recipe above.
 4. Investigate the NumPy-baseline `decode_speed` gap on this machine.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
-6. **File upstream MLX issues** — drafts ready in `docs/upstream-issues/`:
+6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
+   side, order 1→4→3→2, all four accepted by the tracker:
+   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) (batched-GEMV
+   batch>65,535 crash), [mlx#3859](https://github.com/ml-explore/mlx/issues/3859)
+   (`[cuda13]` missing headers), [mlx#3860](https://github.com/ml-explore/mlx/issues/3860)
+   (TF32 default, undocumented), [mlx#3861](https://github.com/ml-explore/mlx/issues/3861)
+   (`sm_120` GEMM 36×). Cross-referenced (#3860 ↔ #3861). **Watch GitHub
+   notifications for maintainer follow-ups** — verification requests run
+   on the CUDA box. Original draft/dedup record below:
+
+   Drafts in `docs/upstream-issues/`:
    (1) batched-GEMV batch>65,535 crash (one-line repro); (2) `sm_120` matmul
    ~36× under cuBLAS; (3) TF32-by-default, undocumented; (4) `[cuda13]`
    extra missing runtime/CCCL headers. Deduped against the tracker 2026-07-17

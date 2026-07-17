@@ -1,5 +1,7 @@
 # [PERF] [CUDA] fp32 matmul ~36× slower than cuBLAS on sm_120 (RTX 50 / consumer Blackwell)
 
+> **Filed 2026-07-17 as [ml-explore/mlx#3861](https://github.com/ml-explore/mlx/issues/3861).** This file is the archived draft; the live discussion is upstream.
+
 ## Describe the issue
 
 On an RTX 5070 Laptop (sm_120), `mx.matmul` sustains **0.32 TFLOP/s**

@@ -1,5 +1,7 @@
 # [PACKAGING] `mlx[cuda13]` missing CUDA runtime/CCCL headers — first GPU op fails; silent abort under pytest
 
+> **Filed 2026-07-17 as [ml-explore/mlx#3859](https://github.com/ml-explore/mlx/issues/3859).** This file is the archived draft; the live discussion is upstream.
+
 ## Describe the bug
 
 A fresh `pip install "mlx[cuda13]"` cannot execute any GPU op. The

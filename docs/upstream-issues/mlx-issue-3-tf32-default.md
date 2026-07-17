@@ -1,5 +1,7 @@
 # [BUG] [CUDA] fp32 matmul silently defaults to TF32 (`MLX_ENABLE_TF32=1`); undocumented, diverges from Metal
 
+> **Filed 2026-07-17 as [ml-explore/mlx#3860](https://github.com/ml-explore/mlx/issues/3860).** This file is the archived draft; the live discussion is upstream.
+
 ## Describe the bug
 
 On the CUDA backend, fp32 `mx.matmul` runs in TF32 (10-bit mantissa)
