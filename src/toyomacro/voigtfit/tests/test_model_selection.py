@@ -155,7 +155,7 @@ def test_E5_candidates_carry_exactly_K_structured_components():
     len(components), preserved verbatim through scoring and selection."""
     scores = []
     for k in (1, 2, 3):
-        m = model_k(k)
+        m = model_k(k, variance_estimated=True)
         assert m.k_structured == k == len(m.components)
         scores.append(
             score_candidate(m, CandidateFit(n_points=200, rss=100.0 / k))
@@ -172,10 +172,10 @@ def test_E6_failed_candidate_with_best_ic_is_never_selected():
     """The failed K=3 fit has by far the lowest RSS (would win every IC);
     selection must ignore it, base deltas on successful fits only, and
     say so in the warnings."""
-    s1 = score_candidate(model_k(1), CandidateFit(n_points=200, rss=50.0))
-    s2 = score_candidate(model_k(2), CandidateFit(n_points=200, rss=30.0))
+    s1 = score_candidate(model_k(1, variance_estimated=True), CandidateFit(n_points=200, rss=50.0))
+    s2 = score_candidate(model_k(2, variance_estimated=True), CandidateFit(n_points=200, rss=30.0))
     s3 = score_candidate(
-        model_k(3),
+        model_k(3, variance_estimated=True),
         CandidateFit(
             n_points=200, rss=1e-6, success=False,
             termination_reason="max_iterations",
@@ -195,7 +195,7 @@ def test_E6_failed_candidate_with_best_ic_is_never_selected():
 
 def test_E6_all_failed_yields_no_selection_with_warning():
     s = score_candidate(
-        model_k(1),
+        model_k(1, variance_estimated=True),
         CandidateFit(n_points=100, rss=10.0, success=False, termination_reason="diverged"),
     )
     sel = select_peak_count([s])
@@ -209,7 +209,7 @@ def test_E6_all_failed_yields_no_selection_with_warning():
 
 def test_boundary_flags_emit_regularity_warning():
     s = score_candidate(
-        model_k(2),
+        model_k(2, variance_estimated=True),
         CandidateFit(n_points=200, rss=30.0, boundary_flags=("amplitude_0_at_zero",)),
     )
     assert any("regularity" in w for w in s.warnings)
@@ -217,14 +217,95 @@ def test_boundary_flags_emit_regularity_warning():
 
 def test_gaussian_scoring_requires_rss_and_poisson_requires_loglik():
     with pytest.raises(ValueError, match="requires fit.rss"):
-        score_candidate(model_k(1), CandidateFit(n_points=10))
+        score_candidate(model_k(1, variance_estimated=True), CandidateFit(n_points=10))
     with pytest.raises(ValueError, match="requires fit.loglik"):
         score_candidate(model_k(1), CandidateFit(n_points=10, rss=1.0), "poisson")
 
 
+# ------------------------------------------- Gate 2 review boundary tests
+
+
+def test_gaussian_rss_scoring_requires_variance_estimated_true():
+    """The RSS formulas are the profile likelihood with the variance MLE
+    substituted in — scoring with variance_estimated=False would drop a
+    genuinely estimated parameter from k."""
+    with pytest.raises(ValueError, match="variance_estimated=True"):
+        score_candidate(model_k(1), CandidateFit(n_points=100, rss=10.0))
+    # poisson has no such requirement
+    score_candidate(
+        model_k(1),
+        CandidateFit(n_points=100, loglik=-50.0),
+        "poisson",
+    )
+
+
+def test_all_inf_aicc_best_is_none_and_deltas_none_with_warning():
+    """n=5 makes AICc inf for every candidate (n <= k+1): AICc must not
+    pick a spurious winner and deltas must not be inf-inf = NaN; AIC/BIC
+    stay finite and still select."""
+    s1 = score_candidate(
+        model_k(1, variance_estimated=True), CandidateFit(n_points=5, rss=50.0)
+    )  # k=4, n<=k+1
+    s2 = score_candidate(
+        model_k(2, variance_estimated=True), CandidateFit(n_points=5, rss=1.0)
+    )  # k=7
+    assert math.isinf(s1.aicc) and math.isinf(s2.aicc)
+
+    sel = select_peak_count([s1, s2])
+    assert sel.best_by["aicc"] is None
+    assert sel.delta_aicc == (None, None)
+    assert any("aicc" in w and "non-finite" in w for w in sel.warnings)
+    assert sel.best_by["aic"] is not None
+    assert sel.best_by["bic"] is not None
+    assert all(d is None or not math.isnan(d) for d in sel.delta_bic)
+
+
+def test_multiple_exact_fits_neg_inf_tie_produces_no_nan():
+    """Two RSS=0 candidates give IC = -inf for both: -inf - (-inf) must
+    never surface as NaN; the tie is reported, not resolved."""
+    s1 = score_candidate(
+        model_k(1, variance_estimated=True), CandidateFit(n_points=200, rss=0.0)
+    )
+    s2 = score_candidate(
+        model_k(2, variance_estimated=True), CandidateFit(n_points=200, rss=0.0)
+    )
+    sel = select_peak_count([s1, s2])
+    assert sel.best_by == {"aic": None, "aicc": None, "bic": None}
+    assert sel.delta_aicc == (None, None)
+    assert sel.delta_bic == (None, None)
+    for deltas in (sel.delta_aicc, sel.delta_bic):
+        assert all(d is None or not math.isnan(d) for d in deltas)
+    assert any("tie" in w for w in sel.warnings)
+    json.dumps(sel.to_dict())  # still serializable
+
+
+def test_single_exact_fit_neg_inf_wins_without_nan():
+    s1 = score_candidate(
+        model_k(1, variance_estimated=True), CandidateFit(n_points=200, rss=0.0)
+    )
+    s2 = score_candidate(
+        model_k(2, variance_estimated=True), CandidateFit(n_points=200, rss=30.0)
+    )
+    sel = select_peak_count([s1, s2])
+    assert sel.best_by == {"aic": 1, "aicc": 1, "bic": 1}
+    assert sel.delta_aicc == (0.0, math.inf)
+    assert all(d is None or not math.isnan(d) for d in sel.delta_aicc)
+    assert any("dominates" in w for w in sel.warnings)
+
+
+def test_poisson_deviance_validates_shape_and_negative_y():
+    with pytest.raises(ValueError, match="same shape"):
+        poisson_deviance(np.array([1.0, 2.0]), np.array([1.0]))
+    with pytest.raises(ValueError, match="non-negative"):
+        poisson_deviance(np.array([-1.0]), np.array([1.0]))
+
+
 def test_selection_is_json_serializable():
     scores = [
-        score_candidate(model_k(k), CandidateFit(n_points=200, rss=100.0 / k))
+        score_candidate(
+            model_k(k, variance_estimated=True),
+            CandidateFit(n_points=200, rss=100.0 / k),
+        )
         for k in (1, 2)
     ]
     sel = select_peak_count(scores)
@@ -233,4 +314,4 @@ def test_selection_is_json_serializable():
         "scores", "delta_aicc", "delta_bic", "best_by", "excluded_k", "warnings",
     }
     assert back["scores"][0]["noise_model"] == "gaussian"
-    assert back["scores"][0]["n_free_parameters"] == 3
+    assert back["scores"][0]["n_free_parameters"] == 4  # amp+center+sigma+variance

@@ -14,6 +14,12 @@ Frozen conventions (benchmarks/README_rank_model_selection.md §2.5):
       AICc = AIC + 2k(k+1)/(n-k-1)     (inf + warning when n <= k+1)
       BIC  = n log(RSS/n) + k log(n)
 
+  This is the profile-likelihood form: the variance MLE ``RSS/n`` is
+  substituted in, so the variance IS an estimated parameter. Gaussian
+  RSS scoring therefore REQUIRES ``variance_estimated=True`` on the
+  model (Gate 2 review); a known-variance Gaussian path would use a
+  different log-likelihood and is deliberately not implemented yet.
+
 - Poisson ICs use the exact log-likelihood
   ``sum(y log mu - mu - lgamma(y+1))``; the deviance is carried as a
   diagnostic (its saturated-model constant cancels in delta-IC but not
@@ -255,9 +261,16 @@ def poisson_loglik(y: np.ndarray, mu: np.ndarray) -> float:
 
 
 def poisson_deviance(y: np.ndarray, mu: np.ndarray) -> float:
-    """Poisson deviance ``2 sum(y log(y/mu) - (y - mu))`` (diagnostic)."""
+    """Poisson deviance ``2 sum(y log(y/mu) - (y - mu))`` (diagnostic).
+
+    Input validation mirrors :func:`poisson_loglik` (Gate 2 review).
+    """
     y = np.asarray(y, dtype=np.float64)
     mu = np.asarray(mu, dtype=np.float64)
+    if y.shape != mu.shape:
+        raise ValueError("y and mu must have the same shape")
+    if np.any(y < 0):
+        raise ValueError("Poisson data y must be non-negative")
     if np.any(mu < 0) or np.any((mu == 0) & (y > 0)):
         raise ValueError("non-positive Poisson prediction mu where y > 0")
     ylogy = np.where(y > 0, y * np.log(np.where(y > 0, y, 1.0) / np.where(mu > 0, mu, 1.0)), 0.0)
@@ -289,6 +302,13 @@ def score_candidate(
     k = model.n_free_parameters
     warnings: list[str] = []
     if noise_model == "gaussian":
+        if not model.variance_estimated:
+            raise ValueError(
+                "gaussian RSS scoring uses the profile likelihood with the "
+                "variance MLE substituted in, so the variance is an estimated "
+                "parameter: set variance_estimated=True (a known-variance "
+                "Gaussian path is a separate, unimplemented log-likelihood)"
+            )
         if fit.rss is None:
             raise ValueError("gaussian scoring requires fit.rss")
         aic, aicc, bic, w = gaussian_ic(fit.rss, fit.n_points, k)
@@ -358,11 +378,63 @@ class PeakCountSelection:
         }
 
 
+def _criterion_selection(
+    scores: list[CandidateScore], ok: list[CandidateScore], attr: str
+) -> tuple[int | None, tuple[float | None, ...], list[str]]:
+    """Best K and per-candidate deltas for one criterion, NaN-free.
+
+    Non-finite handling (Gate 2 review):
+    - all successful values +inf  -> best None, deltas None, warning
+    - two or more -inf (exact fits) -> tie: best None, deltas None, warning
+    - exactly one -inf             -> it wins; its delta 0.0, others +inf
+    - otherwise                    -> min over finite values; +inf
+      candidates keep delta +inf (never NaN)
+    """
+    none_deltas = tuple(None for _ in scores)
+    if not ok:
+        return None, none_deltas, []
+    vals = {id(s): getattr(s, attr) for s in ok}
+    neg = [s for s in ok if vals[id(s)] == -math.inf]
+    finite = [vals[id(s)] for s in ok if math.isfinite(vals[id(s)])]
+
+    if len(neg) >= 2:
+        return None, none_deltas, [
+            f"{attr}: {len(neg)} exact fits (IC = -inf) tie — selection "
+            "undefined; deltas suppressed"
+        ]
+    if len(neg) == 1:
+        winner = neg[0]
+        deltas = tuple(
+            (0.0 if s is winner else math.inf) if s.success else None
+            for s in scores
+        )
+        return winner.k_structured, deltas, [
+            f"{attr}: exact fit (IC = -inf) at K={winner.k_structured} "
+            "dominates — deltas to it are +inf"
+        ]
+    if not finite:
+        return None, none_deltas, [
+            f"{attr}: all successful candidates are non-finite (+inf) — "
+            "no selection possible for this criterion"
+        ]
+    base = min(finite)
+    best = min(
+        (s for s in ok if math.isfinite(vals[id(s)])),
+        key=lambda s: vals[id(s)],
+    ).k_structured
+    deltas = tuple(
+        (getattr(s, attr) - base) if s.success else None for s in scores
+    )
+    return best, deltas, []
+
+
 def select_peak_count(scores: list[CandidateScore]) -> PeakCountSelection:
     """Compare scored candidates; failed fits never win (Gate 2, E6).
 
     Purely an IC comparison table — the supported/ambiguous/unsupported
-    verdict that folds in rank diagnostics is Phase 3.
+    verdict that folds in rank diagnostics is Phase 3. Non-finite IC
+    values never produce NaN deltas or a spurious winner (see
+    :func:`_criterion_selection`).
     """
     if not scores:
         raise ValueError("no candidates to select from")
@@ -370,31 +442,20 @@ def select_peak_count(scores: list[CandidateScore]) -> PeakCountSelection:
     ok = [s for s in scores if s.success]
     excluded = tuple(s.k_structured for s in scores if not s.success)
     if excluded:
-        warnings.append(
-            f"excluded failed candidates: K={sorted(excluded)}"
-        )
-
-    def _deltas(attr: str) -> tuple[float | None, ...]:
-        if not ok:
-            return tuple(None for _ in scores)
-        base = min(getattr(s, attr) for s in ok)
-        return tuple(
-            (getattr(s, attr) - base) if s.success else None for s in scores
-        )
-
-    def _best(attr: str) -> int | None:
-        if not ok:
-            return None
-        return min(ok, key=lambda s: getattr(s, attr)).k_structured
-
+        warnings.append(f"excluded failed candidates: K={sorted(excluded)}")
     if not ok:
         warnings.append("all candidate fits failed: no selection possible")
 
+    best_aic, _, w_aic = _criterion_selection(scores, ok, "aic")
+    best_aicc, delta_aicc, w_aicc = _criterion_selection(scores, ok, "aicc")
+    best_bic, delta_bic, w_bic = _criterion_selection(scores, ok, "bic")
+    warnings += w_aic + w_aicc + w_bic
+
     return PeakCountSelection(
         scores=tuple(scores),
-        delta_aicc=_deltas("aicc"),
-        delta_bic=_deltas("bic"),
-        best_by={"aic": _best("aic"), "aicc": _best("aicc"), "bic": _best("bic")},
+        delta_aicc=delta_aicc,
+        delta_bic=delta_bic,
+        best_by={"aic": best_aic, "aicc": best_aicc, "bic": best_bic},
         excluded_k=excluded,
         warnings=tuple(warnings),
     )

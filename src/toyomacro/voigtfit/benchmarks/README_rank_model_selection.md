@@ -245,6 +245,16 @@ output contract.
   (c) Phase 3 handoff: candidate models K = 1..Kmax must share ONE
   `ParameterScales` instance — per-candidate auto-derived scales would
   shift rank layers and make them incomparable across K.
+- 2026-07-17 (Gate 2 review): (a) Gaussian RSS scoring requires
+  `variance_estimated=True` — the §2.5 formulas are the profile
+  likelihood with the variance MLE substituted in, so the variance is
+  always an estimated parameter there; a known-variance Gaussian path
+  is a separate (unimplemented) log-likelihood. (b) Non-finite IC
+  selection semantics fixed: all-`inf` criterion → best `None` +
+  deltas `None` + warning; two or more `-inf` exact fits → tie
+  reported, not resolved; a single `-inf` wins with delta 0 / `+inf`;
+  NaN is never produced. (c) `poisson_deviance` validates shape and
+  `y >= 0` like `poisson_loglik`.
 
 ## 9. Non-goals (frozen)
 
