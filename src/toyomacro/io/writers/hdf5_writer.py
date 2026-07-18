@@ -114,6 +114,10 @@ class HDF5Writer:
 
         self._file = h5py.File(self.filepath, "w")
 
+        # File schema version (absent = legacy 1.1.x file). Additive root
+        # attribute; every copy path preserves or re-stamps it.
+        self._file.attrs[ToyomacroSchema.ATTR_SCHEMA_VERSION] = ToyomacroSchema.VERSION
+
         # specdata: (n_spectra+1, n_energy) - row 0 is energy, rows 1+ are spectra
         self._file.create_dataset(
             ToyomacroSchema.PATH_SPECDATA,
@@ -257,6 +261,36 @@ class HDF5Writer:
 
         self.write_fitpara(idx, fitpara)
         self.write_otherpara(idx, otherpara)
+
+    # ------------------------------------------------------------------
+    # Provenance (facts from the upstream input + transform history)
+    # ------------------------------------------------------------------
+
+    def write_provenance(
+        self,
+        metadata,
+        transforms=(),
+        *,
+        persist_datetime: bool = False,
+        persist_vendor_metadata: bool = False,
+        vendor_metadata_allowlist=(),
+    ) -> None:
+        """Write the /provenance group from Phase A reader output.
+
+        See toyomacro.io.provenance and
+        docs/hdf5_provenance_phase_b1_design.md.
+        """
+        self._ensure_open()
+        from toyomacro.io.provenance import write_provenance
+
+        write_provenance(
+            self._file,
+            metadata,
+            transforms,
+            persist_datetime=persist_datetime,
+            persist_vendor_metadata=persist_vendor_metadata,
+            vendor_metadata_allowlist=vendor_metadata_allowlist,
+        )
 
     # ------------------------------------------------------------------
     # dim_shape (4D navigation metadata)

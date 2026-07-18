@@ -52,6 +52,12 @@ from toyomacro.io.importer import (
     import_file,
     import_folder,
 )
+from toyomacro.io.provenance import (
+    HDF5Provenance,
+    ProvenanceWarning,
+    read_provenance,
+    write_provenance,
+)
 from toyomacro.io.readers import (
     BaseReader,
     DatasetInfo,
@@ -200,6 +206,11 @@ __all__ = [
     "RawSpectrumData",
     "ReaderTransform",
     "ReaderWarning",
+    # Provenance (Toyomacro-local HDF5 schema)
+    "HDF5Provenance",
+    "ProvenanceWarning",
+    "read_provenance",
+    "write_provenance",
     "SpectrumMetadata",
     "PXTReader",
     "SESTxtReader",

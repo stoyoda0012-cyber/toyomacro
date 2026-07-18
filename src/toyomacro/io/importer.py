@@ -50,6 +50,11 @@ class ImportConfig:
     compress: bool = True  # apply uint16+LZ4 compression
     sweep_mode: str = "individual"  # individual|integrate
     region_name_override: str | None = None  # override region name for filename
+    # /provenance opt-ins (docs/hdf5_provenance_phase_b1_design.md §3, §7).
+    # The group itself is always written; these gate privacy-sensitive parts.
+    persist_datetime: bool = False  # acquisition datetime is an indirect identifier
+    persist_vendor_metadata: bool = False
+    vendor_metadata_allowlist: tuple[str, ...] = ()  # empty = nothing persisted
 
 
 @dataclass
@@ -376,6 +381,16 @@ def import_file(
         )
         dim0_is_angle = len(angle) > 1 and detector_role == "emission_angle"
         writer.write_dim0_is_angle(dim0_is_angle)
+
+        # Provenance: facts read from the upstream input file plus the
+        # reader/importer transform history (Toyomacro-local schema).
+        writer.write_provenance(
+            data.metadata,
+            data.transforms,
+            persist_datetime=config.persist_datetime,
+            persist_vendor_metadata=config.persist_vendor_metadata,
+            vendor_metadata_allowlist=config.vendor_metadata_allowlist,
+        )
 
         # Write spectra
         # specdata is [n_energy, n_spectra], HDF5 wants [n_spectra, n_energy]

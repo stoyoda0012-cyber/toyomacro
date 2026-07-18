@@ -385,11 +385,19 @@ class StreamingFitparaWriter:
         self._h5_out.flush()
 
     def _copy_metadata_from_input(self):
-        """Copy non-fitpara datasets from input file."""
+        """Copy non-fitpara objects and root attributes from input file."""
         if not self.input_path:
             return
 
         with h5py.File(self.input_path, "r") as f_in:
+            # Inherit root attributes (e.g. toyomacro_schema_version).
+            # Crash-recovery markers are per-file state, not metadata —
+            # they are re-stamped for this output right after this copy.
+            for key, val in f_in.attrs.items():
+                if key.startswith(("_toyomacro_", "_voigtfit_")):
+                    continue
+                self._h5_out.attrs[key] = val
+
             for name, obj in f_in.items():
                 if name == "fitpara":
                     continue  # Skip fitpara

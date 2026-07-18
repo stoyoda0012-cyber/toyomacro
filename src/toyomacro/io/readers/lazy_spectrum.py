@@ -24,7 +24,7 @@ from toyomacro.io.schema import ToyomacroSchema
 from toyomacro.io.utils import calculate_batch_size
 
 if TYPE_CHECKING:
-    pass
+    from toyomacro.io.provenance import HDF5Provenance
 
 
 @dataclass
@@ -430,6 +430,18 @@ class LazySpectrum:
         return ToyomacroSchema.PATH_FITPARA in self._file
 
     # ===== Metadata Access =====
+
+    def get_provenance(self) -> HDF5Provenance | None:
+        """Read the /provenance group (Toyomacro-local schema).
+
+        Returns:
+            HDF5Provenance for files written with provenance support,
+            None for legacy files without the group.
+        """
+        self._ensure_open()
+        from toyomacro.io.provenance import read_provenance
+
+        return read_provenance(self._file)
 
     def get_misc(self) -> dict:
         """

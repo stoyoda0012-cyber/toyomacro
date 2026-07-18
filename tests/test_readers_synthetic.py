@@ -546,3 +546,28 @@ class TestImporterWithSyntheticFiles:
         assert len(paths) == 1
         assert paths[0].suffix == ".h5"
         assert paths[0].exists()
+
+    def test_import_writes_provenance_by_default(self, tmp_path):
+        """Phase B-1: imported files carry /provenance + root schema version."""
+        import h5py
+
+        from toyomacro.io.importer import ImportConfig, import_file
+        from toyomacro.io.provenance import read_provenance
+
+        f = self._pxt(tmp_path)
+        result = import_file(
+            f, tmp_path / "out", ImportConfig(element="Si2p", compress=False)
+        )
+        with h5py.File(result.output_path) as h5:
+            assert h5.attrs["toyomacro_schema_version"] == "1.2.0"
+            prov = read_provenance(h5)
+        assert prov is not None
+        assert prov.source_format == "scienta_pxt"
+        assert prov.source_format_version == "3"
+        assert prov.excitation_energy == pytest.approx(1486.6)
+        assert [t["name"] for t in prov.transforms] == [
+            t["name"] for t in result.metadata["transforms"]
+        ]
+        # Privacy defaults: no vendor metadata, no datetime
+        assert prov.vendor_metadata is None
+        assert prov.datetime is None

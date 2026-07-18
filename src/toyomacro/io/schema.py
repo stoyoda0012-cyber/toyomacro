@@ -30,7 +30,12 @@ class ToyomacroSchema:
     Uses C-order (row-major) layout for Python compatibility.
     """
 
-    VERSION: Final[str] = "1.1.0"  # Updated for voigtfit compatibility
+    # 1.2.0: additive /provenance group + root schema-version attribute.
+    # Files without the root attribute are legacy 1.1.x and read unchanged.
+    VERSION: Final[str] = "1.2.0"
+
+    # Root attribute carrying the file schema version (absent = legacy 1.1.x)
+    ATTR_SCHEMA_VERSION: Final[str] = "toyomacro_schema_version"
 
     # Dataset paths
     PATH_SPECDATA: Final[str] = "/specdata"
@@ -38,6 +43,14 @@ class ToyomacroSchema:
     PATH_OTHERPARA: Final[str] = "/otherpara"
     PATH_XYTDATA: Final[str] = "/xytdata"
     PATH_MISC: Final[str] = "/misc"
+    # Provenance namespace: facts read from the upstream input file
+    # (PXT/IBW/VAMAS/NPL/SES) plus the reader/importer transform history.
+    # See docs/hdf5_provenance_phase_b1_design.md. The /uncertainty
+    # namespace is reserved by that document and NOT created here.
+    PATH_PROVENANCE: Final[str] = "/provenance"
+
+    # Version of the /provenance group schema (independent of VERSION)
+    PROVENANCE_SCHEMA_VERSION: Final[str] = "1.0"
 
     # Data types (all float32 for MATLAB compatibility)
     DTYPE_SPECDATA = np.float32
