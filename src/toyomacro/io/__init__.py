@@ -60,6 +60,8 @@ from toyomacro.io.readers import (
     NPLReader,
     PXTReader,
     RawSpectrumData,
+    ReaderTransform,
+    ReaderWarning,
     SESTxtReader,
     SpectrumMetadata,
     VAMASReader,
@@ -196,6 +198,8 @@ __all__ = [
     # Raw data readers
     "BaseReader",
     "RawSpectrumData",
+    "ReaderTransform",
+    "ReaderWarning",
     "SpectrumMetadata",
     "PXTReader",
     "SESTxtReader",

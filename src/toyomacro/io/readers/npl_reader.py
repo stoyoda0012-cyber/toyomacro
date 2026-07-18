@@ -9,6 +9,7 @@ NPL files are line-oriented text, one field per line.
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +18,8 @@ import numpy as np
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
+    ReaderTransform,
+    ReaderWarning,
     SpectrumMetadata,
 )
 
@@ -60,7 +63,10 @@ def _read_npl_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
             try:
                 excitation_energy = float(region_header[14])
             except (ValueError, IndexError):
-                excitation_energy = 0.0
+                excitation_energy = None
+            if excitation_energy is not None and excitation_energy <= 0:
+                # 0 is the legacy "not recorded" sentinel — treat as unknown
+                excitation_energy = None
 
             region_name_flag = region_header[30] if len(region_header) > 30 else "-1"
 
@@ -99,15 +105,41 @@ def _read_npl_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
 
             # Energy axis
             raw_energy = np.arange(n_energy, dtype=np.float64) * e_step + e_ini
+            transforms: list[ReaderTransform] = []
 
             if "binding" in energy_label:
                 # Data is already in binding energy
                 energy = raw_energy
                 energy_scale_out = "Binding"
-            else:
+            elif excitation_energy is not None:
                 # Kinetic energy -> binding energy
                 energy = excitation_energy - raw_energy - WORK_FUNCTION
                 energy_scale_out = "Binding"
+                transforms.append(
+                    ReaderTransform(
+                        name="energy_scale_conversion",
+                        parameters={
+                            "from": "Kinetic",
+                            "to": "Binding",
+                            "excitation_energy_eV": float(excitation_energy),
+                            "work_function_eV": WORK_FUNCTION,
+                            "formula": "BE = hv - KE - work_function",
+                        },
+                        source="npl_reader",
+                        reason="NPL files are analyzed in binding energy (PHI convention)",
+                    )
+                )
+            else:
+                # hv unknown: converting would fabricate an axis. Keep the
+                # kinetic scale and say so instead of guessing.
+                warnings.warn(
+                    f"{filepath.name}[region {region_idx}]: excitation energy "
+                    "not recorded; kinetic->binding conversion skipped",
+                    ReaderWarning,
+                    stacklevel=2,
+                )
+                energy = raw_energy
+                energy_scale_out = "Kinetic"
 
             # Data: n_energy intensity values
             data_lines = _read_lines(fid, n_energy)
@@ -123,6 +155,13 @@ def _read_npl_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
                 lens_mode="Angular",
                 n_slices=n_slices,
                 n_sweeps=n_sweeps,
+                pass_energy=None,
+                source_format="npl",
+                source_region_index=region_idx,
+                intensity_semantics="unknown",
+                intensity_unit="unknown",
+                original_shape=(int(n_energy),),
+                dimension_roles=("energy",),
             )
 
             specdata = intensity.reshape(-1, 1)
@@ -135,6 +174,7 @@ def _read_npl_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
                         energy=energy,
                         angle=angle,
                         metadata=metadata,
+                        transforms=tuple(transforms),
                     ),
                     region_name,
                 )

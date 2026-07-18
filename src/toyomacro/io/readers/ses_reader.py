@@ -21,8 +21,26 @@ from numpy.typing import NDArray
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
+    ReaderTransform,
     SpectrumMetadata,
+    coerce_optional_float,
+    coerce_optional_int,
 )
+
+# Structural [Region N] keys that are represented by the energy/angle
+# arrays themselves — excluded from vendor_metadata to avoid duplicating
+# array data as text.
+_STRUCTURAL_KEY_RE = re.compile(r"^Dimension \d+ (name|scale|size)$")
+
+
+def _detector_role(lens_mode: str) -> str:
+    """Role of the non-energy detector dimension from a normalized lens mode."""
+    lm = lens_mode.strip().lower()
+    if lm.startswith("angular"):
+        return "emission_angle"
+    if lm.startswith("transmission"):
+        return "position"
+    return "unknown"
 
 
 def _parse_dimension_scale(s: str) -> NDArray:
@@ -99,6 +117,7 @@ def _read_ses_format(filepath: Path) -> list[RawSpectrumData]:
     # Global info
     global_info = _parse_kv_section(sections.get("Info", ""))
     n_regions = int(global_info.get("Number of Regions", "1"))
+    format_version = global_info.get("Version") or None
 
     results: list[RawSpectrumData] = []
 
@@ -113,22 +132,51 @@ def _read_ses_format(filepath: Path) -> list[RawSpectrumData]:
 
         # Merge: info_fields takes precedence for metadata, region_fields for dimensions
         all_fields = {**region_fields, **info_fields}
+        src = f"{filepath.name}[region {reg_idx}]"
+
+        # Track keys adopted into standard fields so everything else
+        # survives in vendor_metadata (malformed values stay there too).
+        consumed: set[str] = set()
+
+        def field_str(*keys: str) -> str:
+            for k in keys:
+                if k in all_fields:
+                    consumed.add(k)
+                    return all_fields[k]
+            return ""
+
+        def field_float(*keys: str) -> float | None:
+            for k in keys:
+                if k in all_fields:
+                    value = coerce_optional_float(all_fields[k], k, src)
+                    if value is not None:
+                        consumed.add(k)
+                    return value
+            return None
+
+        def field_int(*keys: str, default: int) -> int:
+            for k in keys:
+                if k in all_fields:
+                    value = coerce_optional_int(all_fields[k], k, src)
+                    if value is not None:
+                        consumed.add(k)
+                        return value
+                    return default
+            return default
 
         # Build metadata
-        region_name = all_fields.get("Region Name", all_fields.get("Spectrum Name", ""))
-        excitation_energy = float(all_fields.get("Excitation Energy", "0"))
-        energy_scale = all_fields.get("Energy Scale", "Kinetic")
-        lens_mode = all_fields.get("Lens Mode", "")
+        region_name = field_str("Region Name", "Spectrum Name")
+        excitation_energy = field_float("Excitation Energy")
+        energy_scale = field_str("Energy Scale") or "Kinetic"
+        lens_mode = field_str("Lens Mode")
         if lens_mode.startswith("T"):
             lens_mode = "Transmission"
         elif lens_mode.startswith("A"):
             lens_mode = "Angular"
-        n_slices = int(all_fields.get("Number of Slices", "1"))
-        n_sweeps = int(all_fields.get("Number of Sweeps", "1"))
-        acquisition_mode = all_fields.get(
-            "Acquisition Mode", all_fields.get("Aquisition Mode", "")
-        )
-        pass_energy = float(all_fields.get("Pass Energy", "0"))
+        n_slices = field_int("Number of Slices", default=1)
+        n_sweeps = field_int("Number of Sweeps", default=1)
+        acquisition_mode = field_str("Acquisition Mode", "Aquisition Mode")
+        pass_energy = field_float("Pass Energy")
 
         # Parse datetime
         dt = None
@@ -138,9 +186,16 @@ def _read_ses_format(filepath: Path) -> list[RawSpectrumData]:
             for fmt in ["%Y-%m-%d %H:%M:%S", "%m/%d/%Y %I:%M:%S %p"]:
                 try:
                     dt = datetime.strptime(f"{date_str} {time_str}", fmt)
+                    consumed |= {"Date", "Time"}
                     break
                 except ValueError:
                     pass
+
+        vendor = {
+            k: v
+            for k, v in all_fields.items()
+            if k not in consumed and not _STRUCTURAL_KEY_RE.match(k)
+        }
 
         metadata = SpectrumMetadata(
             region=region_name,
@@ -152,6 +207,12 @@ def _read_ses_format(filepath: Path) -> list[RawSpectrumData]:
             n_sweeps=n_sweeps,
             acquisition_mode=acquisition_mode,
             pass_energy=pass_energy,
+            source_format="ses_txt",
+            source_format_version=format_version,
+            source_region_index=reg_idx - 1,
+            vendor_metadata=vendor,
+            intensity_semantics="unknown",
+            intensity_unit="unknown",
         )
 
         # Parse dimension scales from [Region N]
@@ -245,6 +306,9 @@ def _read_region_1d(
 
     angle = np.array([0.0])
 
+    metadata.original_shape = (int(specdata.shape[0]),)
+    metadata.dimension_roles = ("energy",)
+
     return RawSpectrumData(
         specdata=specdata,
         energy=energy,
@@ -263,6 +327,7 @@ def _read_region_with_dimensions(
 ) -> RawSpectrumData:
     """Read a 2D or 3D region with dimension scales."""
     n_sweeps_data = len(data_blocks)
+    transforms: list[ReaderTransform] = []
 
     if len(d3) == 0:
         d3 = np.array([1.0])
@@ -270,10 +335,39 @@ def _read_region_with_dimensions(
     # Check for Seq. Iteration mode — swap d2 and d3
     if "Seq. Iteration" in d2_name:
         d2, d3 = d3, d2
+        transforms.append(
+            ReaderTransform(
+                name="dimension_reorder",
+                parameters={"swapped_scales": ["Dimension 2", "Dimension 3"]},
+                source="ses_reader",
+                reason="'Seq. Iteration' in Dimension 2 name",
+            )
+        )
 
     n_e = len(d1)
     n_a = len(d2)
     n_s = max(len(d3), n_sweeps_data)
+
+    detector_role = _detector_role(metadata.lens_mode)
+
+    def _flip_transforms(data_flipped: bool) -> None:
+        if data_flipped:
+            transforms.append(
+                ReaderTransform(
+                    name="angle_axis_reversal",
+                    parameters={"target": "specdata", "axis": 1},
+                    source="ses_reader",
+                    reason="Scienta slice order convention (Number of Slices > 1)",
+                )
+            )
+        transforms.append(
+            ReaderTransform(
+                name="angle_axis_reversal",
+                parameters={"target": "angle_values"},
+                source="ses_reader",
+                reason="legacy Toyomacro convention: angle scale stored descending",
+            )
+        )
 
     if n_s <= 1 and n_sweeps_data <= 1:
         # Single block: 2D data (energy x angle)
@@ -292,15 +386,20 @@ def _read_region_with_dimensions(
 
         if metadata.n_slices > 1:
             specdata = np.fliplr(specdata)
+        _flip_transforms(metadata.n_slices > 1)
 
         energy = d1.astype(np.float64)
         angle = np.flipud(d2).astype(np.float64)
+
+        metadata.original_shape = tuple(int(s) for s in specdata.shape)
+        metadata.dimension_roles = ("energy", detector_role)
 
         return RawSpectrumData(
             specdata=specdata,
             energy=energy,
             angle=angle,
             metadata=metadata,
+            transforms=tuple(transforms),
         )
     else:
         # Multiple blocks: 3D data (energy x angle x sweep)
@@ -326,6 +425,10 @@ def _read_region_with_dimensions(
 
         if metadata.n_slices > 1:
             specdata_3d = np.flip(specdata_3d, axis=1)
+        _flip_transforms(metadata.n_slices > 1)
+
+        metadata.original_shape = (n_e, n_a, n_s)
+        metadata.dimension_roles = ("energy", detector_role, "sweep")
 
         # Squeeze if single sweep
         if n_s == 1:
@@ -341,6 +444,7 @@ def _read_region_with_dimensions(
             energy=energy,
             angle=angle,
             metadata=metadata,
+            transforms=tuple(transforms),
         )
 
 
@@ -372,6 +476,11 @@ def _read_region_simple(
     n_angle = specdata.shape[1]
     angle = np.arange(n_angle, dtype=np.float64)
 
+    # Without dimension scales the meaning of the column axis is not
+    # confirmable — do not assume it is an angle axis.
+    metadata.original_shape = tuple(int(s) for s in specdata.shape)
+    metadata.dimension_roles = ("energy",) + ("unknown",) * (specdata.ndim - 1)
+
     return RawSpectrumData(
         specdata=specdata,
         energy=energy,
@@ -394,6 +503,14 @@ def _read_simple_text(filepath: Path) -> list[RawSpectrumData]:
     metadata = SpectrumMetadata(
         region=filepath.stem,
         energy_scale="Kinetic",  # Default; user can override
+        source_format="text_columns",
+        source_region_index=0,
+        intensity_semantics="unknown",
+        intensity_unit="unknown",
+        original_shape=tuple(int(s) for s in specdata.shape),
+        # Plain columnar text carries no metadata about what the columns
+        # are — never assume the second dimension is an angle axis.
+        dimension_roles=("energy",) + ("unknown",) * (specdata.ndim - 1),
     )
 
     return [

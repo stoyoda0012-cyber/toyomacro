@@ -139,6 +139,9 @@ def _apply_energy_conversion(
 ) -> RawSpectrumData:
     """Convert energy scale if needed.
 
+    The conversion (E_out = hv - E_in) is recorded in ``data.transforms``
+    together with hv, so the original axis stays reconstructible.
+
     Args:
         data: Input data
         target_scale: 'BE' or 'KE' or 'auto' (keep as-is)
@@ -151,22 +154,38 @@ def _apply_energy_conversion(
     if not current_scale:
         current_scale = "Kinetic"
 
-    # Determine hv
-    hv = excitation_energy or data.metadata.excitation_energy
-    if hv <= 0 and current_scale != target_scale:
+    if current_scale.startswith("K") and target_scale == "BE":
+        new_scale = "Binding"
+    elif current_scale.startswith("B") and target_scale == "KE":
+        new_scale = "Kinetic"
+    else:
+        return data  # already on the requested scale
+
+    # Determine hv (None = unknown; never assume 0)
+    hv = (
+        excitation_energy
+        if excitation_energy is not None
+        else data.metadata.excitation_energy
+    )
+    if hv is None or hv <= 0:
         raise ValueError(
             f"Cannot convert {current_scale} -> {target_scale}: "
             "excitation energy not available. Use --excitation-energy."
         )
 
-    if current_scale.startswith("K") and target_scale == "BE":
-        # KE -> BE: BE = hv - KE
-        data.energy = hv - data.energy
-        data.metadata.energy_scale = "Binding"
-    elif current_scale.startswith("B") and target_scale == "KE":
-        # BE -> KE: KE = hv - BE
-        data.energy = hv - data.energy
-        data.metadata.energy_scale = "Kinetic"
+    data.energy = hv - data.energy
+    data.metadata.energy_scale = new_scale
+    data.record_transform(
+        "energy_scale_conversion",
+        parameters={
+            "from": current_scale,
+            "to": new_scale,
+            "excitation_energy_eV": float(hv),
+            "formula": "E_out = hv - E_in",
+        },
+        source="importer",
+        reason=f"requested energy_scale={target_scale}",
+    )
 
     return data
 
@@ -197,17 +216,40 @@ def _apply_sweep_integration(data: RawSpectrumData, sweep_mode: str) -> RawSpect
     if specdata.ndim <= 2:
         return data
 
+    input_shape = tuple(int(s) for s in specdata.shape)
+
     if sweep_mode == "integrate":
         # Sum across all dimensions beyond the first two (energy, angle)
+        summed_axes = list(range(2, specdata.ndim))
         while specdata.ndim > 2:
             specdata = np.sum(specdata, axis=-1)
         data.specdata = specdata
+        data.record_transform(
+            "sweep_integration",
+            parameters={
+                "input_shape": list(input_shape),
+                "output_shape": [int(s) for s in specdata.shape],
+                "summed_axes": summed_axes,
+            },
+            source="importer",
+            reason="sweep_mode='integrate'",
+        )
     elif sweep_mode == "individual":
         # Flatten all non-energy dimensions into a single spectra axis
         # Shape: (n_energy, n_angle, d3, d4, ...) -> (n_energy, n_angle*d3*d4*...)
         n_energy = specdata.shape[0]
         n_spectra = int(np.prod(specdata.shape[1:]))
         data.specdata = specdata.reshape(n_energy, n_spectra, order="F")
+        data.record_transform(
+            "dimension_flattening",
+            parameters={
+                "input_shape": list(input_shape),
+                "output_shape": [n_energy, n_spectra],
+                "order": "F",
+            },
+            source="importer",
+            reason="sweep_mode='individual'",
+        )
 
     return data
 
@@ -258,9 +300,20 @@ def import_file(
 
     # Ensure 2D: (n_energy, n_spectra) — safety net
     if specdata.ndim > 2:
+        in_shape = [int(s) for s in specdata.shape]
         n_energy = specdata.shape[0]
         n_flat = int(np.prod(specdata.shape[1:]))
         specdata = specdata.reshape(n_energy, n_flat, order="F")
+        data.record_transform(
+            "dimension_flattening",
+            parameters={
+                "input_shape": in_shape,
+                "output_shape": [int(n_energy), n_flat],
+                "order": "F",
+            },
+            source="importer",
+            reason="HDF5 schema requires 2D (n_energy, n_spectra)",
+        )
 
     n_energy = specdata.shape[0]
     n_spectra = specdata.shape[1]
@@ -286,8 +339,12 @@ def import_file(
     #      2D (401,400)        -> dim_shape = [400]
     dim_shape = list(raw_shape[1:]) if len(raw_shape) > 1 else []
 
+    # The HDF5 schema (unchanged) stores fermienergy as a plain float;
+    # 0.0 remains the legacy sentinel for "unknown". The honest value
+    # (None = unknown) stays available on data.metadata / ImportResult.
+    hv = data.metadata.excitation_energy
     misc = {
-        "fermienergy": data.metadata.excitation_energy,
+        "fermienergy": float(hv) if hv is not None else 0.0,
         "bindingenergysign": be_sign,
         "maxcomp": config.max_components,
         "numberofslice": data.metadata.n_slices,
@@ -309,20 +366,15 @@ def import_file(
         if dim_shape:
             writer.write_dim_shape(dim_shape)
 
-        # Save dim0_is_angle flag (Angular vs Spatial first dimension)
-        # Decision tree:
-        #   1. Single-channel (len<=1) → always False
-        #   2. lens_mode exactly "Transmission" → False (SES spatial mode)
-        #   3. Multi-channel (len>1) → True (angle-resolved data)
-        # Note: PXT lens_mode can be raw strings like "T_HiPPHAXPES",
-        # "Angular56", etc. Only SES normalizes to "Transmission"/"Angular".
-        # Multi-channel PXT data is always angle-resolved.
-        if len(angle) <= 1:
-            dim0_is_angle = False
-        elif data.metadata.lens_mode == "Transmission":
-            dim0_is_angle = False
-        else:
-            dim0_is_angle = True
+        # Save dim0_is_angle without re-inferring an unknown detector axis.
+        # The reader owns this format-specific classification; extension,
+        # channel count, or instrument name alone are not evidence of angle.
+        detector_role = (
+            data.metadata.dimension_roles[1]
+            if len(data.metadata.dimension_roles) > 1
+            else "unknown"
+        )
+        dim0_is_angle = len(angle) > 1 and detector_role == "emission_angle"
         writer.write_dim0_is_angle(dim0_is_angle)
 
         # Write spectra
@@ -392,8 +444,18 @@ def import_file(
             "element": config.element,
             "region": data.metadata.region,
             "energy_scale": data.metadata.energy_scale,
-            "excitation_energy": data.metadata.excitation_energy,
+            "excitation_energy": data.metadata.excitation_energy,  # None = unknown
+            "pass_energy": data.metadata.pass_energy,  # None = unknown
             "source_file": str(input_path),
+            "source_format": data.metadata.source_format,
+            "source_format_version": data.metadata.source_format_version,
+            "source_region_index": data.metadata.source_region_index,
+            "intensity_semantics": data.metadata.intensity_semantics,
+            "intensity_unit": data.metadata.intensity_unit,
+            "original_shape": list(data.metadata.original_shape),
+            "dimension_roles": list(data.metadata.dimension_roles),
+            # Full transform history (reader conventions + importer steps)
+            "transforms": [t.to_dict() for t in data.transforms],
         },
     )
 

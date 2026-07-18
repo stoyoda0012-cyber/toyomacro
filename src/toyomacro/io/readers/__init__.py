@@ -3,6 +3,8 @@
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
+    ReaderTransform,
+    ReaderWarning,
     SpectrumMetadata,
     create_reader,
     detect_format,
@@ -18,6 +20,8 @@ __all__ = [
     # Base
     "BaseReader",
     "RawSpectrumData",
+    "ReaderTransform",
+    "ReaderWarning",
     "SpectrumMetadata",
     "create_reader",
     "detect_format",

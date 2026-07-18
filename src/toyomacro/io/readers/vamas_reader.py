@@ -43,6 +43,10 @@ def _read_vamas_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
         file_header = _read_lines(fid, 12)
         n_regions = int(file_header[5])
 
+        # Line 0 is the VAMAS format identifier, e.g.
+        # "VAMAS Surface Chemical Analysis Standard Data Transfer Format 1988 May 4"
+        format_version = file_header[0] if file_header and "VAMAS" in file_header[0] else None
+
         for region_idx in range(n_regions):
             # Region header: 9 lines
             region_header = _read_lines(fid, 9)
@@ -95,10 +99,21 @@ def _read_vamas_file(filepath: Path) -> list[tuple[RawSpectrumData, str]]:
             metadata = SpectrumMetadata(
                 region=display_name,
                 datetime=dt,
+                # Excitation and pass energy are not parsed from the
+                # VAMAS block layout used here — unknown, not 0.
+                excitation_energy=None,
                 energy_scale="Kinetic",
                 lens_mode="Angular",
                 n_slices=n_slices,
                 n_sweeps=n_sweeps,
+                pass_energy=None,
+                source_format="vamas",
+                source_format_version=format_version,
+                source_region_index=region_idx,
+                intensity_semantics="unknown",
+                intensity_unit="unknown",
+                original_shape=(int(n_energy),),
+                dimension_roles=("energy",),
             )
 
             specdata = intensity.reshape(-1, 1)

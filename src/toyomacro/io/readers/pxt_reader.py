@@ -8,7 +8,9 @@ Based on DNNDenoiser/utils/pxt_reader.py and MATLAB Toyomacro PXTReader.
 from __future__ import annotations
 
 import struct
+import warnings
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +20,11 @@ from numpy.typing import NDArray
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
+    ReaderTransform,
+    ReaderWarning,
     SpectrumMetadata,
+    coerce_optional_float,
+    coerce_optional_int,
 )
 
 # --- Low-level binary structures ---
@@ -56,6 +62,7 @@ class _PXTRegion:
     data: NDArray
     wave_notes: str
     wave_header: _WaveHeader
+    wave_version: int = 5  # IBW binary version of this wave (3 or 5)
 
 
 # --- Binary parsing functions ---
@@ -153,7 +160,7 @@ def _parse_wave_notes(notes: str) -> dict[str, Any]:
     return result
 
 
-def _read_all_regions(filepath: Path) -> list[_PXTRegion]:
+def _read_all_regions(filepath: Path) -> tuple[str, list[_PXTRegion]]:
     """Read all regions from a PXT/IBW file.
 
     PXT files use the **Igor Packed Experiment** format: a sequence of
@@ -167,6 +174,10 @@ def _read_all_regions(filepath: Path) -> list[_PXTRegion]:
 
     IBW files (v5) contain a single standalone wave (no packed-experiment
     wrapper).
+
+    Returns:
+        (container_format, regions) where container_format is
+        "scienta_pxt" (packed experiment) or "igor_ibw" (standalone wave).
     """
     file_size = filepath.stat().st_size
     regions: list[_PXTRegion] = []
@@ -177,7 +188,7 @@ def _read_all_regions(filepath: Path) -> list[_PXTRegion]:
 
         if first_header.version == 5:
             # --- Standalone IBW v5 (single wave, no packed-experiment wrapper)
-            return _read_ibw_regions(fid, first_header, file_size)
+            return "igor_ibw", _read_ibw_regions(fid, first_header, file_size)
 
         # --- Packed Experiment (.pxt) ---
         # The very first bytes are a packed-experiment record header, NOT a
@@ -246,10 +257,11 @@ def _read_all_regions(filepath: Path) -> list[_PXTRegion]:
                     data=data,
                     wave_notes=notes,
                     wave_header=wave_header,
+                    wave_version=bin_header.version,
                 )
             )
 
-    return regions
+    return "scienta_pxt", regions
 
 
 def _read_ibw_regions(fid, first_header: _BinHeader, file_size: int) -> list[_PXTRegion]:
@@ -279,8 +291,61 @@ def _read_ibw_regions(fid, first_header: _BinHeader, file_size: int) -> list[_PX
             data=data,
             wave_notes=notes,
             wave_header=wave_header,
+            wave_version=5,
         )
     ]
+
+
+# --- Metadata helpers ---
+
+# Wave-note keys mapped onto SpectrumMetadata standard fields. Any other
+# key survives verbatim in metadata.vendor_metadata.
+_NOTE_DATETIME_FORMATS = (
+    "%Y-%m-%d %H:%M:%S",
+    "%m/%d/%Y %I:%M:%S %p",
+    "%m/%d/%Y %H:%M:%S",
+)
+
+
+def _parse_note_datetime(
+    notes: dict[str, Any], source: str
+) -> tuple[datetime | None, set[str]]:
+    """Type-safe Date/Time extraction from wave notes.
+
+    Returns (datetime or None, set of note keys consumed). On an
+    unrecognized format the raw values stay in vendor_metadata and a
+    ReaderWarning is emitted.
+    """
+    date_v = notes.get("Date")
+    time_v = notes.get("Time")
+    if date_v is None or time_v is None:
+        return None, set()
+    text = f"{date_v} {time_v}".strip()
+    for fmt in _NOTE_DATETIME_FORMATS:
+        try:
+            return datetime.strptime(text, fmt), {"Date", "Time"}
+        except ValueError:
+            pass
+    warnings.warn(
+        f"{source}: unrecognized Date/Time format: {text!r}",
+        ReaderWarning,
+        stacklevel=2,
+    )
+    return None, set()
+
+
+def _infer_detector_role(lens_mode: str) -> str:
+    """Role of the non-energy detector dimension, from the lens mode.
+
+    Only unambiguous lens-mode families are mapped; raw Scienta mode
+    strings like "T_HiPPHAXPES" stay "unknown" rather than being guessed.
+    """
+    lm = lens_mode.strip().lower()
+    if lm.startswith("angular"):
+        return "emission_angle"
+    if lm.startswith("transmission"):
+        return "position"
+    return "unknown"
 
 
 # --- Public reader class ---
@@ -298,10 +363,11 @@ class PXTReader(BaseReader):
     def __init__(self, filepath: str | Path):
         super().__init__(filepath)
         self._regions: list[_PXTRegion] | None = None
+        self._container_format: str = "unknown"
 
     def _ensure_parsed(self):
         if self._regions is None:
-            self._regions = _read_all_regions(self.filepath)
+            self._container_format, self._regions = _read_all_regions(self.filepath)
 
     @property
     def n_regions(self) -> int:
@@ -328,18 +394,97 @@ class PXTReader(BaseReader):
 
         region = self._regions[region_index]
         notes = _parse_wave_notes(region.wave_notes)
+        src = f"{self.filepath.name}[region {region_index}]"
 
-        # Build metadata
-        metadata = SpectrumMetadata(
-            region=notes.get("Region Name", notes.get("RegionName", "")),
-            excitation_energy=float(notes.get("Excitation Energy", notes.get("ExcitationEnergy", 0.0))),
-            energy_scale=str(notes.get("Energy Scale", notes.get("EnergyScale", "Kinetic"))),
-            lens_mode=str(notes.get("Lens Mode", notes.get("LensMode", ""))),
-            n_slices=int(notes.get("Number of Slices", notes.get("NumberOfSlices", 1))),
-            n_sweeps=int(notes.get("Number of Sweeps", notes.get("NumberOfSweeps", notes.get("NumScans", 1)))),
-            acquisition_mode=str(notes.get("Acquisition Mode", notes.get("AcquisitionMode", ""))),
-            pass_energy=float(notes.get("Pass Energy", notes.get("PassEnergy", 0.0))),
+        # Type-safe extraction of standard fields. Keys whose value was
+        # actually adopted are tracked so everything else survives in
+        # vendor_metadata (a malformed "Pass Energy=abc" stays there too).
+        consumed: set[str] = set()
+
+        def note_value(*keys: str) -> Any:
+            for k in keys:
+                if k in notes:
+                    consumed.add(k)
+                    return notes[k]
+            return None
+
+        def note_float(*keys: str) -> float | None:
+            for k in keys:
+                if k in notes:
+                    value = coerce_optional_float(notes[k], k, src)
+                    if value is not None:
+                        consumed.add(k)
+                    return value
+            return None
+
+        def note_int(*keys: str, default: int) -> int:
+            for k in keys:
+                if k in notes:
+                    value = coerce_optional_int(notes[k], k, src)
+                    if value is not None:
+                        consumed.add(k)
+                        return value
+                    return default
+            return default
+
+        region_name = str(note_value("Region Name", "RegionName") or "")
+        excitation_energy = note_float("Excitation Energy", "ExcitationEnergy")
+        energy_scale = str(note_value("Energy Scale", "EnergyScale") or "Kinetic")
+        lens_mode = str(note_value("Lens Mode", "LensMode") or "")
+        n_slices = note_int("Number of Slices", "NumberOfSlices", default=1)
+        n_sweeps = note_int(
+            "Number of Sweeps", "NumberOfSweeps", "NumScans", default=1
         )
+        acquisition_mode = str(note_value("Acquisition Mode", "AcquisitionMode") or "")
+        pass_energy = note_float("Pass Energy", "PassEnergy")
+        dt, dt_consumed = _parse_note_datetime(notes, src)
+        consumed |= dt_consumed
+
+        # Vendor metadata: parsed key=value pairs not adopted above, plus
+        # free-text note lines that are not key=value at all.
+        vendor: dict[str, Any] = {
+            k: v for k, v in notes.items() if k not in consumed
+        }
+        unparsed_lines = [
+            line.strip()
+            for line in region.wave_notes.split("\r")
+            if line.strip() and "=" not in line
+        ]
+        if unparsed_lines:
+            vendor["unparsed_notes"] = unparsed_lines
+
+        # Original dimension structure as stored in the wave
+        original_shape = tuple(
+            int(d) for d in region.wave_header.n_dim if d > 0
+        )
+        roles = ["energy"]
+        if len(original_shape) >= 2:
+            roles.append(_infer_detector_role(lens_mode))
+        # Further dimensions (sweep? frame? position?) cannot be confirmed
+        # from wave notes — never guess.
+        roles.extend("unknown" for _ in original_shape[2:])
+
+        metadata = SpectrumMetadata(
+            region=region_name,
+            datetime=dt,
+            excitation_energy=excitation_energy,
+            energy_scale=energy_scale,
+            lens_mode=lens_mode,
+            n_slices=n_slices,
+            n_sweeps=n_sweeps,
+            acquisition_mode=acquisition_mode,
+            pass_energy=pass_energy,
+            source_format=self._container_format,
+            source_format_version=str(region.wave_version),
+            source_region_index=region_index,
+            vendor_metadata=vendor,
+            intensity_semantics="unknown",
+            intensity_unit="unknown",
+            original_shape=original_shape,
+            dimension_roles=tuple(roles),
+        )
+
+        transforms: list[ReaderTransform] = []
 
         # Energy axis (dimension 0)
         n_energy = region.wave_header.n_dim[0]
@@ -360,10 +505,30 @@ class PXTReader(BaseReader):
             specdata = data
             if metadata.n_slices > 1:
                 specdata = np.fliplr(specdata)
+                transforms.append(
+                    ReaderTransform(
+                        name="angle_axis_reversal",
+                        parameters={"target": "specdata", "axis": 1},
+                        source="pxt_reader",
+                        reason="Scienta slice order convention (Number of Slices > 1)",
+                    )
+                )
             n_angle = specdata.shape[1]
             angle_ini = region.x_ini[1] if len(region.x_ini) > 1 else 0.0
             angle_fin = region.x_fin[1] if len(region.x_fin) > 1 else float(n_angle - 1)
             angle = np.flipud(np.linspace(angle_ini, angle_fin, n_angle))
+            transforms.append(
+                ReaderTransform(
+                    name="angle_axis_reversal",
+                    parameters={
+                        "target": "angle_values",
+                        "scale_start": float(angle_ini),
+                        "scale_stop": float(angle_fin),
+                    },
+                    source="pxt_reader",
+                    reason="legacy Toyomacro convention: angle scale stored descending",
+                )
+            )
         elif region.n_dim_count >= 3:
             # 3D+: energy x angle x sweep (or energy x sweep if no angle)
             if data.ndim < 3:
@@ -372,18 +537,49 @@ class PXTReader(BaseReader):
             specdata = data
             if metadata.n_slices > 1 and data.ndim >= 2:
                 specdata = np.flip(specdata, axis=1)
+                transforms.append(
+                    ReaderTransform(
+                        name="angle_axis_reversal",
+                        parameters={"target": "specdata", "axis": 1},
+                        source="pxt_reader",
+                        reason="Scienta slice order convention (Number of Slices > 1)",
+                    )
+                )
             n_angle = specdata.shape[1] if specdata.ndim >= 2 else 1
             angle_ini = region.x_ini[1] if len(region.x_ini) > 1 else 0.0
             angle_fin = region.x_fin[1] if len(region.x_fin) > 1 else float(n_angle - 1)
             angle = np.flipud(np.linspace(angle_ini, angle_fin, n_angle))
+            transforms.append(
+                ReaderTransform(
+                    name="angle_axis_reversal",
+                    parameters={
+                        "target": "angle_values",
+                        "scale_start": float(angle_ini),
+                        "scale_stop": float(angle_fin),
+                    },
+                    source="pxt_reader",
+                    reason="legacy Toyomacro convention: angle scale stored descending",
+                )
+            )
         else:
             raise ValueError(f"Unsupported dimension count: {region.n_dim_count}")
+
+        if specdata.dtype != np.float64:
+            transforms.append(
+                ReaderTransform(
+                    name="dtype_conversion",
+                    parameters={"from": str(specdata.dtype), "to": "float64"},
+                    source="pxt_reader",
+                    reason="unified float64 output",
+                )
+            )
 
         return RawSpectrumData(
             specdata=specdata.astype(np.float64),
             energy=energy.astype(np.float64),
             angle=angle.astype(np.float64),
             metadata=metadata,
+            transforms=tuple(transforms),
         )
 
     @staticmethod
