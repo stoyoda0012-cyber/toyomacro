@@ -32,6 +32,15 @@ fires.
 # route from the PoC is NOT enough here. sm_120 needs CUDA >= 12.8/13.
 sudo apt install cuda-toolkit-13-0   # NVIDIA repo; driver stays Windows-side
 
+# GATE BEFORE BUILDING (do not skip): an older toolkit rejects
+# CMAKE_CUDA_ARCHITECTURES=120 — and that failure can surface LATE in
+# the build, burning the whole time budget. Verify nvcc accepts sm_120
+# with a 10-second smoke first:
+nvcc --version
+printf '__global__ void k(){}\nint main(){return 0;}\n' > /tmp/sm120.cu
+nvcc -arch=sm_120 /tmp/sm120.cu -o /tmp/sm120 && echo "sm_120 OK" \
+  || echo "STOP: toolkit too old for sm_120 — upgrade before building"
+
 git clone https://github.com/ml-explore/mlx.git && cd mlx   # or reuse a clone
 git fetch origin pull/3883/head:pr3883 && git checkout pr3883
 CMAKE_ARGS="-DMLX_BUILD_CUDA=ON" pip install . --no-build-isolation -v
@@ -43,10 +52,22 @@ CMAKE_ARGS="-DMLX_BUILD_CUDA=ON" pip install . --no-build-isolation -v
 Run each scenario as a SEPARATE process (the warning is once-per-
 process). Count stderr lines containing `[mlx] float32 matmul-family`.
 
+**Isolation is load-bearing, not hygiene**: any fp32 GEMM that runs
+first — framework warm-up, an import side effect, a capability probe —
+consumes the single warning and silently invalidates the scenario.
+Every cell must be its own interpreter process with stderr captured
+whole. And a "0 warnings" result is ambiguous on its own (genuinely
+not triggered vs consumed earlier), so scenario 2 carries a built-in
+control: after the matvec calls, run one fp32 GEMM *in the same
+process*. If matvec printed nothing and the trailing GEMM then prints
+the warning, the 0 is proven genuine — the machinery works and matvec
+really did not trigger it. Report scenario 2 as the pair
+(matvec-phase count, post-GEMM count).
+
 | # | scenario (env / workload) | expected |
 |---|---|---|
 | 1 | env unset / fp32 GEMM x2 (512x512, twice in one process) | exactly 1 |
-| 2 | env unset / fp32 matvec only ((512,512)@(512,1) and (1,512)@(512,512)) | **report** (Metal analog = 0; see open question) |
+| 2 | env unset / fp32 matvec, then one fp32 GEMM as in-process control | **report pair** (Metal analog = 0; control GEMM must warn — proves a matvec 0 is genuine, not consumed) |
 | 3 | env unset / bf16 GEMM | 0 |
 | 4 | MLX_ENABLE_TF32=0 / fp32 GEMM | 0 |
 | 5 | MLX_ENABLE_TF32=1 (explicit) / fp32 GEMM | 0 |
