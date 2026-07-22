@@ -103,3 +103,83 @@ Paste the filled table as a comment on ml-explore/mlx#3883, including
 the matvec answer (and, if it fires, whether we suggest a shape guard
 vs accepting requested-mode semantics). Keep the same format as the
 author's M5 table for side-by-side comparison.
+
+## Results (2026-07-22, RTX 5070 Laptop / sm_120)
+
+Branch build `0.32.0.dev20260722+d3d6c38a`, CUDA toolkit 13.3
+(nvcc 13.3.73), `CMAKE_CUDA_ARCHITECTURES=120`, driver 596.13,
+WSL2 Ubuntu 24.04, Python 3.12.3.
+
+| # | scenario | count | family | verdict |
+|---|---|---|---|---|
+| 1 | env unset / fp32 GEMM ×2 | **1** | matmul | ✅ once per process |
+| 2 | env unset / fp32 matvec → control GEMM | **pair (1, 0)** | matmul | ⚠️ **fires on matvec** — see below |
+| 3 | env unset / bf16 GEMM | 0 | – | ✅ |
+| 4 | `MLX_ENABLE_TF32=0` / fp32 GEMM | 0 | – | ✅ |
+| 5 | `MLX_ENABLE_TF32=1` explicit / fp32 GEMM | 0 | – | ✅ |
+| 6 | env unset / fp32 conv2d | **1** | **convolution** | ✅ cuDNN gate fires, correct family (first hardware exercise — upstream was compile-only) |
+| 7 | numerics, default / `=0` | rel err **2.930e-04 / 2.077e-07** | matmul / – | ✅ matches mlx#3860 |
+| 8a | voigtfit parity suite (774 tests), env unset | **1 warning**; 8 failed / 765 passed | matmul | ✅ = wheel-0.32.0 TF32-on failure set exactly; no behavior change |
+| 8b | suite, `MLX_ENABLE_TF32=0` | **0 warnings**; 4 failed / 769 passed (all speed assertions) | – | ✅ = wheel TF32-off exactly |
+
+**The backend-asymmetry answer (scenario 2): the warning is a false
+positive for matvec on CUDA.** fp32 matvec fires it (the control GEMM
+then stays silent — the single warning was consumed by the matvec
+phase, proving the pair semantics), yet the matvec *result* is
+fp32-exact: rel err **9.718e-08** vs a float64 reference, measured in
+the same env-unset configuration that fired the warning. So CUDA warns
+about a precision reduction that does not occur for that shape, where
+Metal (author's M5 run) correctly stays silent. Cause as predicted:
+`dtype_to_compute_type()` in `cublas_gemm.cpp` is shape-blind.
+Suggested upstream: shape-gate the CUDA call site (warn only when
+`n > 1` and `m > 1` for the output), or accept requested-mode
+semantics and document the asymmetry.
+
+**Bonus finding — pytest swallows the warning.** Under pytest's
+default fd-level capture, the whole 774-test suite *appeared* to emit
+0 warnings; the single warning only became visible with
+`--capture=no`. It fires inside whichever test happens to run the
+process's first fp32 GEMM — usually a passing test whose captured
+stderr is discarded. Not a defect in the PR, but worth noting in the
+discussion: in test-driven workflows the once-per-process warning can
+be invisible in exactly the runs where TF32 is corrupting results.
+
+### Build notes for this box (differences from the plan's sketch)
+
+- `cuda-toolkit-13-3` (newer than the plan's 13-0; matches the pip
+  wheel generation). sm_120 nvcc gate passed.
+- cuDNN: NVIDIA's wsl-ubuntu apt repo carries no cudnn9 packages —
+  pointed CMake at the venv's pip wheel instead via a shim dir with
+  unversioned symlinks: `-DCUDNN_INCLUDE_PATH=$HOME/cudnn-shim/include
+  -DCUDNN_LIBRARY_PATH=$HOME/cudnn-shim/lib`.
+- `libopenblas-dev liblapacke-dev` required (CPU backend).
+- Runtime needs `LD_LIBRARY_PATH` covering the venv's
+  `nvidia/{cudnn,cu13,nccl}/lib` (source build has no wheel rpath).
+- **`CMAKE_BUILD_PARALLEL_LEVEL=6`**, not nproc: a 32-way nvcc build
+  OOM-crashed the entire WSL2 VM (31 GB host / ~15.6 GB WSL default).
+- Restore the wheel afterwards with `uv pip install "mlx[cuda13]"`
+  (the branch build replaced it in the toyomacro venv).
+
+### PR comment draft (paste to ml-explore/mlx#3883)
+
+> Ran the CUDA half on real sm_120 hardware (RTX 5070 Laptop, WSL2
+> Ubuntu 24.04, CUDA 13.3, branch @ d3d6c38): warning behaves as
+> designed for GEMM (fires once per process, silent for bf16 and for
+> either explicit setting), the cuDNN conv site fires with family
+> "convolution", and numerics match the measurements in #3860
+> (2.9e-04 default / 2.1e-07 with `MLX_ENABLE_TF32=0`). Full 774-test
+> parity suite: exactly 1 warning, failure set identical to the
+> 0.32.0 wheel — no behavioral change.
+>
+> One asymmetry vs the M5 measurement: **fp32 matvec fires the warning
+> on CUDA** (your Metal run had 0), while the matvec result itself
+> stays fp32-exact (rel err 9.7e-08 vs fp64, same process). The CUDA
+> gate in `dtype_to_compute_type()` is shape-blind, so matvec-only
+> workloads get warned about a reduction that doesn't happen for that
+> shape. Suggest either shape-gating that call site or documenting the
+> requested-mode semantics.
+>
+> Minor observation for the discussion: under pytest's default capture
+> the once-per-process warning is invisible (swallowed with whichever
+> test ran the first fp32 GEMM); `--capture=no` shows it. May be worth
+> a line in the docs.
