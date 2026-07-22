@@ -42,7 +42,10 @@ nvcc -arch=sm_120 /tmp/sm120.cu -o /tmp/sm120 && echo "sm_120 OK" \
   || echo "STOP: toolkit too old for sm_120 — upgrade before building"
 
 git clone https://github.com/ml-explore/mlx.git && cd mlx   # or reuse a clone
-git fetch origin pull/3883/head:pr3883 && git checkout pr3883
+# NOTE: the PR gained a second commit (d3d6c38, per-family warning text).
+# If pr3883 was fetched before, DELETE and re-fetch to get the new head:
+git branch -D pr3883 2>/dev/null; git fetch origin pull/3883/head:pr3883
+git checkout pr3883 && git log --oneline -2   # expect d3d6c38 on top
 CMAKE_ARGS="-DMLX_BUILD_CUDA=ON" pip install . --no-build-isolation -v
 # (if the build flag differs, follow docs/src/install.rst in the checkout)
 ```
@@ -50,7 +53,14 @@ CMAKE_ARGS="-DMLX_BUILD_CUDA=ON" pip install . --no-build-isolation -v
 ## Test matrix
 
 Run each scenario as a SEPARATE process (the warning is once-per-
-process). Count stderr lines containing `[mlx] float32 matmul-family`.
+process). Since d3d6c38 the message is per-family:
+`[mlx] float32 <family> ops are running at reduced (TF32) ...` with
+family in {matmul, convolution, attention, quantized matmul, grouped
+matmul}, named after whichever route engaged FIRST in the process.
+Count stderr lines containing the family-agnostic substring
+`running at reduced (TF32)` and ALSO record the family word — it is a
+new checkable: the CUDA conv site is compile-only upstream, so
+scenario 6 printing "convolution" is itself a result.
 
 **Isolation is load-bearing, not hygiene**: any fp32 GEMM that runs
 first — framework warm-up, an import side effect, a capability probe —
@@ -66,17 +76,17 @@ really did not trigger it. Report scenario 2 as the pair
 
 | # | scenario (env / workload) | expected |
 |---|---|---|
-| 1 | env unset / fp32 GEMM x2 (512x512, twice in one process) | exactly 1 |
+| 1 | env unset / fp32 GEMM x2 (512x512, twice in one process) | exactly 1, family "matmul" |
 | 2 | env unset / fp32 matvec, then one fp32 GEMM as in-process control | **report pair** (Metal analog = 0; control GEMM must warn — proves a matvec 0 is genuine, not consumed) |
 | 3 | env unset / bf16 GEMM | 0 |
 | 4 | MLX_ENABLE_TF32=0 / fp32 GEMM | 0 |
 | 5 | MLX_ENABLE_TF32=1 (explicit) / fp32 GEMM | 0 |
-| 6 | env unset / fp32 conv2d (small NCHW) | expect 1 (cuDNN gate) |
+| 6 | env unset / fp32 conv2d (small NCHW) | expect 1, family "convolution" (cuDNN gate; wording untested upstream) |
 | 7 | numerics: 512x512 fp32 GEMM rel err vs fp64 ref — default and =0 | ~2.9e-4 / ~2.1e-7 (matches mlx#3860) |
 | 8 | bonus: voigtfit parity suite against the branch build | pass, warning appears at most once per process |
 
 Driver script sketch (each cell via `subprocess.run([sys.executable, "-c", ...], env=...)`,
-capture stderr, `count = stderr.count("[mlx] float32 matmul-family")`):
+capture stderr, `count = stderr.count("running at reduced (TF32)")`):
 
 ```python
 GEMM   = "import mlx.core as mx; a=mx.ones((512,512)); mx.eval(a@a); mx.eval(a@a)"
