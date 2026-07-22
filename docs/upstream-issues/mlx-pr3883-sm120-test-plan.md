@@ -160,6 +160,25 @@ be invisible in exactly the runs where TF32 is corrupting results.
 - Restore the wheel afterwards with `uv pip install "mlx[cuda13]"`
   (the branch build replaced it in the toyomacro venv).
 
+### Addendum for mlx#3861 (measured on the same branch build)
+
+The native-arch build **does not change GEMM performance**: 4096³ fp32
+GEMM on the `CMAKE_CUDA_ARCHITECTURES=120` source build measures
+425.5 ms TF32off / 750.5 ms TF32on — statistically identical to the
+wheel (435.2 / 729.7). This falsifies the "SM90-only CUTLASS falling
+back to JIT-degraded code" hypothesis floated in #3861: compiling
+natively for sm_120 changes nothing, so the 36× gap vs CuPy/cuBLAS
+(11.5 ms on the same library files) lives in how MLX invokes the GEMM
+(algo heuristic / workspace / dispatch), not in cross-arch JIT.
+Suggested one-line comment for #3861:
+
+> Datapoint: rebuilt from source with CMAKE_CUDA_ARCHITECTURES=120
+> (CUDA 13.3, RTX 5070 Laptop) — 4096³ fp32 GEMM is unchanged
+> (425 ms native vs 435 ms wheel, TF32 off both). So the gap is not
+> PTX JIT for a missing arch; CuPy hits 11.5 ms through the same
+> cublas wheel, which points at the MLX-side cublasLt invocation
+> (heuristic/workspace/dispatch) rather than kernel codegen.
+
 ### PR comment draft (paste to ml-explore/mlx#3883)
 
 > Ran the CUDA half on real sm_120 hardware (RTX 5070 Laptop, WSL2
