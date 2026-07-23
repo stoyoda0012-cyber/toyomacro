@@ -12,15 +12,17 @@ Usage:
 
     bridge = DepthProfilerBridge()
 
-    # From synthetic data (depth model → spectra → fit)
-    result = bridge.process_synthetic(
-        depth_profile=depth_profile,  # (n_depth, n_elements)
-        peak_configs=peak_configs,     # List of peak configurations
-        energy_axes=energy_axes,       # List of energy axes per element
-    )
+    # In-memory spectra (numpy array) → fit
+    result = bridge.process_spectra(spectra, peak_config)
 
-    # From image data (map_*.h5 → fit)
-    result = bridge.process_from_h5('map_data.h5', element='C', orbital='1s')
+    # Synthetic forward model (depth → spectra → fit).
+    #   transformation_matrix is a caller-supplied linear map (toy Beer-Lambert
+    #   in tests; real ARXPS transfer-matrix physics lives outside this module).
+    result, truth = bridge.process_synthetic(
+        depth_profile, transformation_matrix, peak_config, snr=100.0)
+
+    # From an Ismp-schema HDF5 file (root /Ismp, filename-independent)
+    data = bridge.load_h5_data('depth_map.h5')
 """
 
 import time
@@ -382,10 +384,15 @@ class DepthProfilerBridge:
         element_idx: int | None = None,
     ) -> dict[str, Any]:
         """
-        Load experimental data from DepthProfiler HDF5 format (map_*.h5).
+        Load experimental data from DepthProfiler combined/Ismp HDF5 format.
+
+        Reads by dataset schema (root /Ismp + metadata), not by filename, so any
+        *.h5 with this layout works. The GUI mainline (SaveSortData ->
+        exportCombinedH5) writes non-prefixed <name>.h5; the MATLAB CLI writes
+        map_*.h5 by convention. Both are read identically here.
 
         Args:
-            h5_path: Path to map_*.h5 file
+            h5_path: Path to a combined/Ismp *.h5 file (map_ prefix optional)
             element_idx: Specific element index (or None for all)
 
         Returns:
