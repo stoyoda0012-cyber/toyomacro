@@ -202,3 +202,39 @@ Suggested one-line comment for #3861:
 > the once-per-process warning is invisible (swallowed with whichever
 > test ran the first fp32 GEMM); `--capture=no` shows it. May be worth
 > a line in the docs.
+
+## Round 2 — shape-gate re-verification (requested by author, commit 57466a7)
+
+The warning moved from `dtype_to_compute_type()` into the `CublasGemm`
+constructor, gated on `M_ > 1 && N_ > 1` (per our scenario-2 finding).
+Author remains compile-only on CUDA; four checks requested.
+
+Setup (incremental — reuse the existing clone and venv):
+
+```bash
+cd mlx
+git branch -D pr3883 2>/dev/null; git fetch origin pull/3883/head:pr3883
+git checkout pr3883 && git log --oneline -3   # expect 57466a7 on top
+CMAKE_ARGS="-DMLX_BUILD_CUDA=ON" pip install . --no-build-isolation -v
+# CMake cache from round 1 makes this a short rebuild; same
+# LD_LIBRARY_PATH / cudnn-shim / CMAKE_BUILD_PARALLEL_LEVEL=6 notes apply.
+```
+
+| # | scenario (separate processes, stderr captured whole) | expected |
+|---|---|---|
+| R1 | env unset / fp32 matvec, then control GEMM in-process | **pair (0, 1)** — was (1, 0) in round 1; the control now proves the gate, not consumption |
+| R2 | env unset / fp32 GEMM x2 | exactly 1, family "matmul" (unchanged) |
+| R3 | env unset / fp32 `mx.addmm(c, a, b, beta=1.0)` (512x512) | exactly 1, family "matmul" — exercises the second, direct `CublasGemm` construction the author gated at the constructor for |
+| R4a/b | 774-test parity suite, env unset / `MLX_ENABLE_TF32=0` | identical to round 1: (1 warning; 8f/765p) / (0 warnings; 4f/769p) |
+| R5 | optional: fp32 conv2d | still 1, family "convolution" (site untouched by 57466a7) |
+
+R3 snippet:
+
+```python
+import mlx.core as mx
+a = mx.ones((512, 512)); b = mx.ones((512, 512)); c = mx.ones((512, 512))
+mx.eval(mx.addmm(c, a, b, beta=1.0))
+```
+
+Report the five rows on ml-explore/mlx#3883 in the same table format;
+that should be the last hardware gate before merge.
