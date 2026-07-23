@@ -238,3 +238,36 @@ mx.eval(mx.addmm(c, a, b, beta=1.0))
 
 Report the five rows on ml-explore/mlx#3883 in the same table format;
 that should be the last hardware gate before merge.
+
+## Round 2 results (2026-07-23, RTX 5070 Laptop / sm_120)
+
+Branch build `0.32.0.dev20260723+57466a72` (incremental rebuild, same
+toolchain/notes as round 1). **All five rows pass — no deviations.**
+
+| # | scenario | count | family | verdict |
+|---|---|---|---|---|
+| R1 | fp32 matvec → control GEMM, env unset | **pair (0, 1)** | – / matmul | ✅ **shape gate works** — matvec now silent (was (1, 0)), control GEMM still warns, so the 0 is a genuine gate, not consumption |
+| R2 | fp32 GEMM ×2, env unset | 1 | matmul | ✅ unchanged |
+| R3 | fp32 `addmm`, env unset | 1 | matmul | ✅ direct `CublasGemm` constructor path covered |
+| R4a | 774-test parity suite, env unset | 1 warning; 8 failed / 765 passed | matmul | ✅ identical to round 1 |
+| R4b | suite, `MLX_ENABLE_TF32=0` | 0 warnings; 4 failed / 769 passed (all speed) | – | ✅ identical to round 1 |
+| R5 | fp32 conv2d, env unset | 1 | convolution | ✅ unchanged (site untouched by 57466a7) |
+
+### PR comment draft (round 2, paste to ml-explore/mlx#3883)
+
+> Re-ran the matrix on real sm_120 hardware against 57466a7
+> (RTX 5070 Laptop, WSL2, CUDA 13.3, incremental rebuild):
+>
+> | scenario | result |
+> |---|---|
+> | fp32 matvec → in-process control GEMM | **(0, 1)** — matvec silent, control still warns |
+> | fp32 GEMM ×2 | 1, family "matmul" |
+> | fp32 `addmm` | 1, family "matmul" |
+> | 774-test parity suite (env unset / `MLX_ENABLE_TF32=0`) | 1 warning, failures identical to wheel / 0 warnings, failures identical to wheel |
+> | fp32 conv2d | 1, family "convolution" |
+>
+> The shape gate resolves the matvec false positive from my earlier
+> comment — matvec-only workloads are now silent while the in-process
+> control GEMM proves the machinery still engages, and the addmm
+> constructor path warns as intended. No behavioral change in either
+> suite configuration. LGTM from the hardware side.
