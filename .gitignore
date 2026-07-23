@@ -53,6 +53,11 @@ _internal/
 # pushed to the public repo.
 IMPLEMENTATION_PLAN.md
 
+# Uncertainty-quantification backbone audit. References private deppro
+# internals; held for a dedicated public release alongside the
+# xps-uncertainty work rather than shipping with the current engine.
+docs/uncertainty_backbone_audit.md
+
 # --- Private companion layers: not part of the public engine distribution.
 # Developed locally in this worktree; excluded from the public repository.
 src/toyomacro/gui/
