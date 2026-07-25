@@ -291,6 +291,11 @@ toyomacro-python/
 The engine has **zero circular dependencies** between subpackages and
 each layer can be imported in isolation.
 
+The principles behind these choices — throughput as a design
+constraint, honest benchmark numbers, round-trip validation, models
+as data — are written up in
+[`docs/DESIGN_PHILOSOPHY.md`](docs/DESIGN_PHILOSOPHY.md).
+
 ## Compatibility
 
 - **HDF5**: ships streaming/chunked writers compatible with the
