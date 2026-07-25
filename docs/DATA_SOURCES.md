@@ -16,6 +16,20 @@ below. No publisher-typeset tables, PDFs, or vendor binaries are included.
 | `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | U.S. national-laboratory publication of factual data — freely redistributed. |
 | `compounds.json` | Compound properties for IMFP (N_v, density, M_w, E_g), ~20 entries | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Small original compilation of public physical constants — no restriction. |
 
+## In-code constants
+
+Two modules carry small curated sets of scalar physical constants
+directly in source (no external database is extracted or shipped):
+
+- `core/xps_database.py`: ~50 spin-orbit splitting values (one number
+  per element/orbital, e.g. Au 4f = 3.67 eV) plus branch ratios from
+  the quantum-mechanical degeneracy formula (2l)/(2l+2). These are
+  element-level physical constants reported consistently across the
+  primary XPS literature, intended as fitting initial guesses.
+- `fitting/templates.py`: chemical-shift starting values for the three
+  bundled fitting templates (Si 2p oxide, Ta 4f oxide, C 1s organic),
+  likewise widely published reference values used as initial guesses.
+
 ## Deliberately NOT bundled
 
 - **Scienta analyzer transmission functions** (`data/transmission.py`):
