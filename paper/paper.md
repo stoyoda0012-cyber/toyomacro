@@ -203,43 +203,37 @@ including the shot-noise collapse ordering shown in
 \autoref{fig:gvrt}. The engine was developed for, and is used in,
 the author's ARXPS simulation-and-inversion research workflow, where
 it removed the peak-fitting bottleneck between spectral simulation
-and depth-profile reconstruction.
-<!-- TODO(author): add verifiable specifics only the author can
-confirm: conference presentations (e.g., JSAP 2026), manuscripts in
-preparation/review that used voigtfit results, any external users or
-integrations. Remove this comment before submission. -->
+and depth-profile reconstruction. Results obtained with the engine
+were presented at the 2026 spring meeting of the Japan Society of
+Applied Physics.
 
 # AI usage disclosure
 
-<!-- TODO(author): This section must be completed by the author;
-JOSS requires disclosure of tools/models (with versions), where they
-were used, the nature and scope of assistance, and confirmation of
-human review. The structure below is a scaffold — fill in the
-bracketed items truthfully and remove this comment. -->
-
 Generative AI tools were used during the development of this
-software and manuscript. **Tools and versions:** [TODO(author):
-list the assistants and model versions used, e.g., coding-assistant
-CLI tools and the underlying models]. **Where used:** [TODO(author):
-code, refactoring, test scaffolding, documentation, benchmark
-scripts, and/or paper text]. **Nature and scope:** [TODO(author):
-describe the approximate division of labor, e.g., AI-drafted
-implementations against author-specified algorithms and acceptance
-criteria]. The author made all core algorithmic and design
-decisions, and reviewed, edited, validated, and tested all
-AI-assisted output; all benchmark measurements reported here were
-executed and verified on the author's hardware.
+software and manuscript. **Tools:** Claude Code (Anthropic), using
+Claude Opus 4-family and Claude 5-family models over the course of
+development. **Where used:** implementation drafting, refactoring,
+test scaffolding, benchmark scripts, documentation, and manuscript
+editing. **Nature and scope:** the AI assistant drafted code against
+algorithms, numerical targets, and acceptance criteria specified by
+the author, in an iterative propose–review–revise loop in which the
+author acted as reviewer and gatekeeper for every change. The author
+made all core algorithmic and design decisions, and reviewed,
+edited, validated, and tested all AI-assisted output; all benchmark
+measurements reported here were executed and verified on the
+author's hardware.
 
 # Acknowledgments
 
 `voigtfit` grew out of the MATLAB Toyomacro suite, whose
 per-spectrum solver and chemical-state library shaped many of the
 present-day API decisions.
-<!-- TODO(author): JOSS requires funding and conflict-of-interest
-transparency. Confirm and state: (1) whether development was part of
-employment at Vacuum Products Corporation and the employer's role,
-(2) funding sources, if any, (3) the relationship to any
-closed-source companion products, (4) the approved copyright holder
-of the MIT license. Remove this comment before submission. -->
+
+This software was developed in the course of the author's work at
+Vacuum Products Corporation, which approved its release under the
+MIT License with the author as copyright holder. No external funding
+was received. The open repository is self-contained: everything
+described in this paper runs from the public code alone (see the
+scope section of the README for what is deliberately out of scope).
 
 # References
