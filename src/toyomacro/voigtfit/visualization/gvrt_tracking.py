@@ -82,7 +82,7 @@ SWEEP_COLORS = {
 
 # ROI presets: (name, display_color, (frac_r0, frac_c0, frac_r1, frac_c1))
 ROI_PRESETS = {
-    'fuji': [
+    'demo': [
         ('sky',   '#1E88E5', (0.02, 0.10, 0.22, 0.35)),
         ('trees', '#43A047', (0.74, 0.05, 0.93, 0.30)),
         ('roof',  '#E53935', (0.37, 0.35, 0.60, 0.55)),
@@ -268,7 +268,7 @@ def _build_sweep_data(
 
 def select_rois(
     image: np.ndarray,
-    preset_name: str = 'fuji',
+    preset_name: str = 'demo',
     n_sample: int = N_ROI_SAMPLES,
     min_size: int = 20,
 ) -> list[tuple[str, str, tuple[int, int, int, int], np.ndarray]]:
@@ -427,7 +427,7 @@ def build_tracking_data(
     preset: SinglePeakPreset = C1S_SINGLE_PRESET,
     solver: str = 'dict2d_parabola',
     max_height: int = 540,
-    roi_preset: str = 'fuji',
+    roi_preset: str = 'demo',
     n_roi_samples: int = N_ROI_SAMPLES,
     verbose: bool = True,
 ) -> TrackingDataV4:

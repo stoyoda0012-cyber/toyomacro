@@ -108,14 +108,14 @@ class TestROISelection:
     def test_returns_3_rois(self):
         from toyomacro.voigtfit.visualization.gvrt_tracking import select_rois
         image = np.random.randint(0, 256, (100, 160, 3), dtype=np.uint8)
-        rois = select_rois(image, preset_name='fuji')
+        rois = select_rois(image, preset_name='demo')
         assert len(rois) == 3
 
     def test_rois_within_bounds(self):
         from toyomacro.voigtfit.visualization.gvrt_tracking import select_rois
         H, W = 100, 160
         image = np.random.randint(0, 256, (H, W, 3), dtype=np.uint8)
-        rois = select_rois(image, preset_name='fuji')
+        rois = select_rois(image, preset_name='demo')
         for name, color, (r0, c0, r1, c1), flat in rois:
             assert 0 <= r0 < r1 <= H
             assert 0 <= c0 < c1 <= W
@@ -125,7 +125,7 @@ class TestROISelection:
     def test_roi_sample_count(self):
         from toyomacro.voigtfit.visualization.gvrt_tracking import select_rois
         image = np.random.randint(0, 256, (200, 300, 3), dtype=np.uint8)
-        rois = select_rois(image, preset_name='fuji', n_sample=50)
+        rois = select_rois(image, preset_name='demo', n_sample=50)
         for _, _, _, flat in rois:
             assert len(flat) <= 50
 
@@ -138,8 +138,8 @@ class TestROISelection:
     def test_deterministic(self):
         from toyomacro.voigtfit.visualization.gvrt_tracking import select_rois
         image = np.random.randint(0, 256, (100, 100, 3), dtype=np.uint8)
-        r1 = select_rois(image, preset_name='fuji', n_sample=30)
-        r2 = select_rois(image, preset_name='fuji', n_sample=30)
+        r1 = select_rois(image, preset_name='demo', n_sample=30)
+        r2 = select_rois(image, preset_name='demo', n_sample=30)
         for (_, _, _, f1), (_, _, _, f2) in zip(r1, r2):
             np.testing.assert_array_equal(f1, f2)
 

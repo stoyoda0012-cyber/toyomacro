@@ -29,12 +29,31 @@ def roundtrip_image_dir() -> Path:
     return data_root() / "Roundtrip" / "image"
 
 
-def fuji_dir() -> Path:
-    return data_root() / "Fuji" / "PSNRTest" / "Fuji"
+def psnr_test_dir() -> Path:
+    return data_root() / "PSNRTest"
 
 
 def speedtest_dir() -> Path:
-    return data_root() / "Fuji" / "SpeedTest"
+    return data_root() / "SpeedTest"
+
+
+def find_default_image(directory: Path | None = None) -> Path | None:
+    """First image file under *directory* (default: the roundtrip image
+    tree), searched recursively in sorted order.
+
+    Benchmarks use this instead of hardcoding any particular file name:
+    the datasets are not bundled, so whatever image the user drops into
+    the data tree becomes the default. Returns ``None`` when nothing is
+    found so callers can print a friendly hint.
+    """
+    base = directory if directory is not None else roundtrip_image_dir()
+    if not base.is_dir():
+        return None
+    exts = {".jpg", ".jpeg", ".png", ".gif"}
+    for f in sorted(base.rglob("*")):
+        if f.is_file() and f.suffix.lower() in exts:
+            return f
+    return None
 
 
 def gazou_dir() -> Path:

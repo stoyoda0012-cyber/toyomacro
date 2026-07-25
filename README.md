@@ -10,8 +10,10 @@
 > of **478 M spectrum-vectors per second** (range 453–490 over nine
 > repetitions; full provenance record committed under
 > [`paper/figures/results/`](paper/figures/results/)) on an Apple
-> M3 Max with MLX, and previously completed the full GVRT 8K UHD
-> round-trip — ≈265 M Voigt fits across eight shot-noise severities —
+> M3 Max with MLX, and previously completed the full GVRT (Giga Voigt
+> Round Trip: image → Voigt spectra → noise → fit → reconstructed
+> image) benchmark on an 8K UHD source
+> — ≈265 M Voigt fits across eight shot-noise severities —
 > in about ten minutes on the same hardware. A pure-NumPy fallback
 > runs the identical algorithms anywhere CPython runs.
 >
@@ -104,7 +106,7 @@ generation + fit time, not the solver alone.
 
 | Image | Noise sweep | Total fits | Wall time (MLX, M3 Max) | PSNR (noise-free) δa / δc / δσ |
 |---|---|---:|---:|---|
-| 540p Fuji (960×540, 6 components) | none | ~0.52 M × 5 = **2.6 M** | ~0.9 s | 59.8 dB (image-level) |
+| 540p demo image (960×540, 6 components) | none | ~0.52 M × 5 = **2.6 M** | ~0.9 s | 59.8 dB (image-level) |
 | 4K UHD | 8 Poisson levels | **66 M** | 1.4 min | 64.1 / 61.3 / 56.9 dB |
 | 8K UHD (7680×4320) | 8 Poisson levels | **265 M** | ~10.4 min | 60.8 / 61.3 / 55.1 dB |
 

@@ -315,16 +315,22 @@ def run_benchmark(
     # Resolve input path (--input takes precedence over --gif)
     media_path = input_path or gif_path
     if media_path is None:
-        media_path = str(
-            roundtrip_image_dir() / 'fuji' / 'fuji_sakura_960x540.gif'
-        )
+        from ._data_paths import find_default_image
+
+        found = find_default_image()
+        if found is None:
+            raise SystemExit(
+                'No input media found — pass --input/--gif or set '
+                'VOIGTFIT_DATA_ROOT to a tree containing images.'
+            )
+        media_path = str(found)
 
     frames = load_image(media_path, all_frames=True)
     n_frames, h, w, _ = frames.shape
     n_pixels = h * w
     print(f"Loaded: {w}x{h}, {n_frames} frames, {n_pixels:,} px/frame")
 
-    preset = get_element_preset('fuji')
+    preset = get_element_preset('demo')
     config = GeneratorConfig()
 
     color_mapping = preset.color_mapping

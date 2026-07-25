@@ -97,7 +97,7 @@ def run_psnr_noise_benchmark(
             image_path=image_path,
             project_name=project_name,
         )
-        generator.configure_fuji_elements()
+        generator.configure_demo_elements()
 
         output_dir = generator.generate(
             noise_config=noise_config,
@@ -117,7 +117,7 @@ def run_psnr_noise_benchmark(
             project_name=project_name,
             original_image_path=image_path,
         )
-        benchmark.configure_fuji_8k()
+        benchmark.configure_demo_8k()
         # Override image shape based on actual image
         benchmark.image_shape = original_image.shape[:2]
 
@@ -269,17 +269,23 @@ def print_benchmark_summary(results: dict[str, NoiseBenchmarkResult]) -> None:
 
 
 if __name__ == '__main__':
-    from ._data_paths import fuji_dir
+    from ._data_paths import find_default_image, psnr_test_dir
 
-    _fuji = fuji_dir()
-    image_path = str(_fuji / 'churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg')
-    output_dir = str(_fuji)
+    _psnr = psnr_test_dir()
+    _img = find_default_image(_psnr) or find_default_image()
+    if _img is None:
+        raise SystemExit(
+            'No benchmark image found — set VOIGTFIT_DATA_ROOT and place '
+            'an image under PSNRTest/ or Roundtrip/image/.'
+        )
+    image_path = str(_img)
+    output_dir = str(_psnr)
 
     results = run_psnr_noise_benchmark(
         image_path=image_path,
         output_base_dir=output_dir,
         poisson_levels=[0, 1e2, 1e3, 1e4],  # Test subset first
-        project_name='fuji_psnr_test',
+        project_name='psnr_noise_test',
     )
 
     print_benchmark_summary(results)

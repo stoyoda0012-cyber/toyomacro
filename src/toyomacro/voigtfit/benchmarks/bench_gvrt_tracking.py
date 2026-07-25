@@ -18,11 +18,26 @@ Usage:
 import argparse
 from pathlib import Path
 
-from ._data_paths import roundtrip_image_dir
+from ._data_paths import find_default_image
 
-DEFAULT_IMAGE = str(
-    roundtrip_image_dir() / 'fuji' / 'churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg'
-)
+
+def _default_image() -> str:
+    """First image under the roundtrip data tree, else a synthetic demo
+    image rendered to outputs/ — so the script always has an input
+    without shipping or referencing any third-party image."""
+    found = find_default_image()
+    if found is not None:
+        return str(found)
+    import matplotlib.image as mpimg
+
+    from ..gvrt_service import make_demo_image
+
+    out = Path(__file__).resolve().parent.parent.parent / 'outputs'
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / 'gvrt_demo_input.png'
+    if not target.exists():
+        mpimg.imsave(str(target), make_demo_image(1024))
+    return str(target)
 
 
 def main():
@@ -31,7 +46,7 @@ def main():
     )
     parser.add_argument(
         '--image', type=str, default=None,
-        help='Input RGB image path. Default: fuji 8K (auto-downsampled)',
+        help='Input RGB image path. Default: auto-discovered or synthetic demo image (auto-downsampled)',
     )
     parser.add_argument(
         '--output', type=str, default=None,
@@ -42,8 +57,8 @@ def main():
         help='Downsample image to this max height (default: 540)',
     )
     parser.add_argument(
-        '--roi-preset', type=str, default='fuji',
-        help='ROI preset name (default: fuji)',
+        '--roi-preset', type=str, default='demo',
+        help='ROI preset name (default: demo)',
     )
     parser.add_argument(
         '--n-roi-samples', type=int, default=500,
@@ -59,7 +74,7 @@ def main():
     )
     args = parser.parse_args()
 
-    image_path = args.image or DEFAULT_IMAGE
+    image_path = args.image or _default_image()
     if not Path(image_path).exists():
         parser.error(f'Image not found: {image_path}')
 

@@ -33,14 +33,18 @@ from toyomacro.voigtfit.spectra_generator import (
 
 from ._data_paths import gazou_dir
 
-# Default 8K images
+# Default 8K images: every image directly under the (unbundled) sample
+# dir, keyed by file stem — no file names are assumed in source.
 _GAZOU_DIR = gazou_dir()
-DEFAULT_IMAGES = {
-    'fuji': _GAZOU_DIR / 'churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg',
-    'dobai': _GAZOU_DIR / '1912095.jpg',
-    'planet': _GAZOU_DIR / 'wallpaperbetter.jpg',
-    'aurora': _GAZOU_DIR / 'wallpapersden.com_aurora-borealis-over-winter-lake_7680x4320.jpg',
-}
+DEFAULT_IMAGES = (
+    {
+        p.stem: p
+        for p in sorted(_GAZOU_DIR.iterdir())
+        if p.is_file() and p.suffix.lower() in {'.jpg', '.jpeg', '.png'}
+    }
+    if _GAZOU_DIR.is_dir()
+    else {}
+)
 
 # Canonical noise levels (excluding aliases)
 CANONICAL_NOISE = [
@@ -252,7 +256,7 @@ def run_giga_benchmark(
     noise_levels: list[str] | None = None,
     output_npz: Path | None = None,
     crop_size: int = 512,
-    elements: str = 'fuji',
+    elements: str = 'demo',
     verbose: bool = True,
 ) -> dict:
     """Run 4-image × N-noise roundtrip benchmark, cache to NPZ.

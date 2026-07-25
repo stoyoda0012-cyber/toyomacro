@@ -365,12 +365,12 @@ def save_side_by_side_gif(
     )
 
 
-def get_color_mapping(preset_name: str = 'fuji') -> tuple[np.ndarray, list[tuple[str, int]]]:
+def get_color_mapping(preset_name: str = 'demo') -> tuple[np.ndarray, list[tuple[str, int]]]:
     """
     Get color mapping and component order for a named element preset.
 
     Args:
-        preset_name: Registered preset name (default: 'fuji')
+        preset_name: Registered preset name (default: 'demo')
 
     Returns:
         (color_mapping, component_order) tuple
@@ -382,16 +382,16 @@ def get_color_mapping(preset_name: str = 'fuji') -> tuple[np.ndarray, list[tuple
     return preset.color_mapping.copy(), list(preset.component_order)
 
 
-def get_fuji_color_mapping() -> tuple[np.ndarray, list[tuple[str, int]]]:
+def get_demo_color_mapping() -> tuple[np.ndarray, list[tuple[str, int]]]:
     """
-    Get color mapping for Fuji 8K test data (6-component).
+    Get color mapping for the 6-component demo preset.
 
-    Backward-compatible wrapper around get_color_mapping('fuji').
+    Backward-compatible wrapper around get_color_mapping('demo').
 
     Returns:
         (color_mapping, component_order) tuple
     """
-    return get_color_mapping('fuji')
+    return get_color_mapping('demo')
 
 
 def print_comparison_report(

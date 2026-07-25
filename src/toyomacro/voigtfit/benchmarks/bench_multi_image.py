@@ -8,13 +8,13 @@ across multiple images to verify PSNR consistency.
 Key question: is solver quality image-independent?
 Expected: yes, because each pixel is processed independently.
 
-Images: fuji, dubai, aurora, planet
+Images: whatever subdirectories exist under the roundtrip image dir
 Solver: 4-step (default)
 
 Usage:
     uv run python -m toyomacro.voigtfit.benchmarks.bench_multi_image
     uv run python -m toyomacro.voigtfit.benchmarks.bench_multi_image --max-pixels 500000
-    uv run python -m toyomacro.voigtfit.benchmarks.bench_multi_image --images fuji dubai
+    uv run python -m toyomacro.voigtfit.benchmarks.bench_multi_image --images <name> [<name> ...]
 """
 
 import argparse
@@ -41,16 +41,23 @@ from ._data_paths import roundtrip_image_dir
 
 IMAGE_DIR = roundtrip_image_dir()
 
-# name → (subdirectory, filename)
-IMAGE_CATALOG = {
-    "fuji": ("fuji", "churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg"),
-    "dubai": ("dobai", "1912095.jpg"),
-    "aurora": (
-        "aurora",
-        "wallpapersden.com_aurora-borealis-over-winter-lake_7680x4320.jpg",
-    ),
-    "planet": ("planet", "wallpaperbetter.jpg"),
-}
+# name → image path, discovered from the subdirectories of IMAGE_DIR at
+# import time. Nothing is bundled and no file name is assumed: drop an
+# image into <IMAGE_DIR>/<name>/ and it becomes selectable as <name>.
+from ._data_paths import find_default_image
+
+
+def _discover_images() -> dict[str, Path]:
+    catalog: dict[str, Path] = {}
+    if IMAGE_DIR.is_dir():
+        for sub in sorted(p for p in IMAGE_DIR.iterdir() if p.is_dir()):
+            img = find_default_image(sub)
+            if img is not None:
+                catalog[sub.name] = img
+    return catalog
+
+
+IMAGE_CATALOG = _discover_images()
 
 AMPLITUDE_SCALE = 1000.0
 BG_FRACTION = 0.001

@@ -99,7 +99,7 @@ def _load_or_synthesize(resolution: str, gif_dir: Path | None) -> np.ndarray:
 def run_chunk_benchmark(
     frames: np.ndarray,
     chunk_spectra: int,
-    elements: str = 'fuji',
+    elements: str = 'demo',
     noise_levels: list[str] | None = None,
 ) -> ChunkBenchmarkResult:
     """Run a single chunk-size benchmark measurement.

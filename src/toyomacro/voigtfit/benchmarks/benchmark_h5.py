@@ -92,7 +92,7 @@ except ImportError:
 from ..image_utils import (
     amplitudes_to_rgb,
     compare_images,
-    get_fuji_color_mapping,
+    get_demo_color_mapping,
     load_image,
 )
 from ..pipeline import HybridPipeline
@@ -328,7 +328,7 @@ class BenchmarkH5:
         # Create benchmark
         bench = BenchmarkH5.create(
             output_path='benchmark.h5',
-            image_path='fuji.jpg',
+            image_path='input.jpg',
             config=BenchmarkH5Config(poisson_levels=[0, 1e4, 1e8]),
         )
         bench.run_all()
@@ -359,7 +359,7 @@ class BenchmarkH5:
             output_path: Path for output H5 file
             image_path: Source image path
             config: Benchmark configuration
-            elements: Element specifications (uses Fuji defaults if None)
+            elements: Element specifications (uses the demo preset if None)
         """
         config = config or BenchmarkH5Config()
         output_path = Path(output_path)
@@ -369,7 +369,7 @@ class BenchmarkH5:
         height, width = image.shape[:2]
         n_pixels = height * width
 
-        # Default elements (Fuji 6-component)
+        # Default elements (6-component demo preset)
         if elements is None:
             elements = [
                 ElementSpec('Si', '1s', 1839.1, sigma=1.02, gamma=0.25),
@@ -381,7 +381,7 @@ class BenchmarkH5:
             ]
 
         # Color mapping
-        color_mapping, component_order = get_fuji_color_mapping()
+        color_mapping, component_order = get_demo_color_mapping()
 
         # Create H5 file
         h5 = h5py.File(output_path, 'w')
@@ -1113,11 +1113,17 @@ def run_unified_benchmark(
 
 
 if __name__ == '__main__':
-    from ._data_paths import fuji_dir
+    from ._data_paths import find_default_image, psnr_test_dir
 
-    _fuji = fuji_dir()
+    _psnr = psnr_test_dir()
+    _img = find_default_image(_psnr) or find_default_image()
+    if _img is None:
+        raise SystemExit(
+            'No benchmark image found — set VOIGTFIT_DATA_ROOT and place '
+            'an image under PSNRTest/ or Roundtrip/image/.'
+        )
     run_unified_benchmark(
-        image_path=str(_fuji / 'fuji_test_480x270.jpg'),
-        output_path=str(_fuji / 'benchmark_unified.h5'),
+        image_path=str(_img),
+        output_path=str(_psnr / 'benchmark_unified.h5'),
         poisson_levels=[0, 1e4, 1e6, 1e8],
     )
