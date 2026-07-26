@@ -178,6 +178,20 @@ unity, i.e., when the peak signal equals its own shot noise. Both
 figures regenerate from self-contained scripts and committed
 measurement records in `paper/figures/`.
 
+The estimator class is also characterized against *systematic*
+lineshape error. Because the solver is a variable-projection method
+[@GolubPereyra1973], the bias that an unrepresentable model error
+(asymmetry, satellites, background curvature) induces in a fitted
+peak position follows a first-order projection law, validated on the
+package's own Voigt basis in
+`examples/04_projection_law_validation.py` — including the
+production `VarProFitter` (slope 1.000, $R^2 > 0.9999$ against the
+predicted bias; full three-level study in
+`docs/projection_law_validation.md`). The law itself is derived in a
+companion theoretical manuscript (in preparation). Together with the
+CRLB utilities this covers both halves of the error budget:
+statistical noise and systematic model error.
+
 ![Throughput bottleneck hierarchy on an Apple M3 Max. Hatched bars
 are theoretical bounds derived from hardware specifications; the
 solid bar is the measured median of nine repetitions (committed
