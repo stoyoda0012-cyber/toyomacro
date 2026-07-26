@@ -33,19 +33,6 @@ SQRT2 = np.sqrt(2.0)
 SQRT2PI = np.sqrt(2.0 * np.pi)
 
 
-def _fit_single_worker(y, energy, initial_centers, initial_sigmas, gamma,
-                       max_iter, tol, bounds_sigma, bounds_center_delta, reg_lambda):
-    """Worker function for multiprocessing VarPro fitting."""
-    fitter = VarProFitter(
-        max_iter=max_iter,
-        tol=tol,
-        bounds_sigma=bounds_sigma,
-        bounds_center_delta=bounds_center_delta,
-        reg_lambda=reg_lambda,
-    )
-    return fitter.fit_single(y, energy, initial_centers, initial_sigmas, gamma)
-
-
 class VarProFitter:
     """
     Variable Projection fitter for Voigt profiles.
@@ -189,7 +176,8 @@ class VarProFitter:
             initial_amplitudes: Optional initial amplitudes (unused, for interface)
 
         Returns:
-            Dict with centers, sigmas, amplitudes, chi2, success
+            Dict with centers, sigmas, amplitudes, chi2, success. ``chi2`` is
+            the unweighted mean squared residual (not a variance-weighted χ²).
         """
         n_components = len(initial_centers)
 
@@ -225,7 +213,7 @@ class VarProFitter:
         Phi = self.voigt_basis(energy, centers_opt, sigmas_opt, gamma)
         amplitudes = self.solve_amplitudes(Phi, y)
 
-        # Compute χ²
+        # Fit quality: unweighted mean squared residual (reported as "chi2")
         residuals = y - Phi @ amplitudes
         chi2 = np.sum(residuals**2) / len(y)
 
@@ -245,11 +233,12 @@ class VarProFitter:
         initial_centers: np.ndarray,
         initial_sigmas: np.ndarray,
         gamma: float = 0.2,
-        initial_amplitudes: np.ndarray | None = None,
-        n_jobs: int = -1,
     ) -> dict:
         """
-        Fit batch of spectra using VarPro with parallel processing.
+        Fit a batch of spectra with a sequential loop over ``fit_single``.
+
+        For large batches use ``FastVoigtFitter`` (the batch-first,
+        matmul-shaped pipeline); this method is a convenience wrapper.
 
         Args:
             Y: Spectra matrix (n_energy, n_spectra)
@@ -257,17 +246,14 @@ class VarProFitter:
             initial_centers: Initial peak positions (shared)
             initial_sigmas: Initial Gaussian widths (shared)
             gamma: Lorentzian width
-            initial_amplitudes: Optional initial amplitudes (n_components, n_spectra)
-            n_jobs: Number of parallel jobs (-1 = all cores)
 
         Returns:
-            Dict with arrays of results
+            Dict with arrays of results (``chi2`` as in ``fit_single``:
+            unweighted mean squared residual)
         """
         n_spectra = Y.shape[1]
         n_components = len(initial_centers)
 
-        # Sequential processing (multiprocessing overhead too high for small tasks)
-        # For large batches, consider chunking or using joblib
         results_list = []
         for i in range(n_spectra):
             results_list.append(self.fit_single(
