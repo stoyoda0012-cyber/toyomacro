@@ -217,9 +217,12 @@ including the shot-noise collapse ordering shown in
 \autoref{fig:gvrt}. The engine was developed for, and is used in,
 the author's ARXPS simulation-and-inversion research workflow, where
 it removed the peak-fitting bottleneck between spectral simulation
-and depth-profile reconstruction. Results obtained with the engine
-were presented at the 2026 spring meeting of the Japan Society of
-Applied Physics.
+and depth-profile reconstruction; it underpins a peer-reviewed
+measurement-methodology paper now in press, and its
+misspecification-bias behaviour is the experimental basis of the
+companion theoretical manuscript in preparation. Results obtained
+with the engine were presented at the 2026 spring meeting of the
+Japan Society of Applied Physics.
 
 # AI usage disclosure
 
