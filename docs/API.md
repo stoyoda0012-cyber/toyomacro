@@ -199,7 +199,58 @@ described — see `docs/projection_law_validation.md`).
   configuration, and Figure 2 of the paper shows the collapse
   ordering (width → amplitude → position).
 
-## 5. Synthetic data and GVRT
+## 5. Quantification inputs
+
+```python
+from toyomacro.data import CrossSection, IMFP, BindingEnergy
+```
+
+Photoionization cross-sections (Scofield, Yeh–Lindau, Trzhaskovskaya)
+ship as tables; TPP-2M inelastic mean free paths are computed from the
+published formula. Provenance and licensing for each is stated in
+[`DATA_SOURCES.md`](DATA_SOURCES.md).
+
+**Analyzer transmission** is an adapter, not shipped data:
+
+```python
+from toyomacro.data.transmission import TransmissionFunction
+
+TransmissionFunction.available()        # is user data present?
+T = TransmissionFunction.load(slit=0.5) # Scienta XOP TSV, log-log interp
+T = TransmissionFunction.from_power_law(alpha=-0.35)  # fallback
+T(ek_ep)                                # transmission in mSr
+```
+
+Pass energy is **not** a table dimension. A curve is selected by
+`(analyzer, mode, slit, spot)` — slit and spot are physical apertures in
+**mm** — and evaluated at the dimensionless ratio KE/Ep using whatever
+Ep you acquired at. Each curve covers a finite ratio range
+(`ek_ep_range`); outside it the value is clamped to the endpoint, so a
+wide kinetic-energy sweep can silently run flat at the ends. Check
+`ek_ep_range` against `KE_max/Ep` before trusting a correction.
+
+Vendor-measured curves are **not redistributed** — point
+`TOYOMACRO_SCIENTA_DATA_DIR` at your own
+`ScientaXOP/Transmission/data` folder (read at call time, so setting it
+mid-session works) and `load()` will find the matching `(slit, spot)`
+configuration. Start from `list_analyzers()` / `list_configs()`: a slit
+width that is not on the grid raises rather than rounding to the
+nearest file, since silently applying the neighbouring calibration is
+the expensive kind of mistake.
+
+Without that directory, `from_power_law()` gives a smooth
+T ∝ (Ek/Ep)^α stand-in. That is a *shape* assumption, not a
+calibration — across one real EW4000/Hipp3/R3000 set the fitted
+exponent ranges from about −0.71 to −0.03 (median ≈ −0.26), so no
+single default stands in for a specific slit/spot/mode. Absolute
+quantification from the fallback is not traceable; use it for relative
+trends only.
+
+This module is experimental in the sense of the stability section — it
+is not re-exported from `toyomacro.data` and no other part of the
+package calls it.
+
+## 6. Synthetic data and GVRT
 
 ```python
 from toyomacro.voigtfit.spectra_generator import (
@@ -213,7 +264,7 @@ peak Poisson mean = (10⁴/level)². `GVRTService.run(image, config)`
 executes the image → spectra → fit → image round trip and returns
 per-channel PSNR — the package's end-to-end accuracy check.
 
-## 6. Reproducible benchmarking
+## 7. Reproducible benchmarking
 
 ```bash
 # kernel throughput with full provenance (JSON committed under

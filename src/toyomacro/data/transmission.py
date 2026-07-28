@@ -3,6 +3,12 @@
 Loads transmission function data from Scienta XOP TSV files and provides
 interpolation for XPS quantitative analysis.
 
+The tabulated abscissa is the dimensionless ratio Ek/Ep, so pass energy
+is *not* a table dimension: a curve is selected by (analyzer, lens mode,
+slit, spot) and then evaluated at KE/Ep with the Ep you acquired at.
+Slit and spot are physical apertures in **mm**, not energy widths.
+Ratios outside the tabulated range are clamped to the endpoint values.
+
 Correction formula (from Scienta Transmission.ipf):
     I_normalized = I_measured / T(Ek/Ep) × 1000  →  Counts/Sr
 
@@ -29,12 +35,21 @@ from scipy.interpolate import interp1d
 # Set ``TOYOMACRO_SCIENTA_DATA_DIR`` to point at your own
 # ``ScientaXOP/Transmission/data`` folder. The bundled scanner
 # expects the analyzer/mode subdirectory layout defined below.
-_SCIENTA_DATA_ROOT = Path(
-    os.environ.get(
-        "TOYOMACRO_SCIENTA_DATA_DIR",
-        str(Path.home() / "scienta_xop" / "Transmission" / "data"),
-    )
-).expanduser()
+_DEFAULT_DATA_ROOT = Path.home() / "scienta_xop" / "Transmission" / "data"
+
+
+def _data_root(data_root: Path | str | None = None) -> Path:
+    """Resolve the data directory, honouring the environment each call.
+
+    Read at call time, not import time: a session that sets
+    ``TOYOMACRO_SCIENTA_DATA_DIR`` after importing toyomacro would
+    otherwise be silently ignored and every lookup would report "no
+    data".
+    """
+    if data_root is not None:
+        return Path(data_root).expanduser()
+    env = os.environ.get("TOYOMACRO_SCIENTA_DATA_DIR")
+    return (Path(env).expanduser() if env else _DEFAULT_DATA_ROOT)
 
 
 # Analyzer → mode → subdirectory mapping
@@ -56,7 +71,7 @@ _ANALYZER_MODES: dict[str, dict[str, str]] = {
 def _parse_filename(name: str) -> tuple[float, str] | None:
     """Parse slit and spot from filename like 'Slit0p5_spot1x0p3.txt'.
 
-    Returns (slit_eV, spot_label) or None if parsing fails.
+    Returns (slit_mm, spot_label) or None if parsing fails.
     """
     m = re.match(
         r"Slit(\d+p\d+)_spot(.+)\.txt$", name, re.IGNORECASE
@@ -82,9 +97,10 @@ class TransmissionFunction:
     mode : str
         Measurement mode (e.g., "Transmission").
     slit : float
-        Slit width in eV.
+        Slit width in mm (the analyzer's physical aperture, not an
+        energy).
     spot : str
-        Spot size label (e.g., "0.1x0.1").
+        Spot size label in mm (e.g., "0.1x0.1").
     """
 
     def __init__(
@@ -96,6 +112,31 @@ class TransmissionFunction:
         slit: float = 0.5,
         spot: str = "0.1x0.1",
     ):
+        ek_ep = np.asarray(ek_ep, dtype=np.float64)
+        transmission = np.asarray(transmission, dtype=np.float64)
+
+        # Both axes are log-interpolated, and the endpoint clamp in
+        # __call__ assumes ascending x — so validate and sort here rather
+        # than silently returning interpolated nonsense.
+        if ek_ep.shape != transmission.shape or ek_ep.ndim != 1:
+            raise ValueError(
+                f"ek_ep and transmission must be 1-D arrays of equal "
+                f"length, got {ek_ep.shape} and {transmission.shape}")
+        if ek_ep.size < 2:
+            raise ValueError(
+                f"need at least 2 points to interpolate, got {ek_ep.size}")
+        if not (np.all(ek_ep > 0) and np.all(transmission > 0)):
+            raise ValueError(
+                "ek_ep and transmission must be strictly positive "
+                "(both are log-interpolated)")
+        if not np.isfinite(ek_ep).all() or not np.isfinite(transmission).all():
+            raise ValueError("ek_ep and transmission must be finite")
+
+        order = np.argsort(ek_ep)
+        ek_ep, transmission = ek_ep[order], transmission[order]
+        if np.any(np.diff(ek_ep) == 0):
+            raise ValueError("ek_ep contains duplicate values")
+
         self.ek_ep = ek_ep
         self.transmission = transmission
         self.analyzer = analyzer
@@ -104,17 +145,17 @@ class TransmissionFunction:
         self.spot = spot
 
         # Log-log interpolation for smooth power-law behavior
+        log_x = np.log(ek_ep)
+        log_y = np.log(transmission)
         self._interp = interp1d(
-            np.log(ek_ep),
-            np.log(transmission),
+            log_x,
+            log_y,
             kind="linear",
             bounds_error=False,
-            fill_value=(np.log(transmission[0]), np.log(transmission[-1])),
+            fill_value=(log_y[0], log_y[-1]),
         )
 
         # Fit power law T = A × (Ek/Ep)^alpha for reference
-        log_x = np.log(ek_ep)
-        log_y = np.log(transmission)
         self.alpha, log_a = np.polyfit(log_x, log_y, 1)
         self._A = np.exp(log_a)
 
@@ -140,7 +181,9 @@ class TransmissionFunction:
     @property
     def label(self) -> str:
         """Human-readable label for display."""
-        return f"{self.analyzer} {self.mode} Slit{self.slit}"
+        base = f"{self.analyzer} {self.mode}"
+        # Synthetic curves (from_power_law) have no physical slit.
+        return f"{base} Slit{self.slit}mm" if self.slit else base
 
     @property
     def ek_ep_range(self) -> tuple[float, float]:
@@ -169,9 +212,10 @@ class TransmissionFunction:
         mode : str
             Mode: "Transmission", "Angular45", "Angular56", "T_Swift".
         slit : float
-            Slit width in eV (e.g., 0.5, 0.8, 1.0, 1.5, 2.5, 4.0).
+            Slit width in mm (e.g., 0.5, 0.8, 1.0, 1.5, 2.5, 4.0 for
+            EW4000). A physical aperture, not an energy width.
         spot : str
-            Spot size like "0.1x0.1", "1x0.05", "2x0.3".
+            Spot size in mm, like "0.1x0.1", "1x0.05", "2x0.3".
         data_root : Path, optional
             Override default Scienta data directory.
 
@@ -184,7 +228,7 @@ class TransmissionFunction:
         FileNotFoundError
             If the data file is not found.
         """
-        root = Path(data_root) if data_root else _SCIENTA_DATA_ROOT
+        root = _data_root(data_root)
 
         modes = _ANALYZER_MODES.get(analyzer, {})
         subdir = modes.get(mode)
@@ -199,17 +243,38 @@ class TransmissionFunction:
         # Ensure at least one decimal: 0p5, 1p0, 2p5, 4p0
         if "p" not in slit_str:
             slit_str += "p0"
+        # The filename carries one decimal, so an off-grid request like
+        # slit=0.54 would round to the 0.5 mm file and quietly apply the
+        # wrong calibration. Refuse instead of guessing.
+        if abs(float(slit_str.replace("p", ".")) - slit) > 1e-9:
+            raise ValueError(
+                f"slit={slit} is not an available slit width (filenames "
+                f"carry one decimal). Use list_configs() to see the "
+                f"widths present for {analyzer}/{mode}.")
         spot_str = spot.replace(".", "p")
         filename = f"Slit{slit_str}_spot{spot_str}.txt"
 
         filepath = root / subdir / filename
         if not filepath.exists():
+            # Names only: the full paths made this message thousands of
+            # characters long and leaked the data directory into logs.
+            names = sorted(p.name for p in (root / subdir).glob("*.txt"))
+            shown = ", ".join(names[:12])
+            more = f", ... (+{len(names) - 12} more)" if len(names) > 12 else ""
             raise FileNotFoundError(
-                f"Transmission file not found: {filepath}\n"
-                f"Available files: {list((root / subdir).glob('*.txt'))}"
+                f"Transmission file {filename!r} not found in "
+                f"{analyzer}/{mode}. Available: {shown}{more}"
+                if names else
+                f"Transmission file {filename!r} not found and "
+                f"{analyzer}/{mode} contains no .txt data. Is "
+                f"TOYOMACRO_SCIENTA_DATA_DIR set correctly?"
             )
 
         data = np.loadtxt(filepath, delimiter="\t")
+        if data.ndim != 2 or data.shape[1] < 2:
+            raise ValueError(
+                f"expected two tab-separated columns (Ek/Ep, T) in "
+                f"{filename}, got array of shape {data.shape}")
         # Remove any rows with NaN or zero
         mask = (data[:, 0] > 0) & (data[:, 1] > 0) & np.isfinite(data).all(axis=1)
         data = data[mask]
@@ -257,7 +322,7 @@ class TransmissionFunction:
         data_root: Path | str | None = None,
     ) -> bool:
         """Check if Scienta transmission data is available."""
-        root = Path(data_root) if data_root else _SCIENTA_DATA_ROOT
+        root = _data_root(data_root)
         return root.exists() and any(root.rglob("*.txt"))
 
     @staticmethod
@@ -268,9 +333,9 @@ class TransmissionFunction:
     ) -> list[tuple[float, str]]:
         """List available (slit, spot) configurations.
 
-        Returns list of (slit_eV, spot_label) tuples.
+        Returns list of (slit_mm, spot_label) tuples.
         """
-        root = Path(data_root) if data_root else _SCIENTA_DATA_ROOT
+        root = _data_root(data_root)
         modes = _ANALYZER_MODES.get(analyzer, {})
         subdir = modes.get(mode)
         if subdir is None:
@@ -291,11 +356,16 @@ class TransmissionFunction:
     def list_analyzers(
         data_root: Path | str | None = None,
     ) -> list[str]:
-        """List available analyzer names."""
-        root = Path(data_root) if data_root else _SCIENTA_DATA_ROOT
+        """List analyzer names that have data in at least one mode.
+
+        An analyzer counts as present if *any* of its mode directories
+        holds data — checking only the first one hid installs that carry,
+        say, EW4000 angular modes but not the standard Transmission mode.
+        """
+        root = _data_root(data_root)
         if not root.exists():
             return []
         return [
-            name for name in _ANALYZER_MODES
-            if (root / list(_ANALYZER_MODES[name].values())[0]).exists()
+            name for name, modes in _ANALYZER_MODES.items()
+            if any(any((root / sub).glob("*.txt")) for sub in modes.values())
         ]
