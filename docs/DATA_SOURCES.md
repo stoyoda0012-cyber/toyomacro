@@ -50,6 +50,18 @@ directly in source (no external database is extracted or shipped):
 - **NIST SRD compound chemical-shift data**: not bundled and not loaded by
   this package (NIST Standard Reference Data carries redistribution terms
   of its own; only the elemental BE table above is shipped).
+- **Transport mean free paths and single-scattering albedos**
+  (`data/elastic_scattering.py`): the effective-attenuation-length helpers
+  require a caller-supplied IMFP/TRMFP pair, and no TRMFP or albedo data
+  is shipped. Jablonski & Powell, *J. Phys. Chem. Ref. Data* **49**,
+  033102 (2020), DOI: 10.1063/5.0008576, tabulate both for 41 elemental
+  solids and 42 inorganic compounds from 50 eV to 30 keV in their
+  supplementary material, which is the obvious candidate and reaches
+  HAXPES energies. Its copyright line reads "© 2020 by the U.S. Secretary
+  of Commerce on behalf of the United States. All rights reserved" —
+  a US government work, but with rights asserted, so it does not simply
+  inherit the public-domain treatment that covers the Scofield report
+  above. Bundling it requires checking those terms first.
 
 ## Regenerating the caches
 

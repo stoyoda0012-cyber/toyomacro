@@ -44,11 +44,10 @@ Scope and limits
   IMFP with a TRMFP from elsewhere; **that remains the caller's
   responsibility.** Enforcement would need the lengths to carry their
   source, material and energy, which is a larger change than this module.
-- **No table lookup.** TRMFP values are the caller's responsibility.
-  Jablonski & Powell (2020) tabulate albedo and TRMFP for 41 elemental
-  solids and 42 inorganic compounds from 50 eV to 30 keV in their
-  supplementary material; bundling that is a separate decision, not least
-  because its redistribution terms need checking.
+- **No table lookup.** TRMFP values are the caller's responsibility; no
+  TRMFP or albedo data is bundled with this package. See
+  ``docs/DATA_SOURCES.md`` under *Deliberately NOT bundled* for the
+  candidate source and why shipping it is not automatic.
 
 References
 ----------
