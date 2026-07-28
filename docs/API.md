@@ -50,6 +50,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.dictionary_solver_3d` | δE × δσ × δγ dictionary (2-D version is the supported path) |
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
 | `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
+| `data.elastic_scattering` | effective attenuation length from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no albedo data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
 any value other than the default `"raw"`.
@@ -209,6 +210,15 @@ Photoionization cross-sections (Scofield, Yeh–Lindau, Trzhaskovskaya)
 ship as tables; TPP-2M inelastic mean free paths are computed from the
 published formula. Provenance and licensing for each is stated in
 [`DATA_SOURCES.md`](DATA_SOURCES.md).
+
+`IMFP.sampling_depth()` is likewise an IMFP-based, straight-line result
+for normal emission — it excludes elastic scattering and so reads as an
+upper bound. For the effective attenuation length, which does account for
+elastic scattering, see `data.elastic_scattering` (experimental): it takes
+an IMFP/TRMFP pair and a required `model`, because the EAL/IMFP slope
+differs between unpolarized XPS and linearly polarized HAXPES. There is no
+`IMFP.attenuation_length()` — a method that multiplied the IMFP by a fixed
+0.9 under that name was removed rather than published.
 
 **Analyzer transmission** is an adapter, not shipped data:
 
