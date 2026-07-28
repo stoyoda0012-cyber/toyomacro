@@ -24,22 +24,15 @@ output/
 outputs
 outputs/
 
-# MATLAB Drive sync markers
-.MATLABDriveTag
-
-# Ephemeral planning and obsolete archives
-.plan
-files.zip
-
 # User-specific MCP config (contains absolute paths)
 .mcp.json
 
-# Archived legacy implementations
-_archived/
-
-# Web build artifacts
+# JS tooling, should any be introduced
 node_modules/
-web/dist/
+
+# Superseded internal notes kept beside the code they describe
+# (docs/_archived, voigtfit/_archived). Matches at any depth.
+_archived/
 
 # Personal analysis / paper-figure scripts — kept out of the public
 # repo pending case-by-case review of what is shareable.
@@ -58,33 +51,14 @@ IMPLEMENTATION_PLAN.md
 # xps-uncertainty work rather than shipping with the current engine.
 docs/uncertainty_backbone_audit.md
 
-# --- Private companion layers: not part of the public engine distribution.
-# Developed locally in this worktree; excluded from the public repository.
-src/toyomacro/gui/
-src/toyomacro/api/
-src/toyomacro/agent/
-src/toyomacro/piar/
-src/toyomacro/depth/
-tests/test_gvrt_playground_tab.py
-web/
+# Local working notes and handoffs. The GUI, web front end and depth
+# pipeline that used to live here moved out on 2026-07-28 (see README);
+# their ignore entries went with them.
 CLAUDE.md
 docs/ROADMAP.md
 docs/HANDOFF_FULL_SURVEY_CRLB.md
 docs/HANDOFF_EAL_ELASTIC_SCATTERING.md
 docs/SESSION_GVRT_RESOLUTION_SCALING.md
-tests/piar/
-tests/unit/
-tests/test_depth_bridges.py
-tests/test_depth_inference.py
-tests/test_depth_maps.py
-tests/test_gui_solver_integration.py
-tests/test_pipeline_bridge.py
-tests/test_profile_chart.py
-tests/test_semifree_thickness_fix.py
-tests/test_solve_pipeline.py
-tests/test_spatial_map.py
-tests/test_tab_auto_connect.py
-tests/test_viewer_4d.py
 
 # Local AI-agent working files (never ship)
 .codex/
