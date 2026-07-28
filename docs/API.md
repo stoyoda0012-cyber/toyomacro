@@ -14,6 +14,58 @@ name or docstring says otherwise (the lower-level
 `HybridPipeline.stage1_screening` is column-major,
 `(n_energy, n_spectra)` — its docstring states this).
 
+## API stability
+
+The package is larger than its supported surface. Three tiers, and the
+rule that separates them:
+
+**Supported.** Every name in the `__all__` list of `toyomacro`,
+`toyomacro.core`, `toyomacro.lineshape`, `toyomacro.background`,
+`toyomacro.io`, `toyomacro.data`, `toyomacro.fitting`, and
+`toyomacro.voigtfit`, plus the submodule entry points given with a
+call signature in the sections below (`dictionary_solver`,
+`multipeak_solver`, `gvrt_service`, `spectra_generator`). These are
+covered by the test suite, exercised by `examples/`, and will not
+change signature or semantics without a minor-version bump and a
+changelog entry.
+
+Two mechanical checks: `python -c "import toyomacro.voigtfit as v;
+print(v.__all__)"` enumerates the exported surface, and a submodule that
+you had to name explicitly (`from toyomacro.voigtfit.rank_diagnostics
+import …`) is not exported — see the next tier before depending on it.
+
+**Experimental.** Research modules that are deliberately *not*
+re-exported from any `__init__`, reachable only by explicit submodule
+import. They are tested, but their API may change or disappear in any
+release, and no CLI or documented workflow depends on them:
+
+| Module | What it is |
+|---|---|
+| `voigtfit.rank_diagnostics` | numerical rank / conditioning of structured Voigt designs |
+| `voigtfit.model_selection` | AIC / AICc / BIC scoring of already-fitted candidates |
+| `voigtfit.exact_k` | component-count (model order) selection |
+| `voigtfit.auto_grouping` | Fisher-justified component grouping for hierarchical fits |
+| `voigtfit.fisher_*`, `voigtfit.crlb` | Fisher information, coordinate transforms, CRLB bounds (referenced in §4 as a diagnostic, not a stable entry point) |
+| `voigtfit.gp_compact`, `voigtfit.gp_reference` | Golub-Pereyra / LM reference layer behind `newton_jacobian_mode` |
+| `voigtfit.dictionary_solver_3d` | δE × δσ × δγ dictionary (2-D version is the supported path) |
+| `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
+| `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
+
+Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
+any value other than the default `"raw"`.
+
+**Internal.** Underscore-prefixed names, `voigtfit.benchmarks.*`, and
+anything not listed above. Benchmarks are runnable and their record
+format is stable enough to compare across hosts, but they are tools,
+not a library API.
+
+**Not in this repository.** The desktop GUI (PySide6), the FastAPI/React
+web front end, and the ARXPS depth-profile solver are developed
+separately and are not part of the published package — `toyomacro.gui`,
+`toyomacro.api`, and `toyomacro.depth` do not exist in an installed
+copy. Nothing in the supported surface imports them, so the boundary
+above does not move if they are released later.
+
 ## Backend selection
 
 ```python
@@ -111,6 +163,25 @@ from toyomacro.voigtfit.multipeak_solver import process_multipeak
 
 runs alternating projection with joint block deflation; a pure-NumPy
 implementation is used automatically when MLX is not usable.
+
+### Per-spectrum reference fitter
+
+```python
+from toyomacro.voigtfit import VarProFitter
+```
+
+Classical variable projection [Golub & Pereyra 1973] on SciPy's
+optimizer: centers and widths are optimized numerically while
+amplitudes are eliminated analytically. It fits **one spectrum at a
+time** and is not part of the high-throughput path — nothing in
+`HybridPipeline`, the dictionary solvers, or `FastVoigtFitter` calls
+it. Use it as an independent oracle when you want a conventional
+optimizer's answer for a handful of spectra, and as the estimator whose
+misspecification bias is characterized in
+`examples/04_projection_law_validation.py` (its effectively
+unregularized inner solve is what makes it match the projection law's
+assumptions; solvers with other regularizers are only directionally
+described — see `docs/projection_law_validation.md`).
 
 ## 4. Quality flags and failure modes
 

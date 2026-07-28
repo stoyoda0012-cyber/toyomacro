@@ -138,7 +138,7 @@ __all__ = [
     "GaussNewtonRefiner",
     "RefineMode",
     "RefineResult",
-    # VarPro (legacy)
+    # VarPro reference fitter (per-spectrum, SciPy; not the batch path)
     "VarProFitter",
     # Voigt functions
     "voigt_profile",

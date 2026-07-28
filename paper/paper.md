@@ -80,12 +80,12 @@ spectra/s single-threaded versus the GPU-batch `dict2d_parabola`
 solver at **6.6 million spectra/s** — about 8,000× — at matching
 accuracy (per-parameter figures and environment in the committed
 `solver_comparison.json`; the amplitude-only kernel solves a smaller
-problem and is reported separately). Traceable quantification tables
-ship with the package (`docs/DATA_SOURCES.md`): Scofield
-[@Scofield1973], Yeh–Lindau [@YehLindau1985], and Trzhaskovskaya
-[@Trzhaskovskaya2018; @Trzhaskovskaya2019] cross-sections, TPP-2M
-mean free paths [@TPP2M], and Scienta-style transmission
-corrections.
+problem and is reported separately). Quantification inputs are
+traceable (`docs/DATA_SOURCES.md`): Scofield [@Scofield1973],
+Yeh–Lindau [@YehLindau1985], and Trzhaskovskaya
+[@Trzhaskovskaya2018; @Trzhaskovskaya2019] cross-section tables ship
+with the package; TPP-2M mean free paths [@TPP2M] follow the
+published formula.
 
 # Software design
 
@@ -122,9 +122,11 @@ error. Because the solver is a variable-projection method
 (asymmetry, satellites, background curvature) induces in a fitted
 peak position follows a first-order projection law, validated on the
 package's own Voigt basis in
-`examples/04_projection_law_validation.py` — including the
-production `VarProFitter` (slope 1.000, $R^2 > 0.9999$; full study
-in `docs/projection_law_validation.md`). The law is derived in a
+`examples/04_projection_law_validation.py` — including the shipped
+per-spectrum `VarProFitter`, whose estimator class matches the law's
+assumptions (slope 1.000, $R^2 > 0.9999$); solvers with other
+regularizers are only directionally described
+(`docs/projection_law_validation.md`). The law is derived in a
 companion theoretical manuscript (in preparation). With the CRLB
 utilities this covers both halves of the error budget — statistical
 and systematic.
