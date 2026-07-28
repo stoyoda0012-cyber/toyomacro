@@ -1,10 +1,19 @@
 # Bundled reference data — provenance and licensing
 
-All reference tables shipped under `src/toyomacro/data/_cache/` are
-machine-readable JSON conversions of published scientific data. The numeric
-values are uncopyrightable facts; what we redistribute is our own
-transformed representation (interpolation-ready JSON), with full citations
-below. No publisher-typeset tables, PDFs, or vendor binaries are included.
+The reference tables under `src/toyomacro/data/_cache/` are published
+scientific data, **bundled and redistributed** here as machine-readable
+JSON. What is redistributed is the table — its selection and arrangement
+included — not merely the numbers in it, so the basis is given per source
+rather than by a general argument.
+
+Individual values are facts and are not copyrightable. Factuality alone
+does not settle redistribution, however: the selection and arrangement of
+a table, database rights in some jurisdictions, and the terms under which
+the data were obtained are separate questions. Each table below therefore
+states its own basis, and a table with no such basis is not bundled (see
+*Deliberately NOT bundled*).
+
+No publisher-typeset tables, PDFs, or vendor binaries are included.
 
 | File | Contents | Source | Licensing rationale |
 |---|---|---|---|
