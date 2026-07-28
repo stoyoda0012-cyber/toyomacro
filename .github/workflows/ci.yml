@@ -37,6 +37,7 @@ jobs:
         env:
           MPLBACKEND: Agg
         run: |
+          uv run python examples/data/make_example_data.py
           uv run python examples/01_fit_single_spectrum.py
           uv run python examples/02_chemical_state_map.py
           uv run python examples/03_quantification.py

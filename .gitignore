@@ -89,3 +89,7 @@ tests/test_viewer_4d.py
 .codex/
 AGENTS.md
 docs/JOSS_IMPLEMENTATION_BRIEF.md
+
+# Generated example data (regenerate: examples/data/make_example_data.py)
+examples/data/*.h5
+examples/output/
