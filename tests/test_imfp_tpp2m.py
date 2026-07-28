@@ -200,3 +200,27 @@ def test_low_energy_is_where_the_bug_lived():
 
     assert IMFP.tpp2m(50, **au) == pytest.approx(0.486, abs=0.01)
     assert IMFP.tpp2m(50, **au) < IMFP.tpp2m(1000, **au)
+
+
+def test_sampling_depth_is_three_imfps_at_95_percent():
+    """d = -lambda ln(1-F); F=0.95 gives 3.00 lambda, normal emission."""
+    imfp = IMFP.tpp2m(1000, compound="SiO2")
+
+    assert IMFP.sampling_depth(1000, compound="SiO2") == pytest.approx(
+        -imfp * math.log(1 - 0.95), rel=1e-12
+    )
+    assert IMFP.sampling_depth(
+        1000, compound="SiO2", fraction=0.95
+    ) == pytest.approx(2.996 * imfp, rel=1e-3)
+
+
+def test_no_eal_helper_is_exposed():
+    """`attenuation_length()` applied a hardcoded 0.9 and was removed.
+
+    It was never called anywhere, and shipping a fixed ratio labelled as
+    an elastic-scattering correction is worse than shipping nothing: the
+    real ratio depends on material, energy and emission angle. A
+    physics-based replacement belongs in its own module, with the
+    single-scattering albedo as a required input.
+    """
+    assert not hasattr(IMFP, "attenuation_length")

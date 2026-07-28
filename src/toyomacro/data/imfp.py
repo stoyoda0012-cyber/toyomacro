@@ -153,47 +153,6 @@ class IMFP:
         return imfp_angstrom / 10.0
 
     @classmethod
-    def attenuation_length(
-        cls,
-        kinetic_energy: float,
-        compound: str | None = None,
-        Nv: float | None = None,
-        density: float | None = None,
-        Mw: float | None = None,
-        Eg: float | None = None,
-        correction_factor: float = 0.9,
-    ) -> float:
-        """
-        Calculate Effective Attenuation Length (EAL).
-
-        EAL ≈ IMFP × correction_factor
-
-        The correction factor accounts for elastic scattering effects.
-        Typical values are 0.8-1.0.
-
-        Args:
-            kinetic_energy: Electron kinetic energy in eV
-            compound: Compound name
-            Nv: Number of valence electrons
-            density: Density in g/cm³
-            Mw: Molecular weight in g/mol
-            Eg: Band gap in eV
-            correction_factor: EAL/IMFP ratio (default 0.9)
-
-        Returns:
-            EAL in nanometers
-        """
-        imfp = cls.tpp2m(
-            kinetic_energy=kinetic_energy,
-            compound=compound,
-            Nv=Nv,
-            density=density,
-            Mw=Mw,
-            Eg=Eg,
-        )
-        return imfp * correction_factor
-
-    @classmethod
     def sampling_depth(
         cls,
         kinetic_energy: float,
@@ -211,6 +170,14 @@ class IMFP:
         F = 1 - exp(-d / lambda)
 
         So: d = -lambda * ln(1 - F)
+
+        **Elastic scattering is not included.** ``lambda`` here is the
+        TPP-2M inelastic mean free path, so this is the straight-line
+        (straight-line-approximation) result for normal emission. Elastic
+        scattering shortens the effective attenuation length below the
+        IMFP, so real sampling depths are smaller than this — increasingly
+        so for high-Z materials, where the effective-attenuation-length to
+        IMFP ratio can fall to ~0.7. Treat the value as an upper bound.
 
         Args:
             kinetic_energy: Electron kinetic energy in eV
