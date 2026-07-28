@@ -21,7 +21,9 @@ from toyomacro.data.elastic_scattering import (
     single_scattering_albedo,
 )
 
-# Au 4f7/2 at 7413 eV — the case the sibling HAXPES work runs on.
+# Si 1s photoelectrons travelling in Au, KE 7413 eV — the case the
+# sibling HAXPES work runs on. (The albedo is a property of the Au
+# matrix at that kinetic energy, not of the emitting level.)
 AU_OMEGA = 0.2082
 # Chosen so that imfp/(imfp+trmfp) == AU_OMEGA exactly.
 AU_IMFP = 5.904
@@ -111,8 +113,8 @@ def test_model_is_keyword_only_and_required():
 def test_eal_is_imfp_times_ratio_from_the_same_pair():
     """The albedo is formed from the imfp it is then applied to.
 
-    Guards the inconsistency the API exists to prevent: an omega derived
-    from one dataset multiplied into an IMFP from another.
+    This is the one inconsistency the signature does rule out: a second,
+    different IMFP cannot enter, because there is nowhere to pass one.
     """
     for model in EAL_MODELS:
         assert overlayer_eal(AU_IMFP, AU_TRMFP, model=model) == pytest.approx(
@@ -120,6 +122,27 @@ def test_eal_is_imfp_times_ratio_from_the_same_pair():
             rel=1e-12,
         )
         assert overlayer_eal(AU_IMFP, AU_TRMFP, model=model) < AU_IMFP
+
+
+def test_mismatched_sources_are_accepted_not_detected():
+    """Records a limitation rather than a guarantee.
+
+    Passing an IMFP from one source with a TRMFP from another is a real
+    error, and nothing here can see it: the lengths carry no provenance.
+    The two-argument signature makes consistent use natural, not
+    mandatory. Detecting this would need the lengths to know their source,
+    material and energy.
+    """
+    sessa_imfp, unrelated_trmfp = 64.4, 300.0
+
+    got = overlayer_eal(
+        sessa_imfp, unrelated_trmfp, model="jp2020_unpolarized")
+
+    assert got > 0  # accepted silently, by design of the scalar API
+    assert got == pytest.approx(
+        sessa_imfp * (1 - 0.738 * (sessa_imfp / (sessa_imfp + unrelated_trmfp))),
+        rel=1e-12,
+    )
 
 
 def test_validity_metadata_is_carried_not_lost():

@@ -173,11 +173,16 @@ class IMFP:
 
         **Elastic scattering is not included.** ``lambda`` here is the
         TPP-2M inelastic mean free path, so this is the straight-line
-        (straight-line-approximation) result for normal emission. Elastic
-        scattering shortens the effective attenuation length below the
-        IMFP, so real sampling depths are smaller than this — increasingly
-        so for high-Z materials, where the effective-attenuation-length to
-        IMFP ratio can fall to ~0.7. Treat the value as an upper bound.
+        approximation at normal emission — the SLA information depth, not
+        an elastic-scattering-corrected sampling or information depth.
+
+        Do **not** correct it with ``data.elastic_scattering``: the slopes
+        there are for the overlayer-thickness attenuation length L_TH, and
+        the information depth follows a different one (1 - 0.787 omega in
+        Jablonski & Powell 2009 Eq. (29), against 1 - 0.735 omega for the
+        EAL). Those quantities are defined separately and are not
+        interchangeable. A corrected information depth is not implemented
+        here.
 
         Args:
             kinetic_energy: Electron kinetic energy in eV

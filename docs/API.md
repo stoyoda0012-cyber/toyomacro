@@ -211,14 +211,22 @@ ship as tables; TPP-2M inelastic mean free paths are computed from the
 published formula. Provenance and licensing for each is stated in
 [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
-`IMFP.sampling_depth()` is likewise an IMFP-based, straight-line result
-for normal emission — it excludes elastic scattering and so reads as an
-upper bound. For the effective attenuation length, which does account for
-elastic scattering, see `data.elastic_scattering` (experimental): it takes
-an IMFP/TRMFP pair and a required `model`, because the EAL/IMFP slope
-differs between unpolarized XPS and linearly polarized HAXPES. There is no
-`IMFP.attenuation_length()` — a method that multiplied the IMFP by a fixed
-0.9 under that name was removed rather than published.
+`IMFP.sampling_depth()` is likewise IMFP-based: the straight-line
+approximation at normal emission, excluding elastic scattering. Do not
+correct it with the module below — those slopes are for the
+overlayer-thickness attenuation length, and sampling/information depth is
+a separately defined quantity with a different slope.
+
+For that attenuation length see `data.elastic_scattering`
+(experimental). It takes an IMFP/TRMFP pair and a required `model`,
+because the L/IMFP slope differs between unpolarized XPS (0.738) and
+linearly polarized HAXPES (0.836) — a 2.4% difference in the result for
+gold at 7.4 keV. Supplying both lengths keeps the albedo tied to the IMFP
+it is applied to, but nothing checks that the two came from the same
+source, material and energy; that stays with the caller.
+
+There is no `IMFP.attenuation_length()` — a method that multiplied the
+IMFP by a fixed 0.9 under that name was removed rather than published.
 
 **Analyzer transmission** is an adapter, not shipped data:
 

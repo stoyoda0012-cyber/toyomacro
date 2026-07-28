@@ -38,8 +38,12 @@ Scope and limits
 - **IMFP and TRMFP must come from the same source and conditions.** omega
   is a ratio of two lengths for one material at one kinetic energy, so an
   albedo derived from one dataset must not be applied to an IMFP from
-  another. That is why these helpers take both lengths rather than an
-  albedo and an IMFP: the pairing cannot be broken by the caller.
+  another. Taking both lengths rather than an albedo and an IMFP makes the
+  consistent use the natural one — but it does not enforce it. Nothing
+  here can tell that ``overlayer_eal(64.4, 300.0, ...)`` mixed a SESSA
+  IMFP with a TRMFP from elsewhere; **that remains the caller's
+  responsibility.** Enforcement would need the lengths to carry their
+  source, material and energy, which is a larger change than this module.
 - **No table lookup.** TRMFP values are the caller's responsibility.
   Jablonski & Powell (2020) tabulate albedo and TRMFP for 41 elemental
   solids and 42 inorganic compounds from 50 eV to 30 keV in their
@@ -185,7 +189,9 @@ def overlayer_eal(imfp: float, trmfp: float, *, model: EALModel) -> float:
     """Return L_TH in the unit of ``imfp``.
 
     The albedo is formed from ``imfp`` and ``trmfp`` and applied to that
-    same ``imfp``, so the pair stays mutually consistent by construction.
+    same ``imfp``, so no second IMFP can enter. Whether the two lengths
+    themselves come from one source, material and energy is not something
+    this function can check — see the module docstring.
 
     Args:
         imfp: Inelastic mean free path.
@@ -213,7 +219,7 @@ def seah_gilmore_2001_overlayer_eal_ratio(
 
     Derived from the Monte Carlo simulations of Cumpson & Seah — a
     different dataset from the Jablonski tables behind that paper's Q and
-    beta_eff equations. Stated validity: 0-58 degrees emission, with the
+    beta_eff equations. Stated validity: 0 < alpha < 58 degrees emission, with the
     angle between the x rays and the detected electrons above 45 degrees.
 
     Args:
