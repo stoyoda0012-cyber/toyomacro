@@ -65,11 +65,11 @@ class IMFP:
             ValueError: If compound not found or required parameters missing
 
         Examples:
-            >>> IMFP.tpp2m(1386.6, compound='SiO2')
-            2.34  # example value in nm
+            >>> round(IMFP.tpp2m(1386.6, compound='SiO2'), 2)
+            3.88
 
-            >>> IMFP.tpp2m(1386.6, Nv=16, density=2.2, Mw=60.08, Eg=8.9)
-            2.34
+            >>> round(IMFP.tpp2m(1386.6, Nv=16, density=2.2, Mw=60.08, Eg=8.9), 2)
+            3.88
         """
         # Get parameters from compound database if needed
         if compound is not None:
@@ -108,9 +108,20 @@ class IMFP:
         """
         Core TPP-2M calculation.
 
-        TPP-2M formula from:
-        S. Tanuma, C.J. Powell, D.R. Penn,
-        Surf. Interface Anal. 21 (1994) 165-176
+        TPP-2M from S. Tanuma, C. J. Powell & D. R. Penn,
+        *Surf. Interface Anal.* **21**, 165 (1994), DOI 10.1002/sia.740210302.
+        (The PDF's running head reads 1993, but the CCC code
+        ``0142-2421/94/030165-12`` and the copyright line give 1994, which
+        is the publisher's bibliographic year — do not "correct" this back.)
+        TPP-2M is Eqns (3), (4b), (4c), (4d), (4e) and (8) of that paper
+        (p. 172); it differs from TPP-2 only in using Eqn (8) for beta.
+
+            lambda = E / (Ep^2 [beta ln(gamma E) - C/E + D/E^2])     (3)
+            gamma  = 0.191 rho^-0.5                                  (4b)
+            C      = 1.97 - 0.91 U                                   (4c)
+            D      = 53.4 - 20.8 U                                   (4d)
+            U      = Nv rho / M = Ep^2 / 829.4                       (4e)
+            beta   = -0.10 + 0.944 (Ep^2 + Eg^2)^-0.5 + 0.069 rho^0.1 (8)
 
         Args:
             E: Kinetic energy in eV
@@ -122,29 +133,23 @@ class IMFP:
         Returns:
             IMFP in nanometers
         """
-        # Avogadro's number
-        Na = 6.022e23
-
-        # Calculate number density of atoms (atoms/cm³)
-        # For compounds, this is molecules/cm³
-        n = rho * Na / M
-
-        # Plasmon energy (eV)
-        # Ep = 28.8 * sqrt(Nv * rho / M)
+        # Free-electron plasmon energy (eV)
         Ep = 28.8 * math.sqrt(Nv * rho / M)
 
-        # TPP-2M parameters
+        # Eqn (4e). U is in mol/cm³ and is NOT Ep/1000 — an earlier version
+        # of this function substituted the latter, which inflated the IMFP by
+        # up to ~900% at 50 eV (the C/E and D/E² terms dominate at low E).
+        U = Nv * rho / M
+
         beta = -0.10 + 0.944 / math.sqrt(Ep**2 + Eg**2) + 0.069 * rho**0.1
         gamma = 0.191 * rho**(-0.50)
-        C = 1.97 - 0.91 * (Ep / 1000)  # U parameter in paper
-        D = 53.4 - 20.8 * (Ep / 1000)  # D parameter
+        C = 1.97 - 0.91 * U
+        D = 53.4 - 20.8 * U
 
-        # IMFP in Angstroms
-        # lambda = E / (Ep^2 * (beta * ln(gamma * E) - (C/E) + (D/E^2)))
-        ln_term = beta * math.log(gamma * E)
-        imfp_angstrom = E / (Ep**2 * (ln_term - C / E + D / E**2))
-
-        # Convert to nanometers
+        # Eqn (3) — IMFP in Angstroms
+        imfp_angstrom = E / (
+            Ep**2 * (beta * math.log(gamma * E) - C / E + D / E**2)
+        )
         return imfp_angstrom / 10.0
 
     @classmethod
