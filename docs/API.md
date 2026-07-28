@@ -62,6 +62,11 @@ result = fitter.fit_batch_rowmajor(
 
 *Recorded on Apple M3 Max (MLX); see committed records under
 `paper/figures/results/` and regenerate with the benchmarks below.
+Without a GPU the same code runs on NumPy at roughly a quarter of these
+rates — on the identical seeded problem, `balanced` measures 6.6 M
+spec/s with MLX and 1.6 M spec/s with `TOYOMACRO_DISABLE_MLX=1`, at
+indistinguishable accuracy (paired records:
+`solver_comparison.json` / `solver_comparison_numpy.json`).
 
 **Solver selection.** Start with `balanced`. Use `preview` when
 centers/widths are known and only amplitudes are needed (composition
@@ -85,6 +90,16 @@ amp, chi2, dE, dsigma, idx = solve_dict2d_parabola(Y, cache)
 - Setup vs. steady state: dictionary construction is a one-time cost
   (seconds) amortized over the batch; benchmark records report it
   separately (`setup_s`).
+- **Batch size matters, and the two backends want opposite things.**
+  On one M3 Max measurement of `solve_dict2d_parabola` (151 channels,
+  13×7 dictionary), MLX climbs with batch size — 0.8 M spec/s at 2 K,
+  6.1 M at 200 K, 7.3 M at 1 M and still rising, since small batches
+  are dominated by dispatch overhead. NumPy runs the opposite way: it
+  peaks near **50 K spectra** (1.9 M spec/s) and then *degrades* as the
+  working set outgrows cache (1.4 M at 1 M). Feed the GPU path the
+  largest batch that fits; chunk the NumPy path into tens of thousands
+  of spectra. Both are the same algorithm, so the ~4× backend gap holds
+  at either side's best size.
 - Returns per-spectrum arrays `(n_spectra,)`; `dE`/`dsigma` are
   offsets from the nominal configuration, in eV.
 

@@ -75,9 +75,9 @@ design that cannot be retrofitted onto a per-spectrum API.
 The package ships a same-problem comparison benchmark (identical
 seeded data — input hash committed — initialization, and bounds;
 accuracy on a common subset), deliberately workflow-versus-workflow
-on one machine: `scipy.optimize.curve_fit` at 798 and `lmfit` at 783
+on one machine: `scipy.optimize.curve_fit` at 845 and `lmfit` at 801
 spectra/s single-threaded versus the GPU-batch `dict2d_parabola`
-solver at **6.5 million spectra/s** — about 8,000× — at matching
+solver at **6.6 million spectra/s** — about 8,000× — at matching
 accuracy (per-parameter figures and environment in the committed
 `solver_comparison.json`; the amplitude-only kernel solves a smaller
 problem and is reported separately). Traceable quantification tables
@@ -94,9 +94,10 @@ possible; per-spectrum model variation falls back to conventional
 tools. Costs are explicit: dictionary construction is a one-time
 expense recorded separately in every benchmark; warm-cache
 throughput is the steady-state figure. Estimation runs in float32 on
-the GPU; the NumPy path reproduces it to about $10^{-3}$ relative,
-and per-spectrum $\chi^2$ and quality flags mark pixels needing
-escalation to a slower stage. A capability probe detects an
+the GPU; the NumPy path reproduces it to about $10^{-3}$ relative at 4×
+lower measured throughput, so the batch formulation, not the GPU,
+carries the speedup above. Per-spectrum $\chi^2$ and quality flags mark
+pixels needing escalation to a slower stage. A capability probe detects an
 installed-but-unusable MLX and falls back to NumPy; `require_mlx()`
 asserts the GPU path.
 

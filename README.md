@@ -44,9 +44,9 @@ submission as a standalone tool.
 > rows are previously recorded values, regenerable with the bundled
 > benchmarks. The pure-NumPy fallback runs the same algorithms with
 > numerically equivalent results (≲10⁻³ relative agreement on the
-> shared solver paths) at roughly **3–5× lower throughput**
-> on the same hardware (and 5–10× lower on a typical Linux x86_64
-> CI runner).
+> shared solver paths) at roughly **4× lower throughput** on the same
+> hardware — measured, see
+> [without Apple Silicon](#without-apple-silicon-numpy-backend) below.
 
 ### Per-solver throughput (MLX, M3 Max)
 
@@ -89,13 +89,50 @@ Committed record (exact figures, input hash, environment):
 
 | Solver | Throughput | Notes |
 |---|---:|---|
-| voigtfit `dict2d_parabola` | **6.5 M spec/s** | MLX GPU batch |
-| `scipy.optimize.curve_fit` | 798 spec/s | bounded TRF, single-thread CPU |
-| `lmfit` | 783 spec/s | bounded, single-thread CPU |
+| voigtfit `dict2d_parabola` | **6.6 M spec/s** | MLX GPU batch |
+| `scipy.optimize.curve_fit` | 845 spec/s | bounded TRF, single-thread CPU |
+| `lmfit` | 801 spec/s | bounded, single-thread CPU |
 
 Matching accuracy on the common subset (MAE amplitude 0.022 vs
 0.022), a factor of about 8,000 in throughput — that ratio, not the kernel headline, is
 the relevant comparison with the conventional workflow.
+
+#### Without the GPU (NumPy backend)
+
+The GPU is an accelerator here, not the source of the speedup. Rerun
+the same benchmark with `TOYOMACRO_DISABLE_MLX=1` and it takes the
+pure-NumPy path through the same solver code; the record is committed
+next to the accelerated one
+([`solver_comparison_numpy.json`](paper/figures/results/solver_comparison_numpy.json)),
+same host, same day, **same input hash** — the backend is the only
+difference.
+
+| Solver | MLX (GPU) | NumPy (CPU) | MAE amplitude |
+|---|---:|---:|---|
+| voigtfit `dict2d_parabola` | 6.6 M spec/s | **1.6 M spec/s** | 0.0222 / 0.0222 |
+| `scipy.optimize.curve_fit` | 845 spec/s | 822 spec/s | 0.0219 |
+| `lmfit` | 801 spec/s | 808 spec/s | 0.0219 |
+
+So the batch formulation alone — no GPU — is worth about **2,000×**
+over the per-spectrum workflow, and MLX contributes a further ~4×.
+Accuracy is unchanged (MAE δE 0.0134 GPU vs 0.0146 CPU, both against
+a peak-count SNR of 10).
+
+Read this as isolating the *backend*, not the vendor: both columns come
+from the same M3 Max, so the NumPy row is what that machine's CPU and
+BLAS deliver. Another host will land elsewhere in absolute terms — but
+it runs the identical code path, and `--out` writes the same record
+format, so you can generate the comparable row on your own machine in
+about a minute:
+
+```bash
+TOYOMACRO_DISABLE_MLX=1 python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark --out my_host.json
+```
+
+> The amplitude-only projection row is BLAS-on-CPU in *both* records
+> (that kernel is not routed through MLX in this benchmark), so its
+> two columns differ only by run-to-run noise. The MLX headline for
+> that kernel is the separate `figure1_throughput.json` record.
 
 ### End-to-end image roundtrip
 

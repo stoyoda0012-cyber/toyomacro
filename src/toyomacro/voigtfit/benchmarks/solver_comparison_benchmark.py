@@ -102,6 +102,13 @@ def _environment() -> dict:
             env[dist] = md.version(dist)
         except Exception:
             env[dist] = None
+    # An installed MLX does not imply an accelerated run: the GPU path is
+    # off when no Metal device answers the probe, or when the user forces
+    # the NumPy backend.  Record both so a reader can tell which happened.
+    from .._mlx_support import mlx_usable
+    env['mlx_usable'] = mlx_usable()
+    env['TOYOMACRO_DISABLE_MLX'] = os.environ.get(
+        'TOYOMACRO_DISABLE_MLX') or None
     try:
         env['cpu'] = subprocess.run(
             ['sysctl', '-n', 'machdep.cpu.brand_string'],
