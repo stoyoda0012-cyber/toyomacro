@@ -164,14 +164,21 @@ meeting.
 
 Generative AI was used in developing this software and manuscript.
 **Tools:** Claude Code (Anthropic), using Claude Opus 4-family and
-Claude 5-family models. **Where used:** implementation, refactoring,
-tests, benchmarks, documentation, manuscript editing. **Nature and
-scope:** the assistant drafted code against algorithms, numerical
-targets, and acceptance criteria specified by the author, in a
-propose–review–revise loop with the author as gatekeeper; the author
-made all core algorithmic and design decisions, reviewed and tested
-all AI-assisted output, and ran and verified every reported
-benchmark on the author's own hardware.
+Claude 5-family models; and ChatGPT and Codex (OpenAI), using
+GPT-4-family and GPT-5-family models. **Where used:** implementation,
+refactoring, tests, benchmarks, documentation, manuscript drafting and
+editing, and critical review of scientific and software claims.
+**Nature and scope:** the assistants drafted code and text against
+algorithms, numerical targets, and acceptance criteria specified by the
+author. For selected high-risk changes, implementation and audit were
+assigned to separate AI contexts, and findings were checked and closed
+against code, tests, primary sources, and generated artifacts. This
+AI-assisted audit was a development control, not independent human peer
+review. The author made all core algorithmic, architectural, scientific,
+and publication decisions; reviewed, edited, and validated all
+AI-assisted output; ran and verified every reported benchmark on the
+author's own hardware; and retains full responsibility for accuracy,
+originality, licensing, and ethical and legal compliance.
 
 # Acknowledgments
 
