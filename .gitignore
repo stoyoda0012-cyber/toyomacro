@@ -54,14 +54,24 @@ docs/uncertainty_backbone_audit.md
 # Local working notes and handoffs. The GUI, web front end and depth
 # pipeline that used to live here moved out on 2026-07-28 (see README);
 # their ignore entries went with them.
+#
+# CLAUDE.md is unanchored on purpose: nested agent notes kept beside the
+# code they describe (e.g. src/toyomacro/voigtfit/CLAUDE.md) stay local.
+# Only the repository-root entry point is tracked.
 CLAUDE.md
+!/CLAUDE.md
 docs/HANDOFF_FULL_SURVEY_CRLB.md
 docs/HANDOFF_EAL_ELASTIC_SCATTERING.md
 docs/SESSION_GVRT_RESOLUTION_SCALING.md
 
-# Local AI-agent working files (never ship)
+# Local AI-agent working files. None of these ship in the sdist or
+# wheel (see [tool.hatch.build.targets.sdist] and the CI archive
+# assertion) — but the root AGENTS.md is tracked, as the shared,
+# tool-agnostic instructions for this repository. Same unanchored
+# pattern plus root exception as CLAUDE.md above.
 .codex/
 AGENTS.md
+!/AGENTS.md
 docs/JOSS_IMPLEMENTATION_BRIEF.md
 
 # Generated example data (regenerate: examples/data/make_example_data.py)
