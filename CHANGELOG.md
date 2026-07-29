@@ -10,6 +10,22 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **Experimental** `toyomacro.data.elastic_scattering`: overlayer-thickness
+  effective attenuation length from the single-scattering albedo
+  ω = IMFP/(IMFP+TRMFP), with a required `model` keyword selecting the
+  published slope (Jablonski & Powell 2020 Eq. 20 for unpolarized x rays,
+  Eq. 62 for linearly polarized HAXPES — a 2.4% difference for gold at
+  7.4 keV, so there is no default). Both lengths are caller-supplied; no
+  TRMFP or albedo tables are bundled. Scope is overlayer thickness only —
+  mean escape depth, information depth and marker depth follow different
+  slopes and are not implemented.
+- CUDA backend proof-of-concept and validation record
+  (`docs/CUDA_BACKEND_POC.md`): the MLX↔NumPy parity suite run against
+  MLX's CUDA backend on an RTX 5070 Laptop under WSL2, plus the
+  throughput/precision baseline, the TF32-by-default finding, the
+  batch > 65,535 multipeak crash, and the four upstream MLX issues filed
+  from it (`docs/upstream-issues/`). Validation only — CUDA is **not** a
+  supported installation target and no `[cuda]` extra ships.
 - **Experimental** `newton_jacobian_mode` on the multipeak solver
   (`"raw"` | `"kaufman"` | `"golub_pereyra"` | `"gp_lm"`): compact
   Golub-Pereyra normal equations (no projector, no inverse; one
@@ -45,6 +61,10 @@ archived on Zenodo for a citable DOI.
   `require_mlx()` errors wrongly described it as looking for a Metal
   device and told callers MLX was "Apple Silicon only" — false, and a
   dead end for non-Apple users. Detection behavior is unchanged.
+- README and `docs/API.md` now state the backend boundary explicitly:
+  NumPy and Apple Metal supported, CUDA experimentally validated with
+  its caveats (TF32 default, the 65,535-batch multipeak crash, no CI)
+  rather than left unmentioned.
 - Public CLI surface reduced to implemented, distributed commands:
   `gui` (private companion layer, not installed by this package) and
   `fit` (placeholder) are no longer registered; `import` and `convert`
@@ -69,6 +89,24 @@ archived on Zenodo for a citable DOI.
   compiler.
 - JOSS paper restructured (State of the field, Software design,
   Research impact statement, AI usage disclosure sections added).
+
+### Fixed
+- **TPP-2M IMFP transcription error** (`data/imfp.py`): the C and D
+  terms of Tanuma, Powell & Penn substituted `Ep/1000` for the parameter
+  `U = Nv·ρ/M = Ep²/829.4`. The error grows as kinetic energy falls —
+  about 1% at 1 keV, +34% at 100 eV, +900% for Au at 50 eV — and stayed
+  hidden because the examples and the quantification demo all sit near
+  1 keV. The corrected implementation reproduces all 14 compounds of the
+  source paper's Table 5 to within 0.3%. Two layers of regression tests
+  (implementation fidelity against quantities the paper states
+  explicitly; physical plausibility with justified tolerances) added in
+  `tests/test_imfp_tpp2m.py`, where there had been none.
+
+### Removed
+- `IMFP.attenuation_length()`, which multiplied the TPP-2M IMFP by a
+  hardcoded 0.9 and described that as accounting for elastic scattering.
+  It had no callers and was never part of the documented surface; use
+  `data.elastic_scattering` with an explicit IMFP/TRMFP pair instead.
 
 ## [0.1.0] - 2026-07-07
 

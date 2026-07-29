@@ -25,11 +25,23 @@
 | Subpackage | What it does | Install extra |
 |---|---|---|
 | `toyomacro.voigtfit` | The dictionary + Newton Voigt solvers, MLX backends, CRLB analysis, benchmarks. Standalone (numpy/scipy/h5py/matplotlib). | (core) |
-| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), analyzer-transmission loader, HDF5/MAT readers. | (core) |
-| MLX GPU backend | Apple-Silicon accelerated Faddeeva, Stage 2 refinement, multipeak solver. | `[mlx]` |
+| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), analyzer-transmission loader, HDF5/MAT readers. Also an **experimental** overlayer-thickness EAL correction computed from a caller-supplied IMFP/TRMFP pair — no TRMFP or albedo tables are bundled (see [`docs/API.md`](docs/API.md#5-quantification-inputs) and [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md)). | (core) |
 
 The Voigt engine is the part the project is being prepared for JOSS
 submission as a standalone tool.
+
+### Backend support status
+
+| Backend | Status | Installation | Notes |
+|---|---|---|---|
+| NumPy / CPU | **Supported** | base install | Runs the identical algorithms anywhere CPython runs. This is the path CI covers — the hosted runners are headless, so no CI job exercises a GPU. |
+| MLX / Apple Metal | **Supported accelerator** | `[mlx]` | Accelerates the Faddeeva kernel, Stage 2 refinement and the multipeak solver. Every MLX number quoted below was recorded here; correctness rests on the MLX↔NumPy parity tests, which run only where `mlx_usable()` is True. |
+| MLX / CUDA | **Experimental validation** — not a supported install target | manual setup; no extra ships for it | The MLX↔NumPy parity suite passed once on an RTX 5070 Laptop under WSL2. Requires `MLX_ENABLE_TF32=0` (TF32 is on by default and silently costs precision) and multipeak batches ≤ 65,535 (upstream crash). No CUDA CI, no committed performance record. See [`docs/CUDA_BACKEND_POC.md`](docs/CUDA_BACKEND_POC.md). |
+
+The backend probe (`mlx_usable()`) is device-agnostic — it checks
+whether MLX can execute work on its default device, not whether that
+device is Metal. Supported packaging and published benchmarks currently
+stop at Apple.
 
 ## How fast
 

@@ -50,7 +50,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.dictionary_solver_3d` | δE × δσ × δγ dictionary (2-D version is the supported path) |
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
 | `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
-| `data.elastic_scattering` | effective attenuation length from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no albedo data bundled |
+| `data.elastic_scattering` | overlayer-thickness effective attenuation length from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
 any value other than the default `"raw"`.
@@ -73,15 +73,64 @@ above does not move if they are released later.
 from toyomacro.voigtfit import mlx_installed, mlx_usable, require_mlx
 ```
 
-- `mlx_usable()` — True only if a probe kernel actually executed on a
-  Metal device. Installed-but-headless MLX returns False and every
-  solver silently uses the NumPy backend (numerically identical to
-  ~1e-3 relative in float32).
+- `mlx_usable()` — True only if a probe kernel actually executed. The
+  probe runs on **MLX's default device, whatever that is**; it answers
+  "can MLX execute work here", not "is this a Metal device". Installed
+  MLX that cannot execute (headless or virtualized host, broken
+  driver/toolchain) returns False and every solver silently uses the
+  NumPy backend (numerically identical to ~1e-3 relative in float32).
 - `require_mlx()` — raises an actionable `RuntimeError` when the GPU
   path is unavailable; call it first if your workload depends on GPU
   throughput.
 - `TOYOMACRO_DISABLE_MLX=1` — environment variable forcing the NumPy
   backend (useful for A/B validation).
+
+### What is distributed, and what merely runs
+
+The device-agnostic probe and the distribution boundary are separate
+questions, and the answer differs:
+
+| Backend | Status | Installation |
+|---|---|---|
+| NumPy / CPU | Supported | base install; runs anywhere CPython runs |
+| MLX / Apple Metal | Supported accelerator | `pip install "toyomacro[mlx]"` |
+| MLX / CUDA | Experimentally validated, **not a supported install target** | manual; no extra ships for it |
+
+Apple Metal is the accelerator this project distributes and quotes
+numbers for. The `[mlx]` extra pins `mlx-metal` and is Apple-only.
+
+**What CI actually covers.** The hosted runners are headless, so no CI
+job exercises an accelerator. The Ubuntu/macOS × 3.11/3.12 matrix
+installs without the `[mlx]` extra and tests the NumPy path; one macOS
+job installs MLX and runs the whole suite with `TOYOMACRO_DISABLE_MLX=1`,
+which certifies the *fallback*, not the GPU. The accelerated Metal path
+is covered by the MLX↔NumPy parity tests, which run only on a machine
+where `mlx_usable()` is True — the maintainer's, and (once)
+the CUDA box.
+
+MLX's own CUDA backend also satisfies `mlx_usable()`, and the MLX↔NumPy
+parity suite has been run end to end against it once — on an RTX 5070
+Laptop under WSL2, where the `requires_mlx` blocks genuinely executed
+(81 skips collapsed to 1) and passed within existing tolerances. That is
+a validation result, not a support claim. Before relying on it, read
+[`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md); the load-bearing caveats:
+
+- **No `[cuda]` extra.** Setup is manual, and `mlx[cuda13]` does not
+  pull the CUDA headers it needs to JIT — see the recipe in that
+  document.
+- **TF32 must be disabled.** MLX's CUDA backend runs float32 matmul in
+  TF32 by default, silently: ~1000× the matmul error of true fp32,
+  costing ~9.4 dB PSNR and 3× the δσ RMSE end to end, and flipping
+  near-tie dictionary argmax indices. Set `MLX_ENABLE_TF32=0`.
+- **Batches above 65,535 crash the multipeak alternating-projection
+  solver** (upstream MLX batched-GEMV grid-dimension limit,
+  [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Chunk to
+  ≤ 65,535. Metal has no such limit.
+- **No CUDA CI**, and no committed performance record. On the one
+  machine measured, streaming/amplitude-only paths lost to that host's
+  CPU while compute-dense dictionary AP won 4–6×; MLX's `sm_120` GEMM
+  measured ~36× below what cuBLAS delivers on the same GPU. Do not
+  generalize any of that.
 
 ## 1. Lineshape
 
