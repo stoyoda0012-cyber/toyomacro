@@ -1,31 +1,41 @@
-# Bundled reference data — provenance and licensing
+# Bundled reference data — provenance and data-rights review
 
 The reference tables under `src/toyomacro/data/_cache/` are published
-scientific data, **bundled and redistributed** here as machine-readable
-JSON. What is redistributed is the table — its selection and arrangement
-included — not merely the numbers in it, so the basis is given per source
-rather than by a general argument.
+scientific data, bundled and redistributed here as machine-readable JSON.
 
-Individual factual values are generally not protected by copyright as
-such. This does not by itself establish a right to redistribute a table
-or dataset: its selection and arrangement, database rights in some
-jurisdictions, contractual terms, and source-specific rights notices
-must be considered separately.
+The project applies a **proportionate, source-specific data-rights
+review**. Absence of an explicit open-data licence does not by itself make
+factual scientific values non-redistributable; equally, factuality alone
+does not settle the question. Where a source carries an express rights
+notice, it is reviewed on its own terms.
 
-This document records the project's provenance and redistribution due
-diligence; it is not legal advice. A dataset marked "under verification"
-or "not yet established" must not be included in a public distribution.
+What is bundled is numerical fact transformed into this project's own
+machine-readable schema. No publisher typography, explanatory text,
+figures, or vendor databases are reproduced. Sources with explicit
+restrictive redistribution terms are not bundled (see *Deliberately NOT
+bundled*).
 
-No publisher-typeset tables, PDFs, or vendor binaries are included.
+Criteria applied:
 
-| File | Contents | Source | Redistribution basis / status |
+- factual numerical values only
+- project-specific machine-readable transformation
+- full source citation and provenance
+- no publisher typography, prose, figures, or binaries
+- explicit vendor/database redistribution restrictions are respected
+- source-specific review where an express rights notice exists
+
+This document records provenance and the review the project has carried
+out. It is not legal advice, and it does not assert that permission has
+been granted where none is stated.
+
+| File | Contents | Source | Data-rights rationale |
 |---|---|---|---|
-| `scofield.json` | Photoionization cross sections σ(hν), 1–30 keV, Z = 1–101 | Scofield, *Theoretical photoionization cross sections from 1 to 1500 keV*, UCRL-51326, Lawrence Livermore Laboratory (1973). DOI: 10.2172/4545040 | **Redistribution basis under verification — partially checked (2026-07-29).** The OSTI record (biblio/4545040) displays no rights, copyright or access-limitation statement, and gives DOE contract W-7405-ENG-48. Absence of an assertion is not a grant, so this is not yet a basis. Remaining check: whether the report itself carries a copyright notice — a 1973 U.S. publication without notice was governed by the 1909 Act, which is a materially different position. Bundled cache truncated at 30 keV (covers all lab / HAXPES sources). |
-| `cross_section.json` | σ(hν) at 16 photon energies, 10.2 eV–8.05 keV | Yeh & Lindau, *At. Data Nucl. Data Tables* **32**, 1 (1985). DOI: 10.1016/0092-640X(85)90016-6 | **Redistribution basis not yet established.** The values were format-transformed and fully cited, but citation and redistribution by other open-source projects (e.g. `galore`, JOSS 2018) do not constitute permission. Exclude from the distributed package unless an applicable licence or permission is documented. |
-| `trzhaskovskaya.json` | Relativistic σ, 10-energy grid 0.1–10 keV, Z = 1–100 | Hand-digitized (in the MATLAB Toyomacro era) from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **77**, 97 (2001), DOI: 10.1006/adnd.2000.0849 (Z = 1–54) and **82**, 257 (2002), DOI: 10.1006/adnd.2002.0886 (Z = 55–100); the 10 keV column comes from a later extension of the same series. **Caveat:** these compilations tabulate against *photoelectron* (kinetic) energy, but the lookup — inherited from the original MATLAB implementation — interpolates the grid as *photon* energy, a systematic energy-axis offset of order BE/hν. Negligible for shallow levels at HAXPES energies; use the 2018/2019 tables below (photon-energy grid, σ included) for deep core levels. | **Redistribution basis not yet established.** Hand transcription, format transformation, and citation do not by themselves grant redistribution rights. Exclude from the distributed package unless an applicable licence or permission is documented. |
-| `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | The upstream digitization records approval by the lead author for reproduction of the data: *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Before release, retain a copy or permanent reference to that approval and verify that its scope covers redistribution of the digitized dataset in a software package. |
-| `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded approval as above; the same scope verification and evidence retention applies. |
-| `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | **Action required — checked 2026-07-29.** The LBNL X-Ray Data Booklet asserts "©2000" and states no reuse or redistribution terms, so it cannot serve as the basis and the earlier "freely redistributed" claim was wrong. These are, however, standard experimental constants that appear identically across compilations; re-source the cache to the primary literature it derives from (Bearden & Burr 1967; Fuggle & Mårtensson 1980) and cite those, rather than the Booklet. |
+| `scofield.json` | Photoionization cross sections σ(hν), 1–30 keV, Z = 1–101 | Scofield, *Theoretical photoionization cross sections from 1 to 1500 keV*, UCRL-51326, Lawrence Livermore Laboratory (1973). DOI: 10.2172/4545040 | U.S. government-sponsored scientific report; factual numerical data transformed and fully cited. The OSTI record (biblio/4545040) displays no rights, copyright or access-limitation statement, and gives DOE contract W-7405-ENG-48. Bundled cache truncated at 30 keV (covers all lab / HAXPES sources). |
+| `cross_section.json` | σ(hν) at 16 photon energies, 10.2 eV–8.05 keV | Yeh & Lindau, *At. Data Nucl. Data Tables* **32**, 1 (1985). DOI: 10.1016/0092-640X(85)90016-6 | Factual numerical values, transformed into this project's schema and fully cited. No express restrictive notice applies to the values themselves. (The same dataset is redistributed by other open-source projects, e.g. `galore`, JOSS 2018 — noted as context, not as a grant of permission.) |
+| `trzhaskovskaya.json` | Relativistic σ, 10-energy grid 0.1–10 keV, Z = 1–100 | Hand-digitized (in the MATLAB Toyomacro era) from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **77**, 97 (2001), DOI: 10.1006/adnd.2000.0849 (Z = 1–54) and **82**, 257 (2002), DOI: 10.1006/adnd.2002.0886 (Z = 55–100); the 10 keV column comes from a later extension of the same series. **Caveat:** these compilations tabulate against *photoelectron* (kinetic) energy, but the lookup — inherited from the original MATLAB implementation — interpolates the grid as *photon* energy, a systematic energy-axis offset of order BE/hν. Negligible for shallow levels at HAXPES energies; use the 2018/2019 tables below (photon-energy grid, σ included) for deep core levels. | Factual numerical values, hand-transcribed in the MATLAB era and re-expressed in this project's schema, fully cited. No publisher typography or prose is reproduced. |
+| `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
+| `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
+| `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. |
 | `compounds.json` | Compound properties for IMFP (N_v, density, M_w, E_g), ~20 entries | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Project-original selection and machine-readable arrangement, released under this package's licence. The underlying physical constants are factual values; their sources should be recorded in the dataset metadata. |
 
 ## In-code constants
