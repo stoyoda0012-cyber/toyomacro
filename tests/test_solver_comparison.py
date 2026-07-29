@@ -57,6 +57,44 @@ def test_full_run_report_structure():
     assert env['numpy'] and env['python']
 
 
+class TestBackendLabel:
+    """The provenance ``backend`` field must name what actually ran.
+
+    It previously hardcoded ``mlx (Apple Silicon GPU)`` for any
+    MLX-active run, which would have written a false vendor into a
+    committed record the first time the benchmark was run on MLX's CUDA
+    backend. Both labels are pinned here because they end up in a file
+    that outlives the run.
+    """
+
+    def test_numpy_label_when_mlx_inactive(self, monkeypatch):
+        from toyomacro.voigtfit.benchmarks import (
+            solver_comparison_benchmark as scb,
+        )
+        monkeypatch.setattr(scb, '_mlx_active', lambda: False)
+        assert scb._backend_label() == 'numpy (CPU)'
+
+    def test_gpu_label_reports_device_type_not_vendor(self, monkeypatch):
+        from toyomacro.voigtfit.benchmarks import (
+            solver_comparison_benchmark as scb,
+        )
+        monkeypatch.setattr(scb, '_mlx_active', lambda: True)
+        label = scb._backend_label()
+        # MLX exposes a device *type* only, so Metal and CUDA are both
+        # 'gpu' here; the env block is what tells them apart.
+        assert label in ('mlx (gpu)', 'mlx (cpu)', 'mlx (GPU)')
+        assert 'Apple' not in label
+
+    def test_label_reaches_the_record(self, small_problem):
+        from toyomacro.voigtfit.benchmarks import (
+            solver_comparison_benchmark as scb,
+        )
+        energy, Y, truth = small_problem
+        rec = scb.bench_dict2d_parabola(energy, Y, truth, n_common=100,
+                                        repeats=1)
+        assert rec['backend'] == scb._backend_label()
+
+
 class TestReproducibility:
     """The committed JSON must be regenerable from (n, seed) alone."""
 

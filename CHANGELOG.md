@@ -9,6 +9,7 @@ archived on Zenodo for a citable DOI.
 ## [Unreleased]
 
 ### Added
+
 - **Experimental** `newton_jacobian_mode` on the multipeak solver
   (`"raw"` | `"kaufman"` | `"golub_pereyra"` | `"gp_lm"`): compact
   Golub-Pereyra normal equations (no projector, no inverse; one
@@ -39,6 +40,11 @@ archived on Zenodo for a citable DOI.
   `CITATION.cff`, and this changelog.
 
 ### Changed
+- MLX capability messaging is now device-neutral. `mlx_usable()` probes
+  MLX's default device and always did; the docstrings and
+  `require_mlx()` errors wrongly described it as looking for a Metal
+  device and told callers MLX was "Apple Silicon only" — false, and a
+  dead end for non-Apple users. Detection behavior is unchanged.
 - Public CLI surface reduced to implemented, distributed commands:
   `gui` (private companion layer, not installed by this package) and
   `fit` (placeholder) are no longer registered; `import` and `convert`

@@ -117,7 +117,7 @@ try:
         voigt_with_jacobian_mlx,
     )
     from .stage2_mlx import Stage2MLXConfig, Stage2MLXRefiner, Stage2MLXResult
-    HAS_MLX = mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

@@ -27,7 +27,7 @@ import pytest
 
 from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
 
-HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 IN_CI = os.environ.get("CI") == "true"
 
 from toyomacro.voigtfit.benchmarks.bench_gvrt_multipeak_1b import (

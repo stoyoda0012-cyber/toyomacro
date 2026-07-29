@@ -1,9 +1,14 @@
 """MLX capability detection: absent / installed-but-unusable / usable.
 
 The package must import and fall back to NumPy whenever MLX cannot
-actually execute work (not installed, no Metal device, or disabled via
-``TOYOMACRO_DISABLE_MLX=1``), and must raise an actionable error only
-when the caller explicitly asserts the GPU path via ``require_mlx()``.
+actually execute work (not installed, no usable accelerator, or
+disabled via ``TOYOMACRO_DISABLE_MLX=1``), and must raise an actionable
+error only when the caller explicitly asserts the GPU path via
+``require_mlx()``.
+
+The probe runs on MLX's default device and is device-agnostic, so
+neither it nor the errors it feeds may claim that Metal is the only
+backend MLX can run on.
 """
 
 import subprocess
@@ -41,13 +46,13 @@ class TestCapabilityDetection:
 
     def test_probe_failure_reports_unusable(self, fresh_cache, monkeypatch):
         # Simulate MLX importable but the device probe raising (headless
-        # or virtualized macOS).
+        # or virtualized host, broken driver/toolchain).
         import builtins
         real_import = builtins.__import__
 
         def failing_import(name, *args, **kwargs):
             if name == 'mlx.core' or name.startswith('mlx'):
-                raise RuntimeError('no Metal device')
+                raise RuntimeError('no usable device')
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, '__import__', failing_import)
@@ -71,6 +76,31 @@ class TestRequireMlx:
         if not mlx_usable():
             pytest.skip('MLX not usable on this host')
         require_mlx()  # must not raise
+
+    def test_messages_do_not_claim_metal_is_the_only_backend(
+            self, fresh_cache, monkeypatch):
+        """Both failure messages must stay device-neutral.
+
+        ``mlx_usable`` probes the default device, whatever it is — MLX
+        also has a CUDA backend (``docs/CUDA_BACKEND_POC.md``). Wording
+        that tells the caller MLX is Apple-only, or that the probe looks
+        for a Metal device specifically, is factually wrong and sends
+        non-Apple users down a dead end.
+        """
+        monkeypatch.setattr(_mlx_support, 'mlx_usable', lambda: False)
+        banned = ('apple silicon only', 'metal device', 'apple-only')
+
+        for installed in (True, False):
+            monkeypatch.setattr(
+                _mlx_support, 'mlx_installed', lambda: installed)
+            with pytest.raises(RuntimeError) as excinfo:
+                _mlx_support.require_mlx()
+            message = str(excinfo.value).lower()
+            for phrase in banned:
+                assert phrase not in message, (
+                    f'installed={installed}: {phrase!r} in {message!r}')
+            # Still actionable: it must name the way out.
+            assert 'numpy backend' in message
 
 
 class TestLazyCompiled:

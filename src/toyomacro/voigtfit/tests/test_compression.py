@@ -464,7 +464,7 @@ class TestSpecdataUint16:
         """Test that uint16 data can be directly transferred to MLX."""
         from toyomacro.voigtfit._mlx_support import mlx_usable
         if not mlx_usable():
-            pytest.skip("MLX not usable (not installed, or no Metal device)")
+            pytest.skip("MLX not usable (not installed, or the default device failed the probe)")
         import mlx.core as mx
 
         n_spectra = 10_000
@@ -500,7 +500,7 @@ class TestSpecdataUint16:
         """Test MLX throughput with uint16 data."""
         from toyomacro.voigtfit._mlx_support import mlx_usable
         if not mlx_usable():
-            pytest.skip("MLX not usable (not installed, or no Metal device)")
+            pytest.skip("MLX not usable (not installed, or the default device failed the probe)")
         import time
 
         import mlx.core as mx
