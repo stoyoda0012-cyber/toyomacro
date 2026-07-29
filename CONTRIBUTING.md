@@ -39,6 +39,24 @@ closed-source companion tools and are not part of this repository
 5. Open a PR describing what changed and why; link any related issue.
 6. Be patient — review is best-effort, not real-time.
 
+## Changelog
+
+Significant user-visible changes must update the `[Unreleased]` section
+of [CHANGELOG.md](CHANGELOG.md) in the same pull request. Treat these as
+significant:
+
+- adding, changing, or removing a public API
+- changing a scientific model, coefficient, data source, or the
+  numerical meaning of a result
+- changing a backend, a supported platform, or how the package installs
+- changing the CLI or any other user-facing behavior
+- changing a published performance or accuracy claim
+- fixing a bug that affects compatibility or previously published results
+
+Internal refactors, test-only changes, and typo fixes may be omitted —
+but be ready to say why in the PR. Add entries under `[Unreleased]`, not
+under an already-released version.
+
 ## Style
 
 - Python: PEP 8 via `ruff` (configured in `pyproject.toml`,

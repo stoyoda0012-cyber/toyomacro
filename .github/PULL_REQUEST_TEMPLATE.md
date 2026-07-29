@@ -12,6 +12,8 @@ What does this PR change, and why?
 - [ ] `uv run pytest tests/` passes
 - [ ] `uv run ruff check .` clean
 - [ ] New behavior covered by tests
+- [ ] Updated `CHANGELOG.md` under `[Unreleased]`, or explained why no
+      entry is needed (see the Changelog section of CONTRIBUTING.md)
 
 ## Notes for reviewers
 
