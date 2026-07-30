@@ -38,6 +38,55 @@ been granted where none is stated.
 | `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. |
 | `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: ~12 compounds and the rest elements, including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Project-original selection and machine-readable arrangement, released under this package's licence. **Per-entry sources are not recorded, and this is a known gap** — the constants are asserted, not cited. The transactinide densities in particular are theoretical predictions, not measurements, and TPP-2M was never fitted to anything resembling those materials; treat those entries as placeholders, not reference data. Pass parameters explicitly where the value matters. |
 
+## Cross-section units — one table's is not established
+
+The three tables reachable through `CrossSection.lookup` are **not on a
+common scale**, and the evidence for each unit is different. Query it
+rather than assuming: `CrossSection.unit_info(table)`.
+
+| Table | Unit | Evidence |
+|---|---|---|
+| `yeh_lindau` | Mb | **Confirmed.** Yeh & Lindau tabulate in Mb. |
+| `scofield` | Mb | **Confirmed.** UCRL-51326 Table A2 is headed "PHOTOELECTRIC CROSS SECTIONS(BARNS)"; the bundled cache reproduces those entries after barn → Mb. |
+| `trzhaskovskaya` | *inferred* kb | **Not confirmed.** Values run ~10³ above the megabarn tables. Comparison with Scofield after correcting the energy axis, and the same authors' later tables, both point to kb — but the ADNDT 77 (2001) / 82 (2002) table heading itself has not been read. |
+
+`unit_info()` therefore reports `unit=None` and `inferred_unit="kb"` for
+that table, so no caller can convert by reading a single field, and no
+conversion factor is offered. **The stored values are not rescaled** on
+an inference. A ratio within one table cancels the unknown *unit*
+factor, and only that — for `trzhaskovskaya` the photoelectron-vs-photon
+energy axis error recorded above survives any ratio between lines of
+different binding energy. Absolute cross-sections, σ×λ sensitivities,
+and any comparison that mixes tables carry both problems.
+
+The 2018/2019 tables are a **separate** question and were checked
+separately — the 2001/2002 inference is not inherited. The UCL
+digitization's own "Explanation of Tables" sheet states that column (B)
+lists the cross section "in kb (=10⁻²¹ cm²) **for completely filled
+subshells**". So for `trzh2018_haxpes.json` and `trzh2019_inner.json`
+the unit is confirmed as kb, and the σ values are full-subshell
+quantities rather than occupancy-weighted ones. Those two files feed
+`AngularCorrection`, not `CrossSection.lookup`.
+
+Two conventions that are easy to conflate, and are not the same:
+
+- **Scofield** incorporates the report's assumed *fractional* subshell
+  occupations. UCRL-51326 Table A1 lists them per state: B 2p is
+  NE 0.33 + 0.67 = 1 electron, C 0.67 + 1.33 = 2, N 1 + 2 = 3,
+  O 1.33 + 2.67 = 4. Components are summed as stored; weighting them by
+  occupancy again double-corrects.
+- **Trzhaskovskaya 2018/2019** gives full-subshell values, per the sheet
+  quoted above.
+
+Whether the 2001/2002 table follows one convention or the other has not
+been established here, and `CrossSection` does not assume an answer. Its
+38 half-listed subshells are consistent with "listed iff occupied", but
+until the inclusion rule is read from the source a half-listed bare
+subshell returns `None` rather than summing the listed component alone
+and calling the absent one zero. The listed component is still available
+as a j-resolved request, and the 38-count is pinned by test so the
+evidence remains actionable if the rule is later confirmed.
+
 ## In-code constants
 
 Two modules carry small curated sets of scalar physical constants

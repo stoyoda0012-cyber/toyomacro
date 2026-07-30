@@ -50,6 +50,44 @@ class TestReferenceDataTools:
         assert ga_ka["imfp_extrapolated"] is True
         assert "inelastic only" in ga_ka["imfp_model"]
 
+    def test_calculate_sensitivity_does_not_reconfirm_an_inferred_unit(self):
+        """The unit's status has to survive the MCP layer.
+
+        `unit_info()` deliberately keeps `unit` empty for a table whose
+        unit was never read from a primary source. Collapsing that into a
+        single `sensitivity_unit` string here would undo the separation
+        one layer up, which is where a consuming agent would convert on
+        it.
+        """
+        from toyomacro.data import CrossSection
+
+        try:
+            CrossSection.set_default_table("trzhaskovskaya")
+            out = json.loads(mcp_server.calculate_sensitivity(
+                "Si", "2p", photon_energy=1486.6, compound="SiO2",
+            ))
+        finally:
+            CrossSection.set_default_table("yeh_lindau")
+
+        assert out["cross_section_unit"] is None
+        assert out["cross_section_inferred_unit"] == "kb"
+        assert out["cross_section_unit_status"] == "inferred"
+        assert out["sensitivity_unit"] is None
+        assert out["sensitivity_inferred_unit"] == "kb*nm"
+        # The failure this guards against: a string that reads confirmed.
+        assert "None" not in str(out["sensitivity_inferred_unit"])
+
+    def test_calculate_sensitivity_reports_a_confirmed_unit_plainly(self):
+        """And the confirmed case must not be hedged into uselessness."""
+        out = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+        assert out["cross_section_unit"] == "Mb"
+        assert out["cross_section_inferred_unit"] is None
+        assert out["cross_section_unit_status"] == "confirmed"
+        assert out["sensitivity_unit"] == "Mb*nm"
+        assert out["sensitivity_inferred_unit"] is None
+
     def test_calculate_sensitivity_names_what_it_is_not(self):
         """`sensitivity` is sigma x IMFP, not an AMRSF.
 

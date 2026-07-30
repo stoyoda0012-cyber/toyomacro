@@ -10,6 +10,23 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- `CrossSection.unit_info(table)` reports the unit *and how well
+  established it is*: `unit`, `inferred_unit`, `status`,
+  `values_rescaled`, plus a `note` where inferred. The three tables are
+  not on a common scale — Trzhaskovskaya runs ~10³ above the megabarn
+  tables — and its unit has not been read from the ADNDT 77/82 table
+  heading, so `unit` stays `None`, the candidate sits in
+  `inferred_unit`, and **no conversion factor is offered**. Stored values
+  are never rescaled on an inference. The 2018/2019 tables were checked
+  separately rather than inheriting that inference: the UCL
+  digitization's own sheet states kb explicitly, and that those σ are
+  for completely filled subshells. Recorded in `docs/DATA_SOURCES.md`.
+- The MCP `calculate_sensitivity` result carries the unit with its
+  status intact — `cross_section_unit`, `cross_section_inferred_unit`,
+  `cross_section_unit_status`, `sensitivity_unit`,
+  `sensitivity_inferred_unit` — so an inferred unit cannot be collapsed
+  into a single confirmed-looking string at the layer where an agent
+  would act on it.
 - **Experimental** `toyomacro.data.elastic_scattering`: overlayer-thickness
   effective attenuation length from the single-scattering albedo
   ω = IMFP/(IMFP+TRMFP), with a required `model` keyword selecting the
@@ -143,65 +160,19 @@ archived on Zenodo for a citable DOI.
   says so: out-of-range is certainly extrapolated, in-range is not a
   guarantee for a sparsely tabulated orbital. Numerical values are
   unaffected.
-- `docs/API.md` §5 now warns about two pre-existing cross-section
-  lookup defects, because the section's new advice to pass `table=`
-  explicitly is what exposes them. Documented, not yet fixed — fixing
-  either changes returned numbers and belongs in its own change set with
-  its own audit.
-  - Spin-orbit-split orbitals resolve differently per table, and no
-    single request is correct everywhere. On Scofield and Trzhaskovskaya
-    a bare orbital never reaches the doublet-summing path: the suffix
-    search tries `3/2, 5/2, 7/2, 1/2` in that order and returns the
-    first key that exists, so σ is low by *approximately*
-    `2(2l+1)/(2j+1)` — ≈1.50× for p, 2.50× for d, 2.33× for f. Which key
-    is returned is exact; the magnitude is a statistical branching-ratio
-    estimate, and over all 832 doublets in the two tables only 71% fall
-    within 3% of it (88% within 10%, all within 30%, worst case +29.6%
-    for Scofield Pu 3d), so §5 states it as an approximation for
-    recognizing the defect rather than correcting it. It is *not* always
-    the j = 3/2 component (`4f3/2` does not exist, so `'4f'` yields
-    `4f5/2`) and the shortfall is ~1.6× worse for d and f than for p,
-    which matters because Ag 3d and Au 4f are standard calibration
-    lines. The "sum the components" remedy also has a precondition: 38
-    non-s subshells in `trzhaskovskaya` are tabulated with only one j
-    component (`scofield` has none), and requesting the absent partner
-    resolves through the log(Z) fit rather than raising — so the sum
-    adds a fabricated value to a real one and roughly doubles σ
-    (Si 3p 2.51×, Ti 3d 1.94×, C 2p 2.25×). On the
-    default Yeh–Lindau table the mirror applies — no element in its 105
-    entries carries a j-resolved key — so a bare orbital is correct and
-    requesting components sends both through the cross-element log(Z)
-    fallback, each returning roughly the whole shell: summing them
-    double-counts by 1.979× (2p), 2.184× (Ag 3d), 2.258× (Au 4f). §5
-    now gives the mechanism and the per-table remedy rather than one
-    blanket instruction.
-  - The tables are not reconcilable by any scale factor. At 1486.6 eV
-    the Trzhaskovskaya values run 141× (Zn 2p) to 553× (C 1s) the
-    Yeh–Lindau ones across twelve lines sampled — a 3.9× spread, so the
-    unconditional "Megabarn" in the `CrossSection` docstring cannot hold
-    for all three tables, and the discrepancy is units *plus* the
-    photon-vs-photoelectron axis convention already recorded in
-    `DATA_SOURCES.md`, not a single unit error. Part of the spread is the
-    component-selection defect above leaking in: the d lines sit below
-    the trend for their orbital type, and multiplying them by the 2.45×
-    d-orbital shortfall puts them back on it.
-  - Every magnitude quoted in §5 for these two defects is now pinned by
-    `tests/test_cross_section_spin_orbit_limits.py`, and pinned **over
-    the whole population** rather than over exemplars: the degeneracy
-    test iterates all 832 doublets in both tables and asserts the
-    distribution (including that a hard 3% tolerance would *fail*, so
-    the approximation cannot quietly be restated as an equality). Four
-    audit rounds found numbers in this section that had been measured on
-    a few lines and written as general — the fourth found it inside the
-    test written to prevent the third. The rule going forward is that a
-    magnitude in §5 is pinned by a test over the population it claims to
-    describe, or it does not appear there.
-  - **Known gap**: the §5 magnitudes inherited from the IMFP change — the
-    1.8%/7% relativistic α(T) figures, the 18.9% RMS for inorganic
-    compounds, and the −0.71/−0.03/−0.26 transmission power-law
-    exponents — are *not* pinned by tests. They were audited in their own
-    change set; extending the rule to them is deferred rather than
-    silently skipped.
+- Every magnitude `docs/API.md` §5 quotes for the cross-section tables is
+  now pinned by `tests/test_cross_section_spin_orbit_limits.py`, and
+  pinned **over the population** the claim describes rather than over
+  exemplars. Five audit rounds found numbers in that section that had
+  been measured on a few lines and written as general — one of them
+  inside the test written to prevent the previous one. The rule going
+  forward is that a magnitude in §5 is pinned by a test over its own
+  population, or it does not appear there. **Known gap**: the §5
+  magnitudes inherited from the IMFP change — the 1.8%/7% relativistic
+  α(T) figures, the 18.9% RMS for inorganic compounds, and the
+  −0.71/−0.03/−0.26 transmission power-law exponents — are *not* pinned.
+  They were audited in their own change set; extending the rule to them
+  is deferred rather than silently skipped.
 - `AngularCorrection` is now documented, and documented as
   **experimental** (`docs/API.md` §5). It was a public export named
   nowhere in the docs while §5 listed the angular/polarization factor it
@@ -245,6 +216,54 @@ archived on Zenodo for a citable DOI.
   Research impact statement, AI usage disclosure sections added).
 
 ### Fixed
+- **A bare orbital label now returns the whole spin-orbit doublet**
+  (`data/cross_section.py`). It previously returned a single j
+  component: the suffix search tried `3/2, 5/2, 7/2, 1/2` and took the
+  first key that existed, never reaching the doublet-summing path. σ
+  came out low by roughly the ratio of the shell's degeneracy to that
+  component's — ~1.5× for p, ~2.5× for d, ~2.33× for f — so `'3d'` and
+  `'4f'` were worse than the p case, and Ag 3d and Au 4f are standard
+  calibration lines. **This changes returned numbers.** The Scofield
+  O 1s / Si 2p ratio from the Scofield table moves from 5.40 to 3.57 —
+  the summed doublet rather than one component. No published sensitivity
+  ratio is cited for it: none was verified against a primary source, so
+  the value is pinned as a regression on the bundled table rather than
+  as a literature check.
+  - Each component is now evaluated at the requested energy and then
+    added. Summing the stored arrays and interpolating once is not
+    equivalent: the interpolator fits one polynomial across an element's
+    whole range, so where the components sit on different grids — routine
+    just above a split threshold — the two disagree by up to ~27%
+    (Re 3d at 2 keV). The invariant `bare == sum of ionizable
+    components` is pinned over every non-s subshell in both j-resolved
+    tables at six energies.
+  - Thresholds are applied **per component**. Between the two thresholds
+    of a split doublet only the lower-BE member is ionizable and the
+    bare label returns it alone, which is what the spectrum contains
+    there (W 3d at 1850 eV, between 1809 and 1872 eV).
+  - Scofield cross sections already incorporate the report's assumed
+    fractional subshell occupations — UCRL-51326 Table A1: B 2p is
+    NE 0.33 + 0.67 = 1 electron, C 0.67 + 1.33 = 2, N 1 + 2 = 3,
+    O 1.33 + 2.67 = 4 — so components are summed as stored and are not
+    weighted by occupancy again.
+  - A missing component is never guessed at, on either table, and the
+    evidence for the two is kept separate. Trzhaskovskaya half-lists 38
+    non-s subshells — all open valence shells whose upper-j component
+    would be empty, with the configuration exceptions Cr 3d⁵, Mo 4d⁵,
+    Eu 4f⁷ and Re 5d⁵ carrying both. That is consistent with "listed iff
+    occupied", but the rule has not been read from ADNDT 77/82, so a
+    half-listed bare subshell returns `None` rather than treating the
+    absence as a zero; the listed component stays available as a
+    j-resolved request. Scofield lists both components of everything it
+    carries, so an absent one there would be a data gap and the subshell
+    likewise returns `None`. The Trzhaskovskaya count is pinned, so the rule must
+    be re-established if the data changes.
+  - A component omitted from a covered subshell is no longer filled in
+    by cross-element extrapolation. Where the table carries the subshell
+    and leaves one component out, fitting that component from other
+    elements would replace a known gap with a fabricated number that is
+    indistinguishable from a tabulated one. Where the table carries no
+    component of the subshell at all, the extrapolation still applies.
 - **The CI archive-content guards never failed** (`.github/workflows/ci.yml`).
   They were written as `! grep <pattern> …` under `set -e`, and `set -e`
   explicitly does not exit when a command's status is inverted with `!` —
@@ -271,6 +290,20 @@ archived on Zenodo for a citable DOI.
   `tests/test_imfp_tpp2m.py`, where there had been none.
 
 ### Removed
+- **Breaking:** a j-resolved request against a table that stores only
+  bare subshells now returns `None` instead of a fabricated value.
+  Yeh–Lindau is the **default** table and carries no j-resolved key for
+  any of its 105 elements, so `CrossSection.lookup('Au', '4f7/2', hv)`
+  with no `table=` argument is now `None`; previously it fell through to
+  the cross-element log(Z) fit and returned roughly the *whole* shell,
+  so summing two components double-counted by ~2×. Splitting a total by
+  an assumed branching ratio is not available: the statistical ratio is
+  not exact (Scofield's own Si 2p3/2 : 2p1/2 is 1.966) and a split value
+  would be indistinguishable from a tabulated one. Ask `scofield` or
+  `trzhaskovskaya` for j-resolved values, or use the bare label.
+- `CrossSection.unit()` was **not** published, deliberately. A method
+  returning a bare `'kb'` string would let a caller convert on an
+  inference by reading one field; `unit_info()` is the only accessor.
 - `IMFP.attenuation_length()`, which multiplied the TPP-2M IMFP by a
   hardcoded 0.9 and described that as accounting for elastic scattering.
   It had no callers and was never part of the documented surface; use

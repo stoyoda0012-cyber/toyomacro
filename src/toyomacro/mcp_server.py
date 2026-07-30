@@ -80,6 +80,22 @@ def calculate_sensitivity(
     apply it twice: if the peak areas were taken from a
     transmission-corrected spectrum, leave this sensitivity as it is.
 
+    The tables are not on a common scale, and one of them has no
+    confirmed unit. `cross_section_unit` and `sensitivity_unit` are
+    populated only where the unit was read from the primary source; for
+    an inferred unit they are null and the candidate travels in
+    `cross_section_inferred_unit` / `sensitivity_inferred_unit`, with
+    `cross_section_unit_status` saying which case you are in. Do not
+    convert on an inferred unit. Sensitivities are comparable only
+    between calls that used the same table. A ratio within one table
+    cancels the unknown unit factor and only that — the Trzhaskovskaya
+    table also carries a photoelectron-vs-photon energy axis error that
+    a ratio between lines of different binding energy does not remove.
+
+    A bare orbital such as '2p' is the summed spin-orbit doublet, which
+    is what a measured peak envelope contains; pass '2p3/2' for one
+    component.
+
     Both factors extrapolate at HAXPES energies, and the default
     photon energy is a HAXPES line, so the *default* call extrapolates
     both:
@@ -100,12 +116,16 @@ def calculate_sensitivity(
     - within the range, sigma is a polynomial fit in log-log space over
       the whole grid, not a local interpolation, and a sparsely
       tabulated orbital can still be extrapolated;
-    - if the table lacks the requested orbital entirely, `lookup` falls
-      back to a cross-element fit in log(Z) and returns a number with
-      this flag still False. On the default table, asking for a
-      j-resolved level such as '2p3/2' takes that path and lands near
-      the *whole* 2p doublet. Prefer the bare orbital there, and see
-      `docs/API.md` section 5 for the per-table behavior.
+    - where the table lacks the requested orbital and the reason is not
+      established, `lookup` may still fall back to a cross-element fit
+      in log(Z), and this flag stays False for that value.
+
+    A j-resolved request the table cannot answer is refused rather than
+    reconstructed. The default table (Yeh & Lindau) stores no j-resolved
+    key, so asking it for '2p3/2' returns an error rather than a value
+    split from the doublet by an assumed branching ratio. Ask for the
+    bare orbital, or select 'scofield' / 'trzhaskovskaya'. See
+    `docs/API.md` section 5 for the per-table behavior.
 
     Args:
         element: Element symbol (e.g. 'Si', 'O').
@@ -133,6 +153,16 @@ def calculate_sensitivity(
     # energy, and at the HAXPES default it is not.
     grid = CrossSection.get_available_photon_energies()
     cs_lo, cs_hi = (min(grid), max(grid)) if grid else (None, None)
+    # Carry the unit through with its status intact. Collapsing an
+    # inferred unit into a single confirmed-looking string here would
+    # undo the separation `unit_info()` exists to keep — so a unit that
+    # was never read from a primary source stays None, and the candidate
+    # travels in its own field.
+    units = CrossSection.unit_info()
+    sens_unit = f"{units['unit']}*nm" if units["unit"] else None
+    sens_inferred = (
+        f"{units['inferred_unit']}*nm" if units["inferred_unit"] else None
+    )
     return json.dumps({
         "element": element,
         "orbital": orbital,
@@ -141,6 +171,9 @@ def calculate_sensitivity(
         "kinetic_energy_eV": ke,
         "cross_section": sigma,
         "cross_section_table": CrossSection.get_default_table(),
+        "cross_section_unit": units["unit"],
+        "cross_section_inferred_unit": units["inferred_unit"],
+        "cross_section_unit_status": units["status"],
         "cross_section_table_range_eV": [cs_lo, cs_hi],
         "cross_section_extrapolated": (
             cs_lo is None or not (cs_lo <= photon_energy <= cs_hi)
@@ -150,6 +183,8 @@ def calculate_sensitivity(
         "imfp_fitted_range_eV": [lo, hi],
         "imfp_extrapolated": not (lo <= ke <= hi),
         "sensitivity": sigma * lam,
+        "sensitivity_unit": sens_unit,
+        "sensitivity_inferred_unit": sens_inferred,
         "sensitivity_model": (
             "simplified intrinsic sensitivity = cross-section x IMFP; "
             "not a complete AMRSF. Excludes analyzer transmission, "

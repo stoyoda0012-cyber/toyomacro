@@ -260,84 +260,78 @@ ship as tables; TPP-2M inelastic mean free paths are computed from the
 published formula. Provenance and licensing for each is stated in
 [`DATA_SOURCES.md`](DATA_SOURCES.md). `CrossSection.lookup()` uses the
 process default table — Yeh–Lindau unless `set_default_table()` changed
-it — so pass `table=` explicitly whenever the choice matters. Two
-pre-existing defects make that riskier than it should be. Both are
-tracked for a fix; they are recorded here because switching tables is
-what exposes them.
+it — so pass `table=` explicitly whenever the choice matters, and read
+`unit_info()` before comparing anything across tables.
 
-**The tables are not interchangeable, and not by a constant.** At
-1486.6 eV the Trzhaskovskaya values run from 141× the Yeh–Lindau ones
-(Zn 2p) to 553× (C 1s) across twelve lines sampled — a 3.9× spread, so
-there is no scale factor that reconciles them and the unconditional
-"Megabarn" in the `CrossSection` docstring cannot hold for all three
-tables. A pure unit error would be one constant; this is units
-*plus* the photon-vs-photoelectron axis convention already recorded in
-[`DATA_SOURCES.md`](DATA_SOURCES.md). Do not mix tables within one
-quantification, and do not treat any of these numbers as a conversion
-factor.
+**A bare orbital is the whole doublet.** `lookup('Si', '2p', hv)` returns
+σ(2p1/2) + σ(2p3/2) — what a measured peak envelope contains. Each
+component is evaluated at the requested energy and then added; summing
+the stored arrays and interpolating once is not equivalent, because the
+interpolator fits one polynomial across an element's whole tabulated
+range. Pass `'2p3/2'` for a single component.
 
-**Spin-orbit-split orbitals resolve differently in each table**, and
-there is no single request that is correct everywhere. The two failure
-modes are mechanical, so take the mechanism rather than any one number:
+`BindingEnergy` uses the opposite convention for bare labels (the main
+line, j = l+1/2), deliberately: a binding energy is a position, of which
+a doublet has two, whereas a cross-section adds over the subshells that
+make up the envelope.
 
-*On `scofield` and `trzhaskovskaya`*, which store only j-resolved
-entries, a bare orbital never reaches the doublet-summing path. The
-suffix search tries `3/2, 5/2, 7/2, 1/2` **in that order** and returns
-the first key that exists, so it yields one component. *Which* key comes
-back is exact and mechanical; note `1/2` is tried *last*, which is why
-`p` behaves unlike `d` and `f`:
+Three consequences worth knowing before you trust a number:
 
-| Bare request | Returns | Missing weight | Measured shortfall (Al Kα) |
-|---|---|---|---|
-| `'2p'` | `2p3/2` (4 of 6) | the `1/2` half | Si 1.510, Cu 1.519 |
-| `'3d'`, `'4d'` | `3d3/2` (4 of 10) | the `5/2` half | Ag 3d 2.446, Au 4d 2.460 |
-| `'4f'` | `4f5/2` (6 of 14) | the `7/2` half | Au 4f 2.271 |
+- **Each component carries its own threshold.** Between the two
+  thresholds of a well-split doublet only the lower-BE member is
+  ionizable, and the bare label returns that component alone — which is
+  what the spectrum contains there. W 3d5/2 opens at 1809 eV and 3d3/2
+  at 1872 eV, so `lookup('W', '3d', 1850)` is the 3d5/2 value.
+- **A j-resolved request against a bare-keyed table returns `None`.**
+  Yeh–Lindau — the *default* — stores no j-resolved key for any of its
+  105 elements, so `lookup('Au', '4f7/2', hv)` with no `table=` is
+  `None` rather than the total split by an assumed branching ratio. The
+  statistical ratio is not exact (Scofield's own Si 2p3/2 : 2p1/2 is
+  1.966, not 2) and a split value would be indistinguishable from a
+  tabulated one.
+- **A missing component is not guessed at.** Trzhaskovskaya
+  half-lists 38 non-s subshells, all open valence shells whose upper-j
+  component would be empty, and the configuration exceptions (Cr 3d⁵,
+  Mo 4d⁵, Eu 4f⁷, Re 5d⁵) carry both. That is consistent with "listed
+  iff occupied" — but the inclusion rule has **not** been read from
+  ADNDT 77/82, so a half-listed bare subshell returns `None` rather than
+  treating the absence as a zero. The component that *is* listed remains
+  available as a j-resolved request. Scofield lists both
+  components of every subshell it carries, so an absent one there would
+  be a data gap and the subshell refuses rather than under-counting.
+  These rules rest on different evidence and are pinned separately by
+  `tests/test_cross_section_spin_orbit_limits.py`.
 
-The size of the shortfall is **approximately** the ratio of the shell's
-full degeneracy to the returned component's,
+Scofield cross sections **already incorporate the report's assumed
+fractional subshell occupations** (UCRL-51326 Table A1: B 2p is
+NE 0.33 + 0.67 = 1 electron, C 0.67 + 1.33 = 2, N 1 + 2 = 3,
+O 1.33 + 2.67 = 4). Sum the components as stored; weighting them by
+occupancy again double-corrects.
 
+**The tables are not on a common scale, and one unit is not
+established.** Ask rather than assume:
+
+```python
+CrossSection.unit_info('scofield')
+# {'table': 'scofield', 'unit': 'Mb', 'inferred_unit': None,
+#  'status': 'confirmed', 'values_rescaled': False}
+CrossSection.unit_info('trzhaskovskaya')
+# {'unit': None, 'inferred_unit': 'kb', 'status': 'inferred', ...}
 ```
-sigma_correct / sigma_returned  ≈  2(2l+1) / (2j+1)
-```
 
-≈ 1.50 for p, 2.50 for d, 2.33 for f — but this is a *statistical
-branching-ratio* estimate, not an identity. Measured over all 832
-doublets in the two tables at Al Kα: 71% fall within 3% of it, 88%
-within 10%, all within 30%, with the worst case +29.6% (Scofield Pu 3d,
-3.240 against 2.500 predicted). It is good to a few percent for light
-and mid-Z levels well above threshold and degrades for actinide p and d.
-
-**That is the Al Kα figure, and it is the favourable one.** The
-approximation degrades with photon energy across the board, not just for
-heavy elements: at Ga Kα — the default for the MCP `calculate_sensitivity`
-tool and the energy used in `examples/03_quantification.py` — only ~12%
-of doublets fall within 3% and the worst deviation exceeds 200%. Treat
-the ratio as an Al Kα-regime rule of thumb for *recognizing* this
-defect, never as a correction factor.
-
-So `d` and `f` are ~1.6× worse than `p`, and `Ag 3d` and `Au 4f` are
-standard calibration lines. Request the components explicitly and sum
-them — **but check they both exist first.** In `trzhaskovskaya`, 38 non-s
-subshells are tabulated with only one j component (B 2p, C 2p, Al 3p,
-Si 3p, Sc/Ti/V 3d, Ga/Ge 4p, Y/Zr/Nb 4d, …; `scofield` has none). There,
-requesting the absent partner does not raise — it resolves through the
-cross-element log(Z) fit and returns a plausible number, so the "sum the
-components" remedy silently adds a fabricated value to a real one and
-roughly doubles σ (Si 3p 2.51×, Ti 3d 1.94×, C 2p 2.25×). These are
-valence subshells rather than the levels normally quantified, but the
-failure is silent.
-
-*On `yeh_lindau`* (the default) the mirror applies: **no element in the
-105-entry table carries a j-resolved key at all**, so a bare orbital is
-correct, while a request for a component falls through to the
-cross-element log(Z) fit and returns roughly the *whole* shell. Summing
-two components therefore roughly doubles σ — 1.979× for 2p, 2.184× for
-Ag 3d, 2.258× for Au 4f. Request the bare orbital here and do **not**
-sum components.
-
-Call `get_available_orbitals(element, table=...)` to see which case you
-are in rather than assuming. Every factor quoted above is pinned by
-`tests/test_cross_section_spin_orbit_limits.py`.
+Yeh–Lindau and Scofield are megabarn, each read from its source.
+Trzhaskovskaya values run ~10³ larger; the evidence points to kilobarn
+but the ADNDT 77/82 table heading has not been read, so `unit` stays
+empty, the candidate travels in `inferred_unit`, and no conversion
+factor is offered. Nothing stored is rescaled on an inference. Ratios
+within one table cancel the unknown *unit* factor — and only that. For
+`trzhaskovskaya` a second, independent problem survives any ratio: the
+table is gridded in photoelectron energy but interpolated as photon
+energy, so two lines with different binding energies are read at
+different effective points. Absolute cross-sections, σ×λ sensitivities
+and cross-table comparisons carry both. See
+[`DATA_SOURCES.md`](DATA_SOURCES.md), which also records why the
+2018/2019 tables' unit was checked separately rather than inherited.
 
 `CrossSection.get_rsf()` returns a **cross-section ratio**
 σ₁(hν)/σ₂(hν) against a reference line, and nothing more. Despite the
@@ -383,19 +377,33 @@ compose yourself:
 | Factor | Where | Status |
 |---|---|---|
 | σ(hν) | `CrossSection.lookup()` | supported, with the two table caveats above |
-| angular/polarization | `AngularCorrection` (`data.angular_correction`) — dipole, unpolarized and full β/γ/δ forms from the bundled Trzhaskovskaya tables | **experimental** — see the clamp below |
+| angular/polarization | `AngularCorrection` (`data.angular_correction`) — dipole, unpolarized and full β/γ/δ forms from the bundled Trzhaskovskaya 2018/2019 tables. **only j-resolved input is defined** | **experimental** — see below |
 | λ | `IMFP.tpp2m()` — for the *specific* compound, not an averaged matrix | supported |
 | `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair | experimental |
 
-`AngularCorrection` is experimental for two reasons, not one. It has no
-test coverage and no example, so it does not meet the Supported bar
-defined at the top of this document. And its β/γ/δ grid **starts at
-1500 eV** (2018 outer shells 1.5–10 keV; 2019 inner shells 2–18 keV);
-lookups below that clamp to the edge value instead of refusing, so
-`lookup('Si', '2p', 1486.6)` returns the 1500 eV parameters unchanged.
-Al Kα — the most common lab source — sits just under that floor. That
-is the same failure mode flagged for σ, λ and analyzer transmission
-elsewhere in this section, and it is not signalled in the return value.
+`AngularCorrection` is experimental for three reasons.
+
+**Only j-resolved input is defined.** A bare label such as `'2p'` is
+not rejected at runtime yet — it is simply undefined: it resolves to whichever j component the
+internal suffix search finds first, which is the same miscounting
+`CrossSection` was fixed for. It has not been given the same treatment
+because the fix is not analogous — the 2018/2019 tables give σ for
+*completely filled* subshells (stated on the digitization's own
+explanation sheet), and β, γ and δ are per-component quantities that do
+not add. Use `AngularCorrection.lookup('Si', '2p3/2', hv)`. Bare input is deprecated;
+rejecting or warning on it, and deciding what it should mean, is
+deferred rather than guessed at.
+
+**Its β/γ/δ grid starts at 1500 eV** (2018 outer shells 1.5–10 keV; 2019
+inner shells 2–18 keV), and lookups below that clamp to the edge value
+instead of refusing, so `lookup('Si', '2p3/2', 1486.6)` returns the
+1500 eV parameters unchanged. Al Kα — the most common lab source — sits
+just under that floor. That is the same failure mode flagged for σ, λ
+and analyzer transmission elsewhere in this section, and it is not
+signalled in the return value.
+
+**And it has no example.** It is covered by tests only for the two limits
+above, which pins those limits without making the surface stable.
 
 Composing these factors is the caller's responsibility, and doing so
 still does not reproduce a vendor AMRSF: the averaging convention, the

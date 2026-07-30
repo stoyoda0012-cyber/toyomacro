@@ -35,11 +35,20 @@ References
   Parameters for HAXPES Applications (1.5-10 keV).
 - Scofield, J. H. (1976). J. Electron Spectrosc. Relat. Phenom.
 
+**Only j-resolved orbital labels are defined.** A bare label such as
+``'2p'`` is not rejected at runtime yet, but it is undefined and
+deprecated: it resolves to whichever j component the suffix search
+happens to find first, rather than to the subshell. Unlike
+`CrossSection`, this module cannot simply sum the components — the
+2018/2019 tables give σ for *completely filled* subshells, and β, γ and δ
+are per-component quantities that do not add. Making bare input well
+defined is deferred rather than guessed at.
+
 Usage
 -----
     from toyomacro.data.angular_correction import AngularCorrection
 
-    # Lookup parameters
+    # Lookup parameters — j-resolved label, not a bare subshell
     params = AngularCorrection.lookup('Si', '2p3/2', 9000)
     # → {'sigma': 0.01097, 'beta': 0.222, 'gamma': 0.925, 'delta': 0.289,
     #    'binding_energy': 98.9}
