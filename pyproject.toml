@@ -116,6 +116,10 @@ exclude = [
     "docs/JOSS_IMPLEMENTATION_BRIEF.md",
     "CLAUDE.local.md",
     "*.local.md",
+    # Untracked maintainer notes: handoffs, release-note drafts, API
+    # specs. .gitignore'd, so a clean-clone build never sees them — but
+    # a build from a development tree relies on nothing else.
+    "_internal",
 ]
 
 [tool.ruff]

@@ -31,6 +31,83 @@ class TestReferenceDataTools:
         assert out["sensitivity"] == pytest.approx(
             out["cross_section"] * out["imfp_nm"])
 
+    def test_calculate_sensitivity_flags_out_of_range_imfp(self):
+        """TPP-2M is fitted over 50-2000 eV; the tool's default is HAXPES.
+
+        A caller that only sees `imfp_nm` cannot tell an interpolated
+        value from a 4x extrapolation, so the flag has to travel with
+        the number.
+        """
+        al_ka = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+        ga_ka = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=9251.7, compound="SiO2",
+        ))
+
+        assert al_ka["imfp_fitted_range_eV"] == [50.0, 2000.0]
+        assert al_ka["imfp_extrapolated"] is False
+        assert ga_ka["imfp_extrapolated"] is True
+        assert "inelastic only" in ga_ka["imfp_model"]
+
+    def test_calculate_sensitivity_names_what_it_is_not(self):
+        """`sensitivity` is sigma x IMFP, not an AMRSF.
+
+        The number alone reads like an instrument sensitivity factor, so
+        the caveat has to travel with it — an agent consuming the JSON
+        never sees the docstring.
+        """
+        out = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+
+        model = out["sensitivity_model"]
+        assert "not a complete AMRSF" in model
+        for excluded in ("transmission", "elastic", "polarization", "geometry"):
+            assert excluded in model.lower()
+
+    def test_calculate_sensitivity_reports_the_table_it_actually_used(self):
+        """`cross_section_table` must name the table sigma came from.
+
+        The docstring claimed Scofield while the call resolves the
+        process default; for Si 2p at Al K-alpha the two differ by 43%.
+        So assert the reported name against a *literal*, and against the
+        sigma an explicit lookup on that table returns — comparing it to
+        `get_default_table()` would only restate how it was built.
+        """
+        from toyomacro.data import CrossSection
+
+        out = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+
+        assert out["cross_section_table"] == "yeh_lindau"
+        assert out["cross_section"] == pytest.approx(
+            CrossSection.lookup("Si", "2p", 1486.6, table="yeh_lindau"))
+        # ...and that this is a distinguishable claim, not a tautology.
+        assert out["cross_section"] != pytest.approx(
+            CrossSection.lookup("Si", "2p", 1486.6, table="scofield"))
+
+    def test_calculate_sensitivity_flags_out_of_range_cross_section(self):
+        """Yeh & Lindau stops at 8047.8 eV; the tool's default is above it.
+
+        The IMFP already carries an extrapolation flag. Flagging only
+        the IMFP would imply the cross-section is on firmer ground at
+        the same energy, which at the HAXPES default it is not.
+        """
+        al_ka = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=1486.6, compound="SiO2",
+        ))
+        ga_ka = json.loads(mcp_server.calculate_sensitivity(
+            "Si", "2p", photon_energy=9251.7, compound="SiO2",
+        ))
+
+        assert al_ka["cross_section_table_range_eV"] == [10.2, 8047.8]
+        assert al_ka["cross_section_extrapolated"] is False
+        assert ga_ka["cross_section_extrapolated"] is True
+        # The default call extrapolates *both* factors, not just lambda.
+        assert ga_ka["imfp_extrapolated"] is True
+
     def test_list_fitting_templates(self):
         out = json.loads(mcp_server.list_fitting_templates())
         names = [t["name"] for t in out]

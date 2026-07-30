@@ -355,9 +355,35 @@ class CrossSection:
         table: str | None = None,
     ) -> float | None:
         """
-        Calculate relative sensitivity factor (RSF).
+        Photoionization-cross-section ratio relative to a reference line.
 
-        RSF = sigma1 / sigma2
+        Returns ``sigma1 / sigma2`` at the given photon energy, both from
+        the same table. Each is whatever ``lookup()`` returns, so either
+        may be a log-log extrapolation beyond the tabulated energies, or
+        a cross-element fit in log(Z) for an orbital the table does not
+        carry at all — see ``lookup()``. Neither case is signalled here.
+
+        Despite the historical method name, this is **not** a complete
+        relative sensitivity factor and **not** an average-matrix RSF. It
+        contains the cross-section term alone. It does not include:
+
+        - the inelastic mean free path or effective attenuation length
+          (see ``data.imfp`` and ``data.elastic_scattering``)
+        - elastic-scattering corrections
+        - the photoelectron angular distribution, x-ray polarization, or
+          the source/analyzer geometry
+        - analyzer transmission or detector response (see
+          ``data.transmission``, which is applied separately and is not
+          bundled)
+        - matrix-dependent averaging
+
+        Subshell occupancy is *not* among the missing factors: it is
+        already carried by the tabulated cross-sections, which is why
+        ``2p3/2``/``2p1/2`` comes out near 2:1.
+
+        A published RSF table from an instrument vendor is a different
+        quantity and the two are not interchangeable. See §5 of
+        ``docs/API.md`` for what a full AMRSF would additionally require.
 
         Args:
             element1: First element symbol
@@ -368,7 +394,8 @@ class CrossSection:
             table: Which table to use
 
         Returns:
-            RSF value, or None if cross-sections unavailable
+            The cross-section ratio, or None if either cross-section is
+            unavailable.
         """
         sigma1 = cls.lookup(element1, orbital1, photon_energy, table)
         sigma2 = cls.lookup(element2, orbital2, photon_energy, table)

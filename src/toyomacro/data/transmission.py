@@ -3,18 +3,49 @@
 Loads transmission function data from Scienta XOP TSV files and provides
 interpolation for XPS quantitative analysis.
 
+Analyzer transmission is **instrument- and configuration-specific data
+and is not bundled with toyomacro** — this module is an adapter only.
+Users must supply curves they are authorized to use (see
+``TOYOMACRO_SCIENTA_DATA_DIR`` below). Transmission is a separate
+instrument-response factor, evaluated independently of the intrinsic
+cross-section and IMFP terms; nothing here folds it into them for you.
+
 The tabulated abscissa is the dimensionless ratio Ek/Ep, so pass energy
 is *not* a table dimension: a curve is selected by (analyzer, lens mode,
 slit, spot) and then evaluated at KE/Ep with the Ep you acquired at.
 Slit and spot are physical apertures in **mm**, not energy widths.
-Ratios outside the tabulated range are clamped to the endpoint values.
+Ratios outside the tabulated range are clamped to the endpoint values,
+so a curve can silently run flat at the ends — check ``ek_ep_range``
+against your KE/Ep span first. HAXPES conditions push KE/Ep well beyond
+the range of curves measured for soft-x-ray work, where the clamp is
+extrapolation in all but name.
 
 Correction formula (from Scienta Transmission.ipf):
     I_normalized = I_measured / T(Ek/Ep) × 1000  →  Counts/Sr
 
-For quantification:
-    sensitivity = σ(hν) × λ(KE) × T(KE/Ep)
-    at% ∝ Area / sensitivity
+The factor 1000 converts the tabulated mSr into Sr. It applies only
+because these curves are stored in mSr; it is not a universal constant
+and must not be carried over to transmission data in other units.
+
+Apply transmission on **one** side of the quantification, never both.
+Either correct the spectrum:
+
+    I_corrected = I_measured / T(KE/Ep) × 1000
+    quantity ∝ I_corrected / S_intrinsic          # S_intrinsic = σ × λ
+
+or correct the sensitivity and leave the spectrum raw:
+
+    S_instrument = S_intrinsic × T(KE/Ep) / 1000
+    quantity ∝ I_measured / S_instrument
+
+The two are algebraically the same. Dividing a transmission-corrected
+spectrum by a transmission-corrected sensitivity applies T twice and is
+a silent, energy-dependent error.
+
+Note that σ × λ is an *intrinsic* sensitivity, not a complete AMRSF:
+even with T applied it still omits elastic-scattering/EAL corrections,
+the photoelectron angular distribution, x-ray polarization and the
+source/analyzer geometry.
 
 Supported analyzers:
     - EW4000: Transmission, Angular45, Angular56

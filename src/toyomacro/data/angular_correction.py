@@ -486,7 +486,14 @@ def _interp_linear(
     points: list[tuple[float, float]],
     x: float,
 ) -> float:
-    """Linear interpolation / extrapolation for β, γ, δ."""
+    """Linear interpolation for β, γ, δ; clamped outside the grid.
+
+    Outside the tabulated range this returns the nearest endpoint, which
+    is a clamp and not an extrapolation — the caller gets parameters for
+    a different energy with nothing to signal it. The grid starts at
+    1500 eV, so Al Kα (1486.6 eV) is clamped. Pinned by
+    ``tests/test_angular_correction_limits.py``.
+    """
     points = sorted(points)
     xs = np.array([p[0] for p in points])
     ys = np.array([p[1] for p in points])
@@ -494,5 +501,5 @@ def _interp_linear(
     if len(xs) < 2:
         return float(ys[0]) if len(ys) else 0.0
 
-    # np.interp clamps to boundaries (safe extrapolation)
+    # np.interp clamps to the endpoints rather than extrapolating.
     return float(np.interp(x, xs, ys))

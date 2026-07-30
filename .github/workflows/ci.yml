@@ -69,10 +69,37 @@ jobs:
           set -e
           tar tzf dist/*.tar.gz > sdist_contents.txt
           unzip -l dist/*.whl > wheel_contents.txt
-          # Private development layers must never ship
-          ! grep -E 'toyomacro/(gui|api|agent|piar|depth|outputs)/' sdist_contents.txt wheel_contents.txt
-          # Local agent/control files must never ship
-          ! grep -iE 'AGENTS\.md|\.codex/|JOSS_IMPLEMENTATION_BRIEF|CLAUDE' sdist_contents.txt wheel_contents.txt
+
+          # NOTE: do not write these as `! grep ...`. `set -e` explicitly
+          # does not exit when a command's status is inverted with `!`, so
+          # that form matches, prints the offending path, and passes
+          # anyway. These guards were inert until 2026-07-30.
+          fail=0
+          deny() {  # deny <description> <extended-regex>
+            if grep -iE "$2" sdist_contents.txt wheel_contents.txt; then
+              echo "::error::$1 must not ship (pattern: $2)"
+              fail=1
+            fi
+          }
+          deny "Private development layers" \
+               'toyomacro/(gui|api|agent|piar|depth|outputs)/'
+          deny "Local agent/control files" \
+               'AGENTS\.md|\.codex/|JOSS_IMPLEMENTATION_BRIEF|CLAUDE'
+          deny "Maintainer notes (handoffs, drafts, specs)" \
+               '_internal/'
+          deny "Vendor analyzer-transmission data" \
+               'Slit[0-9]+p[0-9]+_spot|ScientaXOP'
+
+          # Guard the guard: the patterns above are worthless if the
+          # contents listings are empty or unwritten.
+          for f in sdist_contents.txt wheel_contents.txt; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f is empty — the archive listing failed"
+              fail=1
+            fi
+          done
+
+          [ "$fail" -eq 0 ] || exit 1
           echo "archive contents clean"
 
       - name: Install built wheel into a clean env and smoke-test

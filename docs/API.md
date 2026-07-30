@@ -258,7 +258,181 @@ from toyomacro.data import CrossSection, IMFP, BindingEnergy
 Photoionization cross-sections (Scofield, Yeh–Lindau, Trzhaskovskaya)
 ship as tables; TPP-2M inelastic mean free paths are computed from the
 published formula. Provenance and licensing for each is stated in
-[`DATA_SOURCES.md`](DATA_SOURCES.md).
+[`DATA_SOURCES.md`](DATA_SOURCES.md). `CrossSection.lookup()` uses the
+process default table — Yeh–Lindau unless `set_default_table()` changed
+it — so pass `table=` explicitly whenever the choice matters. Two
+pre-existing defects make that riskier than it should be. Both are
+tracked for a fix; they are recorded here because switching tables is
+what exposes them.
+
+**The tables are not interchangeable, and not by a constant.** At
+1486.6 eV the Trzhaskovskaya values run from 141× the Yeh–Lindau ones
+(Zn 2p) to 553× (C 1s) across twelve lines sampled — a 3.9× spread, so
+there is no scale factor that reconciles them and the unconditional
+"Megabarn" in the `CrossSection` docstring cannot hold for all three
+tables. A pure unit error would be one constant; this is units
+*plus* the photon-vs-photoelectron axis convention already recorded in
+[`DATA_SOURCES.md`](DATA_SOURCES.md). Do not mix tables within one
+quantification, and do not treat any of these numbers as a conversion
+factor.
+
+**Spin-orbit-split orbitals resolve differently in each table**, and
+there is no single request that is correct everywhere. The two failure
+modes are mechanical, so take the mechanism rather than any one number:
+
+*On `scofield` and `trzhaskovskaya`*, which store only j-resolved
+entries, a bare orbital never reaches the doublet-summing path. The
+suffix search tries `3/2, 5/2, 7/2, 1/2` **in that order** and returns
+the first key that exists, so it yields one component. *Which* key comes
+back is exact and mechanical; note `1/2` is tried *last*, which is why
+`p` behaves unlike `d` and `f`:
+
+| Bare request | Returns | Missing weight | Measured shortfall (Al Kα) |
+|---|---|---|---|
+| `'2p'` | `2p3/2` (4 of 6) | the `1/2` half | Si 1.510, Cu 1.519 |
+| `'3d'`, `'4d'` | `3d3/2` (4 of 10) | the `5/2` half | Ag 3d 2.446, Au 4d 2.460 |
+| `'4f'` | `4f5/2` (6 of 14) | the `7/2` half | Au 4f 2.271 |
+
+The size of the shortfall is **approximately** the ratio of the shell's
+full degeneracy to the returned component's,
+
+```
+sigma_correct / sigma_returned  ≈  2(2l+1) / (2j+1)
+```
+
+≈ 1.50 for p, 2.50 for d, 2.33 for f — but this is a *statistical
+branching-ratio* estimate, not an identity. Measured over all 832
+doublets in the two tables at Al Kα: 71% fall within 3% of it, 88%
+within 10%, all within 30%, with the worst case +29.6% (Scofield Pu 3d,
+3.240 against 2.500 predicted). It is good to a few percent for light
+and mid-Z levels well above threshold and degrades for actinide p and d.
+
+**That is the Al Kα figure, and it is the favourable one.** The
+approximation degrades with photon energy across the board, not just for
+heavy elements: at Ga Kα — the default for the MCP `calculate_sensitivity`
+tool and the energy used in `examples/03_quantification.py` — only ~12%
+of doublets fall within 3% and the worst deviation exceeds 200%. Treat
+the ratio as an Al Kα-regime rule of thumb for *recognizing* this
+defect, never as a correction factor.
+
+So `d` and `f` are ~1.6× worse than `p`, and `Ag 3d` and `Au 4f` are
+standard calibration lines. Request the components explicitly and sum
+them — **but check they both exist first.** In `trzhaskovskaya`, 38 non-s
+subshells are tabulated with only one j component (B 2p, C 2p, Al 3p,
+Si 3p, Sc/Ti/V 3d, Ga/Ge 4p, Y/Zr/Nb 4d, …; `scofield` has none). There,
+requesting the absent partner does not raise — it resolves through the
+cross-element log(Z) fit and returns a plausible number, so the "sum the
+components" remedy silently adds a fabricated value to a real one and
+roughly doubles σ (Si 3p 2.51×, Ti 3d 1.94×, C 2p 2.25×). These are
+valence subshells rather than the levels normally quantified, but the
+failure is silent.
+
+*On `yeh_lindau`* (the default) the mirror applies: **no element in the
+105-entry table carries a j-resolved key at all**, so a bare orbital is
+correct, while a request for a component falls through to the
+cross-element log(Z) fit and returns roughly the *whole* shell. Summing
+two components therefore roughly doubles σ — 1.979× for 2p, 2.184× for
+Ag 3d, 2.258× for Au 4f. Request the bare orbital here and do **not**
+sum components.
+
+Call `get_available_orbitals(element, table=...)` to see which case you
+are in rather than assuming. Every factor quoted above is pinned by
+`tests/test_cross_section_spin_orbit_limits.py`.
+
+`CrossSection.get_rsf()` returns a **cross-section ratio**
+σ₁(hν)/σ₂(hν) against a reference line, and nothing more. Despite the
+name it is not a complete relative sensitivity factor and not an
+average-matrix RSF: no IMFP or EAL, no elastic scattering, no angular
+distribution, no polarization or geometry, no analyzer transmission, no
+matrix averaging. (Subshell occupancy is *not* a missing factor — it is
+already inside the tabulated σ, which is why the `2p3/2` : `2p1/2` ratio
+comes out near 2:1.) A vendor RSF table is a different quantity; the two
+are not interchangeable. The name is kept for backward compatibility and
+may be revisited after v0.1.0.
+
+The same caveat applies one level up. What this package can assemble is
+an **intrinsic** sensitivity,
+
+```
+S_intrinsic = σ(hν) × λ(KE)
+```
+
+which is what the MCP `calculate_sensitivity` tool and
+[`examples/03_quantification.py`](../examples/03_quantification.py)
+compute. A physical AMRSF contains, at minimum,
+
+```
+AMRSF ∝ σ(hν) × L(θ) × λ_average-matrix(KE) × Q_elastic
+```
+
+where σ already carries the subshell occupancy, `L(θ)` is the
+angular-asymmetry factor at the source/analyzer angle θ for the given
+x-ray polarization, `λ_average-matrix` is an IMFP or EAL for the
+averaged matrix rather than the specific compound, and `Q_elastic`
+corrects for elastic scattering. (θ here is the geometric angle —
+`psi_deg` / `alpha_deg` / `phi_deg` in `AngularCorrection`. Do not
+confuse it with the non-dipole asymmetry *parameters* β, γ and δ that
+`L(θ)` is computed **from**; γ means the parameter, never the angle.)
+The analyzer transmission function is a further, **separate** instrument
+response, not part of the physical AMRSF.
+
+**No complete AMRSF is assembled here**, and no third-party AMRSF table
+is bundled. Two of the four factors do have implementations you can
+compose yourself:
+
+| Factor | Where | Status |
+|---|---|---|
+| σ(hν) | `CrossSection.lookup()` | supported, with the two table caveats above |
+| angular/polarization | `AngularCorrection` (`data.angular_correction`) — dipole, unpolarized and full β/γ/δ forms from the bundled Trzhaskovskaya tables | **experimental** — see the clamp below |
+| λ | `IMFP.tpp2m()` — for the *specific* compound, not an averaged matrix | supported |
+| `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair | experimental |
+
+`AngularCorrection` is experimental for two reasons, not one. It has no
+test coverage and no example, so it does not meet the Supported bar
+defined at the top of this document. And its β/γ/δ grid **starts at
+1500 eV** (2018 outer shells 1.5–10 keV; 2019 inner shells 2–18 keV);
+lookups below that clamp to the edge value instead of refusing, so
+`lookup('Si', '2p', 1486.6)` returns the 1500 eV parameters unchanged.
+Al Kα — the most common lab source — sits just under that floor. That
+is the same failure mode flagged for σ, λ and analyzer transmission
+elsewhere in this section, and it is not signalled in the return value.
+
+Composing these factors is the caller's responsibility, and doing so
+still does not reproduce a vendor AMRSF: the averaging convention, the
+reference line, and the normalization basis all have to match the table
+you want to compare against. Treat `S_intrinsic` as a relative figure of
+merit; absolute composition from it alone is not traceable.
+
+`IMFP.tpp2m()` takes the electron's kinetic energy **in the solid**, in
+eV, and returns nanometres (Eqn (3) of the paper is in Ångströms). No
+work function or photon energy is subtracted internally — convert from
+binding energy before calling. The paper defines `Eg` "for
+non-conductors" and prescribes nothing for conductors; 0 is this
+package's default and the usual convention. Pass it for anything else.
+
+Tanuma, Powell & Penn fit the formula over **50–2000 eV** and state that
+"Eqns (3) and (4) should not be used for energies greater than 2000 eV",
+with the largest deviations from
+optically-derived IMFPs below 200 eV. `tpp2m()` does not refuse energies
+outside that window — HAXPES estimates are a legitimate use — and
+`data.imfp.TPP2M_FITTED_RANGE_EV` exports the bounds so callers can
+decide for themselves.
+
+What is returned above 2 keV is the **non-relativistic** form — which
+the same authors later reported "useful for energies between 50 eV and
+30 keV" (Shinotsuka et al., *Surf. Interface Anal.* **47**, 871 (2015)),
+on the evidence of 41 elemental solids, so that reassurance does not
+extend to compounds on its own.
+That paper also gives a relativistic form for higher energies, using the
+same parameters plus a factor α(T); it is **not** implemented here, and
+omitting it overestimates the IMFP by roughly 1.8% at 7.4 keV and 7% at
+30 keV. Small against the formula's ~10–19% RMS, but one-sided.
+
+Material parameters from `CompoundDB` are curated data with their own
+provenance and their own errors, independent of the formula's fidelity.
+Note also that the 18.9% RMS figure for inorganic compounds — the group
+SiO₂ belongs to — is for a group that was *excluded* from the TPP-2M
+fit, on the authors' judgement that its optical data was less reliable.
 
 `IMFP.sampling_depth()` is likewise IMFP-based: the straight-line
 approximation at normal emission, excluding elastic scattering. Do not
@@ -294,7 +468,31 @@ Pass energy is **not** a table dimension. A curve is selected by
 Ep you acquired at. Each curve covers a finite ratio range
 (`ek_ep_range`); outside it the value is clamped to the endpoint, so a
 wide kinetic-energy sweep can silently run flat at the ends. Check
-`ek_ep_range` against `KE_max/Ep` before trusting a correction.
+`ek_ep_range` against `KE_max/Ep` before trusting a correction. HAXPES
+kinetic energies reach ratios far above those of curves measured for
+soft-x-ray work, where that clamp is extrapolation under another name.
+
+Apply transmission on **one** side of the quantification. Either
+correct the spectrum,
+
+```
+I_corrected  = I_measured / T(KE/Ep) × 1000
+quantity     ∝ I_corrected / S_intrinsic
+```
+
+or correct the sensitivity and leave the spectrum raw,
+
+```
+S_instrument = S_intrinsic × T(KE/Ep) / 1000
+quantity     ∝ I_measured / S_instrument
+```
+
+These are algebraically identical. Doing both — dividing a
+transmission-corrected spectrum by a transmission-corrected sensitivity
+— applies T twice, and because T is energy-dependent the error does not
+cancel between lines. The factor 1000 is the mSr→Sr conversion for
+these particular curves, not a constant that transfers to transmission
+data stored in other units.
 
 Vendor-measured curves are **not redistributed** — point
 `TOYOMACRO_SCIENTA_DATA_DIR` at your own

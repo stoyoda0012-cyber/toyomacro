@@ -36,7 +36,7 @@ been granted where none is stated.
 | `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
 | `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. |
-| `compounds.json` | Compound properties for IMFP (N_v, density, M_w, E_g), ~20 entries | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Project-original selection and machine-readable arrangement, released under this package's licence. The underlying physical constants are factual values; their sources should be recorded in the dataset metadata. |
+| `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: ~12 compounds and the rest elements, including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Project-original selection and machine-readable arrangement, released under this package's licence. **Per-entry sources are not recorded, and this is a known gap** — the constants are asserted, not cited. The transactinide densities in particular are theoretical predictions, not measurements, and TPP-2M was never fitted to anything resembling those materials; treat those entries as placeholders, not reference data. Pass parameters explicitly where the value matters. |
 
 ## In-code constants
 
@@ -58,8 +58,22 @@ directly in source (no external database is extracted or shipped):
   vendor-measured curves are read from a user-supplied directory
   (`TOYOMACRO_SCIENTA_DATA_DIR`); a power-law fallback is used when absent.
   Vendor data is not redistributed.
-- **TPP-2M IMFP** (`data/imfp.py`): implemented as the published formula
-  (Tanuma, Powell & Penn), no data tables shipped.
+- **TPP-2M IMFP** (`data/imfp.py`): implemented as the published formula,
+  no data tables shipped. Model TPP-2M; source S. Tanuma, C. J. Powell &
+  D. R. Penn, *Surf. Interface Anal.* **21**, 165 (1994), DOI
+  10.1002/sia.740210302; equations (3), (4b), (4c), (4d), (4e) and (8).
+  Inputs: kinetic energy in eV (the electron's energy in the solid —
+  nothing is subtracted internally), N_v valence electrons per atom
+  (elements) or per molecule (compounds), density in g/cm³, molecular
+  weight in g/mol, band gap in eV (0 for conductors). Eqn (3) yields
+  Ångströms; the public functions return nanometres. The quantity is the
+  *inelastic* mean free path — elastic scattering is not included, so it
+  is not an EAL. Fitted by the authors over 50–2000 eV; they state the
+  equations should not be used above 2000 eV, and that deviations are
+  largest below 200 eV. The material parameters in `compounds.json` are
+  a separate input with separate provenance (see the table above): the
+  fidelity of this formula implies nothing about the accuracy of any
+  particular entry.
 - **NIST SRD compound chemical-shift data**: not bundled and not loaded by
   this package (NIST Standard Reference Data carries redistribution terms
   of its own; only the elemental BE table above is shipped).

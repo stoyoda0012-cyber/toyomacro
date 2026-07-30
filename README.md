@@ -25,7 +25,7 @@
 | Subpackage | What it does | Install extra |
 |---|---|---|
 | `toyomacro.voigtfit` | The dictionary + Newton Voigt solvers, MLX backends, CRLB analysis, benchmarks. Standalone (numpy/scipy/h5py/matplotlib). | (core) |
-| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), analyzer-transmission loader, HDF5/MAT readers. Also an **experimental** overlayer-thickness EAL correction computed from a caller-supplied IMFP/TRMFP pair — no TRMFP or albedo tables are bundled (see [`docs/API.md`](docs/API.md#5-quantification-inputs) and [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md)). | (core) |
+| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), an analyzer-transmission loader for user-supplied vendor curves (no transmission data is bundled), HDF5/MAT readers. Also an **experimental** overlayer-thickness EAL correction computed from a caller-supplied IMFP/TRMFP pair — no TRMFP or albedo tables are bundled (see [`docs/API.md`](docs/API.md#5-quantification-inputs) and [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md)). | (core) |
 
 The Voigt engine is the part the project is being prepared for JOSS
 submission as a standalone tool.
@@ -280,8 +280,9 @@ per channel; `--inspect X,Y` adds a spectrum-space plot of one pixel
 
 The engine is exposed as an [MCP](https://modelcontextprotocol.io)
 server so AI agents (Claude Code, Claude Desktop, ...) can drive it —
-look up binding energies and sensitivity factors, fit spectrum files,
-and run GVRT accuracy experiments:
+look up binding energies, compute simplified intrinsic sensitivities
+(cross-section × IMFP, with no instrument response), fit spectrum
+files, and run GVRT accuracy experiments:
 
 ```bash
 pip install -e ".[mcp]"
