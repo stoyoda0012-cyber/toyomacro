@@ -4,7 +4,7 @@ GVRT MultiPeak 1-Billion Spectra Round-Trip Benchmark
 
 Extends dev-log 68 (single-peak 1B) to 2-component MultiPeak with:
   - TwoPeakSplitEncoder (Split Fisher-Hilbert, dev-log 76)
-  - 2-Stage γ-calibrated solver
+  - Two-phase γ-calibrated solver (Dict3D → Dict2D; not the Stage 2 fallback)
   - CPU-GPU pipelined execution
 
 Pipeline per chunk:

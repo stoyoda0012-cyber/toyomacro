@@ -1,6 +1,6 @@
 """
-Weight Matrix Cache for 2-Stage Hybrid Pipeline
-================================================
+Weight Matrix Cache for the Stage 1 screening pipeline
+=======================================================
 
 Pre-computes and caches weight matrices for each element/orbital combination.
 

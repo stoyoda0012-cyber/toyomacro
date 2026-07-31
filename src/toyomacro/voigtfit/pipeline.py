@@ -1,6 +1,26 @@
 """
-2-Stage Hybrid Processing Pipeline
-===================================
+Screening pipeline with a Gauss-Newton fallback ("Stage 1 / Stage 2")
+=====================================================================
+
+Naming, because two unrelated things in this package are two-phase:
+
+- **Stage 1 / Stage 2** — *this* module. Stage 1 screens every spectrum
+  with the pre-computed weight matrix; Stage 2 is a **fallback** that
+  re-fits only the small fraction Stage 1 flags as anomalous. "Stage 2"
+  always means this Gauss-Newton fallback and nothing else.
+- **γ-calibrated two-phase solver** — a different construction in
+  ``dictionary_solver_3d`` / ``multipeak_solver``: Dict3D fixes a global
+  γ, then Dict2D fits precisely. It has no Stage 2 in it. Where the
+  comments there used to say "2-Stage" they now say "two-phase".
+
+Status of Stage 2: it is a **legacy compatibility path**. The 4-step and
+adaptive dictionary solvers are the recommended route for new code —
+every benchmark in this repository runs with ``enable_stage2=False``,
+and ``toyomacro.fitting.FastVoigtFitter`` disables it. The constructor
+default is still ``True`` so that existing callers keep their behaviour,
+which means a bare ``HybridPipeline(cache)`` does route its anomalies
+through Stage 2. The path is kept for compatibility and **may change in
+a future release**; new code should pass ``enable_stage2=False``.
 
 Stage 1: Fast Screening (MLX)
     - Pre-computed weight matrix: A = Wt @ Y
@@ -179,7 +199,12 @@ class FitResult:
 
 class HybridPipeline:
     """
-    2-Stage Hybrid Processing Pipeline.
+    Stage 1 screening, with the legacy compatibility fallback for anomalies.
+
+    Stage 2 is the Gauss-Newton fallback described in the module
+    docstring — not the γ-calibrated two-phase solver, which is a
+    separate construction. It is a legacy compatibility path; see
+    ``enable_stage2`` below.
 
     Usage:
         from toyomacro.voigtfit import WeightMatrixCache, HybridPipeline
@@ -224,8 +249,16 @@ class HybridPipeline:
                 that the GPU path is actually in use, call
                 ``toyomacro.voigtfit.require_mlx()`` first — it raises an
                 actionable error otherwise.
-            enable_stage2: Enable Stage 2 refinement
-            stage2_mode: Stage 2 refinement mode
+            enable_stage2: Run the legacy compatibility fallback (the
+                Gauss-Newton refinement) on the spectra Stage 1 flags as
+                anomalous. Defaults to True so existing callers keep
+                their behaviour; the 4-step and adaptive dictionary
+                solvers are the recommended route for new code, and
+                every benchmark here passes False, as does
+                ``FastVoigtFitter``. This path may change in a future
+                release. Unrelated to the γ-calibrated two-phase solver,
+                despite both being two-phase.
+            stage2_mode: Refinement mode for that legacy fallback
                 - 'light': center only (fastest, for charging correction)
                 - 'medium': center + σ (default, for instrument variation)
                 - 'full': center + σ + γ (slowest, for unknown peaks)

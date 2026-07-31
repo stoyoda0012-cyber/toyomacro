@@ -86,6 +86,20 @@ archived on Zenodo for a citable DOI.
   `CITATION.cff`, and this changelog.
 
 ### Changed
+
+- **Documentation only: "Stage 2" now says what it is and what it is
+  for.** Two unrelated constructions here have two phases, and both were
+  written "2-Stage": the Stage 1 / Stage 2 screening pipeline, and the
+  γ-calibrated Dict3D → Dict2D solver, which contains no Stage 2. The
+  latter is now "two-phase" throughout, with the distinction stated
+  where a reader meets either. Stage 2 itself is described consistently
+  as a **legacy compatibility fallback** that may change in a future
+  release: `enable_stage2` still defaults to `True` so existing callers
+  keep their behaviour — a bare `HybridPipeline(cache)` does route its
+  anomalous spectra through it — while the 4-step and adaptive
+  dictionary solvers are the recommended route for new code. No
+  identifier, default, or executable line changed; the parsed source is
+  identical once docstrings are removed.
 - **TPP-2M IMFP provenance and validity limits are now stated**
   (`data/imfp.py`, `docs/API.md`, `docs/DATA_SOURCES.md`). The formula
   itself is unchanged and every returned value inside the documented

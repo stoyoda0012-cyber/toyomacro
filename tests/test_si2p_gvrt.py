@@ -601,7 +601,7 @@ class TestSi2pGVRTStepC:
 
 
 # ============================================================================
-# Hierarchical 2-Stage Si 2p Solver
+# Hierarchical two-phase Si 2p solver (not the Stage 2 fallback)
 # ============================================================================
 #
 # Insight: Si⁰ and Si⁴⁺ are 8σ apart → fit as 2-comp with high precision.

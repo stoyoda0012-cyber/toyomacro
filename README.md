@@ -35,7 +35,7 @@ submission as a standalone tool.
 | Backend | Status | Installation | Notes |
 |---|---|---|---|
 | NumPy / CPU | **Supported** | base install | Runs the identical algorithms anywhere CPython runs. This is the path CI covers — the hosted runners are headless, so no CI job exercises a GPU. |
-| MLX / Apple Metal | **Supported accelerator** | `[mlx]` | Accelerates the Faddeeva kernel, Stage 2 refinement and the multipeak solver. Every MLX number quoted below was recorded here; correctness rests on the MLX↔NumPy parity tests, which run only where `mlx_usable()` is True. |
+| MLX / Apple Metal | **Supported accelerator** | `[mlx]` | Accelerates the Faddeeva kernel, the legacy compatibility fallback (Stage 2) and the multipeak solver. Every MLX number quoted below was recorded here; correctness rests on the MLX↔NumPy parity tests, which run only where `mlx_usable()` is True. |
 | MLX / CUDA | **Experimental validation** — not a supported install target | manual setup; no extra ships for it | The MLX↔NumPy parity suite passed once on an RTX 5070 Laptop under WSL2. Requires `MLX_ENABLE_TF32=0` (TF32 is on by default and silently costs precision) and multipeak batches ≤ 65,535 (upstream crash). No CUDA CI, no committed performance record. See [`docs/CUDA_BACKEND_POC.md`](docs/CUDA_BACKEND_POC.md). |
 
 The backend probe (`mlx_usable()`) is device-agnostic — it checks
@@ -335,7 +335,7 @@ file guards.
 toyomacro/
 ├── src/toyomacro/
 │   ├── voigtfit/        # Voigt-fitting engine (the JOSS target)
-│   │   ├── pipeline.py            # HybridPipeline (Stage1 + Stage2)
+│   │   ├── pipeline.py            # HybridPipeline (Stage 1 screening + legacy compatibility fallback)
 │   │   ├── dictionary_solver.py   # Dict1D / Dict2D / parabola
 │   │   ├── dictionary_solver_3d.py # δE × δσ × δγ joint
 │   │   ├── multipeak_solver.py    # Alternating projection

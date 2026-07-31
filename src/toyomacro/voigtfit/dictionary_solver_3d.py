@@ -839,7 +839,9 @@ def _solve_dict3d_chunked(
 
 
 # ---------------------------------------------------------------------------
-# 2-Stage Hybrid: Dict3D (global γ) → Dict2D (precision fit)
+# Two-phase γ calibration: Dict3D (global γ) → Dict2D (precision fit).
+# "Two-phase", not "2-Stage": this is unrelated to the Stage 1 / Stage 2
+# screening pipeline, and uses no Stage 2 fallback.
 # ---------------------------------------------------------------------------
 
 @dataclass

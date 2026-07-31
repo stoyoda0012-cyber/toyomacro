@@ -3257,7 +3257,8 @@ def process_multipeak(
 
 
 # ---------------------------------------------------------------------------
-# 2-Stage γ-calibrated multi-peak solver
+# Two-phase γ-calibrated multi-peak solver (Dict3D → Dict2D).
+# Unrelated to the Stage 1 / Stage 2 screening pipeline.
 # ---------------------------------------------------------------------------
 
 

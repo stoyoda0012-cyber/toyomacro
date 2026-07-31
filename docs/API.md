@@ -14,6 +14,20 @@ name or docstring says otherwise (the lower-level
 `HybridPipeline.stage1_screening` is column-major,
 `(n_energy, n_spectra)` — its docstring states this).
 
+**"Stage 2" vs "two-phase".** Two unrelated things here have two
+phases. **Stage 2** always means one thing: the legacy compatibility
+fallback — a Gauss-Newton refinement that `HybridPipeline` runs on the
+spectra Stage 1 flags as anomalous. The 4-step and adaptive dictionary
+solvers are the recommended route for new code: every benchmark in this
+repository sets `enable_stage2=False`, and `FastVoigtFitter` disables
+it. The constructor default remains `True` so existing callers keep
+their behaviour, so a bare `HybridPipeline(cache)` still routes
+anomalies through it. Being a compatibility path, it **may change in a
+future release**. The
+**γ-calibrated two-phase solver** (Dict3D fixes a global γ, then
+Dict2D fits precisely) is a separate construction and contains no
+Stage 2.
+
 ## API stability
 
 The package is larger than its supported surface. Three tiers, and the
