@@ -395,7 +395,63 @@ compose yourself:
 | λ | `IMFP.tpp2m()` — for the *specific* compound, not an averaged matrix | supported |
 | `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair | experimental |
 
-`AngularCorrection` is experimental for three reasons.
+**Angles: which one you have, and which one the formulas want.** Three
+angles are involved, and only the first is something you measured.
+
+```
+        photon
+          \   ψ
+           \ ---- e⁻
+            \  /
+   ----------\/----------  surface
+             ||  θ
+           normal
+```
+
+| Symbol | Definition | Where it comes from |
+|---|---|---|
+| `theta` | Electron emission angle from the surface normal | **Your data** — the analyzer's angle axis. Often built as `C − analyzer_axis_value` for a stated centre `C`, so pin down `C` too |
+| `xray_from_normal` | X-ray incidence angle from the surface normal | **Your instrument** — a value to confirm, never to inherit |
+| `psi` / `alpha` | Angle from the photon direction to the emission direction | **Derived**: `psi = xray_from_normal - theta` (coplanar). This is what `L_dipole` / `L_full` / `L_unpolarized` take |
+
+Use `angular_distribution()` or `angular_distribution_unpolarized()`:
+they take `theta` and derive the rest. Calling `L_dipole` with `theta`
+returns a plausible wrong number rather than raising — for β = 1.9255
+and θ = 8.78° it gives 0.0709 where 1.4309 is correct, a factor of 20,
+with both values sitting unremarkably between 0 and 2.
+
+Leaving `xray_from_normal_deg` at its 88° default now emits a
+`UserWarning`. The default is a placeholder, not an instrument value,
+and the assumption sets the *shape* of the angular dependence: over one
+51°–9° emission fan the peak-to-peak spread of `L_dipole` relative to
+its mean is 85% at 88° incidence, 194% at 60° and 216% at 55°. The
+default is unchanged for compatibility; the warning exists so that no
+result is produced without the geometry having been stated once.
+
+**Sign and reference axis.** `L_dipole` is `1 − (β/2)·P₂(cos ψ)` — the
+**unpolarized** form, with the angle taken from the beam **k**. The form
+quoted throughout the synchrotron literature, `1 + β·P₂(cos θ_ε)`,
+differs in *both* sign and reference axis: θ_ε is measured from the
+**polarization vector ε**. Transcribing one for the other is a real
+error. `L_full` currently mixes the two conventions — see immediately
+below.
+
+`AngularCorrection` is experimental for four reasons.
+
+**`L_full`'s convention is unresolved.** Its dipole term is the
+polarization-*averaged* coefficient `1 − (β/2)P₂` applied to an angle
+documented as being from the photon direction, while its non-dipole term
+is the linearly polarized form, which the module docstring writes with
+the angle taken from ε. The two cannot both be right, and the module's
+own claim that `L_unpolarized` is `L_full` averaged over ε ⊥ k does not
+hold: that average sends cos φ to zero and returns `L_dipole`. Settling
+it requires the printed formula in Trzhaskovskaya & Yarzhemsky, ADNDT
+**119**, 99 (2018), which has not been read. **Nothing has been changed**
+— `tests/test_angular_geometry.py` pins the present values as a record,
+explicitly not as a claim that they are right, so that resolving the
+question produces a visible diff. `L_dipole` and `L_unpolarized` are
+unaffected; each matches its form in the module docstring. Prefer them
+until this is closed.
 
 **Only j-resolved input is defined.** A bare label such as `'2p'` is
 not rejected at runtime yet — it is simply undefined: it resolves to whichever j component the
@@ -416,8 +472,11 @@ just under that floor. That is the same failure mode flagged for σ, λ
 and analyzer transmission elsewhere in this section, and it is not
 signalled in the return value.
 
-**And it has no example.** It is covered by tests only for the two limits
-above, which pins those limits without making the surface stable.
+**And it has no example.** Its tests pin the limits and conventions
+described above — the grid clamp, the magic-angle identity, the θ↔ψ
+conversion and its cost, the geometry warning, and `L_full`'s present
+values — which constrains the behaviour without making the surface
+stable.
 
 Composing these factors is the caller's responsibility, and doing so
 still does not reproduce a vendor AMRSF: the averaging convention, the

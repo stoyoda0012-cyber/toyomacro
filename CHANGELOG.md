@@ -10,6 +10,28 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`AngularCorrection` now warns when the x-ray incidence angle was
+  never stated.** `angular_distribution()` and
+  `angular_distribution_unpolarized()` default `xray_from_normal_deg` to
+  88°, which is a placeholder for a grazing-incidence geometry and not a
+  property of anyone's instrument. Leaving it in place emits a
+  `UserWarning`; passing `88.0` explicitly does not, so "I checked" and
+  "I never thought about it" are no longer indistinguishable. The
+  default is **unchanged** and no returned number moves. It matters
+  because the assumption sets the *shape* of the angular dependence, not
+  its scale: over one 51°–9° emission fan the peak-to-peak spread of
+  `L_dipole` relative to its mean is 85% at 88° incidence, 194% at 60°
+  and 216% at 55°.
+- The angle conventions are now written down where they are used — a
+  geometry sketch and a table of θ (measured), `xray_from_normal`
+  (instrument) and ψ (derived) in `docs/API.md` and the module
+  docstring, plus the warning that `L_dipole`/`L_unpolarized` take the
+  *derived* angle. Handing them θ returns a plausible wrong number
+  instead of raising: for β = 1.9255 and θ = 8.78° that is 0.0709 where
+  1.4309 is correct, a factor of 20 between two unremarkable values.
+  `angular_distribution()` already takes θ and derives ψ itself; it is
+  now documented as the entry point rather than a variant.
+  `tests/test_angular_geometry.py` (16 tests) pins all of it.
 - The Scofield summation convention is now checked against a number the
   source states rather than against our own arithmetic. Table A2 of
   UCRL-51326 prints TOTAL and K/L/M SHELL columns beside the individual
@@ -243,6 +265,23 @@ archived on Zenodo for a citable DOI.
   Research impact statement, AI usage disclosure sections added).
 
 ### Fixed
+- **`AngularCorrection.L_full`'s convention is flagged as unresolved.**
+  Its dipole term is the polarization-*averaged* coefficient
+  `1 − (β/2)P₂` applied to an angle documented as being from the photon
+  direction, while its non-dipole term is the linearly polarized form,
+  which the module docstring writes with the angle measured from the
+  polarization vector. The two conventions cannot both apply, and the
+  module's own statement that `L_unpolarized` is `L_full` averaged over
+  ε ⊥ k does not hold — that average sends cos φ to zero and returns
+  `L_dipole`. Settling it needs the printed formula in Trzhaskovskaya &
+  Yarzhemsky, ADNDT **119**, 99 (2018), which has not been read, so
+  **nothing was changed**: the docstring and `docs/API.md` say the
+  convention is under review, and the current values are pinned as a
+  record — explicitly not as a claim of correctness — so that resolving
+  it produces a visible diff. Not academic: for Si 1s at 9.25 keV the
+  non-dipole term runs from 4.5% of the dipole value to 132% across one
+  emission fan. `L_dipole` and `L_unpolarized` are unaffected; each
+  matches its form in the module docstring.
 - **The solvers no longer warn on their own first iteration.** Both
   Gauss-Newton refiners seed the previous residual norm with infinity and
   divided by it on iteration 0, so `inf/inf` raised "invalid value

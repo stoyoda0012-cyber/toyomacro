@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,592 automated tests** across **68 files**, in two
+This suite has **1,608 automated tests** across **69 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 32 | 746 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 33 | 762 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 846 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,7 +16,7 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,160 tests, 73%) — guarantee the library
+- **Contract / regression** (1,176 tests, 73%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (746)
+## Library body — `tests/` (762)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -85,7 +85,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (239)
+### Quantification data (255)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -94,6 +94,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 23 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
+| 16 | `test_angular_geometry.py` | θ (measured) vs ψ (derived): the magic-angle identity, the factor-of-20 cost of confusing them, the unstated-incidence-angle warning, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
 
 ### MCP server (13)

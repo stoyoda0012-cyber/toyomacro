@@ -24,9 +24,37 @@ Two geometry modes are supported:
 
 P₂(x) = (3x² − 1) / 2  (2nd Legendre polynomial).
 
-For HAXPES geometry with grazing incidence (coplanar):
-    ψ(θ) = α_xray − θ   where α_xray = X-ray angle from surface normal,
-                                θ = emission angle from surface normal.
+Which angle is which
+--------------------
+
+Three angles are easy to confuse. Only the first is measured::
+
+        photon
+          \\   ψ
+           \\ ---- e⁻          θ  emission angle from the surface normal
+            \\  /                 — the analyzer's angle axis, the one
+    ---------\\/---------          you have in your data
+             ||  θ              α_xray  x-ray incidence from the normal
+             ||                     — an instrument property you must
+          normal                      confirm; there is no safe default
+                                ψ, α  angle from the photon direction to
+                                      the emission direction — *derived*:
+                                      ψ = α_xray − θ (coplanar)
+
+``L_dipole``, ``L_full`` and ``L_unpolarized`` all want the derived
+angle. ``angular_distribution`` and ``angular_distribution_unpolarized``
+take θ and derive it for you — prefer them. Passing θ where ψ belongs
+does not raise; it returns a plausible wrong number (see ``L_dipole``).
+
+Sign convention
+---------------
+
+``L_unpol`` above is ``1 − (β/2) P₂``, the **unpolarized** form with the
+angle measured from the beam **k**. The form quoted throughout the
+synchrotron literature, ``1 + β P₂(cos θ_ε)``, differs in both sign and
+reference axis: θ_ε is measured from the **polarization vector ε**.
+Transcribing one for the other is a real error, not a cosmetic one.
+``L_full`` currently mixes the two — see its docstring.
 
 References
 ----------
@@ -68,11 +96,50 @@ Usage
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Any
 
 import numpy as np
 
 from toyomacro.data.paths import load_trzh2018_data, load_trzh2019_data
+
+
+class _UnstatedAngle(float):
+    """A default that remembers the caller never stated the geometry.
+
+    A plain ``88.0`` default cannot tell "I verified my instrument is at
+    88°" from "I did not think about it", and the two deserve different
+    treatment: the x-ray incidence angle sets the *shape* of the angular
+    dependence, not just its scale. Subclassing ``float`` keeps the
+    parameter a float with the same numeric default in the signature,
+    while ``type(...) is _UnstatedAngle`` still identifies the unstated
+    case. An explicit ``88.0`` from the caller is a plain float and does
+    not warn.
+    """
+
+    __slots__ = ()
+
+
+#: Placeholder incidence angle: 2° grazing, a synchrotron-like geometry.
+#: Not a property of any particular instrument — see the warning below.
+_XRAY_ANGLE_UNSTATED = _UnstatedAngle(88.0)
+
+
+def _warn_if_geometry_unstated(xray_from_normal_deg: float) -> None:
+    """Warn when the incidence angle was inherited rather than stated."""
+    if type(xray_from_normal_deg) is not _UnstatedAngle:
+        return
+    warnings.warn(
+        "xray_from_normal_deg was left at its placeholder value of 88.0° "
+        "(2° grazing incidence). This is not a property of your "
+        "instrument, and the assumed incidence angle sets the shape of "
+        "the angular dependence, not merely its scale: for Si 1s at "
+        "9.25 keV the spread of L_dipole across a 51°–9° emission fan is "
+        "85% at 88° incidence and 216% at 55°. Pass the angle your "
+        "instrument actually uses.",
+        UserWarning,
+        stacklevel=3,
+    )
 
 
 class AngularCorrection:
@@ -248,7 +315,21 @@ class AngularCorrection:
         beta : float
             Angular asymmetry parameter.
         psi_deg : float or array
-            Angle between photon direction and emission direction (degrees).
+            Angle between photon direction and emission direction
+            (degrees).
+
+            **Not the emission angle from the surface normal.** In
+            angle-resolved work θ (from the normal) is the measured
+            variable and ψ is derived from it and the incidence
+            geometry — for a coplanar setup
+            ``psi = xray_from_normal - theta``. Passing θ here returns a
+            plausible but wrong number instead of raising: for
+            β = 1.9255 and θ = 8.78°, this gives 0.0709, where the
+            correct ψ (79.22° at 88° incidence) gives 1.4309 — a factor
+            of 20, and both are unremarkable numbers between 0 and 2.
+
+            ``angular_distribution()`` takes θ directly and does this
+            conversion for you; prefer it.
         """
         psi = np.radians(psi_deg)
         cos_psi = np.cos(psi)
@@ -267,6 +348,34 @@ class AngularCorrection:
 
         L = 1 - (β/2) P₂(cos ψ) + (δ + γ cos²ψ) sin ψ cos φ
 
+        .. warning::
+
+           **Convention under review — do not rely on this value.**
+           This expression combines two different angular conventions,
+           and the module's own documentation contradicts it:
+
+           - The module docstring gives the linearly polarized form as
+             ``1 + β P₂(cos θ_ε) + (δ + γ cos²θ_ε) sin θ_ε cos φ`` with
+             θ_ε measured **from the polarization vector ε**. The
+             dipole term here is instead ``1 - (β/2) P₂``, which is the
+             *polarization-averaged* coefficient, applied to an angle
+             documented as being **from the photon direction k**.
+           - ``L_unpolarized`` states it is "obtained by averaging
+             L_full over all polarization directions ε ⊥ k". That
+             relation does not hold for this implementation: averaging
+             this expression over φ sends cos φ to zero, leaving exactly
+             ``L_dipole``, not ``L_unpolarized``.
+
+           Resolving it requires reading the printed formula in
+           Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables*
+           **119**, 99 (2018), which has not been done. Nothing is
+           changed until then, so current values remain reproducible;
+           ``test_angular_geometry.py`` pins them as a record of present
+           behaviour, explicitly **not** as a claim of correctness.
+
+           ``L_dipole`` and ``L_unpolarized`` are unaffected: each
+           matches the corresponding form in the module docstring.
+
         For synchrotron sources. For unpolarized lab sources, use
         L_unpolarized() instead.
 
@@ -275,7 +384,9 @@ class AngularCorrection:
         beta, gamma, delta : float
             Angular distribution parameters.
         psi_deg : float or array
-            Angle from photon direction (degrees).
+            Angle from photon direction (degrees) — but see the warning
+            above: which axis this is measured from is the open question.
+            Not the emission angle from the surface normal.
         phi_deg : float
             Azimuthal angle (degrees). 0 = scattering plane.
         """
@@ -308,8 +419,15 @@ class AngularCorrection:
         beta, gamma, delta : float
             Angular distribution parameters.
         alpha_deg : float or array
-            Angle from X-ray beam direction k (degrees).
-            α = 90° when detector is perpendicular to beam.
+            Angle from the X-ray beam direction k to the electron
+            emission direction (degrees). α = 90° when the detector is
+            perpendicular to the beam.
+
+            **Not the emission angle from the surface normal.** For a
+            coplanar setup ``alpha = xray_from_normal - theta``; the
+            factor-of-20 trap described in ``L_dipole`` applies here
+            too. ``angular_distribution_unpolarized()`` takes θ and does
+            the conversion for you.
 
         Returns
         -------
@@ -333,7 +451,7 @@ class AngularCorrection:
         orbital: str,
         photon_energy: float,
         emission_angles_deg: np.ndarray | list[float],
-        xray_from_normal_deg: float = 88.0,
+        xray_from_normal_deg: float = _XRAY_ANGLE_UNSTATED,
     ) -> dict[str, Any] | None:
         """Compute angular correction for unpolarized X-rays.
 
@@ -352,8 +470,12 @@ class AngularCorrection:
         emission_angles_deg : array-like
             Emission angles θ from surface normal (degrees).
         xray_from_normal_deg : float
-            X-ray angle from surface normal (degrees).
-            Default 88° = 2° grazing incidence.
+            X-ray angle from surface normal (degrees). The default 88°
+            (2° grazing) is a **placeholder, not an instrument value**,
+            and leaving it in place emits a ``UserWarning``. A lab source
+            — which is what this unpolarized form is for — is rarely at
+            grazing incidence, so the placeholder is a poor fit here in
+            particular. State your instrument's angle.
 
         Returns
         -------
@@ -370,6 +492,8 @@ class AngularCorrection:
         params = cls.lookup(element, orbital, photon_energy)
         if params is None:
             return None
+
+        _warn_if_geometry_unstated(xray_from_normal_deg)
 
         theta = np.asarray(emission_angles_deg, dtype=np.float64)
         # α = angle from beam = xray_from_normal - θ (coplanar geometry)
@@ -401,13 +525,24 @@ class AngularCorrection:
         orbital: str,
         photon_energy: float,
         emission_angles_deg: np.ndarray | list[float],
-        xray_from_normal_deg: float = 88.0,
+        xray_from_normal_deg: float = _XRAY_ANGLE_UNSTATED,
         phi_deg: float = 0.0,
     ) -> dict[str, Any] | None:
         """Compute angular correction over emission angles.
 
-        For grazing incidence HAXPES:
-            ψ = xray_from_normal - θ  (coplanar geometry)
+        **This is the entry point that takes the angle you measured.**
+        It accepts θ from the surface normal — the analyzer's angle axis
+        — and derives ψ internally::
+
+            ψ = xray_from_normal - θ   (coplanar geometry)
+
+        Do not compute ψ yourself and call ``L_dipole`` with θ: that
+        returns a plausible but wrong number rather than raising. See the
+        warning in ``L_dipole``.
+
+        The returned ``L_full`` carries an unresolved convention question
+        — see ``L_full``'s docstring. ``L_dipole`` in the returned dict
+        is unaffected.
 
         Parameters
         ----------
@@ -420,8 +555,11 @@ class AngularCorrection:
         emission_angles_deg : array-like
             Emission angles θ from surface normal (degrees).
         xray_from_normal_deg : float
-            X-ray angle from surface normal (degrees).
-            Default 88° = 2° grazing incidence.
+            X-ray angle from surface normal (degrees). The default 88°
+            (2° grazing) is a **placeholder, not an instrument value**,
+            and leaving it in place emits a ``UserWarning``. The assumed
+            incidence angle sets the shape of the angular dependence, not
+            just its scale — verify it against your instrument.
         phi_deg : float
             Azimuthal angle (degrees). 0 = scattering plane.
 
@@ -440,6 +578,8 @@ class AngularCorrection:
         params = cls.lookup(element, orbital, photon_energy)
         if params is None:
             return None
+
+        _warn_if_geometry_unstated(xray_from_normal_deg)
 
         theta = np.asarray(emission_angles_deg, dtype=np.float64)
         psi = xray_from_normal_deg - theta  # coplanar geometry
