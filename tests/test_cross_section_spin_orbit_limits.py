@@ -42,6 +42,50 @@ SCOFIELD_TABLE_A1_NE = {
     ("Si", "3p"): {"1/2": 0.67, "3/2": 1.33, "electrons": 2},
 }
 
+# Scofield, UCRL-51326 (1973), Table A2 ("PHOTOELECTRIC CROSS
+# SECTIONS(BARNS)"). Alongside the individual subshells the table prints
+# TOTAL and K/L/M SHELL columns. Those shell columns are *stated sums* —
+# they are not carried in the bundled JSON, which stores j-resolved
+# subshells only. So comparing our summed subshells against them tests
+# the summation semantics against a number the source states, not
+# against our own arithmetic. Transcribed from the report; the report
+# itself is not redistributed with this package.
+#
+# Si, at the two tabulated energies that bracket Al K-alpha. Scofield
+# prints K-SHELL = .0E+00 at both: BE(Si 1s) = 1.8285 keV, so the K
+# shell is closed and TOTAL = L + M there.
+SCOFIELD_TABLE_A2_SI_BARN = {
+    1000.0: {
+        "subshells": {
+            "2s1/2": 3.0801e04,
+            "2p1/2": 1.3149e04,
+            "2p3/2": 2.5849e04,
+            "3s1/2": 2.6478e03,
+            "3p1/2": 2.2022e02,
+            "3p3/2": 4.3296e02,
+        },
+        "L_shell": 6.9800e04,
+        "M_shell": 3.3010e03,
+        "total": 7.3101e04,
+    },
+    1500.0: {
+        "subshells": {
+            "2s1/2": 1.2766e04,
+            "2p1/2": 3.6599e03,
+            "2p3/2": 7.1743e03,
+            "3s1/2": 1.0791e03,
+            "3p1/2": 6.2936e01,
+            "3p3/2": 1.2338e02,
+        },
+        "total": 2.4866e04,
+    },
+}
+BARN_TO_MB = 1e-6
+# The stated columns carry five significant figures, so agreement is
+# bounded below by the source's own rounding, not by our interpolation:
+# every comparison here reads the tabulated grid point directly.
+A2_ROUNDING_REL = 1e-4
+
 # Trzhaskovskaya carries exactly this many half-listed non-s subshells.
 # The rule "an absent component is unoccupied" rests on that structure,
 # so the count is pinned: if it moves, the rule must be re-established
@@ -51,6 +95,20 @@ TRZH_HALF_LISTED_COUNT = 38
 
 def _keys(element, table):
     return CrossSection._get_data(table)["data"].get(element, {})
+
+
+def _tabulated(table, element, orbital, hv):
+    """The stored value at an exact grid energy, bypassing interpolation.
+
+    The Table A2 comparisons must not route through the interpolator:
+    that would fold fit error into a check whose whole purpose is to
+    read the stored numbers against the source.
+    """
+    data = CrossSection._get_data(table)
+    entry = data["data"].get(element, {}).get(orbital)
+    if entry is None:
+        return None
+    return entry["cross_sections"][data["photon_energies"].index(hv)]
 
 
 def _subshells(table):
@@ -185,6 +243,83 @@ def test_scofield_table_a1_occupations_sum_to_the_subshell_electron_count(
     assert ne["1/2"] + ne["3/2"] == pytest.approx(ne["electrons"], abs=0.005)
     # Split in the degeneracy ratio 2 : 4 for a p subshell.
     assert ne["3/2"] == pytest.approx(2 * ne["1/2"], rel=0.02)
+
+
+# ---------------------------------------------------------------------------
+# Scofield: summation semantics against Table A2's stated shell columns
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("hv", sorted(SCOFIELD_TABLE_A2_SI_BARN))
+def test_scofield_stated_shell_columns_equal_our_subshell_sums(hv):
+    """Summing the stored subshells reproduces columns we do not store.
+
+    This is the implementation-fidelity half of the two-layer rule in
+    ``AGENTS.md``. The L/M/TOTAL columns are absent from the bundled
+    JSON, so the agreement cannot be an artifact of comparing the data
+    to itself: it says our summation convention is the source's own.
+    """
+    case = SCOFIELD_TABLE_A2_SI_BARN[hv]
+    stored = {
+        orb: _tabulated("scofield", "Si", orb, hv) for orb in case["subshells"]
+    }
+    assert None not in stored.values(), f"Si subshells missing at {hv} eV"
+
+    sums = {
+        "L_shell": sum(stored[o] for o in ("2s1/2", "2p1/2", "2p3/2")),
+        "M_shell": sum(stored[o] for o in ("3s1/2", "3p1/2", "3p3/2")),
+    }
+    sums["total"] = sums["L_shell"] + sums["M_shell"]
+
+    for column, stated_barn in case.items():
+        if column == "subshells":
+            continue
+        assert sums[column] == pytest.approx(
+            stated_barn * BARN_TO_MB, rel=A2_ROUNDING_REL
+        ), f"Si {column} at {hv} eV should be Table A2's {stated_barn:.4E} barn"
+
+
+@pytest.mark.parametrize("hv", sorted(SCOFIELD_TABLE_A2_SI_BARN))
+def test_scofield_k_shell_is_closed_at_both_energies(hv):
+    """Which is why TOTAL = L + M above, with no K term.
+
+    Scofield prints K-SHELL = .0E+00 at 1.0 and 1.5 keV; BE(Si 1s) =
+    1.8285 keV. If the bundled table ever gained a 1s value here, the
+    sum above would silently stop matching the stated TOTAL.
+    """
+    assert _tabulated("scofield", "Si", "1s1/2", hv) is None
+
+
+@pytest.mark.parametrize("hv", sorted(SCOFIELD_TABLE_A2_SI_BARN))
+def test_scofield_stored_si_subshells_match_table_a2(hv):
+    """Localizes a failure of the sum above to one subshell.
+
+    Weaker evidence than that test on its own: these six numbers are
+    what the JSON stores, so this pins them rather than confirming them
+    independently. It earns its place by naming which entry drifted.
+    """
+    for orbital, barns in sorted(SCOFIELD_TABLE_A2_SI_BARN[hv]["subshells"].items()):
+        got = _tabulated("scofield", "Si", orbital, hv)
+        assert got == pytest.approx(barns * BARN_TO_MB, rel=A2_ROUNDING_REL), (
+            f"Si {orbital} at {hv} eV should be Table A2's {barns:.4E} barn"
+        )
+
+
+def test_scofield_bare_2p_is_the_stated_l_shell_minus_2s():
+    """The doublet fix, checked against the source rather than itself.
+
+    ``lookup('Si', '2p')`` must be L-SHELL - 2s. Before the fix it
+    returned the 2p3/2 component alone. Tolerance is looser than
+    ``A2_ROUNDING_REL`` because ``lookup`` interpolates the summed
+    curve onto the requested energy while the subtrahend is read off
+    the grid.
+    """
+    case = SCOFIELD_TABLE_A2_SI_BARN[1000.0]
+    expected = case["L_shell"] * BARN_TO_MB - _tabulated(
+        "scofield", "Si", "2s1/2", 1000.0
+    )
+    got = CrossSection.lookup("Si", "2p", 1000.0, table="scofield")
+    assert got == pytest.approx(expected, rel=1e-3)
 
 
 def test_scofield_lists_both_components_of_every_subshell_it_carries():

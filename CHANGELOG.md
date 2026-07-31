@@ -10,6 +10,19 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- The Scofield summation convention is now checked against a number the
+  source states rather than against our own arithmetic. Table A2 of
+  UCRL-51326 prints TOTAL and K/L/M SHELL columns beside the individual
+  subshells; those columns are **not** in the bundled JSON, which stores
+  j-resolved subshells only, so summing our stored Si subshells and
+  comparing against them cannot be satisfied by the data agreeing with
+  itself. They agree to ~1.4×10⁻⁵ relative — the source's own five-figure
+  rounding — at both 1.0 and 1.5 keV, and the sum is verified to reject
+  returning one j component (19% off), dropping a doublet (0.9%), a
+  0.1% drift in a single subshell, and re-weighting by degeneracy on top
+  of Scofield's already-included fractional occupancies (130%). No
+  implementation change was needed; this records agreement that was
+  previously untested.
 - `CrossSection.unit_info(table)` reports the unit *and how well
   established it is*: `unit`, `inferred_unit`, `status`,
   `values_rescaled`, plus a `note` where inferred. The three tables are

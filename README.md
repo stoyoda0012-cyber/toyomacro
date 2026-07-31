@@ -358,7 +358,7 @@ as data — are written up in
 
 ```bash
 uv sync --extra dev --extra mlx
-uv run pytest                                    # 1,578 tests (see tests/README.md)
+uv run pytest                                    # 1,585 tests (see tests/README.md)
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check src/ tests/                    # lint
 ```

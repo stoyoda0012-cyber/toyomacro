@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,578 automated tests** across **67 files**, in two
+This suite has **1,585 automated tests** across **67 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 32 | 739 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 32 | 746 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 35 | 839 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,7 +16,7 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,146 tests, 73%) — guarantee the library
+- **Contract / regression** (1,153 tests, 73%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (739)
+## Library body — `tests/` (746)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -85,11 +85,11 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (232)
+### Quantification data (239)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
-| 38 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
+| 45 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
 | 26 | `test_element_dedup.py` | Element-name dedup + `ElementInfo` utilities |
 | 23 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
