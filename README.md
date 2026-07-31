@@ -308,6 +308,20 @@ test suite need no external tools or data.
 - `toyomacro.fitting` — high-level peak-fitting templates that wrap
   the engine for common XPS analyses.
 
+### Quantification boundary in v0.1
+
+The v0.1 release includes quantification-oriented reference utilities: binding-energy and
+photoionization cross-section lookup, TPP-2M IMFP calculation, and interpolation of a
+user-supplied, authorized analyzer-transmission curve. Their outputs retain the selected source,
+units, energy range, extrapolation status, and instrument-specific assumptions where available.
+
+These utilities provide peak observables and declared sensitivity terms for relative comparisons.
+They do not claim traceable absolute composition from a universal sensitivity factor. In
+particular, `cross-section × IMFP`, even with transmission applied, omits factors such as
+elastic-scattering/EAL, detector response, angular distribution, polarization, geometry, and
+matrix assumptions. A future composition workflow will require an explicit input contract,
+uncertainty/assumption reporting, and redistributable validation data.
+
 GUI front-ends and a depth-profiling solver built on this engine are
 maintained separately; nothing in this repository depends on them.
 If you are evaluating the JOSS submission, the entry point is
@@ -358,7 +372,7 @@ as data — are written up in
 
 ```bash
 uv sync --extra dev --extra mlx
-uv run pytest                                    # 1,585 tests (see tests/README.md)
+uv run pytest                                    # 1,592 tests (see tests/README.md)
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check src/ tests/                    # lint
 ```

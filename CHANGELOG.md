@@ -229,6 +229,18 @@ archived on Zenodo for a citable DOI.
   Research impact statement, AI usage disclosure sections added).
 
 ### Fixed
+- **The solvers no longer warn on their own first iteration.** Both
+  Gauss-Newton refiners seed the previous residual norm with infinity and
+  divided by it on iteration 0, so `inf/inf` raised "invalid value
+  encountered in scalar divide" (and the array form in the vectorized
+  path). It surfaced on the first line of output from the README quick
+  start. The nan never reached control flow — `nan < tol` is False and an
+  `iteration > 0` guard already suppressed the break — so **no computed
+  value changes**: iteration counts, convergence flags, residuals and
+  recovered centers are identical before and after, verified across six
+  tolerance/iteration regimes. The ratio is simply not formed until there
+  is a previous norm. Regression tests fail on the pre-fix code
+  (`test_convergence_warnings.py`), which nothing else did.
 - **Documented commands that could not run.** 45 `Usage:` lines across
   19 modules invoked `python -m voigtfit.…` — the import path from
   before the engine moved under `toyomacro`, so every one raised
