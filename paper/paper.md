@@ -153,8 +153,8 @@ benchmark records; the GVRT suite validates recovery against ground
 truth at the $10^9$-spectrum scale. Developed for the author's ARXPS
 simulation-and-inversion workflow, the engine removed the
 peak-fitting bottleneck between spectral simulation and
-depth-profile reconstruction; it underpins a peer-reviewed
-measurement-methodology paper now in press, and its
+depth-profile reconstruction; it underpins a published
+measurement-methodology paper [@Toyoda2026JVSTA], and its
 misspecification-bias behaviour is the experimental basis of the
 companion theoretical manuscript in preparation. Engine results were
 presented at the Japan Society of Applied Physics 2026 spring
