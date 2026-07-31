@@ -7,7 +7,7 @@ Investigates:
 3. What is the optimal threshold for adaptive switching?
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d_margin
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d_margin
 """
 
 import numpy as np

@@ -9,8 +9,8 @@ Tools:
     repack_h5 - Convert HDF5 files to optimal layout
 
 Usage:
-    python -m voigtfit.tools.inspect_h5 data.h5
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5
+    python -m toyomacro.voigtfit.tools.inspect_h5 data.h5
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5
 """
 
 from .inspect_h5 import benchmark_read, inspect_file

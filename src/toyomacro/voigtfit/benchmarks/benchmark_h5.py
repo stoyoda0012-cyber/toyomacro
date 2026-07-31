@@ -54,7 +54,6 @@ Structure:
         ├── noise_levels: [0, 1e4, 1e6, ...]
         ├── psnr_values: [40.7, 40.6, ...]
         └── snr_estimates: [inf, 100, 10, ...]
-Date: 2026-01-22
 """
 
 import gc
@@ -104,7 +103,7 @@ def get_available_memory_gb() -> float:
     Get available physical memory in GB.
 
     Works on macOS, Linux, and Windows.
-    Based on MATLAB DepthProfiler.m line 4018-4022.
+    Based on MATLAB DepthProfiler.m.
     """
     system = platform.system()
 

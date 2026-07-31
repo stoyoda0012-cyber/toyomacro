@@ -8,7 +8,7 @@ Key question: Does Dict2D's dense grid become fragile at high noise?
 dev-log 44 showed Dict1D vs 6-step crossover at SNR≈3. Where does Dict2D cross?
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d_noise
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d_noise
 """
 import time
 from dataclasses import dataclass

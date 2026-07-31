@@ -5,7 +5,7 @@ Generates exact Voigt spectra with known (amp, δE, δσ), recovers with
 three solver configurations, and reports per-parameter PSNR/RMSE/correlation.
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d
 """
 import time
 from dataclasses import dataclass

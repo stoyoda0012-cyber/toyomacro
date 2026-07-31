@@ -8,9 +8,8 @@ for a single summary figure.
 Total: 33.2M px × 5 files × 4 images × 7 NL = 4.65 billion spectra (physical noise)
 
 Usage:
-    python -m voigtfit.benchmarks.giga_mosaic_benchmark
-    python -m voigtfit.benchmarks.giga_mosaic_benchmark --output outputs/giga_mosaic_cache.npz
-Date: 2026-02-18
+    python -m toyomacro.voigtfit.benchmarks.giga_mosaic_benchmark
+    python -m toyomacro.voigtfit.benchmarks.giga_mosaic_benchmark --output outputs/giga_mosaic_cache.npz
 """
 
 import gc

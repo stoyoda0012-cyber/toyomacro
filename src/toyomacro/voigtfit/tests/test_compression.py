@@ -14,9 +14,7 @@ from scipy.ndimage import gaussian_filter
 IN_CI = os.environ.get("CI") == "true"
 skip_in_ci = pytest.mark.skipif(IN_CI, reason="speed assertion is sensitive to CI hardware")
 
-sys.path.insert(0, str(__file__).rsplit('/tests/', 1)[0])
-
-from h5io import (
+from toyomacro.voigtfit.h5io import (
     HAS_LZ4,
     FitparaCodec,
     FitparaCodecConfig,

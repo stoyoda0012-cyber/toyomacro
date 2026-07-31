@@ -318,7 +318,7 @@ file guards.
 ## Architecture
 
 ```
-toyomacro-python/
+toyomacro/
 ├── src/toyomacro/
 │   ├── voigtfit/        # Voigt-fitting engine (the JOSS target)
 │   │   ├── pipeline.py            # HybridPipeline (Stage1 + Stage2)
@@ -327,7 +327,7 @@ toyomacro-python/
 │   │   ├── multipeak_solver.py    # Alternating projection
 │   │   ├── crlb.py                # Cramer-Rao Lower Bound
 │   │   ├── benchmarks/            # GVRT 1B, multi-image, noise sweep
-│   │   └── tests/                 # 701 unit tests
+│   │   └── tests/                 # 839 unit tests
 │   ├── core/            # Spectrum, FittingResult
 │   ├── lineshape/       # Voigt, Gaussian, Lorentzian, PseudoVoigt, Doniach-Sunjic
 │   ├── background/      # Shirley / Tougaard / Linear
@@ -358,7 +358,7 @@ as data — are written up in
 
 ```bash
 uv sync --extra dev --extra mlx
-uv run pytest                                    # 1,146+ tests (see tests/README.md)
+uv run pytest                                    # 1,578 tests (see tests/README.md)
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check src/ tests/                    # lint
 ```

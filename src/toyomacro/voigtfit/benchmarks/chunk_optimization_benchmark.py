@@ -10,10 +10,9 @@ Python loop) is amortized over more spectra, revealing the asymptotic
 throughput ceiling.
 
 Usage:
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark --quick
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark --resolutions 320x180 640x360 1280x720
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark --quick
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark --resolutions 320x180 640x360 1280x720
 """
 
 import gc

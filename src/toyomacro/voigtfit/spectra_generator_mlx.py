@@ -15,7 +15,6 @@ Benchmark targets (Apple M1/M2/M3):
 - 8K image (7680x4320 = 33M pixels): < 10s total (was ~110s on CPU)
 - Noise injection: < 2s (was ~107s on CPU)
 - Spectra generation: < 3s (was ~20s on CPU)
-Date: 2026-01-21
 """
 
 import time

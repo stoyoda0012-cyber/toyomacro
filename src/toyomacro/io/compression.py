@@ -17,7 +17,6 @@ Usage:
     # Python
     from toyomacro.io.compression import convert_folder
     convert_folder('/path/to/data')
-Date: 2026-02-07
 """
 
 from __future__ import annotations

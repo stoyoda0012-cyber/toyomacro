@@ -36,7 +36,7 @@ _archived/
 
 # Personal analysis / paper-figure scripts — kept out of the public
 # repo pending case-by-case review of what is shareable.
-scripts/
+/scripts/
 
 # Internal-only documents (proposal drafts, business notes). Never
 # pushed to the public repo.

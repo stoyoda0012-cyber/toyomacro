@@ -15,7 +15,6 @@ Supported output formats:
   - APNG with full 24-bit RGB (ApngWriter)
   - Directory of numbered PNGs (ImageSequenceWriter)
   - MP4/WebM (planned, via imageio[pyav])
-Date: 2026-02-18
 """
 
 import warnings

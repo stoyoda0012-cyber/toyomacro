@@ -19,11 +19,10 @@ Pipeline:
     6. Per-channel PSNR evaluation (R/G/B independently)
 
 Usage:
-    python -m voigtfit.benchmarks.param_roundtrip_benchmark \\
+    python -m toyomacro.voigtfit.benchmarks.param_roundtrip_benchmark \\
         --image /path/to/image.jpg \\
         --noise-levels None Moderate Strong \\
         --output /path/to/outputs/
-Date: 2026-02-20
 """
 
 import argparse

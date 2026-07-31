@@ -5,7 +5,7 @@ Box-Muller Gaussian近似 (MLX GPU), Cornish-Fisher補正 (MLX GPU),
 厳密Poisson (NumPy CPU) の3方式でスループットと分布精度を定量比較する。
 
 Usage:
-    python -m voigtfit.benchmarks.poisson_benchmark
+    python -m toyomacro.voigtfit.benchmarks.poisson_benchmark
     python voigtfit/benchmarks/poisson_benchmark.py
 """
 

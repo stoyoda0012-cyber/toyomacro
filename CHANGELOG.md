@@ -216,6 +216,29 @@ archived on Zenodo for a citable DOI.
   Research impact statement, AI usage disclosure sections added).
 
 ### Fixed
+- **Documented commands that could not run.** 45 `Usage:` lines across
+  19 modules invoked `python -m voigtfit.…` — the import path from
+  before the engine moved under `toyomacro`, so every one raised
+  `ModuleNotFoundError`. Seven carried a `PYTHONPATH=python` prefix from
+  a repository layout that no longer exists. The `HybridPipeline`
+  docstring and `roundtrip_benchmark`'s usage block imported from
+  `voigtfit` and from a top-level `benchmark` module respectively;
+  `test_compression` reached `h5io` through a `sys.path` insertion that
+  assumed a POSIX path separator. All now use the installed paths.
+- **`src/toyomacro/voigtfit/scripts/` was excluded from linting.** The
+  `.gitignore` rule for the repository's private `scripts/` directory
+  was unanchored, so it also matched the tracked package directory of
+  the same name — and ruff, which respects `.gitignore`, skipped it. The
+  rule is now `/scripts/`; the previously hidden import-order error is
+  fixed. New files added under any nested `scripts/` are no longer
+  silently untracked.
+- Test inventory (`tests/README.md`) reported 1,149 tests across 50
+  files; the suite collects **1,578 across 67**. Fifteen files were
+  missing from the tables, including the TPP-2M IMFP, elastic-scattering
+  and provenance-schema suites. Every file is now listed and every
+  subtotal sums to the stated count. `README.md`'s own two test counts,
+  and its architecture tree's stale `toyomacro-python/` root, are
+  corrected with it.
 - **A bare orbital label now returns the whole spin-orbit doublet**
   (`data/cross_section.py`). It previously returned a single j
   component: the suffix search tried `3/2, 5/2, 7/2, 1/2` and took the
@@ -308,6 +331,14 @@ archived on Zenodo for a citable DOI.
   hardcoded 0.9 and described that as accounting for elastic scattering.
   It had no callers and was never part of the documented surface; use
   `data.elastic_scattering` with an explicit IMFP/TRMFP pair instead.
+- `ReconstructionBenchmark.run_with_noise()`, reachable from the
+  `toyomacro.voigtfit` surface, accepted a `noise_levels` list and
+  ignored it: it always returned `{0.0: baseline}` and printed a note
+  that noise injection needed a MATLAB routine not in this repository.
+  A caller reading the return value got a silently truncated sweep. It
+  had no callers. Working noise sweeps live in
+  `RoundtripBenchmark.run_noise_sweep()`, the module-level
+  `run_noise_sweep()`, and `spectra_generator.generate_noise_sweep()`.
 
 ## [0.1.0] - 2026-07-07
 

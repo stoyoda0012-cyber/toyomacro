@@ -8,9 +8,8 @@ real imaging XPS conditions.
 Workflow:
     Original Image → Color Decomposition → Voigt Spectra + Noise → H5 Files
 
-Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback (line 3744)
+Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback
 and NoiseGenerator.m
-Date: 2026-01-22
 """
 
 import time
@@ -228,7 +227,7 @@ class SpectralConfig:
     """
     Spectral generation parameters with strict defaults.
 
-    Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback (line 3744-3894)
+    Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback
     and ToyomacroSchema definitions.
 
     Default values selected for:
@@ -778,7 +777,7 @@ def decompose_image_to_amplitudes(
     """
     Decompose RGB image to element amplitudes using color mapping.
 
-    Based on MATLAB DepthProfiler.m line 3911-3950
+    Based on MATLAB DepthProfiler.m.
 
     Args:
         image: (H, W, 3) RGB image, values 0-255 or 0-1
@@ -1595,7 +1594,7 @@ def create_prj_file(
     """
     Create MATLAB .prj file for compatibility.
 
-    Based on DepthProfiler.m line 4396-4401
+    Based on DepthProfiler.m.
 
     Args:
         output_dir: Output directory

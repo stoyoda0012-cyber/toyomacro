@@ -4,17 +4,16 @@ Wraps ParamRoundtripBenchmark to capture per-pixel parameter arrays
 for spatial error analysis. Does NOT modify existing benchmark code.
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.error_map_benchmark \
+    python -m toyomacro.voigtfit.benchmarks.error_map_benchmark \
         --image /path/to/image.jpg \
         --solvers 4step 6step dict1d dict2d adaptive \
         --noise-levels None Moderate Strong \
-        --output python/outputs/error_maps/
+        --output outputs/error_maps/
 
     # Plot from cached results:
-    PYTHONPATH=python python -m voigtfit.benchmarks.error_map_benchmark \
-        --cache python/outputs/error_maps/error_map_results.npz \
+    python -m toyomacro.voigtfit.benchmarks.error_map_benchmark \
+        --cache outputs/error_maps/error_map_results.npz \
         --param dsigma
-Date: 2026-02-21
 """
 
 import argparse

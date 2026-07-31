@@ -5,7 +5,7 @@ Sweeps N_ds from 1 to 50, measuring FWHM PSNR and throughput for both
 4-step and amp_only Phase 2 modes.
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d_sweep
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d_sweep
 """
 import time
 

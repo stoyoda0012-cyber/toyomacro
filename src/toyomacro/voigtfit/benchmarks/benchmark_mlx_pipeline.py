@@ -8,9 +8,8 @@ Before: NumPy(matmul) → np→mx(poisson) → mx→np(copy) → np→mx(fit)
 After:  mx(matmul → poisson) → mx(fit) — only 1 transfer in, 1 out
 
 Usage:
-    python -m voigtfit.benchmarks.benchmark_mlx_pipeline
-    python -m voigtfit.benchmarks.benchmark_mlx_pipeline --frames 20
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.benchmark_mlx_pipeline
+    python -m toyomacro.voigtfit.benchmarks.benchmark_mlx_pipeline --frames 20
 """
 
 import gc

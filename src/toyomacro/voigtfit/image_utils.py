@@ -6,7 +6,6 @@ for evaluating reconstruction quality.
 
 The normalization method matches Toyomacro's PresentMap_Sub.m:
     Map(:,:,ch) = uint8(255 * channel / max(channel))
-Date: 2026-01-22
 """
 
 import math
@@ -105,7 +104,7 @@ def amplitudes_to_rgb(
     """
     Convert component amplitudes to RGB image using MATLAB normalization.
 
-    This implements the same algorithm as PresentMap_Sub.m (line 149-150):
+    This implements the same algorithm as PresentMap_Sub.m:
         r = reshape(sum(r,2),y,x);
         Map(:,:,1) = uint8(255*r./max(r,[],'all'));
 

@@ -9,7 +9,6 @@ Workflow:
                         (MATLAB/DepthProfiler)   (This module)   (This module)
                                 ↓
                          Noise injection, etc.
-Date: 2026-01-22
 """
 
 import time
@@ -339,36 +338,6 @@ class ReconstructionBenchmark:
             reconstructed_image=reconstructed,
             element_results={'amplitudes': amplitudes},
         )
-
-    def run_with_noise(
-        self,
-        noise_levels: list[float] = [0.0, 0.01, 0.05, 0.1],
-        verbose: bool = True,
-    ) -> dict[float, BenchmarkResult]:
-        """
-        Run benchmark with different noise levels.
-
-        Note: This requires re-generating spectra with noise,
-        which is done in MATLAB (SaveAngleProfileSpectra_Callback).
-        This method is a placeholder for future integration.
-
-        Args:
-            noise_levels: List of noise levels (fraction of signal)
-            verbose: Print progress
-
-        Returns:
-            Dict mapping noise_level to BenchmarkResult
-        """
-        # TODO: Integrate with MATLAB noise injection
-        # For now, just run the baseline
-        results = {}
-
-        if verbose:
-            print("Note: Noise injection requires MATLAB integration.")
-            print("Running baseline (noise_level=0) only.\n")
-
-        results[0.0] = self.run(verbose=verbose)
-        return results
 
     def save_result(
         self,

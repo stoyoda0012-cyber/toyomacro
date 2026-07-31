@@ -26,9 +26,8 @@ Phases measured:
   8. GC
 
 Usage:
-    python -m voigtfit.benchmarks.bottleneck_analysis
-    python -m voigtfit.benchmarks.bottleneck_analysis --frames 20
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.bottleneck_analysis
+    python -m toyomacro.voigtfit.benchmarks.bottleneck_analysis --frames 20
 """
 
 import gc

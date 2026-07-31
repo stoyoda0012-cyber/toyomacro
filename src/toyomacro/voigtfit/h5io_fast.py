@@ -17,7 +17,6 @@ Performance targets (M1 Max, SSD):
 - Raw I/O: 5-7 GB/s (SSD limit)
 - With float64->float32 conversion: 3-4 GB/s
 - With prefetch overlap: hide I/O latency behind compute
-Date: 2026-01-23
 """
 
 import threading

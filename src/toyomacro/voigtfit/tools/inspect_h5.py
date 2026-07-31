@@ -10,10 +10,9 @@ Inspects HDF5 files and reports:
 - Recommendations for optimal chunk sizes
 
 Usage:
-    python -m voigtfit.tools.inspect_h5 input.h5
-    python -m voigtfit.tools.inspect_h5 input.h5 --dataset Y
-    python -m voigtfit.tools.inspect_h5 input.h5 --benchmark
-Date: 2026-01-23
+    python -m toyomacro.voigtfit.tools.inspect_h5 input.h5
+    python -m toyomacro.voigtfit.tools.inspect_h5 input.h5 --dataset Y
+    python -m toyomacro.voigtfit.tools.inspect_h5 input.h5 --benchmark
 """
 
 import argparse
@@ -443,9 +442,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python -m voigtfit.tools.inspect_h5 data.h5
-    python -m voigtfit.tools.inspect_h5 data.h5 --benchmark
-    python -m voigtfit.tools.inspect_h5 data.h5 --dataset specdata --benchmark
+    python -m toyomacro.voigtfit.tools.inspect_h5 data.h5
+    python -m toyomacro.voigtfit.tools.inspect_h5 data.h5 --benchmark
+    python -m toyomacro.voigtfit.tools.inspect_h5 data.h5 --dataset specdata --benchmark
         """
     )
     parser.add_argument('h5_file', help='Path to HDF5 file')

@@ -2,7 +2,6 @@
 PSNR vs Noise Level Benchmark.
 
 Runs complete pipeline: Image → Spectra (with noise) → VoigtFit → Reconstruct → PSNR
-Date: 2026-01-22
 """
 
 import time

@@ -182,7 +182,7 @@ class HybridPipeline:
     2-Stage Hybrid Processing Pipeline.
 
     Usage:
-        from voigtfit import WeightMatrixCache, HybridPipeline
+        from toyomacro.voigtfit import WeightMatrixCache, HybridPipeline
 
         cache = WeightMatrixCache()
         pipeline = HybridPipeline(cache)

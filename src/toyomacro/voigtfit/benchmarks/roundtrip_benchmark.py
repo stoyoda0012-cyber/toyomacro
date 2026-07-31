@@ -13,7 +13,7 @@ Workflow:
     6. PSNR Evaluation vs Original and vs Noise-Free
 
 Usage:
-    from benchmark import run_noise_sweep, run_roundtrip_benchmark
+    from toyomacro.voigtfit import run_noise_sweep, run_roundtrip_benchmark
 
     # Quick benchmark
     result = run_roundtrip_benchmark(image_path='my_image.jpg')
@@ -25,7 +25,6 @@ Usage:
         save_spectra=True,  # Keep H5 files
     )
     print(results.summary_table)
-Date: 2026-01-23
 """
 
 import gc
