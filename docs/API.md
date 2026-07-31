@@ -399,20 +399,41 @@ compose yourself:
 angles are involved, and only the first is something you measured.
 
 ```
-        photon
-          \   ψ
-           \ ---- e⁻
-            \  /
-   ----------\/----------  surface
-             ||  θ
-           normal
+ hν                        normal        e⁻
+                              ^
+   \                          |        /
+      \                       |       /
+         \.-------- ψ = 83° --|-----./
+            \                 |     /
+               \              |    /
+                 α_xray = 56° | θ = 27°
+                     \        |  /
+                        \     | /
+                           \  |/
+    --------------------------+-----------------------
+                       sample surface
 ```
+
+Angles in the sketch are magnitudes, as drawn. The values are
+representative, not any particular instrument. (Apparent angles depend
+on the font's character-cell aspect ratio; the drawing assumes 2:1.)
 
 | Symbol | Definition | Where it comes from |
 |---|---|---|
 | `theta` | Electron emission angle from the surface normal | **Your data** — the analyzer's angle axis. Often built as `C − analyzer_axis_value` for a stated centre `C`, so pin down `C` too |
 | `xray_from_normal` | X-ray incidence angle from the surface normal | **Your instrument** — a value to confirm, never to inherit |
-| `psi` / `alpha` | Angle from the photon direction to the emission direction | **Derived**: `psi = xray_from_normal - theta` (coplanar). This is what `L_dipole` / `L_full` / `L_unpolarized` take |
+| `psi` / `alpha` | Angle from the photon direction to the emission direction | **Derived**. As magnitudes: `psi = alpha_xray + theta` when source and analyzer sit on opposite sides of the normal, as drawn (56° + 27° = 83°); `psi = \|alpha_xray − theta\|` on the same side. This is what `L_dipole` / `L_full` / `L_unpolarized` take |
+
+The API takes a **signed** incidence angle instead:
+`angular_distribution()` computes `psi = xray - theta`, so pass a
+negative `xray_from_normal_deg` for the geometry drawn above
+(`psi = -83°` here). `L_dipole` and `L_unpolarized` are even in `psi`,
+so the sign cannot reach them. `L_full` is not even: its non-dipole
+term flips with the sign. Over the full range it is negative for 23% of
+`psi` — on −178.8°…−137.8° and −42.2°…−1.2° for the Si 1s 9.25 keV
+parameters — where it is not a correction factor at all. The drawn
+geometry sits outside those bands, but nothing in the API checks, so
+verify the sign before using `L_full`.
 
 Use `angular_distribution()` or `angular_distribution_unpolarized()`:
 they take `theta` and derive the rest. Calling `L_dipole` with `theta`

@@ -29,17 +29,45 @@ Which angle is which
 
 Three angles are easy to confuse. Only the first is measured::
 
-        photon
-          \\   ψ
-           \\ ---- e⁻          θ  emission angle from the surface normal
-            \\  /                 — the analyzer's angle axis, the one
-    ---------\\/---------          you have in your data
-             ||  θ              α_xray  x-ray incidence from the normal
-             ||                     — an instrument property you must
-          normal                      confirm; there is no safe default
-                                ψ, α  angle from the photon direction to
-                                      the emission direction — *derived*:
-                                      ψ = α_xray − θ (coplanar)
+     hν                        normal        e⁻
+                                  ^
+       \\                          |        /
+          \\                       |       /
+             \\.-------- ψ = 83° --|-----./
+                \\                 |     /
+                   \\              |    /
+                     α_xray = 56° | θ = 27°
+                         \\        |  /
+                            \\     | /
+                               \\  |/
+        --------------------------+-----------------------
+                           sample surface
+
+Angles in the sketch are magnitudes, as drawn. The values are
+representative, not any particular instrument. (Apparent angles depend
+on the font's character-cell aspect ratio; the drawing assumes 2:1.)
+
+- **θ** — emission angle from the surface normal. Measured; the
+  analyzer's angle axis.
+- **α_xray** — x-ray incidence angle from the normal. An instrument
+  property; confirm it, there is no safe default.
+- **ψ** — angle from the photon direction to the emission direction.
+  Derived, and what ``L_dipole`` / ``L_full`` / ``L_unpolarized`` take.
+
+As magnitudes: ψ = α_xray + θ when source and analyzer sit on opposite
+sides of the normal, as drawn (56° + 27° = 83°); ψ = |α_xray − θ| on
+the same side.
+
+The API takes a *signed* incidence angle instead:
+``angular_distribution()`` computes ``psi = xray - theta``, so pass a
+negative ``xray_from_normal_deg`` for the geometry drawn above
+(ψ = −83° here). ``L_dipole`` and ``L_unpolarized`` are even in ψ, so
+the sign cannot reach them. ``L_full`` is not even: its non-dipole term
+flips with the sign. Over the full range it is negative for 23% of ψ —
+on −178.8°…−137.8° and −42.2°…−1.2° for the Si 1s 9.25 keV parameters —
+where it is not a correction factor at all. The drawn geometry
+(ψ = −83°) sits outside those bands, but nothing in the API checks, so
+verify the sign before using ``L_full``.
 
 ``L_dipole``, ``L_full`` and ``L_unpolarized`` all want the derived
 angle. ``angular_distribution`` and ``angular_distribution_unpolarized``
