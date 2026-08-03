@@ -431,16 +431,36 @@ class TestEfficiencyPoint:
     """Smoke test for compute_efficiency_point (requires MLX for solver)."""
 
     def test_well_separated_high_snr(self):
-        """Well-separated peaks at high SNR should have efficiency close to 1."""
+        """Well-separated peaks at high SNR: efficiency of order 1, amplitudes unbiased.
+
+        The amplitude assertion is the load-bearing one. The generated
+        spectra, the Fisher matrix and the solver basis must all use the
+        same amplitude convention -- the coefficient of a unit-area
+        Voigt. When they did not (spectra peak-normalised, Fisher and
+        solver area-normalised), the recovered amplitudes were offset by
+        1/V_max - 1 and `rmse_amp` measured that offset rather than any
+        estimator error: 0.917 instead of 0.0025 at this configuration,
+        a factor of 363. `efficiency_dE` moved too, but *upward*, to
+        2.04 -- past the bound it is measured against -- so the previous
+        one-sided `> 0.01` could not see it. Hence the two-sided bracket.
+
+        Both thresholds are set from measurement with ~20x margin; the
+        bracket is deliberately wide because the remaining known
+        artefacts in this ratio (see EfficiencyResult) are unfixed.
+        """
         try:
             er = compute_efficiency_point(
                 n_comp=2, overlap_ratio=3.0, snr=500,
                 sigma=SIGMA, gamma=GAMMA,
                 n_energy=128, n_spectra=2_000, seed=42,
             )
-            # Efficiency should be reasonable (> 0.1) for well-separated case
-            assert er.efficiency_dE > 0.01, (
-                f"Efficiency too low: {er.efficiency_dE:.4f}"
+            assert er.rmse_amp < 0.05, (
+                f"Amplitude RMSE {er.rmse_amp:.5f} is too large to be estimator "
+                "error at this SNR; the generator, Fisher and solver amplitude "
+                "conventions have diverged"
+            )
+            assert 0.1 < er.efficiency_dE < 1.5, (
+                f"Efficiency out of range: {er.efficiency_dE:.4f}"
             )
             assert er.rmse_dE > 0, "RMSE should be positive"
             assert er.n_comp == 2

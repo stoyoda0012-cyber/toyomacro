@@ -8,6 +8,34 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`voigtfit.crlb.compute_efficiency_point()` measured its spectra and
+  its bound in different amplitude conventions.** The synthetic spectra
+  were generated peak-normalised (`generate_ncomp_spectra` defaults to
+  `peak_normalize=True`, so amplitude 1.0 means peak height 1) while
+  both the Fisher matrix and the solver's own basis are area-normalised
+  — `Re[w]/(σ√(2π))`, i.e. amplitude 1.0 means unit integrated area.
+  Two things followed. The recorded ground-truth amplitude was wrong by
+  `1/V_max - 1`, so `rmse_amp` measured that offset rather than any
+  estimator error: 0.917 where 0.0025 was right, at σ=0.5, γ=0.3,
+  n_comp=2, SNR 500. And `noise_std` was taken from the stronger
+  generated spectra while the Fisher matrix was built from the weaker
+  modelled one, inflating every CRLB by the square of the amplitude
+  ratio — measured at 3.64× for that configuration, and
+  configuration-dependent in general. The generator call now passes
+  `peak_normalize=False`; nothing else moved. **Every `efficiency_*`
+  number this function has ever reported was affected**, in both
+  directions: the same well-separated case returned 2.04 before the fix
+  and 0.598 after, so the ratio had been sitting above the bound it is
+  measured against. The guard was `assert efficiency_dE > 0.01`, which
+  is one-sided and could not see an inflated value; it is now a
+  two-sided bracket plus an amplitude-bias assertion, both set from
+  measurement with ~20× margin and verified to fail when the defect is
+  reintroduced. Two further artefacts in the same ratio — the
+  aggregation formula and an oracle relabelling step — remain
+  documented and unfixed.
+
 ### Added
 
 - **`AngularCorrection` now warns when the x-ray incidence angle was

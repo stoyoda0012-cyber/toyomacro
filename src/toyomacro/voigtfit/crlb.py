@@ -832,7 +832,7 @@ class EfficiencyResult:
         rmse_ds: Empirical RMSE for sigma shift (eV), averaged over components
         rmse_amp: Empirical RMSE for amplitude, averaged over components
         efficiency_dE: CRLB[dE] / RMSE²[dE]. **Do not read 1.0 as the
-            attainable value.** Four separate effects move this ratio,
+            attainable value.** Three separate effects move this ratio,
             and only the last is about the solver:
 
             - *Aggregation.* The numerator averages per-component
@@ -848,14 +848,6 @@ class EfficiencyResult:
               truth. No estimator has that information. It can only
               lower RMSE, hence only raise this ratio, and its influence
               grows with n_swapped.
-            - *A known normalisation mismatch.* The spectra are
-              generated peak-normalised while the Fisher matrix is built
-              from area-normalised profiles at the same amplitudes, so
-              the modelled spectrum is weaker than the one the solver
-              sees and the CRLB is inflated by the square of that ratio
-              (a factor of 3.6 for a single peak at sigma=0.5, gamma=0.3;
-              it depends on the configuration). This is a defect, not a
-              property of the estimator.
             - *Bias.* RMSE² is Var + bias². The bias² term lowers the
               ratio; separately, the variance of a biased estimator is
               not bounded by the unbiased CRLB at all and can fall below
@@ -908,9 +900,9 @@ def compute_efficiency_point(
     4. Compare empirical RMSE with theoretical CRLB
 
     Read EfficiencyResult before interpreting the efficiency_* fields:
-    the comparison in step 4 carries an aggregation artefact, an oracle
-    relabelling step, and a known profile-normalisation mismatch, none
-    of which are properties of the solver being measured.
+    the comparison in step 4 carries an aggregation artefact and an
+    oracle relabelling step, neither of which is a property of the
+    solver being measured.
 
     Args:
         n_comp: Number of peaks
@@ -941,7 +933,11 @@ def compute_efficiency_point(
     e_max = centers[-1] + energy_padding * fwhm
     energy = np.linspace(e_min, e_max, n_energy, dtype=np.float32)
 
-    # Amplitude: use 1.0 (peak-normalized profiles)
+    # Amplitude 1.0 as the coefficient of a unit-area Voigt. This has to
+    # match the solver: its basis is Re[w]/(sigma*sqrt(2pi)) (see
+    # weight_cache.build_basis), the same normalisation the Fisher matrix
+    # is built from, so gt['amp'] and the recovered amplitudes are the
+    # same quantity.
     amp_val = 1.0
     amps = np.full(n_comp, amp_val)
 
@@ -953,6 +949,7 @@ def compute_efficiency_point(
         gammas=np.full(n_comp, gamma),
         amplitudes=amps,
         energy=energy,
+        peak_normalize=False,
         snr=snr,
         dE_range=dE_range,
         ds_range=ds_range,
