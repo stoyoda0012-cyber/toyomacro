@@ -10,6 +10,33 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`voigtfit.crlb` efficiency is now the mean of per-component
+  efficiencies, and the oracle step behind it is visible.** The ratio
+  was `mean_k(CRLB_k) / (mean_k RMSE_k)²` — a mean of variances over the
+  square of a mean of standard deviations — which by Jensen exceeds 1
+  for an estimator that attains the bound in every component, unless the
+  per-component bounds happen to be equal. At σ=0.5, γ=0.3 that ideal
+  value is 1.16 for three peaks at overlap 0.3 and 1.51 for five at
+  overlap 0.5, i.e. the artefact is largest exactly where the harness is
+  used, and it was indistinguishable from the effects being measured.
+  The equal-bounds case returns 1.000, which is why the well-separated
+  two-peak smoke test never saw it. `mean_efficiency()` now computes
+  `mean_k(CRLB_k / RMSE_k²)`; it is a module-level function so the
+  property can be asserted directly rather than only through a solver
+  run. Separately, the RMSE behind these numbers is computed after
+  `_correct_swaps_ncomp()`, which chooses the component permutation
+  minimising error **against the ground truth** — an oracle no estimator
+  has, applied to 16–96% of spectra at the overlaps this harness sweeps.
+  It remains the primary figure, because without it the RMSE at high
+  overlap is dominated by label permutation rather than estimation
+  error, but `efficiency_*_unmatched` now reports the same comparison in
+  the solver's own component order, and `swap_fraction` sits beside it.
+  Measured, the oracle is worth 0–12% and the aggregation change 0–8% on
+  real runs: both are corrections of meaning more than of magnitude.
+  `EfficiencyResult` also exposes `rmse_*_per` so no averaging is
+  hidden. The remaining upstream defect — singular directions inverted
+  to zero rather than diverging — is unchanged.
+
 - **`voigtfit.crlb.compute_efficiency_point()` measured its spectra and
   its bound in different amplitude conventions.** The synthetic spectra
   were generated peak-normalised (`generate_ncomp_spectra` defaults to

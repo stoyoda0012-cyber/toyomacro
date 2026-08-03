@@ -30,6 +30,7 @@ from toyomacro.voigtfit.crlb import (
     compute_multipeak_fisher,
     crlb_grid_sweep,
     generate_ncomp_spectra,
+    mean_efficiency,
 )
 from toyomacro.voigtfit.fisher_information import compute_fisher_matrix
 from toyomacro.voigtfit.multipeak_config import ComponentConfig, MultiPeakConfig
@@ -427,6 +428,40 @@ class TestNcompSpectraGeneration:
         Y2, gt2 = generate_ncomp_spectra(**kwargs)
         np.testing.assert_array_equal(Y1, Y2)
         np.testing.assert_array_equal(gt1['dE'], gt2['dE'])
+class TestMeanEfficiency:
+    """The efficiency aggregation must give 1.0 for an ideal estimator."""
+
+    @pytest.mark.parametrize("crlb_per", [
+        np.array([1e-4, 1e-4, 1e-4]),          # equal bounds
+        np.array([8.8e1, 3.0e2, 7.7e2]),       # 3 peaks, overlap 0.3
+        np.array([2.2e1, 1.5e2, 4.0e2, 6.0e2, 8.4e2]),  # 5 peaks, overlap 0.5
+    ])
+    def test_ideal_estimator_returns_one(self, crlb_per):
+        """RMSE_k = sqrt(CRLB_k) in every component must give exactly 1.0.
+
+        The previous aggregation, mean(CRLB) / mean(RMSE)**2, divides a
+        mean of variances by the square of a mean of standard
+        deviations, so Jensen puts it above 1 whenever the
+        per-component bounds differ: 1.17 and 1.23 for the second and
+        third vectors here, and 1.16 (three peaks at overlap 0.3) and
+        1.51 (five at overlap 0.5) on the Fisher matrices those vectors
+        are modelled on. Only the equal-bounds case hid the defect,
+        which is why the well-separated two-peak smoke test never saw
+        it.
+        """
+        rmse_per = np.sqrt(crlb_per)
+        assert mean_efficiency(crlb_per, rmse_per) == pytest.approx(1.0, rel=1e-12)
+
+        old = float(np.mean(crlb_per) / np.mean(rmse_per) ** 2)
+        if len(set(crlb_per.tolist())) > 1:
+            assert old > 1.0, "the old formula should be the one that inflates"
+
+    def test_zero_rmse_is_floored_not_infinite(self):
+        """A noiseless component must not turn the mean into inf."""
+        eff = mean_efficiency(np.array([1e-4, 1e-4]), np.array([1e-2, 0.0]))
+        assert np.isfinite(eff)
+
+
 class TestEfficiencyPoint:
     """Smoke test for compute_efficiency_point (requires MLX for solver)."""
 

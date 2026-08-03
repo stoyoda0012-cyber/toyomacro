@@ -819,6 +819,32 @@ def _correct_swaps_ncomp(
     return dE_corr, ds_corr, amp_corr, n_swapped
 
 
+def mean_efficiency(crlb_per: np.ndarray, rmse_per: np.ndarray) -> float:
+    """Mean over components of the per-component efficiency CRLB_k / RMSE_k^2.
+
+    An estimator that attains the bound in every component returns
+    exactly 1.0, whatever the spread of the per-component bounds.
+
+    The obvious alternative, mean_k(CRLB_k) / (mean_k RMSE_k)^2, does
+    not: it divides a mean of variances by the square of a mean of
+    standard deviations, which by Jensen is >= 1 for that same ideal
+    estimator, with equality only when the per-component bounds are all
+    equal. At sigma=0.5, gamma=0.3 that inflation reaches 1.16 for three
+    peaks at overlap 0.3 and 1.51 for five at overlap 0.5 -- largest in
+    the overlapped regime the efficiency harness exists to study.
+
+    Args:
+        crlb_per: Per-component CRLB (variance units), shape (n_comp,)
+        rmse_per: Per-component RMSE (standard-deviation units), same shape
+
+    Returns:
+        Mean per-component efficiency. Zero RMSE entries are floored
+        rather than raising, so a noiseless run returns a large finite
+        number instead of inf.
+    """
+    return float(np.mean(crlb_per / np.maximum(rmse_per ** 2, 1e-30)))
+
+
 @dataclass
 class EfficiencyResult:
     """Result of CRLB vs empirical RMSE comparison at one grid point.
@@ -828,40 +854,54 @@ class EfficiencyResult:
         overlap_ratio: Δcenter / FWHM
         snr: Signal-to-noise ratio
         crlb: CRLBResult (theoretical)
-        rmse_dE: Empirical RMSE for center shift (eV), averaged over components
-        rmse_ds: Empirical RMSE for sigma shift (eV), averaged over components
-        rmse_amp: Empirical RMSE for amplitude, averaged over components
-        efficiency_dE: CRLB[dE] / RMSE²[dE]. **Do not read 1.0 as the
-            attainable value.** Three separate effects move this ratio,
-            and only the last is about the solver:
+        rmse_dE: Mean over components of rmse_dE_per (eV). Descriptive
+            only -- the efficiencies are not derived from it.
+        rmse_ds: Mean over components of rmse_ds_per (eV), same caveat
+        rmse_amp: Mean over components of rmse_amp_per, same caveat
+        rmse_dE_per: Per-component RMSE for center shift (eV), shape
+            (n_comp,). Oracle-matched, as below.
+        rmse_ds_per: Per-component RMSE for sigma shift (eV)
+        rmse_amp_per: Per-component RMSE for amplitude
+        efficiency_dE: mean_k(CRLB_k[dE] / RMSE_k²[dE]) -- the mean of
+            per-component efficiencies, so an ideal estimator returns
+            1.0 whether or not the per-component bounds are equal.
 
-            - *Aggregation.* The numerator averages per-component
-              variances; the denominator squares an average of
-              per-component standard deviations. By Jensen the ratio is
-              then >= 1 even for a perfectly efficient estimator, with
-              equality only when the per-component CRLBs are equal. The
-              inflation grows with overlap, i.e. exactly where the
-              harness is used.
-            - *Oracle relabelling.* RMSE is computed after
-              _correct_swaps_ncomp(), which picks the component
-              permutation minimising squared error against the ground
-              truth. No estimator has that information. It can only
-              lower RMSE, hence only raise this ratio, and its influence
-              grows with n_swapped.
+            **This number is oracle-matched.** The RMSE behind it is
+            computed after _correct_swaps_ncomp(), which picks, per
+            spectrum, the component permutation minimising squared error
+            against the ground truth. No estimator has that information;
+            the step can only lower RMSE and raise this ratio. It is
+            kept as the primary figure because without it the RMSE at
+            high overlap is dominated by label permutation rather than
+            by estimation error, which is not what this harness is
+            measuring -- but the cost is not hidden: compare against
+            efficiency_*_unmatched, and see swap_fraction for how often
+            the permutation was actually used.
+
+            Two effects remain, and only the first is about the solver:
+
             - *Bias.* RMSE² is Var + bias². The bias² term lowers the
               ratio; separately, the variance of a biased estimator is
               not bounded by the unbiased CRLB at all and can fall below
               it. So bias alone can move the ratio either way.
+            - *Ensemble mismatch.* The CRLB is evaluated once at the
+              nominal parameters while RMSE is pooled over spectra whose
+              true parameters are drawn across +/-dE_range and
+              +/-ds_range, so the two refer to different points in
+              parameter space.
 
-            Two further reasons not to expect exactly 1.0: the CRLB is
-            evaluated once at the nominal parameters while RMSE is
-            pooled over spectra whose true parameters are drawn across
-            +/-dE_range and +/-ds_range, so the two refer to different
-            points in parameter space; and at n_spectra=10_000 the Monte
-            Carlo error on RMSE² is already of order a percent.
-        efficiency_ds: CRLB[ds] / RMSE²[ds], same caveats
-        efficiency_amp: CRLB[amp] / RMSE²[amp], same caveats
-        n_swapped: Number of spectra with component swap correction
+            Finally, at n_spectra=10_000 the Monte Carlo error on RMSE²
+            is already of order a percent, so exact equality with 1.0 is
+            not a meaningful target.
+        efficiency_ds: same for sigma shift
+        efficiency_amp: same for amplitude
+        efficiency_dE_unmatched: efficiency_dE computed in the solver's
+            own component order, with no appeal to the ground truth. The
+            gap between the two is what the oracle step buys.
+        efficiency_ds_unmatched: same for sigma shift
+        efficiency_amp_unmatched: same for amplitude
+        n_swapped: Number of spectra whose components were permuted
+        swap_fraction: n_swapped / n_spectra
         solver_time: Solver wall time (seconds)
     """
     n_comp: int
@@ -871,10 +911,17 @@ class EfficiencyResult:
     rmse_dE: float
     rmse_ds: float
     rmse_amp: float
+    rmse_dE_per: np.ndarray
+    rmse_ds_per: np.ndarray
+    rmse_amp_per: np.ndarray
     efficiency_dE: float
     efficiency_ds: float
     efficiency_amp: float
+    efficiency_dE_unmatched: float
+    efficiency_ds_unmatched: float
+    efficiency_amp_unmatched: float
     n_swapped: int
+    swap_fraction: float
     solver_time: float
 
 
@@ -900,9 +947,9 @@ def compute_efficiency_point(
     4. Compare empirical RMSE with theoretical CRLB
 
     Read EfficiencyResult before interpreting the efficiency_* fields:
-    the comparison in step 4 carries an aggregation artefact and an
-    oracle relabelling step, neither of which is a property of the
-    solver being measured.
+    the RMSE in step 4 is oracle-matched against the ground truth, which
+    is not something an estimator can do. efficiency_*_unmatched is the
+    same comparison without that step.
 
     Args:
         n_comp: Number of peaks
@@ -1008,24 +1055,42 @@ def compute_efficiency_point(
         result.delta_E, result.delta_sigma, result.amplitudes, gt,
     )
 
-    # Per-component RMSE, then average
-    rmse_dE_per = np.sqrt(np.mean((dE_corr - gt['dE']) ** 2, axis=0))
-    rmse_ds_per = np.sqrt(np.mean((ds_corr - gt['ds']) ** 2, axis=0))
-    rmse_amp_per = np.sqrt(np.mean((amp_corr - gt['amp']) ** 2, axis=0))
+    def _rmse_per(est: np.ndarray, truth: np.ndarray) -> np.ndarray:
+        return np.sqrt(np.mean((est - truth) ** 2, axis=0))
+
+    # Oracle-matched: after _correct_swaps_ncomp, which uses the ground
+    # truth to choose the permutation.
+    rmse_dE_per = _rmse_per(dE_corr, gt['dE'])
+    rmse_ds_per = _rmse_per(ds_corr, gt['ds'])
+    rmse_amp_per = _rmse_per(amp_corr, gt['amp'])
+
+    # Same quantities in the solver's own component order, with no
+    # appeal to the ground truth. The gap between the two is what the
+    # oracle step buys.
+    rmse_dE_per_un = _rmse_per(result.delta_E, gt['dE'])
+    rmse_ds_per_un = _rmse_per(result.delta_sigma, gt['ds'])
+    rmse_amp_per_un = _rmse_per(result.amplitudes, gt['amp'])
 
     rmse_dE = float(np.mean(rmse_dE_per))
     rmse_ds = float(np.mean(rmse_ds_per))
     rmse_amp = float(np.mean(rmse_amp_per))
 
-    # --- Step 5: Efficiency = CRLB / RMSE² ---
-    # Average CRLB over components
-    avg_crlb_dE = np.mean([cr.crlb_per_component[k]['dE'] for k in range(n_comp)])
-    avg_crlb_ds = np.mean([cr.crlb_per_component[k]['dsigma'] for k in range(n_comp)])
-    avg_crlb_amp = np.mean([cr.crlb_per_component[k]['amp'] for k in range(n_comp)])
+    # --- Step 5: Efficiency, averaged over per-component ratios ---
+    # mean_k(CRLB_k / RMSE_k^2), not mean_k(CRLB_k) / (mean_k RMSE_k)^2:
+    # the latter divides a mean of variances by the square of a mean of
+    # standard deviations, which Jensen puts at >= 1 for an ideal
+    # estimator whenever the per-component bounds differ.
+    crlb_dE_per = np.array([cr.crlb_per_component[k]['dE'] for k in range(n_comp)])
+    crlb_ds_per = np.array([cr.crlb_per_component[k]['dsigma'] for k in range(n_comp)])
+    crlb_amp_per = np.array([cr.crlb_per_component[k]['amp'] for k in range(n_comp)])
 
-    eff_dE = float(avg_crlb_dE / max(rmse_dE ** 2, 1e-30))
-    eff_ds = float(avg_crlb_ds / max(rmse_ds ** 2, 1e-30))
-    eff_amp = float(avg_crlb_amp / max(rmse_amp ** 2, 1e-30))
+    eff_dE = mean_efficiency(crlb_dE_per, rmse_dE_per)
+    eff_ds = mean_efficiency(crlb_ds_per, rmse_ds_per)
+    eff_amp = mean_efficiency(crlb_amp_per, rmse_amp_per)
+
+    eff_dE_un = mean_efficiency(crlb_dE_per, rmse_dE_per_un)
+    eff_ds_un = mean_efficiency(crlb_ds_per, rmse_ds_per_un)
+    eff_amp_un = mean_efficiency(crlb_amp_per, rmse_amp_per_un)
 
     return EfficiencyResult(
         n_comp=n_comp,
@@ -1035,10 +1100,17 @@ def compute_efficiency_point(
         rmse_dE=rmse_dE,
         rmse_ds=rmse_ds,
         rmse_amp=rmse_amp,
+        rmse_dE_per=rmse_dE_per,
+        rmse_ds_per=rmse_ds_per,
+        rmse_amp_per=rmse_amp_per,
         efficiency_dE=eff_dE,
         efficiency_ds=eff_ds,
         efficiency_amp=eff_amp,
+        efficiency_dE_unmatched=eff_dE_un,
+        efficiency_ds_unmatched=eff_ds_un,
+        efficiency_amp_unmatched=eff_amp_un,
         n_swapped=n_swapped,
+        swap_fraction=float(n_swapped) / max(n_spectra, 1),
         solver_time=solver_time,
     )
 
