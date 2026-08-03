@@ -32,6 +32,26 @@ archived on Zenodo for a citable DOI.
   `angular_distribution()` already takes θ and derives ψ itself; it is
   now documented as the entry point rather than a variant.
   `tests/test_angular_geometry.py` (16 tests) pins all of it.
+- **The CRLB utilities now state when their bound is a bound.**
+  `voigtfit.crlb` presented `Var(θ̂) ≥ [g⁻¹]ᵢᵢ` as unconditional; the
+  words *unbiased*, *bias* and *misspecification* did not appear in the
+  file. The inequality needs an unbiased estimator of a correctly
+  specified model and a non-singular Fisher matrix, and the module also
+  conditions on everything outside θ — no background parameter enters
+  the Fisher matrix, `mode='3d'` treats the Lorentzian widths as known,
+  and the component count is assumed known. Three consequences are now
+  written down at the point of use rather than left to be rediscovered:
+  eigenvalues at or below `1e-12·λ_max` are inverted to **zero**, so in
+  a strongly overlapped configuration the reported `crlb` *understates*
+  the bound and can fall as the problem gets harder; `classify_solvability()`
+  — which `process_multipeak()` attaches to every result — computes its
+  meV figure from a default SNR of 100 and unit amplitudes, not from the
+  data being fitted; and `efficiency_*` is moved by an aggregation
+  artefact (variances averaged over squared averages of standard
+  deviations), by an oracle relabelling step, and by a profile-normalisation
+  mismatch between the generated spectra and the Fisher matrix, before
+  any property of the solver enters. No returned number changes; the
+  three defects named here are documented, not fixed.
 - The Scofield summation convention is now checked against a number the
   source states rather than against our own arithmetic. Table A2 of
   UCRL-51326 prints TOTAL and K/L/M SHELL columns beside the individual

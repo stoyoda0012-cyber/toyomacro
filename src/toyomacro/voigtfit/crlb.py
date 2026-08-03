@@ -3,23 +3,72 @@ Cramer-Rao Lower Bound (CRLB) for Multi-Peak Voigt Spectra
 ===========================================================
 
 Computes the theoretical minimum variance for parameter estimation
-of overlapping Voigt peaks under Poisson noise.
+of overlapping Voigt peaks.
 
 For n_comp peaks with parameters theta_k = (A_k, dE_k, dsigma_k [, dgamma_k]),
 the total parameter vector is theta = (theta_0, theta_1, ..., theta_{n-1}).
 
-The Fisher Information Matrix is:
+The Fisher Information Matrix depends on the noise model, and the two
+supported here give different numbers for the same spectrum:
 
-    g_ij = sum_E (df/dtheta_i)(df/dtheta_j) / f(E; theta)
+    poisson:   g_ij = sum_E (df/dtheta_i)(df/dtheta_j) / f(E; theta)
+    gaussian:  g_ij = (1/noise_std^2) sum_E (df/dtheta_i)(df/dtheta_j)
 
-where f(E) = sum_k A_k V_k(E) is the composite spectrum (Poisson mean).
+where f(E) = sum_k A_k V_k(E) is the composite spectrum (the Poisson
+mean under the first model). Photon counting is Poisson; the Gaussian
+form is the convention the multipeak benchmarks use. The Poisson branch
+is a Fisher matrix only if the amplitudes are scaled so that f(E) is
+expected counts per channel -- normalised or arbitrary-unit amplitudes
+rescale the bound silently, and nothing here checks.
+
+Which model produced a given number is not uniform across this module:
+compute_multipeak_fisher() defaults to 'poisson', crlb_grid_sweep()
+inherits that default, classify_solvability() defaults to 'gaussian',
+and compute_efficiency_point() hardcodes 'gaussian' with no way to
+override it. Read CRLBResult.config['noise_model'] rather than assuming.
+Where a SolvabilityInfo is what you hold, the same field is at
+info.detail.config['noise_model']; its __str__ does not disclose which
+model produced the meV figure it prints.
 
 The CRLB states: Var(theta_hat_i) >= [g^{-1}]_ii
 
-Key insight: overlapping peaks share the Poisson denominator f(E),
-creating off-diagonal blocks that couple parameters of different peaks.
-As overlap increases, the Fisher matrix becomes ill-conditioned and
-CRLB diverges -- quantifying the fundamental limit of peak separation.
+Three conditions, none of them automatic here:
+
+1. *Unbiasedness.* Regularization biases the estimator by design, and
+   box constraints bias it whenever a bound can bind -- which for the
+   auto-constrained solver in the efficiency harness is not hypothetical
+   but routine at the overlaps it sweeps.
+2. *Correct specification.* A wrong component count, a mis-modelled
+   background, or unmodelled lineshape asymmetry all break it.
+3. *A non-singular Fisher matrix*, plus the usual regularity conditions
+   (support independent of theta, differentiation under the integral).
+   See compute_multipeak_fisher(): where the matrix is singular this
+   module does **not** report an infinite bound.
+
+Beyond those, the bound conditions on everything not in theta. No
+background parameter appears in the Fisher matrix at all; mode='3d'
+treats the Lorentzian widths as exactly known; the component count is
+assumed known. Estimating any of them jointly raises the true bound,
+and this number does not move. So a bound computed here can be below
+the bound for the problem actually being solved even when the estimator
+is unbiased and the model is right.
+
+Where a condition fails, the bound is not a target the solver failed to
+reach -- it is a bound on a different estimation problem. Nothing in
+this module estimates the bias, so nothing here can tell you which case
+you are in.
+
+A CRLB is computed from a model; it is not a measurement. It states
+what an ideal estimator could achieve on data generated from these
+parameters, not what any particular fit achieved on real data.
+
+Key insight: the off-diagonal blocks coupling parameters of different
+peaks come from the overlap of their Jacobian columns, and are present
+under both weightings; the Poisson denominator modulates them rather
+than creating them. As overlap increases the Fisher matrix becomes
+ill-conditioned and the true bound diverges -- which is the fundamental
+limit of peak separation, and also the regime where the truncation
+noted above makes the *reported* number stop tracking it.
 
 References:
     Rao (1945), Cramer (1946)
@@ -51,6 +100,14 @@ class SolvabilityLevel(Enum):
         HARD:       2-10% of sigma — tens of meV, valley visible but shallow
         SHOULDER:   10-40% of sigma — shoulder visible, position uncertain
         IMPOSSIBLE: > 40% of sigma — peaks merge into one feature
+
+    The thresholds are dimensionless fractions of sigma, so the "meV"
+    readings above hold only near sigma ~ 0.5 eV; at sigma = 2 eV, EASY
+    admits 40 meV. They are thresholds on the bound, not on any
+    solver's realized error, and they inherit the bound's conditions
+    (see the module docstring). EASY says the configuration does not
+    itself forbid that precision; it does not promise a fit will
+    reach it.
     """
     EASY = "easy"
     HARD = "hard"
@@ -134,7 +191,19 @@ def classify_solvability(
         noise_model: 'poisson' or 'gaussian'
 
     Returns:
-        SolvabilityInfo with classification and CRLB bounds
+        SolvabilityInfo with classification and CRLB bounds. These
+        describe the configuration **at the assumed amplitudes and
+        snr**, not a fit, and they are not confidence intervals for any
+        fitted parameter. Both assumptions are defaulted here (unit
+        amplitudes, SNR 100) and the bound scales as 1/SNR^2, so the
+        level is as much a statement about those defaults as about the
+        peak geometry.
+
+        This matters because process_multipeak() attaches such an object
+        to every result with the defaults in place: the meV figure
+        printed beside a fit of real data was not computed from that
+        data. Note also that the default noise model here is 'gaussian',
+        unlike compute_multipeak_fisher().
     """
     centers = np.asarray(centers, dtype=np.float64)
     sigmas = np.asarray(sigmas, dtype=np.float64)
@@ -289,7 +358,20 @@ def compute_multipeak_fisher(
         noise_std: Standard deviation of Gaussian noise (required if noise_model='gaussian')
 
     Returns:
-        CRLBResult with Fisher matrix, CRLB, and diagnostics
+        CRLBResult with Fisher matrix, CRLB, and diagnostics. The CRLB
+        entries bound the variance of an unbiased estimator of this
+        exact model **only where the Fisher matrix is non-singular**;
+        see the module docstring for what else that excludes. The noise
+        model actually used is recorded in CRLBResult.config['noise_model'].
+
+        Where the matrix is singular this function does not report an
+        infinite bound: eigenvalues at or below 1e-12 * lambda_max are
+        inverted to zero, so a non-identifiable direction contributes
+        nothing to the diagonal and the returned value **understates**
+        the true bound. Check `condition_number` and `eigenvalues`
+        before reading `crlb` in a strongly overlapped configuration. A
+        `crlb` entry that falls as overlap increases is this truncation,
+        not information.
     """
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
     centers = np.asarray(centers, dtype=np.float64)
@@ -749,9 +831,44 @@ class EfficiencyResult:
         rmse_dE: Empirical RMSE for center shift (eV), averaged over components
         rmse_ds: Empirical RMSE for sigma shift (eV), averaged over components
         rmse_amp: Empirical RMSE for amplitude, averaged over components
-        efficiency_dE: CRLB[dE] / RMSE²[dE] (1.0 = theoretical limit)
-        efficiency_ds: CRLB[ds] / RMSE²[ds]
-        efficiency_amp: CRLB[amp] / RMSE²[amp]
+        efficiency_dE: CRLB[dE] / RMSE²[dE]. **Do not read 1.0 as the
+            attainable value.** Four separate effects move this ratio,
+            and only the last is about the solver:
+
+            - *Aggregation.* The numerator averages per-component
+              variances; the denominator squares an average of
+              per-component standard deviations. By Jensen the ratio is
+              then >= 1 even for a perfectly efficient estimator, with
+              equality only when the per-component CRLBs are equal. The
+              inflation grows with overlap, i.e. exactly where the
+              harness is used.
+            - *Oracle relabelling.* RMSE is computed after
+              _correct_swaps_ncomp(), which picks the component
+              permutation minimising squared error against the ground
+              truth. No estimator has that information. It can only
+              lower RMSE, hence only raise this ratio, and its influence
+              grows with n_swapped.
+            - *A known normalisation mismatch.* The spectra are
+              generated peak-normalised while the Fisher matrix is built
+              from area-normalised profiles at the same amplitudes, so
+              the modelled spectrum is weaker than the one the solver
+              sees and the CRLB is inflated by the square of that ratio
+              (a factor of 3.6 for a single peak at sigma=0.5, gamma=0.3;
+              it depends on the configuration). This is a defect, not a
+              property of the estimator.
+            - *Bias.* RMSE² is Var + bias². The bias² term lowers the
+              ratio; separately, the variance of a biased estimator is
+              not bounded by the unbiased CRLB at all and can fall below
+              it. So bias alone can move the ratio either way.
+
+            Two further reasons not to expect exactly 1.0: the CRLB is
+            evaluated once at the nominal parameters while RMSE is
+            pooled over spectra whose true parameters are drawn across
+            +/-dE_range and +/-ds_range, so the two refer to different
+            points in parameter space; and at n_spectra=10_000 the Monte
+            Carlo error on RMSE² is already of order a percent.
+        efficiency_ds: CRLB[ds] / RMSE²[ds], same caveats
+        efficiency_amp: CRLB[amp] / RMSE²[amp], same caveats
         n_swapped: Number of spectra with component swap correction
         solver_time: Solver wall time (seconds)
     """
@@ -785,10 +902,15 @@ def compute_efficiency_point(
 ) -> EfficiencyResult:
     """Compute CRLB efficiency at a single (n_comp, overlap, SNR) point.
 
-    1. Compute theoretical CRLB (Gaussian noise model)
+    1. Compute theoretical CRLB (Gaussian noise model, hardcoded here)
     2. Generate synthetic spectra with controlled noise
     3. Run multipeak solver
     4. Compare empirical RMSE with theoretical CRLB
+
+    Read EfficiencyResult before interpreting the efficiency_* fields:
+    the comparison in step 4 carries an aggregation artefact, an oracle
+    relabelling step, and a known profile-normalisation mismatch, none
+    of which are properties of the solver being measured.
 
     Args:
         n_comp: Number of peaks
