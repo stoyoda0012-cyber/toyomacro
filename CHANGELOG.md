@@ -10,6 +10,27 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`clear_cache()` deleted shipped reference data, and
+  `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
+  every `*.json` under `data/_cache/` — the package's own bundled
+  tables. `regenerate_cache()` called it first and then rebuilt only
+  five of the seven: `scofield.json` and `trzhaskovskaya.json` were
+  absent from its list, so they were deleted with nothing to restore
+  them, after which `CrossSection` silently fell back to an **empty
+  table** rather than reporting the loss. The loader change above made
+  it worse, turning a partial loss into a total one — the first loader
+  now raises, so all seven files were gone and none rebuilt. Both
+  functions are Supported-tier, so the names stay: `clear_cache()` now
+  raises and explains why deleting shipped data has no correct use, and
+  `regenerate_cache()` requires the same `TOYOMACRO_REGENERATE_DATA`
+  opt-in, **never deletes first**, writes each table in place only if
+  its source is available, keeps the shipped copy otherwise, and returns
+  a per-table report naming the two it does not handle instead of
+  omitting them silently. `src/toyomacro/data/_cache/README.md`
+  described these files as regenerable build artifacts that should not
+  be hand-edited, which was the opposite of the policy; it now says what
+  they are.
+
 - **Deleting a bundled reference table no longer rebuilds it, silently,
   from a CSV that is not in this repository.** The tables under
   `data/_cache/` are shipped, reviewed data; the loaders treated them as

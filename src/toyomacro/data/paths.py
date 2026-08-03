@@ -646,18 +646,94 @@ def load_trzh2019_data() -> dict[str, Any]:
     return data
 
 
-def clear_cache():
-    """Clear all cached JSON files."""
+def clear_cache() -> None:
+    """Refuse to delete the bundled tables. Kept so the name still resolves.
+
+    This used to unlink every ``*.json`` under ``_cache/``. Those files
+    are the package's shipped reference data — see
+    ``docs/DATA_SOURCES.md`` — so the operation had no correct use: it
+    destroyed reviewed data, and two of the tables it removed
+    (``scofield.json``, ``trzhaskovskaya.json``) were not rebuilt by
+    :func:`regenerate_cache` at all, leaving cross-section lookups to
+    fall back to an empty table.
+
+    Raises:
+        RuntimeError: always.
+    """
+    raise RuntimeError(
+        "clear_cache() would delete this package's bundled reference tables, "
+        "not a cache. They ship with the package, are documented in "
+        "docs/DATA_SOURCES.md, and are pinned by tests. To rebuild them from "
+        f"local CSV/XLSX sources, set {REGENERATE_ENV_VAR}=1 and call "
+        "regenerate_cache(), which writes in place and never deletes first."
+    )
+
+
+def regenerate_cache() -> dict[str, str]:
+    """Rebuild the bundled tables in place from their local sources.
+
+    Requires :data:`REGENERATE_ENV_VAR` to be set: rebuilding replaces a
+    reference dataset with an unreviewed one, which the project treats as
+    a change needing an independent audit, not a side effect.
+
+    Nothing is deleted first. A table whose source is unavailable keeps
+    the shipped copy and is reported as skipped, so a partial rebuild
+    cannot leave the package with missing data.
+
+    Returns:
+        Mapping of table filename to ``"rebuilt"`` or a reason it was
+        skipped.
+
+    Raises:
+        RuntimeError: if the opt-in is not set.
+    """
+    if not os.environ.get(REGENERATE_ENV_VAR):
+        raise RuntimeError(
+            "regenerate_cache() rebuilds shipped reference tables from local "
+            "CSV/XLSX sources that are not part of this repository, and the "
+            "result may differ from the reviewed data this package ships. Set "
+            f"{REGENERATE_ENV_VAR}=1 to confirm that is what you want."
+        )
+
     cache_dir = get_cache_dir()
-    for f in cache_dir.glob("*.json"):
-        f.unlink()
+    results: dict[str, str] = {}
 
+    for cache_name, csv_name, converter in (
+        ("binding_energy.json", "BindingEnergyTable.csv", _csv_to_json_binding_energy),
+        ("compounds.json", "CompoundTable.csv", _csv_to_json_compounds),
+        ("cross_section.json", "CrossSectionTable_Yeh=Lindau.csv", _csv_to_json_cross_section),
+    ):
+        try:
+            csv_path = get_common_data_path() / csv_name
+        except FileNotFoundError as exc:
+            results[cache_name] = f"skipped: {exc}"
+            continue
+        if not csv_path.exists():
+            results[cache_name] = f"skipped: {csv_name} not found"
+            continue
+        data = converter(csv_path)
+        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        results[cache_name] = "rebuilt"
 
-def regenerate_cache():
-    """Force regeneration of all cache files."""
-    clear_cache()
-    load_binding_energy_data()
-    load_compound_data()
-    load_cross_section_data()
-    load_trzh2018_data()
-    load_trzh2019_data()
+    for cache_name, path_getter, converter in (
+        ("trzh2018_haxpes.json", _get_trzh2018_xlsx_path, _xlsx_to_json_trzh2018),
+        ("trzh2019_inner.json", _get_trzh2019_xlsx_path, _xlsx_to_json_trzh2019),
+    ):
+        xlsx_path = path_getter()
+        if not xlsx_path.exists():
+            results[cache_name] = f"skipped: {xlsx_path.name} not found"
+            continue
+        data = converter(xlsx_path)
+        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        results[cache_name] = "rebuilt"
+
+    # scofield.json and trzhaskovskaya.json are rebuilt through
+    # CrossSection's own loader, from CSVs in the same Common/data tree.
+    # They were silently absent from this function's old list, which is
+    # why clear_cache() could remove them with nothing to restore them.
+    for cache_name in ("scofield.json", "trzhaskovskaya.json"):
+        results[cache_name] = "not rebuilt here: see CrossSection._load_with_cache"
+
+    return results
