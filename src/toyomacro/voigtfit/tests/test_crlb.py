@@ -24,6 +24,7 @@ from toyomacro.voigtfit.crlb import (
     SolvabilityInfo,
     SolvabilityLevel,
     _build_equal_spacing_centers,
+    _classify_crlb_dE,
     _voigt_fwhm,
     classify_solvability,
     compute_efficiency_point,
@@ -428,6 +429,74 @@ class TestNcompSpectraGeneration:
         Y2, gt2 = generate_ncomp_spectra(**kwargs)
         np.testing.assert_array_equal(Y1, Y2)
         np.testing.assert_array_equal(gt1['dE'], gt2['dE'])
+class TestSingularFisher:
+    """A singular Fisher matrix must produce an infinite bound, not a small one."""
+
+    @staticmethod
+    def _fisher(n_comp, overlap, noise_std=1e-2):
+        centers = _build_equal_spacing_centers(n_comp, overlap, SIGMA, GAMMA)
+        fwhm = _voigt_fwhm(SIGMA, GAMMA)
+        energy = np.linspace(centers[0] - 5 * fwhm, centers[-1] + 5 * fwhm, 256)
+        return compute_multipeak_fisher(
+            np.ones(n_comp), centers, np.full(n_comp, SIGMA), np.full(n_comp, GAMMA),
+            energy, mode='3d', noise_model='gaussian', noise_std=noise_std,
+        )
+
+    def test_full_rank_case_is_untouched(self):
+        """Where nothing is truncated, the bound and the pseudo-inverse agree."""
+        cr = self._fisher(n_comp=3, overlap=0.3)
+        assert cr.null_space_dim == 0
+        assert not cr.unbounded.any()
+        assert np.all(np.isfinite(cr.crlb))
+        np.testing.assert_array_equal(cr.crlb, cr.crlb_pseudo)
+
+    def test_singular_case_is_infinite_and_pseudo_is_smaller(self):
+        """Four peaks at overlap 0.2 are not individually identifiable."""
+        cr = self._fisher(n_comp=4, overlap=0.2)
+        assert cr.null_space_dim == 3, f"expected a 3-D null space, got {cr.null_space_dim}"
+        assert cr.unbounded.all(), "the null directions touch every parameter axis here"
+        assert np.all(np.isinf(cr.crlb))
+        assert np.all(np.isfinite(cr.crlb_pseudo))
+
+    def test_pseudo_inverse_falls_as_the_problem_gets_harder(self):
+        """The artefact that made the truncated diagonal unusable as a bound.
+
+        Going from overlap 0.3 to 0.2 at four peaks takes the null space
+        from 1 dimension to 3, i.e. strictly less information. The
+        pseudo-inverse diagonal nevertheless *drops* by a factor of ~26,
+        because a direction carrying no information contributes zero to
+        it instead of diverging. `crlb` is inf in both cases.
+        """
+        easier = self._fisher(n_comp=4, overlap=0.3)
+        harder = self._fisher(n_comp=4, overlap=0.2)
+        assert harder.null_space_dim > easier.null_space_dim
+
+        dE = slice(1, None, 3)
+        assert harder.crlb_pseudo[dE].min() < easier.crlb_pseudo[dE].min()
+        assert np.all(np.isinf(harder.crlb[dE]))
+        assert np.all(np.isinf(easier.crlb[dE]))
+
+    def test_truncated_value_would_report_easy_at_high_snr(self):
+        """The user-facing harm: a non-identifiable configuration called EASY.
+
+        `process_multipeak` attaches a SolvabilityInfo to every result,
+        and the level comes from sqrt(CRLB[dE]) relative to sigma. At
+        SNR 1e6 the truncated diagonal for four peaks at overlap 0.2 is
+        small enough to classify as EASY -- "meV precision,
+        well-resolved" -- for a configuration with a 3-dimensional null
+        space. The bound classifies it IMPOSSIBLE.
+        """
+        cr = self._fisher(n_comp=4, overlap=0.2, noise_std=1e-6)
+        assert cr.null_space_dim == 3
+
+        n_comp = 4
+        pseudo_dE = float(np.mean([cr.crlb_pseudo[k * 3 + 1] for k in range(n_comp)]))
+        true_dE = float(np.mean([cr.crlb[k * 3 + 1] for k in range(n_comp)]))
+
+        assert _classify_crlb_dE(pseudo_dE, SIGMA) is SolvabilityLevel.EASY
+        assert _classify_crlb_dE(true_dE, SIGMA) is SolvabilityLevel.IMPOSSIBLE
+
+
 class TestMeanEfficiency:
     """The efficiency aggregation must give 1.0 for an ideal estimator."""
 

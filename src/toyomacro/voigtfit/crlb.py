@@ -42,8 +42,9 @@ Three conditions, none of them automatic here:
    background, or unmodelled lineshape asymmetry all break it.
 3. *A non-singular Fisher matrix*, plus the usual regularity conditions
    (support independent of theta, differentiation under the integral).
-   See compute_multipeak_fisher(): where the matrix is singular this
-   module does **not** report an infinite bound.
+   Where the matrix is singular the bound on an individual parameter
+   diverges -- only some combination of parameters is estimable -- and
+   compute_multipeak_fisher() reports inf for it.
 
 Beyond those, the bound conditions on everything not in theta. No
 background parameter appears in the Fisher matrix at all; mode='3d'
@@ -66,9 +67,9 @@ Key insight: the off-diagonal blocks coupling parameters of different
 peaks come from the overlap of their Jacobian columns, and are present
 under both weightings; the Poisson denominator modulates them rather
 than creating them. As overlap increases the Fisher matrix becomes
-ill-conditioned and the true bound diverges -- which is the fundamental
-limit of peak separation, and also the regime where the truncation
-noted above makes the *reported* number stop tracking it.
+ill-conditioned and the bound diverges -- the fundamental limit of peak
+separation -- until the matrix is numerically singular and the bound on
+the individual parameters is infinite.
 
 References:
     Rao (1945), Cramer (1946)
@@ -295,8 +296,24 @@ class CRLBResult:
 
     Attributes:
         fisher: Fisher Information Matrix (n_params_total, n_params_total)
-        crlb: CRLB per parameter = diag(inv(fisher)), shape (n_params_total,)
-        crlb_per_component: Nested dict {comp_idx: {param_name: crlb_value}}
+        crlb: CRLB per parameter = diag(inv(fisher)), shape
+            (n_params_total,). Entries are ``inf`` where the Fisher
+            matrix is singular along that parameter axis: the bound on
+            an individual parameter diverges when only some combination
+            of parameters is estimable. See ``unbounded``.
+        crlb_pseudo: Same diagonal taken from the thresholded
+            Moore-Penrose pseudo-inverse, i.e. with the null directions
+            dropped rather than diverging. **Not a bound** -- it is
+            smaller than the true one exactly where the configuration is
+            hardest, so a map of it can fall as peaks overlap further.
+            Kept because it stays finite and is useful as a regularized
+            diagnostic; never present it as a limit on precision.
+        unbounded: Boolean mask, shape (n_params_total,), true where
+            ``crlb`` is inf
+        null_space_dim: Number of eigenvalues at or below the rank
+            threshold (0 when the Fisher matrix is numerically full rank)
+        crlb_per_component: Nested dict {comp_idx: {param_name: crlb_value}},
+            following ``crlb`` including its infinities
         condition_number: Condition number of Fisher matrix
         eigenvalues: Eigenvalues in ascending order
         eigenvectors: Corresponding eigenvectors (columns)
@@ -308,6 +325,9 @@ class CRLBResult:
     """
     fisher: np.ndarray
     crlb: np.ndarray
+    crlb_pseudo: np.ndarray
+    unbounded: np.ndarray
+    null_space_dim: int
     crlb_per_component: dict[int, dict[str, float]]
     condition_number: float
     eigenvalues: np.ndarray
@@ -322,6 +342,12 @@ class CRLBResult:
 # Parameter name templates
 _PARAM_NAMES_3D = ('amp', 'dE', 'dsigma')
 _PARAM_NAMES_4D = ('amp', 'dE', 'dsigma', 'dgamma')
+
+# A parameter axis counts as lying in the null space when this much of
+# its unit vector projects there. Eigenvectors are orthonormal, so an
+# axis genuinely outside the null space projects at the 1e-30 level;
+# anything above this is structure, not round-off.
+_NULL_PROJECTION_TOL = 1e-10
 
 
 def compute_multipeak_fisher(
@@ -360,18 +386,18 @@ def compute_multipeak_fisher(
     Returns:
         CRLBResult with Fisher matrix, CRLB, and diagnostics. The CRLB
         entries bound the variance of an unbiased estimator of this
-        exact model **only where the Fisher matrix is non-singular**;
-        see the module docstring for what else that excludes. The noise
-        model actually used is recorded in CRLBResult.config['noise_model'].
+        exact model; see the module docstring for what else that
+        excludes. The noise model actually used is recorded in
+        CRLBResult.config['noise_model'].
 
-        Where the matrix is singular this function does not report an
-        infinite bound: eigenvalues at or below 1e-12 * lambda_max are
-        inverted to zero, so a non-identifiable direction contributes
-        nothing to the diagonal and the returned value **understates**
-        the true bound. Check `condition_number` and `eigenvalues`
-        before reading `crlb` in a strongly overlapped configuration. A
-        `crlb` entry that falls as overlap increases is this truncation,
-        not information.
+        Eigenvalues at or below 1e-12 * lambda_max are treated as null.
+        A parameter whose axis projects onto that null space gets
+        `crlb = inf`, flagged in `unbounded`, because only some
+        combination of parameters is estimable there and the bound on
+        the individual parameter genuinely diverges. `crlb_pseudo`
+        keeps the thresholded pseudo-inverse diagonal for callers that
+        need a finite diagnostic; it is smaller than the true bound in
+        exactly those configurations and is not a limit on precision.
     """
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
     centers = np.asarray(centers, dtype=np.float64)
@@ -444,12 +470,31 @@ def compute_multipeak_fisher(
     else:
         condition_number = np.inf
 
-    # Regularized inverse for CRLB
-    # Threshold at machine epsilon * max eigenvalue
+    # Moore-Penrose pseudo-inverse, thresholded at machine epsilon times
+    # the largest eigenvalue. This is a regularized diagnostic, not a
+    # bound: it drops the null directions instead of letting them
+    # diverge.
     eig_threshold = max(eigenvalues[-1] * 1e-12, 1e-30)
-    eig_inv = np.where(eigenvalues > eig_threshold, 1.0 / eigenvalues, 0.0)
+    null_mask = eigenvalues <= eig_threshold
+    eig_inv = np.where(null_mask, 0.0, 1.0 / eigenvalues)
     fisher_inv = (eigenvectors * eig_inv[np.newaxis, :]) @ eigenvectors.T
-    crlb = np.diag(fisher_inv)
+    crlb_pseudo = np.diag(fisher_inv).copy()
+
+    # The bound itself. [g^-1]_ii diverges for any parameter whose unit
+    # basis vector has a component in the null space of g: only the
+    # estimable combinations are bounded, not the individual parameters
+    # entering them. Report that as inf rather than as the pseudo-inverse
+    # diagonal, which is *smaller* than the true bound exactly where the
+    # problem is hardest.
+    crlb = crlb_pseudo.copy()
+    null_space_dim = int(null_mask.sum())
+    if null_space_dim:
+        # Squared projection of each parameter axis onto the null space.
+        null_weight = (eigenvectors[:, null_mask] ** 2).sum(axis=1)
+        unbounded = null_weight > _NULL_PROJECTION_TOL
+        crlb[unbounded] = np.inf
+    else:
+        unbounded = np.zeros(n_total, dtype=bool)
 
     # --- Step 6: Per-component CRLB and parameter names ---
     param_names = []
@@ -469,6 +514,9 @@ def compute_multipeak_fisher(
     return CRLBResult(
         fisher=fisher,
         crlb=crlb,
+        crlb_pseudo=crlb_pseudo,
+        unbounded=unbounded,
+        null_space_dim=null_space_dim,
         crlb_per_component=crlb_per_component,
         condition_number=condition_number,
         eigenvalues=eigenvalues,
@@ -893,6 +941,12 @@ class EfficiencyResult:
             Finally, at n_spectra=10_000 the Monte Carlo error on RMSE²
             is already of order a percent, so exact equality with 1.0 is
             not a meaningful target.
+
+            Where the Fisher matrix is singular the bound is infinite
+            and so is this ratio. That is the correct answer -- there is
+            no efficiency to quote against an unbounded target -- and it
+            marks the grid point as non-identifiable rather than merely
+            difficult. See CRLBResult.null_space_dim.
         efficiency_ds: same for sigma shift
         efficiency_amp: same for amplitude
         efficiency_dE_unmatched: efficiency_dE computed in the solver's

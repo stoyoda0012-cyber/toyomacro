@@ -10,6 +10,31 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`voigtfit.crlb` reported a small bound where it should have
+  reported no bound at all.** `compute_multipeak_fisher()` never
+  inverted the Fisher matrix; it built a pseudo-inverse with eigenvalues
+  at or below `1e-12·λ_max` sent to zero, so a direction carrying no
+  information contributed **nothing** to the diagonal instead of
+  diverging. The reported `crlb` was therefore *smaller* than the true
+  bound exactly where the configuration was hardest, and it fell as the
+  problem got worse: four peaks at σ=0.5, γ=0.3 go from a 1-dimensional
+  null space at overlap 0.3 to a 3-dimensional one at overlap 0.2, and
+  the reported bound drops by a factor of 26 across that step. The
+  consequence reached users: `process_multipeak()` attaches a
+  `SolvabilityInfo` to every result, and at SNR 1e6 that four-peak,
+  overlap-0.2 configuration — where the individual centres are not
+  identifiable at all — was classified **EASY**, "meV precision,
+  well-resolved". It is now IMPOSSIBLE. `crlb` entries are `inf` for any
+  parameter whose axis projects onto the numerical null space, flagged
+  in the new `unbounded` mask and counted by `null_space_dim`; the
+  previous diagonal remains available as `crlb_pseudo`, documented as a
+  regularized diagnostic and explicitly not a bound. Full-rank
+  configurations are unaffected: `crlb` and `crlb_pseudo` are identical
+  there, and every existing test passes unchanged. Downstream, an
+  infinite bound propagates to `classify_solvability()` (IMPOSSIBLE) and
+  to `efficiency_*` (`inf`), which is the correct answer rather than a
+  failure — there is no efficiency to quote against an unbounded target.
+
 - **`voigtfit.crlb` efficiency is now the mean of per-component
   efficiencies, and the oracle step behind it is visible.** The ratio
   was `mean_k(CRLB_k) / (mean_k RMSE_k)²` — a mean of variances over the
