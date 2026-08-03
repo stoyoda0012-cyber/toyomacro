@@ -14,6 +14,7 @@ accident -- only on an explicit opt-in, and loudly.
 from __future__ import annotations
 
 import json
+import warnings
 
 import pytest
 
@@ -91,6 +92,57 @@ def test_regenerate_cache_requires_the_opt_in(empty_cache, monkeypatch):
 
     with pytest.raises(RuntimeError, match=paths.REGENERATE_ENV_VAR):
         paths.regenerate_cache()
+
+
+def test_regenerate_cache_warns_before_each_overwrite(empty_cache, monkeypatch):
+    """The warning must fire before reviewed data is replaced, not after.
+
+    ``README.md`` and the docstrings promise it; without it the opt-in is
+    the only signal, and an opt-in set once in a shell persists.
+    """
+    monkeypatch.setenv(paths.REGENERATE_ENV_VAR, "1")
+    monkeypatch.setattr(paths, "get_common_data_path", lambda: empty_cache)
+    monkeypatch.setattr(paths, "_get_trzh2018_xlsx_path", lambda: empty_cache / "no-2018.xlsx")
+    monkeypatch.setattr(paths, "_get_trzh2019_xlsx_path", lambda: empty_cache / "no-2019.xlsx")
+    for csv_name in (
+        "BindingEnergyTable.csv",
+        "CompoundTable.csv",
+        "CrossSectionTable_Yeh=Lindau.csv",
+    ):
+        (empty_cache / csv_name).write_text("")
+
+    monkeypatch.setattr(paths, "_csv_to_json_binding_energy", lambda p: {"t": "be"})
+    monkeypatch.setattr(paths, "_csv_to_json_compounds", lambda p: {"t": "compounds"})
+    monkeypatch.setattr(paths, "_csv_to_json_cross_section", lambda p: {"t": "xs"})
+
+    with pytest.warns(UserWarning) as record:
+        results = paths.regenerate_cache()
+
+    messages = [str(w.message) for w in record]
+    assert len(messages) == 3, messages
+    for cache_name in ("binding_energy.json", "compounds.json", "cross_section.json"):
+        assert any(cache_name in m for m in messages), cache_name
+        assert results[cache_name] == "rebuilt"
+    assert all("unreviewed" in m for m in messages)
+
+
+def test_regenerate_cache_warns_before_it_writes(empty_cache, monkeypatch):
+    """Ordering, not just presence: turn the warning into an error.
+
+    If the warning were emitted after the write, the file would already
+    be on disk when the error propagates.
+    """
+    monkeypatch.setenv(paths.REGENERATE_ENV_VAR, "1")
+    monkeypatch.setattr(paths, "get_common_data_path", lambda: empty_cache)
+    (empty_cache / "BindingEnergyTable.csv").write_text("")
+    monkeypatch.setattr(paths, "_csv_to_json_binding_energy", lambda p: {"t": "be"})
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        with pytest.raises(UserWarning):
+            paths.regenerate_cache()
+
+    assert not (empty_cache / "binding_energy.json").exists()
 
 
 def test_regenerate_cache_keeps_tables_whose_source_is_missing(empty_cache, monkeypatch):

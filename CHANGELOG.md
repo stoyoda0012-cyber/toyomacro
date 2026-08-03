@@ -26,7 +26,12 @@ archived on Zenodo for a citable DOI.
   opt-in, **never deletes first**, writes each table in place only if
   its source is available, keeps the shipped copy otherwise, and returns
   a per-table report naming the two it does not handle instead of
-  omitting them silently. `src/toyomacro/data/_cache/README.md`
+  omitting them silently. It also warns immediately **before** each
+  overwrite, which the README and docstrings promised but the code did
+  not do — the opt-in alone is a poor signal, since an environment
+  variable set once in a shell persists; a test turns the warning into
+  an error and asserts nothing was written.
+  `src/toyomacro/data/_cache/README.md`
   described these files as regenerable build artifacts that should not
   be hand-edited, which was the opposite of the policy; it now says what
   they are.
@@ -165,6 +170,41 @@ archived on Zenodo for a citable DOI.
   documented and unfixed.
 
 ### Added
+
+- **`CompoundDB` now reports where each bundled value came from.**
+  `get_provenance(name)` returns a record per field, `get_comparisons(name)`
+  the published values found later that disagree with it, and
+  `get_investigations()` what was searched and what the search did not
+  cover. The data lives in a new bundled table,
+  `data/_cache/compounds_provenance.json`, deliberately **separate from
+  the values**: `get_properties()` still returns the four numbers and
+  nothing else, so no calculation sees a difference, and the CSV rebuild
+  path — which knows only the numeric columns — cannot silently drop the
+  provenance. The file is hand-authored and has no rebuild source.
+  Three distinctions are kept apart because collapsing any of them
+  states something untrue. **`availability` vs `origin`**: what is known
+  about the basis for a value is not how the value came to be what it
+  is. Almost every field is `not_recorded` with an `asserted` origin —
+  a number was typed in and the basis was never written down — and a
+  test being able to re-derive that number now does not make its origin
+  `derived`. Exactly one field in the table is `derived`: the Si3N4
+  molecular weight corrected above, which carries its expression and the
+  standard version it was computed from. **A source vs a later
+  comparison**: Shinotsuka *et al.* 2019 is not where SiO2's 2.2 g/cm³
+  came from, so it appears under `comparisons`, never as an origin; a
+  test fails if any entry with only a comparison acquires a `cited`
+  origin. **A property of the material vs a fact about a search**: "no
+  published counterpart" describes which three compilations were read,
+  and is recorded with its limits under `investigation`. A `phase`
+  record sits beside the value fields because density depends on it and
+  the table has no phase label — `rutile` for TiO2 and `monoclinic` for
+  HfO2 and ZrO2, but **`unknown` for GeO2**, whose two forms differ by
+  about 48% in density and which is therefore the largest unrecorded
+  uncertainty in the table. `tests/test_compound_provenance.py` (18
+  tests) pins key parity with `compounds.json`, coverage of every field,
+  a mandatory reason on every non-`known` state, the required members of
+  a `derived` or `cited` origin, and that the values themselves are
+  unchanged.
 
 - **`AngularCorrection` now warns when the x-ray incidence angle was
   never stated.** `angular_distribution()` and

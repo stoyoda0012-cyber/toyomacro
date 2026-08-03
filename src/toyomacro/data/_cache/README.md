@@ -39,6 +39,7 @@ correct use.
 | `trzhaskovskaya.json` | `CrossSectionTable_Trzhaskovskaya=Yarzhemsky.csv` | Trzhaskovskaya–Yarzhemsky cross sections |
 | `trzh2018_haxpes.json` | SESSAAnalyser Trzhaskovskaya 2018 xlsx | HAXPES σ/β/γ/δ, Z=1–100, 1.5–10 keV |
 | `trzh2019_inner.json` | SESSAAnalyser Trzhaskovskaya 2019 xlsx | Inner-shell σ/β/γ/δ, Z=13–100 |
+| `compounds_provenance.json` | hand-authored | Per-field provenance for `compounds.json` (no source to rebuild from) |
 
 "Generated from" records where a table originally came from, not a
 current equivalence: see the `compounds.json` section of

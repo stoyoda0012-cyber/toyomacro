@@ -21,11 +21,12 @@ from typing import Any
 # paths.py → data/ → toyomacro/ → src/ → toyomacro/ → SourceCode/ → Common/
 _DEFAULT_COMMON_PATH = Path(__file__).parent.parent.parent.parent.parent / "Common"
 
-# Cache directory inside the package.
-# These JSON files are regenerable (see regenerate_cache()) from the source
-# CSV/Excel tables in the sibling Common/ and SESSAAnalyser/ repos, but are
-# committed here as a pre-generated cache so the package works offline without
-# those sources. Treat them as build artifacts, not hand-edited data.
+# Bundled reference tables. The directory name is historical: these JSON
+# files are shipped, reviewed data, documented in docs/DATA_SOURCES.md and
+# pinned by tests -- not build artifacts. The CSV/Excel sources they were
+# built from are not part of this repository and have diverged since, so
+# rebuilding one (see regenerate_cache()) changes a reference dataset and
+# is gated behind REGENERATE_ENV_VAR rather than happening on demand.
 _CACHE_DIR = Path(__file__).parent / "_cache"
 
 
@@ -316,6 +317,24 @@ def load_compound_data() -> dict[str, Any]:
     return _load_shipped_table(
         "compounds.json", "CompoundTable.csv", _csv_to_json_compounds
     )
+
+
+def load_compound_provenance() -> dict[str, Any]:
+    """Load the per-field provenance for the compound table.
+
+    Hand-authored, never rebuilt from a CSV: the CSV sources carry no
+    provenance, so a rebuild would silently drop it.
+    """
+    provenance_file = get_cache_dir() / "compounds_provenance.json"
+    if not provenance_file.exists():
+        raise FileNotFoundError(
+            f"Bundled provenance table compounds_provenance.json is missing "
+            f"from {get_cache_dir()}. It ships with this package and is "
+            f"hand-authored -- there is no source to rebuild it from. Restore "
+            f"it (e.g. `git checkout` the file, or reinstall)."
+        )
+    with open(provenance_file, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def load_cross_section_data() -> dict[str, Any]:
@@ -698,6 +717,18 @@ def regenerate_cache() -> dict[str, str]:
     cache_dir = get_cache_dir()
     results: dict[str, str] = {}
 
+    def _write(cache_name: str, data: dict[str, Any]) -> None:
+        """Warn immediately before overwriting reviewed data, then write."""
+        warnings.warn(
+            f"Overwriting the bundled {cache_name} with an unreviewed rebuild "
+            f"from local sources. Review the diff before committing it: this "
+            f"is a change to a reference dataset.",
+            UserWarning,
+            stacklevel=3,
+        )
+        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
     for cache_name, csv_name, converter in (
         ("binding_energy.json", "BindingEnergyTable.csv", _csv_to_json_binding_energy),
         ("compounds.json", "CompoundTable.csv", _csv_to_json_compounds),
@@ -711,9 +742,7 @@ def regenerate_cache() -> dict[str, str]:
         if not csv_path.exists():
             results[cache_name] = f"skipped: {csv_name} not found"
             continue
-        data = converter(csv_path)
-        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        _write(cache_name, converter(csv_path))
         results[cache_name] = "rebuilt"
 
     for cache_name, path_getter, converter in (
@@ -724,9 +753,7 @@ def regenerate_cache() -> dict[str, str]:
         if not xlsx_path.exists():
             results[cache_name] = f"skipped: {xlsx_path.name} not found"
             continue
-        data = converter(xlsx_path)
-        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        _write(cache_name, converter(xlsx_path))
         results[cache_name] = "rebuilt"
 
     # scofield.json and trzhaskovskaya.json are rebuilt through

@@ -532,6 +532,12 @@ omitting it overestimates the IMFP by roughly 1.8% at 7.4 keV and 7% at
 
 Material parameters from `CompoundDB` are curated data with their own
 provenance and their own errors, independent of the formula's fidelity.
+`CompoundDB.get_provenance(name)` reports, per field, what is known
+about where each value came from; `get_comparisons(name)` gives
+published values found later that disagree with it, and
+`get_investigations()` says which compilations were searched and what
+the search did not cover. `get_properties()` is unaffected — it still
+returns the four numbers and nothing else.
 Note also that the 18.9% RMS figure for inorganic compounds — the group
 SiO₂ belongs to — is for a group that was *excluded* from the TPP-2M
 fit, on the authors' judgement that its optical data was less reliable.

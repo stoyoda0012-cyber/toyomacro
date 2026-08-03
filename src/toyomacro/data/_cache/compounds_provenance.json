@@ -1,0 +1,4128 @@
+{
+  "schema_version": "1",
+  "about": "Per-field provenance for compounds.json. availability records what is known about where a value came from; origin records how it came to hold the value it does. They are independent: a value can be asserted with its basis unrecorded. Verifying a stored value against a formula does not make its origin derived -- only authorship does. See docs/DATA_SOURCES.md.",
+  "vocabulary": {
+    "availability": {
+      "known": "The basis for this value is recorded here.",
+      "unknown": "A basis exists but has not been established.",
+      "not_recorded": "A basis existed when the value was entered and was not written down. A historical fact about this table, not a statement about the literature.",
+      "not_applicable": "The field is conceptually inapplicable to this entry."
+    },
+    "origin": {
+      "derived": "Computed here from a stated expression and standard. Requires formula, expression, standard and standard_version.",
+      "cited": "Taken from a identified publication. Requires a citation identifier.",
+      "asserted": "Recorded as a value with no basis captured. May coexist with availability not_recorded."
+    }
+  },
+  "investigation": [
+    {
+      "date": "2026-08-04",
+      "question": "Do the bundled compounds have counterparts in the TPP parameter series?",
+      "scope": [
+        "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991)",
+        "Shinotsuka et al., Surf. Interface Anal. 51, 427 (2019)",
+        "Shinotsuka et al., Surf. Interface Anal. 54, 534 (2022)"
+      ],
+      "result": "Five of the eleven compounds appear: Al2O3, GaAs, SiC and SiO2 in the 2019 set, Si3N4 in the 1991 set. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the three.",
+      "limits": "Three parts of a series running to at least Part XIII were read. Later parts have not been surveyed, so an absence here is not an absence from the series."
+    },
+    {
+      "date": "2026-08-04",
+      "question": "Can SESSA (NIST SRD 100) supply an independently sourced density or band gap for the six compounds with no TPP counterpart?",
+      "scope": [
+        "SESSA v2.2.2 bundled databases, read locally"
+      ],
+      "result": "No. SESSA has no band-gap database outside its 100-entry TPP table, and none of the six is in that table. Its compound density table carries no per-entry source, and its HfO2 density is 9.68 -- the value already bundled here, so not an independent check. It did establish the GeO2 and TiO2 phase ambiguities recorded above.",
+      "limits": "Read-only inspection of the shipped databases. SESSA was not run. Its own Si3N4 row attributes parameters to the 2019 paper, which states that it excluded Si3N4, so that attribution is not usable."
+    }
+  ],
+  "comparisons": {
+    "Al2O3": [
+      {
+        "source": {
+          "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
+          "doi": "10.1002/sia.6598"
+        },
+        "values": {
+          "Mw": 101.961,
+          "density": 3.97,
+          "Nv": 24,
+          "Eg": 8.63
+        },
+        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+      }
+    ],
+    "GaAs": [
+      {
+        "source": {
+          "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
+          "doi": "10.1002/sia.6598"
+        },
+        "values": {
+          "Mw": 144.645,
+          "density": 5.32,
+          "Nv": 8,
+          "Eg": 1.47
+        },
+        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+      }
+    ],
+    "Si3N4": [
+      {
+        "source": {
+          "name": "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5",
+          "doi": null,
+          "note": "Pre-DOI; cited by volume and page. Table 5 has no molecular-weight column."
+        },
+        "values": {
+          "density": 3.44,
+          "Nv": 32,
+          "Eg": 5.25
+        },
+        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+      }
+    ],
+    "SiC": [
+      {
+        "source": {
+          "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
+          "doi": "10.1002/sia.6598"
+        },
+        "values": {
+          "Mw": 40.096,
+          "density": 3.22,
+          "Nv": 8,
+          "Eg": 2.31
+        },
+        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+      }
+    ],
+    "SiO2": [
+      {
+        "source": {
+          "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
+          "doi": "10.1002/sia.6598"
+        },
+        "values": {
+          "Mw": 60.008,
+          "density": 2.19,
+          "Nv": 16,
+          "Eg": 9.1
+        },
+        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+      }
+    ]
+  },
+  "entries": {
+    "AVERAGE": {
+      "Nv": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "density": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "Mw": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "Eg": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "phase": {
+        "availability": "not_applicable",
+        "reason": "Not a material; it has no crystal phase."
+      }
+    },
+    "SiO2": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "GeO2": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "Two forms differ by ~48% in density: hexagonal quartz-like ~4.25 and tetragonal rutile-type ~6.24 g/cm3. The stored 4.228 matches the hexagonal form, but nothing records which was intended, and the wrong choice would move lambda by far more than any other uncertainty in this table.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "TiO2": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "known",
+        "reason": "The stored 4.23 g/cm3 is the rutile density; anatase is 3.79-3.89 and brookite 4.12. Identified here from the density alone -- the table records no phase, and the original entry did not state one.",
+        "value": "rutile",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Al2O3": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "ZrO2": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "known",
+        "reason": "The stored 5.68 g/cm3 is the monoclinic (baddeleyite) density; tetragonal and cubic forms are ~6.1. Identified from the density.",
+        "value": "monoclinic",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "HfO2": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "known",
+        "reason": "The stored 9.68 g/cm3 is the bulk monoclinic density. Amorphous ALD films are commonly lower, which matters here: this is the most density-sensitive entry in the table.",
+        "value": "monoclinic",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ta2O5": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "SrTiO3": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Oxide": {
+      "Nv": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "density": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "Mw": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "Eg": {
+        "availability": "not_applicable",
+        "reason": "Not a material: a placeholder used as a fallback, so no literature source is conceptually applicable."
+      },
+      "phase": {
+        "availability": "not_applicable",
+        "reason": "Not a material; it has no crystal phase."
+      }
+    },
+    "Si3N4": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "known",
+        "origin": {
+          "kind": "derived",
+          "formula": "Si3N4",
+          "expression": "3*A(Si) + 4*A(N)",
+          "standard": "IUPAC conventional standard atomic weights",
+          "standard_version": "2021",
+          "derived_by": "this project, 2026-08-04"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "alpha and beta differ by under 1% in density (3.18 and 3.20 from their lattice constants), so the stored 3.2 does not identify one. The upstream table splits this entry into two phases; this one is not labelled.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "SiC": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "The stored band gap 3.26 eV is a 4H/6H polytype value while the TPP-series tables carry the cubic 3C figure (2.31 eV), so the entry is not internally consistent with a single polytype. The density 3.22 does not discriminate: the polytypes differ by under 1%.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "GaAs": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Li": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Be": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "B": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "C": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Na": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Mg": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Al": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Si": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "P": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "S": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "K": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ca": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sc": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ti": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "V": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cr": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Mn": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Fe": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Co": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ni": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cu": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Zn": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ga": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ge": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "As": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Se": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Rb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sr": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Y": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Zr": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Nb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Mo": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Tc": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ru": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Rh": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pd": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ag": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cd": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "In": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sn": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Te": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cs": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ba": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "La": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ce": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pr": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Nd": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pm": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sm": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Eu": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Gd": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Tb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Dy": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ho": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Er": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Tm": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Yb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Lu": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Hf": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ta": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "W": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Re": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Os": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ir": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pt": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Au": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Tl": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pb": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Bi": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Po": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Fr": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ra": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ac": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Th": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pa": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "U": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Np": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Pu": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Am": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cm": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Bk": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Cf": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Es": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "No": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Rf": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Db": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Sg": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Bh": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Hs": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Mt": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Fl": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Mc": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Lv": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Ts": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    },
+    "Og": {
+      "Nv": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "density": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Mw": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "Eg": {
+        "availability": "not_recorded",
+        "reason": "Hand-entered by the author in 2020-2021 from Wikipedia and commonly quoted literature values; the per-entry source was not written down at the time and cannot be reconstructed.",
+        "origin": {
+          "kind": "asserted"
+        }
+      },
+      "phase": {
+        "availability": "unknown",
+        "reason": "No phase or allotrope was recorded with the entry. Where a material has forms of differing density, which one the stored density describes is not established.",
+        "applies_to": [
+          "density"
+        ]
+      }
+    }
+  }
+}

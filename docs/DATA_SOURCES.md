@@ -211,6 +211,45 @@ The remedy in all of these cases is the same — pass `Nv`, `density`,
 `Mw` and `Eg` to `IMFP.tpp2m()` explicitly, from a source appropriate to
 the sample, whenever the value affects a reported result.
 
+### Querying it per entry
+
+All of the above is recorded per entry and per field in
+`compounds_provenance.json`, reachable through `CompoundDB`:
+
+```python
+CompoundDB.get_provenance("SiO2")["density"]["availability"]  # 'not_recorded'
+CompoundDB.get_comparisons("SiO2")     # the 2019 table, which disagrees
+CompoundDB.get_investigations()        # what was searched, and its limits
+```
+
+It is a **separate file** from the values. `get_properties()` returns
+numbers and nothing else, so a calculation sees exactly what it saw
+before; and the CSV rebuild path, which knows only the four numeric
+columns, cannot silently drop the provenance along the way.
+
+Three distinctions the schema keeps apart, because collapsing any of
+them would state something untrue:
+
+- **`availability` and `origin`.** The first is what is known about the
+  basis for a value; the second is how the value came to be what it is.
+  Almost every entry is `not_recorded` with an `asserted` origin —
+  somebody typed a number in and the basis was never written down. That
+  a test can now re-derive the same number does not make its origin
+  `derived`. Only one field in the whole table is `derived`: the Si3N4
+  molecular weight, computed here from the formula and IUPAC 2021
+  values, which is why it carries the expression and standard version.
+- **A source and a later comparison.** Shinotsuka *et al.* 2019 is not
+  where SiO2's 2.2 g/cm³ came from; it is a table found afterwards that
+  *disagrees*. It lives under `comparisons`, never in `origin`.
+- **A property of the material and a fact about a search.** "No
+  published counterpart" is a statement about which compilations were
+  read — three of them — and belongs in `investigation`, with its
+  limits attached, not in the entry.
+
+`phase` sits alongside the value fields because density depends on it
+and the table carries no phase label. It can be `unknown`, and for GeO2
+that is the largest uncertainty in the entry.
+
 ## In-code constants
 
 Two modules carry small curated sets of scalar physical constants
