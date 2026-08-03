@@ -10,6 +10,27 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **Deleting a bundled reference table no longer rebuilds it, silently,
+  from a CSV that is not in this repository.** The tables under
+  `data/_cache/` are shipped, reviewed data; the loaders treated them as
+  a regenerable cache, and `docs/DATA_SOURCES.md` documented deleting
+  one as the way to rebuild it. On the maintainer's machine that path
+  returns a **different dataset**: 166 compound entries instead of 109,
+  **no `Si3N4`** — the CSV splits it by phase under other names, so
+  `CompoundDB.get_properties("Si3N4")` would begin returning `None` —
+  and different parameters for Al2O3, GaAs, SiC and SiO2, the four with
+  published counterparts. Any of those may be the right change; none
+  should arrive because a file was deleted, least of all in the one
+  category the project requires an independent audit for. A missing
+  table now raises `FileNotFoundError` naming the file and the opt-in;
+  setting `TOYOMACRO_REGENERATE_DATA=1` rebuilds it and warns that the
+  result is unreviewed. Public installs are unaffected either way — the
+  CSVs have never shipped, so that path could only ever fail. Measured
+  while checking the scope: `cross_section.json` and
+  `binding_energy.json` still match their CSVs exactly, so
+  `compounds.json` was the only table that had actually diverged.
+  `tests/test_bundled_table_loading.py` covers all three.
+
 - **`compounds.json` gave Si3N4 a molecular weight of 104.28346 g/mol;
   the correct value is 140.28346.** A digit transposition, and the only
   one in the table — the other ten compounds agree with their formula

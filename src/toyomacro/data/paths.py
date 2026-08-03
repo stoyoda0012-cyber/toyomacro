@@ -1,10 +1,10 @@
 """
-Data path resolution and JSON cache management.
+Data path resolution and bundled-table loading.
 
 Handles:
-- Common/data/ CSV source location
-- JSON cache generation and loading
-- Environment variable overrides
+- locating the bundled reference tables under ``_cache/``
+- the opt-in path that rebuilds one from a local CSV source
+- environment variable overrides
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from __future__ import annotations
 import csv
 import json
 import os
+import warnings
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -237,58 +239,90 @@ def _csv_to_json_cross_section(csv_path: Path) -> dict[str, Any]:
     return {"photon_energies": photon_energies, "data": data}
 
 
-def load_binding_energy_data() -> dict[str, Any]:
-    """Load binding energy data, using cache if available."""
-    cache_file = get_cache_dir() / "binding_energy.json"
+#: Env var that permits rebuilding a shipped table from a local CSV.
+#: Unset (the normal case), a missing table is an error rather than a
+#: silent rebuild — see :func:`_load_shipped_table`.
+REGENERATE_ENV_VAR = "TOYOMACRO_REGENERATE_DATA"
 
-    # Try cache first
+
+def _load_shipped_table(
+    cache_name: str,
+    csv_name: str,
+    converter: Callable[[Path], dict[str, Any]],
+) -> dict[str, Any]:
+    """Load one bundled reference table from ``_cache/``.
+
+    The files under ``_cache/`` are named "cache" for historical reasons
+    but are **shipped reference data**: reviewed, documented in
+    ``docs/DATA_SOURCES.md``, and pinned by tests. The CSV sources they
+    were built from are not part of this repository, are not shipped,
+    and have since moved on independently.
+
+    So a missing table is not rebuilt on the quiet. Doing that would let
+    a table be replaced by whatever a local CSV happens to contain, with
+    no review — the change that most needs one. It is not hypothetical:
+    on the maintainer's machine, rebuilding ``compounds.json`` from the
+    current CSV yields 166 entries rather than 109, drops ``Si3N4``
+    (split there into two phases under different names), and moves the
+    parameters of Al2O3, GaAs, SiC and SiO2.
+
+    Set :data:`REGENERATE_ENV_VAR` to opt in. The result is unreviewed
+    by construction, so it is written where it will be seen in a diff
+    rather than returned silently.
+
+    Raises:
+        FileNotFoundError: if the table is missing and regeneration was
+            not requested.
+    """
+    cache_file = get_cache_dir() / cache_name
+
     if cache_file.exists():
         with open(cache_file, encoding="utf-8") as f:
             return json.load(f)
 
-    # Generate from CSV
-    csv_path = get_common_data_path() / "BindingEnergyTable.csv"
-    data = _csv_to_json_binding_energy(csv_path)
+    if not os.environ.get(REGENERATE_ENV_VAR):
+        raise FileNotFoundError(
+            f"Bundled reference table {cache_name} is missing from "
+            f"{get_cache_dir()}. It ships with this package and is not a "
+            f"disposable cache; restore it (e.g. `git checkout` the file, or "
+            f"reinstall). To rebuild it instead from a local "
+            f"{csv_name} — which may not hold the same values, and which "
+            f"changes a reference dataset without review — set "
+            f"{REGENERATE_ENV_VAR}=1."
+        )
 
-    # Save to cache
+    warnings.warn(
+        f"Rebuilding {cache_name} from {csv_name}. The result is unreviewed "
+        f"and may differ from the reference table this package ships; "
+        f"check the diff before committing it.",
+        UserWarning,
+        stacklevel=3,
+    )
+    data = converter(get_common_data_path() / csv_name)
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
-
     return data
+
+
+def load_binding_energy_data() -> dict[str, Any]:
+    """Load the bundled elemental binding-energy table."""
+    return _load_shipped_table(
+        "binding_energy.json", "BindingEnergyTable.csv", _csv_to_json_binding_energy
+    )
 
 
 def load_compound_data() -> dict[str, Any]:
-    """Load compound data, using cache if available."""
-    cache_file = get_cache_dir() / "compounds.json"
-
-    if cache_file.exists():
-        with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
-
-    csv_path = get_common_data_path() / "CompoundTable.csv"
-    data = _csv_to_json_compounds(csv_path)
-
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    return data
+    """Load the bundled compound/element property table."""
+    return _load_shipped_table(
+        "compounds.json", "CompoundTable.csv", _csv_to_json_compounds
+    )
 
 
 def load_cross_section_data() -> dict[str, Any]:
-    """Load cross section data, using cache if available."""
-    cache_file = get_cache_dir() / "cross_section.json"
-
-    if cache_file.exists():
-        with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
-
-    csv_path = get_common_data_path() / "CrossSectionTable_Yeh=Lindau.csv"
-    data = _csv_to_json_cross_section(csv_path)
-
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    return data
+    """Load the bundled Yeh & Lindau cross-section table."""
+    return _load_shipped_table(
+        "cross_section.json", "CrossSectionTable_Yeh=Lindau.csv", _csv_to_json_cross_section
+    )
 
 
 def _get_trzh2018_xlsx_path() -> Path:

@@ -263,9 +263,27 @@ directly in source (no external database is extracted or shipped):
   supplementary tables has yet been documented, so they are deliberately
   not bundled.
 
-## Regenerating the caches
+## Rebuilding a table
 
-The JSON caches are loaded cache-first (`CrossSection._load_with_cache`);
-the original `Common/data/*.csv` sources are only needed to regenerate them
-and are not part of this repository. Deleting a cache file and performing a
-lookup with the CSV sources present rebuilds it.
+The directory is called `_cache/` for historical reasons. Its contents
+are **shipped reference data**, not a disposable cache: they are
+reviewed, described above, and pinned by tests. The `Common/data/*.csv`
+files they were originally built from are not part of this repository
+and are not shipped.
+
+A missing table therefore raises rather than rebuilding itself. The
+earlier behaviour — delete the file, do a lookup, get it back — was a
+way to replace a reference dataset with whatever a local CSV happened to
+contain, without review. That is not hypothetical. On the maintainer's
+machine today, rebuilding `compounds.json` from the current CSV produces
+166 entries instead of 109, **drops `Si3N4`** (split there into two
+phases under different names, so `CompoundDB.get_properties("Si3N4")`
+would start returning `None`), and moves the parameters of Al2O3, GaAs,
+SiC and SiO2 — the four with published counterparts — toward the 2019
+values. Any of that may be the right change to make; none of it should
+happen because a file was deleted.
+
+To rebuild deliberately, set `TOYOMACRO_REGENERATE_DATA=1`. The loader
+then warns that the result is unreviewed and writes it in place, so the
+change appears in a diff and can be reviewed like any other change to a
+reference dataset.
