@@ -10,6 +10,23 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`compounds.json` gave Si3N4 a molecular weight of 104.28346 g/mol;
+  the correct value is 140.28346.** A digit transposition, and the only
+  one in the table — the other ten compounds and all 96 elements agree
+  with their formula weights to five significant figures. It was not
+  cosmetic: TPP-2M combines the parameters as `U = N_v·ρ/M`, so an M
+  that is 26% low inflates U by 34% and the reported IMFP by **+20% at
+  100 eV, +12% at 500 eV and +11% at 2 keV** — the whole range the
+  formula was fitted over. Anything that took Si3N4 parameters from
+  `CompoundDB` and passed them to `IMFP.tpp2m()` or `sampling_depth()`
+  was affected; explicitly passed parameters were not. The project's
+  upstream table already carried 140.2833, so only the bundled cache was
+  stale. `tests/test_compound_parameters.py` (24 tests) now derives
+  every compound's molecular weight from its chemical formula and checks
+  that N_v is counted per molecule to match, which is the coherence a
+  mistyped constant breaks; reintroducing 104.28346 fails two of them.
+  No other bundled value changed.
+
 - **`voigtfit.crlb` reported a small bound where it should have
   reported no bound at all.** `compute_multipeak_fisher()` never
   inverted the Fisher matrix; it built a pseudo-inverse with eigenvalues
@@ -56,8 +73,14 @@ archived on Zenodo for a citable DOI.
   overlap is dominated by label permutation rather than estimation
   error, but `efficiency_*_unmatched` now reports the same comparison in
   the solver's own component order, and `swap_fraction` sits beside it.
-  Measured, the oracle is worth 0–12% and the aggregation change 0–8% on
-  real runs: both are corrections of meaning more than of magnitude.
+  At the module's own defaults the aggregation change is worth −3% to
+  +1%, but the oracle is not small: it raises `efficiency_dE` by 98.7%
+  for two peaks at overlap 0.5, 13.6% for five at overlap 0.5, and 6.2%
+  for two at overlap 0.8. An earlier draft of this entry said "0–12%"
+  and called both "corrections of meaning more than of magnitude"; that
+  range came from a reduced grid and does not hold. It survives in the
+  message of commit `4b480b6`, which was already published and is left
+  as written.
   `EfficiencyResult` also exposes `rmse_*_per` so no averaging is
   hidden. The remaining upstream defect — singular directions inverted
   to zero rather than diverging — is unchanged.
@@ -74,8 +97,10 @@ archived on Zenodo for a citable DOI.
   n_comp=2, SNR 500. And `noise_std` was taken from the stronger
   generated spectra while the Fisher matrix was built from the weaker
   modelled one, inflating every CRLB by the square of the amplitude
-  ratio — measured at 3.64× for that configuration, and
-  configuration-dependent in general. The generator call now passes
+  ratio — 2.99× measured over that ensemble, against a single-peak
+  nominal `(1/V_max)²` of 3.64; the two differ because the ensemble
+  jitters σ, and the figure is configuration-dependent in any case. The
+  generator call now passes
   `peak_normalize=False`; nothing else moved. **Every `efficiency_*`
   number this function has ever reported was affected**, in both
   directions: the same well-separated case returned 2.04 before the fix
@@ -83,8 +108,11 @@ archived on Zenodo for a citable DOI.
   measured against. The guard was `assert efficiency_dE > 0.01`, which
   is one-sided and could not see an inflated value; it is now a
   two-sided bracket plus an amplitude-bias assertion, both set from
-  measurement with ~20× margin and verified to fail when the defect is
-  reintroduced. Two further artefacts in the same ratio — the
+  measurement and verified to fail when the defect is reintroduced
+  (0.917 against a 0.05 ceiling, 2.036 against a 1.5 one). The margins
+  are not equal: 19.8× on the amplitude assertion, 2.51× on the upper
+  end of the efficiency bracket, which is deliberately loose while the
+  artefacts in that ratio remain. Two further artefacts in the same ratio — the
   aggregation formula and an oracle relabelling step — remain
   documented and unfixed.
 

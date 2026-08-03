@@ -36,7 +36,7 @@ been granted where none is stated.
 | `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
 | `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. |
-| `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and it predates the modern TPP compilations rather than deriving from them. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
+| `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and every entry that overlaps a TPP-series parameter table differs from it. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
 
 ## Cross-section units — one table's is not established
 
@@ -95,27 +95,52 @@ one is not, and the difference matters when the values feed TPP-2M.
 The entries were typed in by hand in 2020–2021 from Wikipedia and from
 figures commonly quoted in the literature, as a working parameter set for
 the IMFP formula. No per-entry source was recorded, and the record cannot
-be reconstructed after the fact. The file has not been revised since.
+be reconstructed after the fact.
 
 Two consequences follow, and they pull in opposite directions.
 
 **On rights, the position is clean.** The set is not an extract of any
-compilation. The modern TPP-series parameter tables — Shinotsuka *et al.*,
-*Surf. Interface Anal.* **51**, 427 (2019), DOI 10.1002/sia.6598 (42
-inorganic compounds) and **54**, 534 (2022), DOI 10.1002/sia.7064
-(organics and water) — are the obvious upstream candidate, and they are
-**not** the source of these values: the file predates their adoption
-anywhere in this project, and the individual numbers differ from those
-tables where the two overlap. Nothing here reproduces a published table.
+compilation. The TPP-series parameter tables — Tanuma, Powell & Penn,
+*Surf. Interface Anal.* **17**, 927 (1991) (15 inorganic compounds,
+Table 5); Shinotsuka *et al.*, **51**, 427
+(2019), DOI 10.1002/sia.6598 (42 inorganic compounds, Table 1); and
+**54**, 534 (2022), DOI 10.1002/sia.7064 (organics and water) — are the
+obvious upstream candidate, and they are **not** the source of these
+values. Every entry that overlaps one of those tables differs from it in
+at least one field. Nothing here reproduces a published table.
 
-**On accuracy, the position is weak, and unevenly so.** Only four of the
-eleven compounds (Al2O3, GaAs, SiC, SiO2) appear in the 2019 inorganic
-set at all. The materials most often wanted in practice — TiO2, HfO2,
-ZrO2, Ta2O5, SrTiO3, GeO2, Si3N4 — are in neither TPP compilation, so
-there is no published parameter set to check them against; they are
-uncited values and will stay uncited until each is sourced individually.
+**On accuracy, the position is weaker, and uneven.** Five of the eleven
+compounds appear somewhere in the TPP series — Al2O3, GaAs, SiC and SiO2
+in the 2019 set, and Si3N4 in the 1991 set (the 2019 study dropped Si3N4
+and LiF, whose energy-loss functions gave large sum-rule errors, and
+recommends the TPP-2M formula for those two instead). Where a published
+set exists the hand-entered values are close, though not identical:
 
-How much that costs depends on the material. Perturbing one input of
+| Entry | bundled λ (Å) | published λ (Å) | Δ | differs in |
+|---|---:|---:|---:|---|
+| GaAs | 22.44 | 22.44 | −0.0% | ρ, E_g (both marginal) |
+| SiO2 | 30.08 | 30.39 | −1.0% | ρ 2.2 vs 2.19, E_g 8.9 vs 9.1 |
+| SiC | 22.63 | 22.38 | +1.1% | E_g 3.26 vs 2.31 — a 4H/6H polytype gap against the cubic one |
+| Si3N4 | 23.98 | 23.59 | +1.7% | α phase (3.2, 5.3) against the tabulated β (3.44, 5.25) |
+| Al2O3 | 24.26 | 24.91 | −2.6% | E_g 7.6 vs 8.63 |
+
+**The other six — TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 — are in no
+TPP compilation**, so there is no published parameter set to check them
+against. They are uncited and will stay uncited until each is sourced
+individually. Note what the table above does *not* license: agreement
+within 2.6% on five entries that happen to have published counterparts
+says nothing about the six that do not.
+
+One class of error is checkable without any source, and one instance was
+found: `Si3N4` carried M = 104.28346 g/mol, a digit transposition of the
+correct 140.28346, which inflated λ by 11–20% across the fitted range.
+`tests/test_compound_parameters.py` now derives every compound's
+molecular weight from its formula and checks that N_v is counted over
+the same unit, so a mistyped constant can no longer sit in the table
+looking plausible.
+
+How much a *sourcing* error costs depends on the material. Perturbing
+one input of
 TPP-2M at 1 keV kinetic energy, inside the 50–2000 eV range the formula
 was fitted over, and reading λ off the bundled entries:
 
