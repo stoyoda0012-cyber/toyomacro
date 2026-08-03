@@ -5,7 +5,8 @@ format); /provenance records facts read from the upstream input files
 plus the reader/importer transform history. These tests run entirely on
 synthetic fixtures (tests/_synthetic_files.py).
 
-Design contract: docs/hdf5_provenance_phase_b1_design.md
+Design contract: the provenance design note (non-public; see
+CONTRIBUTING.md). The contract it fixes is asserted here.
 """
 
 from __future__ import annotations

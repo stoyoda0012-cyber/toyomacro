@@ -243,6 +243,21 @@ archived on Zenodo for a citable DOI.
 
 ### Changed
 
+- **The `/provenance` HDF5 schema design record is no longer published.**
+  `docs/hdf5_provenance_phase_b1_design.md` was a dated internal working
+  document — an approval and phase log, in the maintainer's working
+  language, built on a non-public audit note it cited throughout — which
+  the repository's own publication policy excludes. It moves to
+  `docs/_internal/`. Five shipped modules cited it as their design
+  contract; they now cite it the way this project already cites its
+  non-public development log, and `CONTRIBUTING.md` documents that
+  convention. The rules the note fixes are stated where they are
+  implemented and asserted by `tests/test_provenance_schema.py`, so no
+  behaviour, schema or test changed. Internal documents are now excluded
+  by directory rather than by listing each filename in `.gitignore`,
+  which had put those filenames in a public file and did not catch new
+  ones.
+
 - **Documentation only: `docs/DATA_SOURCES.md` now states where the
   `compounds.json` values actually came from.** The entry read "in-house
   curation" and "project-original selection", which described the

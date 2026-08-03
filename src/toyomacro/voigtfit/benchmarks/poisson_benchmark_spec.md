@@ -1,7 +1,9 @@
 # Poisson Noise Generation Benchmark Specification
 
 **Created**: 2026-02-16 (dev-log 22)
-**Status**: Next session (dev-log 24) task
+**Status**: Implemented — this document is the specification the
+benchmark was written against; run it with `poisson_benchmark.py`
+in this directory.
 
 ## Purpose
 

@@ -8,7 +8,9 @@ reader/importer applied afterwards. ``source_format`` labels which
 upstream format the data was read from; it does not imply conformance
 to, or endorsement of, any vendor's official schema.
 
-Layout and rules: docs/hdf5_provenance_phase_b1_design.md
+Layout and rules: the provenance design note (non-public; see the
+"Dev-log and design-note references" section of CONTRIBUTING.md).
+The rules it fixes, which this module implements:
   - unknown scalar = attribute absent (never 0 / NaN / ""),
   - scalars live in group attributes (robust against the repack path's
     float64->float32 dataset downcast, see design doc §2.1),

@@ -45,8 +45,8 @@ class ToyomacroSchema:
     PATH_MISC: Final[str] = "/misc"
     # Provenance namespace: facts read from the upstream input file
     # (PXT/IBW/VAMAS/NPL/SES) plus the reader/importer transform history.
-    # See docs/hdf5_provenance_phase_b1_design.md. The /uncertainty
-    # namespace is reserved by that document and NOT created here.
+    # See the provenance design note (non-public; CONTRIBUTING.md).
+    # The /uncertainty namespace is reserved by it and NOT created here.
     PATH_PROVENANCE: Final[str] = "/provenance"
 
     # Version of the /provenance group schema (independent of VERSION)

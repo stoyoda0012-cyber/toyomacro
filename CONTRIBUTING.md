@@ -66,7 +66,7 @@ under an already-released version.
 - Performance-critical paths in `voigtfit` should include a benchmark
   in `src/toyomacro/voigtfit/benchmarks/` when introducing new solvers.
 
-## Dev-log references
+## Dev-log and design-note references
 
 Docstrings and comments occasionally cite `dev-log NN`. These refer to
 entries in the maintainer's (non-public) development log, recording
@@ -74,6 +74,17 @@ when a numerical result, threshold, or design decision was
 established — read them like issue-tracker references: the number
 identifies the experiment, the surrounding text states its
 conclusion.
+
+A few modules likewise cite a **design note** that is not published —
+the `/provenance` HDF5 schema is the main one. These are dated working
+records built on other non-public material, so they are kept under
+`docs/_internal/` rather than shipped. Nothing in this repository
+requires one in order to be understood: where such a note fixes a rule
+that the code implements, the rule is stated at the point of use, and
+the tests assert it. Cite them the same way — as provenance for a
+decision, not as required reading. If you find a place where the note
+is load-bearing and the rule is not stated locally, that is a bug in
+the comment; please report it.
 
 ## Code of Conduct
 

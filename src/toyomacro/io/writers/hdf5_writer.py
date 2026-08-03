@@ -277,8 +277,8 @@ class HDF5Writer:
     ) -> None:
         """Write the /provenance group from Phase A reader output.
 
-        See toyomacro.io.provenance and
-        docs/hdf5_provenance_phase_b1_design.md.
+        See toyomacro.io.provenance and the provenance design note
+        (non-public; CONTRIBUTING.md).
         """
         self._ensure_open()
         from toyomacro.io.provenance import write_provenance
