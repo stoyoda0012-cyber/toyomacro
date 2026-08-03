@@ -209,6 +209,26 @@ archived on Zenodo for a citable DOI.
 
 ### Changed
 
+- **Documentation only: `docs/DATA_SOURCES.md` now states where the
+  `compounds.json` values actually came from.** The entry read "in-house
+  curation" and "project-original selection", which described the
+  *choice* of entries but implied a curation process the file never had.
+  The values were hand-entered in 2020–2021 from Wikipedia and commonly
+  quoted literature figures, with no per-entry source recorded — the
+  absence of citations was already flagged, but not its cause. A new
+  section separates the two questions the entry had run together: the
+  rights position is clean (the set reproduces no published table, and
+  is not derived from the Shinotsuka *et al.* 2019/2022 TPP parameter
+  compilations), while accuracy is weak and uneven. Only four of the
+  eleven compounds appear in the 2019 inorganic set; TiO2, HfO2, ZrO2,
+  Ta2O5, SrTiO3, GeO2 and Si3N4 are in neither compilation, so no
+  published parameter set exists to check them against. A measured
+  sensitivity table (TPP-2M at 1 keV, inside the fitted range) shows
+  where this costs anything: ρ ±10% moves λ by 2–3% for most oxides but
+  5% for HfO2, whose bundled 9.68 g/cm³ is the bulk monoclinic density
+  and overestimates amorphous ALD films by 8–14%, biasing λ 3.5–6% in
+  one direction. No bundled value changed.
+
 - **Documentation only: "Stage 2" now says what it is and what it is
   for.** Two unrelated constructions here have two phases, and both were
   written "2-Stage": the Stage 1 / Stage 2 screening pipeline, and the

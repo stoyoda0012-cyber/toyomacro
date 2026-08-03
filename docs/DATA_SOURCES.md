@@ -36,7 +36,7 @@ been granted where none is stated.
 | `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
 | `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (integer eV), per subshell | Standard elemental BE compilation — values match the LBNL X-ray Data Booklet "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. |
-| `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: ~12 compounds and the rest elements, including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) | In-house curation of standard physical constants (densities, molecular weights, band gaps) for TPP-2M input. | Project-original selection and machine-readable arrangement, released under this package's licence. **Per-entry sources are not recorded, and this is a known gap** — the constants are asserted, not cited. The transactinide densities in particular are theoretical predictions, not measurements, and TPP-2M was never fitted to anything resembling those materials; treat those entries as placeholders, not reference data. Pass parameters explicitly where the value matters. |
+| `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and it predates the modern TPP compilations rather than deriving from them. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
 
 ## Cross-section units — one table's is not established
 
@@ -86,6 +86,67 @@ subshell returns `None` rather than summing the listed component alone
 and calling the absent one zero. The listed component is still available
 as a j-resolved request, and the 38-count is pinned by test so the
 evidence remains actionable if the rule is later confirmed.
+
+## `compounds.json` — where these numbers came from
+
+The other bundled tables are transcriptions of a named publication. This
+one is not, and the difference matters when the values feed TPP-2M.
+
+The entries were typed in by hand in 2020–2021 from Wikipedia and from
+figures commonly quoted in the literature, as a working parameter set for
+the IMFP formula. No per-entry source was recorded, and the record cannot
+be reconstructed after the fact. The file has not been revised since.
+
+Two consequences follow, and they pull in opposite directions.
+
+**On rights, the position is clean.** The set is not an extract of any
+compilation. The modern TPP-series parameter tables — Shinotsuka *et al.*,
+*Surf. Interface Anal.* **51**, 427 (2019), DOI 10.1002/sia.6598 (42
+inorganic compounds) and **54**, 534 (2022), DOI 10.1002/sia.7064
+(organics and water) — are the obvious upstream candidate, and they are
+**not** the source of these values: the file predates their adoption
+anywhere in this project, and the individual numbers differ from those
+tables where the two overlap. Nothing here reproduces a published table.
+
+**On accuracy, the position is weak, and unevenly so.** Only four of the
+eleven compounds (Al2O3, GaAs, SiC, SiO2) appear in the 2019 inorganic
+set at all. The materials most often wanted in practice — TiO2, HfO2,
+ZrO2, Ta2O5, SrTiO3, GeO2, Si3N4 — are in neither TPP compilation, so
+there is no published parameter set to check them against; they are
+uncited values and will stay uncited until each is sourced individually.
+
+How much that costs depends on the material. Perturbing one input of
+TPP-2M at 1 keV kinetic energy, inside the 50–2000 eV range the formula
+was fitted over, and reading λ off the bundled entries:
+
+| Entry | λ (Å) | ρ ±10% → λ | E_g +1 eV → λ |
+|---|---:|---:|---:|
+| SiO2 | 30.1 | ∓2.1–2.4% | +4.8% |
+| SiC | 22.6 | ∓2.1–2.3% | +1.6% |
+| TiO2 | 21.2 | ∓2.6% | +1.2% |
+| Al2O3 | 24.3 | ∓2.7–2.9% | +2.8% |
+| ZrO2 | 19.7 | ∓3.8–4.2% | +1.9% |
+| Ta2O5 | 17.3 | ∓4.3–4.8% | +1.3% |
+| HfO2 | 17.0 | ∓4.8–5.3% | +1.6% |
+
+For most oxides a 10% density error moves λ by 2–3%, which is small
+against the other terms in a quantification. **HfO2 is the entry to
+watch**: it is both the most density-sensitive of the set and the one
+where the stored value is least likely to describe the sample. The
+bundled 9.68 g/cm³ is the bulk monoclinic density; ALD-grown films are
+frequently amorphous and lower. For a film at 8.5–9.0 g/cm³ the stored
+value is 8–14% high, and λ comes out 3.5–6% short — a one-directional
+bias, not a scatter. ZrO2 and Ta2O5 sit in the same category to a lesser degree.
+Band gap is the weaker lever for every entry except SiO2.
+
+The 11 transactinide entries are a separate case: those densities are
+theoretical predictions rather than measurements, and TPP-2M was never
+fitted to anything resembling those materials. They are placeholders,
+not reference data.
+
+The remedy in all of these cases is the same — pass `Nv`, `density`,
+`Mw` and `Eg` to `IMFP.tpp2m()` explicitly, from a source appropriate to
+the sample, whenever the value affects a reported result.
 
 ## In-code constants
 
