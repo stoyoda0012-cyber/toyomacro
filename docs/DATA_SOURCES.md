@@ -109,31 +109,67 @@ obvious upstream candidate, and they are **not** the source of these
 values. Every entry that overlaps one of those tables differs from it in
 at least one field. Nothing here reproduces a published table.
 
+This file is the one bundled table that does not satisfy the "full
+source citation and provenance" criterion listed at the top of this
+document, and the exception is deliberate rather than overlooked. The
+criteria exist to establish that what is redistributed is not someone
+else's compilation; here the *absence* of an upstream compilation is
+what the record shows. Missing citations remain a defect — an accuracy
+defect, described below — but they are not the defect the criteria are
+screening for. (Wikipedia, named above as one origin, licenses its prose
+under CC BY-SA. None of it is reproduced here: what was taken is bare
+physical constants, which carry no such claim.)
+
 **On accuracy, the position is weaker, and uneven.** Five of the eleven
 compounds appear somewhere in the TPP series — Al2O3, GaAs, SiC and SiO2
 in the 2019 set, and Si3N4 in the 1991 set (the 2019 study dropped Si3N4
 and LiF, whose energy-loss functions gave large sum-rule errors, and
 recommends the TPP-2M formula for those two instead). Where a published
-set exists the hand-entered values are close, though not identical:
+parameter set exists the hand-entered one is close to it, though not
+identical.
 
-| Entry | bundled λ (Å) | published λ (Å) | Δ | differs in |
+The table below compares **parameter sets, not IMFPs**. Both columns are
+TPP-2M evaluated here at 1 keV kinetic energy — the left from the
+bundled entry, the right from the parameters the cited paper tabulates.
+Neither is a value the papers publish.
+
+| Entry | λ from bundled parameters (Å) | λ from published parameters (Å) | Δ | differs in |
 |---|---:|---:|---:|---|
-| GaAs | 22.44 | 22.44 | −0.0% | ρ, E_g (both marginal) |
+| GaAs | 22.44 | 22.44 | −0.0% | ρ 5.316 vs 5.32, E_g 1.424 vs 1.47 |
 | SiO2 | 30.08 | 30.39 | −1.0% | ρ 2.2 vs 2.19, E_g 8.9 vs 9.1 |
-| SiC | 22.63 | 22.38 | +1.1% | E_g 3.26 vs 2.31 — a 4H/6H polytype gap against the cubic one |
-| Si3N4 | 23.98 | 23.59 | +1.7% | α phase (3.2, 5.3) against the tabulated β (3.44, 5.25) |
+| SiC | 22.63 | 22.38 | +1.1% | E_g 3.26 vs 2.31 |
+| Si3N4 | 23.98 | 23.59 | +1.7% | ρ 3.2 vs 3.44 |
 | Al2O3 | 24.26 | 24.91 | −2.6% | E_g 7.6 vs 8.63 |
 
-**The other six — TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 — are in no
-TPP compilation**, so there is no published parameter set to check them
-against. They are uncited and will stay uncited until each is sourced
+Two caveats on that table. The 1991 paper's Table 5 has no molecular
+weight column, so the Si3N4 comparison uses this project's own M for
+both columns and isolates ρ and E_g. (Neither Si3N4 density is obviously
+the better one: the α and β phases have crystallographic densities of
+3.18 and 3.20 g/cm³ respectively, so the bundled 3.2 sits on top of them
+and the tabulated 3.44 is ~8% above both. The 1991 table states no
+phase, and where its value comes from is not recorded there.) And a
+small Δ here is **not** a
+claim of agreement with the literature: the 2019 paper also publishes
+directly calculated IMFPs (its Table 5), and those differ from TPP-2M by
+more than any of these parameter differences do — at 1 keV it gives
+1.93 nm for SiC where TPP-2M on its own parameters gives 2.24 nm, a 16%
+gap, and 2.13 nm for GaAs against 2.24 nm. That gap is the formula's,
+not the parameters' — the paper reports an average RMS deviation of
+10.7% between TPP-2M and its calculated values — and it is the larger
+error for anyone using `IMFP.tpp2m()` on these five materials.
+
+**The other six — TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 — appear in
+none of the three compilations named above**, so there is no published
+parameter set here to check them against; later parts of the series have
+not been surveyed. They are uncited and will stay uncited until sourced
 individually. Note what the table above does *not* license: agreement
 within 2.6% on five entries that happen to have published counterparts
 says nothing about the six that do not.
 
 One class of error is checkable without any source, and one instance was
 found: `Si3N4` carried M = 104.28346 g/mol, a digit transposition of the
-correct 140.28346, which inflated λ by 11–20% across the fitted range.
+correct 140.28346, which inflated λ by 11–26% across the fitted range
+(+25.8% at 50 eV, +11.5% at 2 keV).
 `tests/test_compound_parameters.py` now derives every compound's
 molecular weight from its formula and checks that N_v is counted over
 the same unit, so a mistyped constant can no longer sit in the table
@@ -158,10 +194,12 @@ For most oxides a 10% density error moves λ by 2–3%, which is small
 against the other terms in a quantification. **HfO2 is the entry to
 watch**: it is both the most density-sensitive of the set and the one
 where the stored value is least likely to describe the sample. The
-bundled 9.68 g/cm³ is the bulk monoclinic density; ALD-grown films are
-frequently amorphous and lower. For a film at 8.5–9.0 g/cm³ the stored
-value is 8–14% high, and λ comes out 3.5–6% short — a one-directional
-bias, not a scatter. ZrO2 and Ta2O5 sit in the same category to a lesser degree.
+bundled 9.68 g/cm³ is the bulk monoclinic density, and ALD-grown films
+are frequently amorphous and lower. Taking 8.5–9.0 g/cm³ as an
+illustrative film range — itself an uncited figure, quoted here to size
+the effect and not as a reference value — the stored density is 8–14%
+high and λ comes out 3.5–6% short: a one-directional bias, not a
+scatter. ZrO2 and Ta2O5 sit in the same category to a lesser degree.
 Band gap is the weaker lever for every entry except SiO2.
 
 The 11 transactinide entries are a separate case: those densities are

@@ -12,20 +12,26 @@ archived on Zenodo for a citable DOI.
 
 - **`compounds.json` gave Si3N4 a molecular weight of 104.28346 g/mol;
   the correct value is 140.28346.** A digit transposition, and the only
-  one in the table — the other ten compounds and all 96 elements agree
-  with their formula weights to five significant figures. It was not
+  one in the table — the other ten compounds agree with their formula
+  weights to better than 0.011%, and the 85 elements that have a
+  standard atomic weight agree with it to better than 0.1%. It was not
   cosmetic: TPP-2M combines the parameters as `U = N_v·ρ/M`, so an M
-  that is 26% low inflates U by 34% and the reported IMFP by **+20% at
-  100 eV, +12% at 500 eV and +11% at 2 keV** — the whole range the
+  that is 26% low inflates U by 34% and the reported IMFP by **+25.8% at
+  50 eV, +20% at 100 eV and +11.5% at 2 keV** — the whole range the
   formula was fitted over. Anything that took Si3N4 parameters from
   `CompoundDB` and passed them to `IMFP.tpp2m()` or `sampling_depth()`
-  was affected; explicitly passed parameters were not. The project's
-  upstream table already carried 140.2833, so only the bundled cache was
-  stale. `tests/test_compound_parameters.py` (24 tests) now derives
-  every compound's molecular weight from its chemical formula and checks
-  that N_v is counted per molecule to match, which is the coherence a
-  mistyped constant breaks; reintroducing 104.28346 fails two of them.
-  No other bundled value changed.
+  was affected, including the `calculate_sensitivity` tool of the
+  bundled MCP server; explicitly passed parameters were not. The 1991
+  paper corroborates the correction independently: inverting the
+  `E_p = 28.8·√(N_v·ρ/M)` printed with its Table 5 gives M ≈ 140.4 g/mol
+  for Si3N4. The project's upstream table already carried 140.2833, so
+  only the bundled cache was stale.
+  `tests/test_compound_parameters.py` (25 tests) now derives every
+  compound's molecular weight from its chemical formula, checks the
+  element entries against IUPAC values, and checks that N_v is counted
+  per molecule to match — the coherence a mistyped constant breaks;
+  reintroducing 104.28346 fails two of them. No other bundled value
+  changed.
 
 - **`voigtfit.crlb` reported a small bound where it should have
   reported no bound at all.** `compute_multipeak_fisher()` never
@@ -246,12 +252,15 @@ archived on Zenodo for a citable DOI.
   absence of citations was already flagged, but not its cause. A new
   section separates the two questions the entry had run together: the
   rights position is clean (the set reproduces no published table, and
-  is not derived from the Shinotsuka *et al.* 2019/2022 TPP parameter
-  compilations), while accuracy is weak and uneven. Only four of the
-  eleven compounds appear in the 2019 inorganic set; TiO2, HfO2, ZrO2,
-  Ta2O5, SrTiO3, GeO2 and Si3N4 are in neither compilation, so no
-  published parameter set exists to check them against. A measured
-  sensitivity table (TPP-2M at 1 keV, inside the fitted range) shows
+  is not derived from the TPP-series parameter compilations), while
+  accuracy is weak and uneven. Five of the eleven compounds appear
+  somewhere in that series — Al2O3, GaAs, SiC and SiO2 in Shinotsuka
+  *et al.* 2019, and Si3N4 in Tanuma, Powell &amp; Penn 1991 — and where a
+  published set exists the hand-entered parameters give λ within 2.6% of
+  it. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the
+  three compilations checked, so no published parameter set is available
+  there. A measured sensitivity table (TPP-2M at 1 keV, inside the
+  fitted range) shows
   where this costs anything: ρ ±10% moves λ by 2–3% for most oxides but
   5% for HfO2, whose bundled 9.68 g/cm³ is the bulk monoclinic density
   and overestimates amorphous ALD films by 8–14%, biasing λ 3.5–6% in
