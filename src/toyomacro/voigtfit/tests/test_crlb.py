@@ -661,12 +661,17 @@ class TestScaleInvariance:
         units: `crlb_pseudo * diag(g)` is `[C^-1]_ii` by construction, so
         a sign error or a misplaced `d**2` shows up here immediately.
 
-        It is not a near-singularity guard, and the docstring should not
-        pretend otherwise: the margin is enormous everywhere measured --
-        1.0005 at two well-separated peaks, and 2.3e7 at four peaks,
-        overlap 0.3, where `cond(C)` is already 3.5e13. A negative bound
-        reaching `_classify_crlb_dE` (which floors at zero and would
-        return EASY) has not been observed in any configuration.
+        It cannot be a near-singularity guard, and that is structural
+        rather than a matter of picking better configurations:
+        `[C^-1]_ii` diverges as C approaches singularity, so the margin
+        necessarily widens exactly where the inversion is least
+        accurate. Measured: 1.0005 at two well-separated peaks, 2.3e7 at
+        four peaks / overlap 0.3 where `cond(C)` is already 3.5e13. The
+        check therefore catches gross errors -- a sign flip, a misplaced
+        `d**2`, the wrong matrix inverted -- and says nothing about
+        accuracy. A negative bound reaching `_classify_crlb_dE` (which
+        floors at zero and would return EASY) has not been observed in
+        any configuration.
         """
         for n_comp, overlap in [(2, 3.0), (3, 0.8), (5, 0.5), (3, 0.3), (4, 0.3)]:
             centers = _build_equal_spacing_centers(n_comp, overlap, SIGMA, GAMMA)

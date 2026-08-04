@@ -53,7 +53,11 @@ archived on Zenodo for a citable DOI.
   rank: none is bit-identical, as two distinct float64 code paths would
   not be, but the median relative difference is 2.4e-13, 88 of 112 agree
   to better than 1e-9, and the largest is 3.3e-5. All 28 rank changes
-  are toward *fewer* null directions.
+  are toward *fewer* null directions — an observation on that grid, not
+  a guarantee: `cond(C) ≤ cond(g)` does not hold in general, and at
+  σ=1, γ=0.02, three peaks at overlap 0.5 it is the other way round
+  (3.53e7 against 4.24e7). The invariance of the rank decision does not
+  depend on which is smaller.
 
   The projection half of the same decision was corrected too.
   `crlb = inf` is applied to a parameter whose axis projects onto the
