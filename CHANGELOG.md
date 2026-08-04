@@ -8,6 +8,53 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **Experimental** `data.elastic_scattering` grew a provenance-carrying
+  layer: `DescribedLength` (a length plus its declared unit, source,
+  material and kinetic energy) and `overlayer_eal_report`, which
+  computes the same overlayer-thickness EAL as `overlayer_eal` but
+  returns it with the model used (equation, slope, fitted energy and
+  angle ranges, geometry), the inputs, and the checks. Declared
+  mismatches that admit no legitimate reading raise (different units,
+  different materials, kinetic energies more than 1% apart — the
+  signature of reading the two lengths at well-separated photoemission
+  lines, where a genuine near-degenerate pair differs by ~0.2%); a
+  declared kinetic energy or emission angle outside the model's fitted
+  range, and a
+  cross-source IMFP/TRMFP pair, are recorded and warned about rather
+  than refused, since extrapolation can be a stated choice. Undeclared
+  facts are reported as `not_recorded`, which is not a pass. The
+  arithmetic is unchanged; sensitivity tests pin what the structure
+  implies for callers — for gold at 7.4 keV a +10% TRMFP error moves
+  the EAL by ~+1.3%, while a +10% IMFP error moves it by ~+8.5%, so
+  the EAL's error budget is dominated by the IMFP fed into it.
+
+### Changed
+
+- **The TRMFP bundling question is settled: caller-supplied, by
+  policy.** `docs/DATA_SOURCES.md` previously recorded that no
+  redistribution permission for the Jablonski & Powell 2020
+  supplementary TRMFP/albedo tables "has yet been documented"; it now
+  records why none is expected without asking NIST: the tables are
+  standard-reference-data lineage, where the Standard Reference Data
+  Act (15 U.S.C. § 290e) makes the Secretary of Commerce's copyright
+  notice statutory rather than boilerplate, and bundling would
+  reproduce a curated database wholesale — the category the project's
+  data-rights policy reserves for explicit permission. What a caller
+  must supply instead (same unit, same material, same kinetic energy
+  as the paired IMFP, source recorded) is now stated there and
+  enforceable via `overlayer_eal_report`.
+- `docs/elastic_scattering_sessa_comparison.md` records where the EAL
+  relations stand against a controlled SESSA v2.2.2 series (elastic
+  scattering toggled, everything else fixed): input-level albedo
+  consistent by construction, analytic predictions (0.826–0.854 for Au
+  at 7.4 keV) inside the numerical observable's spread — and why that
+  is compatibility, not verification: the straight-line control
+  recovers SESSA's own IMFP only to 1.7–9.2% and the fitted ratio
+  moves by ±6% with the thickness window, so no accuracy figure is
+  adopted from it.
+
 ### Fixed
 
 - **`voigtfit.crlb` decided identifiability from a quantity that

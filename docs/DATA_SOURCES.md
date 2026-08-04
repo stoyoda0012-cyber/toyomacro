@@ -395,11 +395,35 @@ directly in source (no external database is extracted or shipped):
   033102 (2020), DOI: 10.1063/5.0008576, tabulate both for 41 elemental
   solids and 42 inorganic compounds from 50 eV to 30 keV in their
   supplementary material, which is the obvious candidate and reaches
-  HAXPES energies. The publication carries the notice "© 2020 by the U.S.
-  Secretary of Commerce on behalf of the United States. All rights
-  reserved." No licence or permission covering redistribution of the
-  supplementary tables has yet been documented, so they are deliberately
-  not bundled.
+  HAXPES energies. **Decision: not bundled, and this is a settled policy
+  rather than a pending question.** The publication carries the notice
+  "© 2020 by the U.S. Secretary of Commerce on behalf of the United
+  States. All rights reserved." That notice is not boilerplate: works of
+  the U.S. government are ordinarily uncopyrightable, but the Standard
+  Reference Data Act (15 U.S.C. § 290e) is a statutory exception that
+  lets the Secretary of Commerce hold copyright in standard reference
+  data, and NIST states that redistribution of SRD is governed by its
+  licensing program. Bundling the supplementary tables would reproduce a
+  curated reference database wholesale — the category this project's
+  data-rights policy treats as requiring explicit permission, unlike an
+  independent transformation of individually cited published values. No
+  such permission is documented, so the tables stay out; individual
+  values quoted in tests and docs for verification carry citations
+  instead. Callers therefore supply TRMFP themselves — from SESSA
+  (NIST SRD 100), which reports IMFP and TRMFP per layer and peak; by
+  obtaining NIST SRD 64 under its own terms of use and deriving a
+  transport mean free path from its elastic-scattering cross sections
+  (SRD 64 carries redistribution terms of its own, which is the user's
+  side of the arrangement, not this package's); or from their own
+  calculations — in the same unit, for the same material, at the same
+  kinetic energy as the IMFP they pair it with (NIST SRD 71 supplies
+  only the paired IMFP, not the TRMFP).
+  `DescribedLength` and `overlayer_eal_report` exist to record exactly
+  those three declarations plus the source, and to check the pair where
+  declared. Revisiting the decision requires documented permission from
+  NIST covering redistribution, plus the usual bar for a bundled
+  dataset: primary-source verification, numerical examples as tests,
+  and an independent audit.
 
 ## Rebuilding a table
 

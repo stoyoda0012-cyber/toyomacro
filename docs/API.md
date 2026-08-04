@@ -553,8 +553,17 @@ For that attenuation length see `data.elastic_scattering`
 because the L/IMFP slope differs between unpolarized XPS (0.738) and
 linearly polarized HAXPES (0.836) — a 2.4% difference in the result for
 gold at 7.4 keV. Supplying both lengths keeps the albedo tied to the IMFP
-it is applied to, but nothing checks that the two came from the same
-source, material and energy; that stays with the caller.
+it is applied to, but the scalar functions cannot check that the two came
+from the same source, material and energy. To have that checked, wrap
+each length in a `DescribedLength` (value, unit, and optionally source,
+material, kinetic energy) and call `overlayer_eal_report`: declared
+units, materials and kinetic energies are enforced, a declared kinetic
+energy or emission angle is checked against the model's fitted range,
+and the result comes back as an `OverlayerEALReport` whose `to_dict()`
+carries the value together with the model, the inputs, the validity
+checks and the warnings — the record a consumer should store next to
+any derived thickness. Facts you do not declare are reported as
+`"not_recorded"`, which is not a pass.
 
 There is no `IMFP.attenuation_length()` — a method that multiplied the
 IMFP by a fixed 0.9 under that name was removed rather than published.
