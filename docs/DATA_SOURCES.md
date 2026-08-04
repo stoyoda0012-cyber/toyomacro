@@ -268,8 +268,14 @@ and the 14 organic compounds, and that "the IMFPs for the group of 15
 inorganic compounds have been excluded from this analysis because the
 optical data on which their IMFPs are based are much less reliable than
 for the other two groups of materials". Neither published generation was
-in that fit, so neither is privileged by it, and **adopting either would
-be a preference rather than a correction.**
+in that fit, so neither is privileged by it, and **adopting one
+wholesale on that basis would be a preference rather than a
+correction.**
+
+That is a conclusion about a *blanket* choice on fit-consistency
+grounds, and nothing wider. It leaves open any future change to an
+individual entry argued from its own primary source, or from an explicit
+phase specification.
 
 For scale — not as the argument — substituting either published set
 moves λ by at most **3.8% at 1 keV** (Al2O3 against the 1991 set,
@@ -285,9 +291,12 @@ per-compound RMS deviations the same paper tabulates (Table 8, p. 173):
 
 The group average is inflated by LiF (49.2%) and GaAs (39.6%). Against
 their own compounds' figures the differences are smaller but **not
-negligible**: about 3× below the formula's own error for SiC and SiO2,
-the two whose optical data the authors judged best, and SiO2 is this
-package's own example matrix.
+negligible**: about 3× below the formula's own error for SiC and SiO2 —
+the two with the smallest RMS in that table, one of which (SiO2) is this
+package's own example matrix. The paper attributes the inorganic
+deviations to limitations of the optical data as a group; it states no
+per-material judgement of optical-data quality, and none is read into it
+here.
 
 What that settles is the blanket change, and only that. It is **not** a
 finding that every bundled value is as good as its published
