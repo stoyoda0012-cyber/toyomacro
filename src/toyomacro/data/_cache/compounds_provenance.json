@@ -46,6 +46,18 @@
       "result": "No blanket replacement on grounds of consistency with the TPP-2M fit: that argument selects neither generation. It is a statement about a blanket choice only, and leaves open any future change to an individual entry made on its own primary source or on an explicit phase specification. The argument for preferring the 1991 parameters was that a formula should be fed the parameter set it was fitted on; the 1994 paper refutes it. On p. 170 it states that the modified expression for beta -- the one change TPP-2M makes to TPP-2 -- was derived from the 27 elements and the 14 organic compounds, and that 'the IMFPs for the group of 15 inorganic compounds have been excluded from this analysis because the optical data on which their IMFPs are based are much less reliable than for the other two groups of materials'. Neither generation was in the fit, so neither is privileged by it, and adopting one wholesale on that basis would be a preference rather than a correction.",
       "effect_size": "For scale, not as the argument. Substituting either published set moves lambda by at most 3.8% at 1 keV (Al2O3 against the 1991 set, relative to the bundled value) and 7.6% at 50 eV -- the differences grow toward low energy, so a single-energy figure understates them. The right yardstick is not the 18.9% group average but the per-compound RMS deviations the same paper tabulates (Table 8, p. 173): SiC 3.2, SiO2 3.6, Si3N4 11.8, Al2O3 15.3, GaAs 39.6. Against those, the parameter-induced differences are smaller but not negligible: about 3x below the formula's own error for SiC and SiO2 -- the two with the smallest RMS in that table. The paper attributes the inorganic deviations to limitations of the optical data as a group; it states no per-material judgement of optical-data quality, and none is claimed here.",
       "limits": "This settles a blanket replacement, and nothing more. It is NOT a finding that every bundled value is as good as its published counterpart. Al2O3's Eg of 7.6 eV differs from both published figures (8.63 and 9.0) and has no recorded basis; a case for changing one value on its own evidence remains open and would need its own citation. The SiC entry is still unlabelled, and its Eg implies a different polytype from its published counterparts -- 3.26 eV is the 4H figure, the tables carry the cubic 3C 2.31 -- while its density discriminates no polytype, so adopting the cubic figures to resolve it would silently redefine what the name SiC means here. Phase-specific entries are the better route to that and were not attempted. Al2O3's density (3.95 against 3.97 in both published sets) is likewise unrecorded, though the band gap dominates the difference."
+    },
+    {
+      "date": "2026-08-04",
+      "question": "Where does the Si3N4 band gap of 5.3 eV come from, and why does another of this author's tables carry 5.6?",
+      "scope": [
+        "carried out by the depthprofiler project, reported here",
+        "J. Robertson, J. Vac. Sci. Technol. B 18, 1785 (2000)",
+        "S. Toyoda et al., Appl. Phys. Lett. 87, 102901 (2005)",
+        "M. Oshima, S. Toyoda et al., J. Vac. Sci. Technol. A 22, 1 (2004)"
+      ],
+      "result": "Neither figure is wrong, and -- correcting the first answer to this question -- neither is a calculation. Robertson 2000 is a waypoint for the widely circulated 5.3 eV, not its source: its Table I gives 5.3 eV under a column headed 'Gap', and the text says the table lists 'the experimental values of their band gaps and electron affinities' with citations to the optical literature. What that paper calculates is the charge neutrality level, by tight binding. 5.6-5.7 eV is a direct measurement on CVD SiN/Si films. So the two differ by specimen and method, not by calculation versus experiment, and the ultimate origin of 5.3 lies further upstream than either. Both are recorded under comparisons. A trap worth recording: the 2004 JVST A paper's abstract says 'probably Si3N4 with a band gap of about 5.3 eV' and is easy to cite as the source of 5.3, but its body withholds the attribution and reports an O 1s loss extrapolation agreeing with Robertson's calculation. It is not an independent measurement and should not be cited as one; the 2005 APL paper is the follow-up that measures.",
+      "limits": "This traces the *circulating* 5.3 eV figure one step, to a paper that adopts it rather than producing it; the optical measurements it cites have not been read. It is NOT evidence that the bundled entry was taken from Robertson: the value was hand-entered with no source recorded, and an exact agreement is not provenance -- the same reasoning already applied to the TPP 1991 comparison. The Eg record therefore stays not_recorded with an asserted origin, and only the comparisons grew."
     }
   ],
   "comparisons": {
@@ -53,7 +65,8 @@
       {
         "source": {
           "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
-          "doi": "10.1002/sia.6598"
+          "doi": "10.1002/sia.6598",
+          "note": "Caution on one value in this table: it prints M = 60.008 for SiO2, while the formula weight is 60.0843 -- 0.127% low. Every other entry checked agrees with its formula weight to better than 0.005%, so SiO2 is a 29x outlier and looks like a typo in the published table rather than a choice. SESSA v2.2.2's tpp2023 carries the same 60.008, so it has propagated. The bundled value here is 60.08, the formula weight, and is unaffected; the effect on lambda would be +0.026% at 1 keV in any case."
         },
         "values": {
           "Mw": 101.961,
@@ -96,7 +109,8 @@
       {
         "source": {
           "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
-          "doi": "10.1002/sia.6598"
+          "doi": "10.1002/sia.6598",
+          "note": "Caution on one value in this table: it prints M = 60.008 for SiO2, while the formula weight is 60.0843 -- 0.127% low. Every other entry checked agrees with its formula weight to better than 0.005%, so SiO2 is a 29x outlier and looks like a typo in the published table rather than a choice. SESSA v2.2.2's tpp2023 carries the same 60.008, so it has propagated. The bundled value here is 60.08, the formula weight, and is unaffected; the effect on lambda would be +0.026% at 1 keV in any case."
         },
         "values": {
           "Mw": 144.645,
@@ -189,13 +203,44 @@
           "Nv"
         ],
         "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "J. Robertson, J. Vac. Sci. Technol. B 18, 1785 (2000)",
+          "doi": "10.1116/1.591472",
+          "note": "A waypoint for the 5.3 eV figure that circulates widely, not its origin. This paper's Table I lists 5.3 eV for Si3N4 in a column headed simply 'Gap', beside columns headed 'calculated EA' and 'Calculated CB offset'; the text states that the table gives 'the experimental values of their band gaps and electron affinities', citing refs 62-67 (French, J. Am. Ceram. Soc. 73, 477 (1990); French et al., Phys. Rev. B 49, 5133 (1994); Palik's Handbook of Optical Properties of Solids; and others). What Robertson computes is the charge neutrality level, from tight-binding band structures -- not the gap. So 5.3 eV is an experimental literature value adopted as an input here, and calling it a calculated gap is wrong. It agrees with the bundled value exactly, which is still not evidence the bundled value came from it."
+        },
+        "values": {
+          "Eg": 5.3
+        },
+        "differs_in": [],
+        "agrees_in": [
+          "Eg"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "S. Toyoda et al., Appl. Phys. Lett. 87, 102901 (2005), 'Precise determination of band offsets and chemical states in SiN/Si'",
+          "doi": "10.1063/1.2041824",
+          "note": "A measured band gap, 5.6-5.7 eV, for CVD SiN/Si films. It is the value for those films, not a general figure for Si3N4. Both this and the 5.3 eV figure trace back to measurements; the difference is between specimens and methods, not between a calculation and an experiment. Do NOT cite Oshima, Toyoda et al., J. Vac. Sci. Technol. A 22, 1 (2004) for 5.3: its abstract says 'probably Si3N4 with a band gap of about 5.3 eV', but its body withholds the attribution -- 'it is not clear at present that the additional structure can be attributed to a band gap for Si3N4' -- and reports an O 1s loss extrapolation agreeing with Robertson's calculation, not an independent measurement."
+        },
+        "values": {
+          "Eg": 5.6
+        },
+        "differs_in": [
+          "Eg"
+        ],
+        "agrees_in": [],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ],
     "SiC": [
       {
         "source": {
           "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
-          "doi": "10.1002/sia.6598"
+          "doi": "10.1002/sia.6598",
+          "note": "Caution on one value in this table: it prints M = 60.008 for SiO2, while the formula weight is 60.0843 -- 0.127% low. Every other entry checked agrees with its formula weight to better than 0.005%, so SiO2 is a 29x outlier and looks like a typo in the published table rather than a choice. SESSA v2.2.2's tpp2023 carries the same 60.008, so it has propagated. The bundled value here is 60.08, the formula weight, and is unaffected; the effect on lambda would be +0.026% at 1 keV in any case."
         },
         "values": {
           "Mw": 40.096,
@@ -238,7 +283,8 @@
       {
         "source": {
           "name": "Shinotsuka, Tanuma, Powell & Penn, Surf. Interface Anal. 51, 427 (2019), Table 1",
-          "doi": "10.1002/sia.6598"
+          "doi": "10.1002/sia.6598",
+          "note": "Caution on one value in this table: it prints M = 60.008 for SiO2, while the formula weight is 60.0843 -- 0.127% low. Every other entry checked agrees with its formula weight to better than 0.005%, so SiO2 is a 29x outlier and looks like a typo in the published table rather than a choice. SESSA v2.2.2's tpp2023 carries the same 60.008, so it has propagated. The bundled value here is 60.08, the formula weight, and is unaffected; the effect on lambda would be +0.026% at 1 keV in any case."
         },
         "values": {
           "Mw": 60.008,

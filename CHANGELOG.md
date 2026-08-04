@@ -251,6 +251,32 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **Two findings from the depthprofiler project are recorded in the
+  provenance table.** Where the circulating Si3N4 E_g of 5.3 eV comes
+  from — or one step of it. The trail leads to Robertson, *J. Vac. Sci.
+  Technol. B* **18**, 1785 (2000), which **adopts** the figure rather
+  than producing it: its Table I lists 5.3 eV under a column headed
+  "Gap", beside "calculated EA" and "Calculated CB offset", and the text
+  says the table gives "the experimental values of their band gaps and
+  electron affinities". What that paper calculates is the charge
+  neutrality level, by tight binding. The 5.6–5.7 eV elsewhere is a
+  measurement on CVD SiN/Si films (*Appl. Phys. Lett.* **87**, 102901
+  (2005)), so the two differ by specimen and method — not as a
+  calculation differs from an experiment, which is how it was first
+  reported and is wrong. Both
+  join `comparisons`; the entry stays `not_recorded` with an `asserted`
+  origin, because identifying the source of a circulating figure is not
+  evidence that the hand-entered value came from it — the same rule
+  already applied to the TPP 1991 comparison. A citation trap is
+  recorded beside them: the abstract of *J. Vac. Sci. Technol. A* **22**,
+  1 (2004) reads as the source of 5.3 eV, but its body withholds the
+  attribution. Separately, verified against the primary source: the 2019
+  table prints M = 60.008 for SiO2 where the formula weight is 60.0843,
+  0.127% low, while every other entry checked agrees to better than
+  0.005% — a 29× outlier, propagated into SESSA v2.2.2. The bundled
+  value is the formula weight and is unaffected. **No bundled value
+  changed.**
+
 - **The provenance table now records why the bundled parameters were
   *not* replaced with their published counterparts.** Five compounds
   have counterparts in the TPP series, and the natural next step was to

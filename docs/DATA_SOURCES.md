@@ -310,6 +310,36 @@ its density discriminates no polytype, so resolving that by adopting the
 cubic values would silently redefine what the name `SiC` means here. Phase-specific
 entries would be the better route, and are not attempted.
 
+The `investigation` records also carry two findings contributed by the
+depthprofiler project, which consumes this table:
+
+- **Where the circulating Si3N4 E_g of 5.3 eV comes from — one step of
+  it.** The trail leads to Robertson, *J. Vac. Sci. Technol. B* **18**,
+  1785 (2000), but that paper **adopts** the figure rather than producing
+  it: its Table I lists 5.3 eV under a column headed "Gap", beside
+  columns headed "calculated EA" and "Calculated CB offset", and the text
+  says the table gives "the experimental values of their band gaps and
+  electron affinities", citing the optical literature. What Robertson
+  computes is the charge neutrality level, by tight binding. So 5.3 eV is
+  an experimental value taken as an input there, and the ultimate source
+  lies further upstream, unread. The 5.6–5.7 eV that appears elsewhere is
+  a measurement on CVD SiN/Si films (*Appl. Phys. Lett.* **87**, 102901
+  (2005)). The two therefore differ by specimen and method — **not** as a
+  calculation differs from an experiment, which is how this was first
+  reported here and is wrong. Both are now under `comparisons`, and the
+  entry stays `not_recorded`:
+  identifying where a circulating figure comes from is not evidence that
+  the hand-entered one was taken from there, and an exact agreement is
+  not provenance. A citation trap is recorded with them — the abstract of
+  *J. Vac. Sci. Technol. A* **22**, 1 (2004) reads as the source of 5.3
+  but its body withholds the attribution.
+- **One value in the 2019 table does not match its own formula weight.**
+  It prints M = 60.008 for SiO2 against a formula weight of 60.0843,
+  0.127% low, while every other entry checked agrees to better than
+  0.005% — a 29× outlier that looks like a typo in the published table.
+  SESSA v2.2.2 carries the same figure, so it has propagated. The bundled
+  value here is the formula weight and is unaffected.
+
 `phase` sits alongside the value fields because density depends on it
 and the table carries no phase label. It can be `unknown`, and for GeO2
 that is the largest uncertainty in the entry — its two forms differ by
