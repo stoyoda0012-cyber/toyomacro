@@ -259,15 +259,25 @@ class TestPositiveDefiniteness:
     """Fisher matrix must be PSD; CRLB must be non-negative."""
 
     def test_fisher_psd(self):
-        """All eigenvalues of Fisher matrix must be >= 0."""
+        """All eigenvalues of the Fisher matrix must be >= 0.
+
+        Asserted on `fisher` directly. `cr.eigenvalues` is the
+        correlation matrix's spectrum, which has unit trace per
+        parameter and so would not exercise the same tolerance.
+        """
         centers = np.array([-0.5, 0.5, 1.5])
         cr = compute_multipeak_fisher(
             np.full(3, AMP), centers,
             np.full(3, SIGMA), np.full(3, GAMMA),
             ENERGY,
         )
+        fisher_eigenvalues = np.linalg.eigvalsh(cr.fisher)
+        tol = -1e-10 * max(float(fisher_eigenvalues[-1]), 1.0)
+        assert np.all(fisher_eigenvalues >= tol), (
+            f"Negative eigenvalue: {fisher_eigenvalues.min()}"
+        )
         assert np.all(cr.eigenvalues >= -1e-10), (
-            f"Negative eigenvalue: {cr.eigenvalues.min()}"
+            f"Negative correlation eigenvalue: {cr.eigenvalues.min()}"
         )
 
     def test_crlb_non_negative(self):
@@ -303,19 +313,39 @@ class TestGridSweep:
             assert result['crlb_amp'][nc].shape == (3, 2)
             assert result['crlb_dE'][nc].shape == (3, 2)
 
-    def test_sweep_crlb_ordering(self):
-        """Higher SNR → lower CRLB in sweep results."""
+    def test_sweep_crlb_scales_as_inverse_snr_squared(self):
+        """The swept bound must follow 1/SNR**2 exactly, at every overlap.
+
+        Ordering alone is too weak to see the defect this guards. Under
+        the old rank test the SNR axis stayed monotone at all four
+        overlaps here -- the values still descended, just too fast (31x
+        and 186x too small at overlap 0.8 and 0.5). The exact law is
+        what breaks, so the exact law is what is asserted.
+
+        `crlb_grid_sweep` passes no `noise_model`, so this is the Poisson
+        branch; its 1/f weighting with the sweep's `amplitude ~ snr**2`
+        makes the law exact rather than asymptotic.
+        """
+        overlaps = np.array([1.5, 1.0, 0.8, 0.5])
+        snr = np.array([10.0, 50.0, 200.0])
         result = crlb_grid_sweep(
             n_comp_list=[2],
-            overlap_ratios=np.array([1.5]),
-            snr_levels=np.array([10, 50, 200]),
+            overlap_ratios=overlaps,
+            snr_levels=snr,
             sigma=SIGMA, gamma=GAMMA,
             n_energy=128,
         )
 
-        crlb_dE = result['crlb_dE'][2]  # shape (1, 3)
-        # Higher SNR → lower CRLB
-        assert crlb_dE[0, 0] > crlb_dE[0, 1] > crlb_dE[0, 2]
+        crlb_dE = np.asarray(result['crlb_dE'][2])  # (n_overlap, n_snr)
+
+        for i, ov in enumerate(overlaps):
+            row = crlb_dE[i]
+            assert np.all(np.isfinite(row)), f"overlap {ov}: {row}"
+            invariant = row * snr ** 2
+            np.testing.assert_allclose(
+                invariant, invariant[0], rtol=1e-8,
+                err_msg=f"overlap {ov} breaks the inverse-square law: {row}",
+            )
 
 
 class TestHelpers:
@@ -450,51 +480,260 @@ class TestSingularFisher:
         assert np.all(np.isfinite(cr.crlb))
         np.testing.assert_array_equal(cr.crlb, cr.crlb_pseudo)
 
-    def test_singular_case_is_infinite_and_pseudo_is_smaller(self):
+    def test_singular_case_is_infinite_and_pseudo_stays_finite(self):
         """Four peaks at overlap 0.2 are not individually identifiable."""
         cr = self._fisher(n_comp=4, overlap=0.2)
-        assert cr.null_space_dim == 3, f"expected a 3-D null space, got {cr.null_space_dim}"
-        assert cr.unbounded.all(), "the null directions touch every parameter axis here"
+        assert cr.null_space_dim == 1, f"expected a 1-D null space, got {cr.null_space_dim}"
+        assert cr.unbounded.all(), "the null direction touches every parameter axis here"
         assert np.all(np.isinf(cr.crlb))
         assert np.all(np.isfinite(cr.crlb_pseudo))
 
-    def test_pseudo_inverse_falls_as_the_problem_gets_harder(self):
-        """The artefact that made the truncated diagonal unusable as a bound.
+    def test_bound_does_not_fall_as_the_problem_gets_harder(self):
+        """Monotonicity, asserted on `crlb` only.
 
-        Going from overlap 0.3 to 0.2 at four peaks takes the null space
-        from 1 dimension to 3, i.e. strictly less information. The
-        pseudo-inverse diagonal nevertheless *drops* by a factor of ~26,
-        because a direction carrying no information contributes zero to
-        it instead of diverging. `crlb` is inf in both cases.
+        Four peaks at overlap 0.3 are identifiable; at 0.2 they are not.
+        The bound must move toward less precision across that step --
+        here from finite to infinite.
+
+        The claim is restricted to `crlb` on purpose. The same
+        monotonicity does *not* hold for `crlb_pseudo`, and that is not
+        an oversight: see
+        test_pseudo_inverse_can_still_fall_as_information_is_lost.
         """
         easier = self._fisher(n_comp=4, overlap=0.3)
         harder = self._fisher(n_comp=4, overlap=0.2)
         assert harder.null_space_dim > easier.null_space_dim
 
         dE = slice(1, None, 3)
-        assert harder.crlb_pseudo[dE].min() < easier.crlb_pseudo[dE].min()
+        assert np.all(np.isfinite(easier.crlb[dE])), "overlap 0.3 is still computable"
         assert np.all(np.isinf(harder.crlb[dE]))
-        assert np.all(np.isinf(easier.crlb[dE]))
 
-    def test_truncated_value_would_report_easy_at_high_snr(self):
-        """The user-facing harm: a non-identifiable configuration called EASY.
+    def test_decoupled_parameters_keep_a_finite_bound(self):
+        """A singular Fisher matrix does not make *every* bound infinite.
+
+        Two nearly coincident peaks plus one placed 10 FWHM away: the
+        pair is not individually identifiable, the distant peak is. Its
+        parameter axes project onto the null space at the 1e-20 level
+        against 5e-01 for the degenerate pair, and they must keep their
+        finite bound. This is the band `_NULL_PROJECTION_TOL` has to
+        stay below.
+        """
+        fwhm = _voigt_fwhm(SIGMA, GAMMA)
+        centers = np.array([-0.01, 0.01, 10 * fwhm])
+        energy = np.linspace(centers.min() - 5 * fwhm, centers.max() + 5 * fwhm, 1024)
+        cr = compute_multipeak_fisher(
+            np.ones(3), centers, np.full(3, SIGMA), np.full(3, GAMMA),
+            energy, mode='3d', noise_model='gaussian', noise_std=1e-2,
+        )
+        assert cr.null_space_dim > 0, "the coincident pair should be degenerate"
+
+        assert np.all(np.isfinite(cr.crlb[6:])), "the distant peak is estimable"
+        assert np.all(np.isinf(cr.crlb[:6])), "the coincident pair is not"
+
+    @pytest.mark.parametrize("noise_std", [1e-2, 6.6e-3, 1e-4])
+    def test_round_off_projection_does_not_buy_a_finite_bound(self, noise_std):
+        """The other band: a coupled axis must not escape on rounding noise.
+
+        Three peaks at overlap 0.15 are rank deficient and every axis is
+        coupled into the degeneracy, but one projects at only 5.5e-12 --
+        rounding noise in an eigenvector of a numerically singular
+        matrix, not decoupling. With the tolerance inside that band it
+        kept a finite `crlb` taken from the truncated pseudo-inverse,
+        and which axis it was moved with `noise_std`, a scalar that
+        multiplies the Fisher matrix and cannot change identifiability.
+
+        Parameterised over noise_std for exactly that reason: the answer
+        must not depend on it.
+        """
+        centers = _build_equal_spacing_centers(3, 0.15, SIGMA, GAMMA)
+        fwhm = _voigt_fwhm(SIGMA, GAMMA)
+        energy = np.linspace(centers[0] - 5 * fwhm, centers[-1] + 5 * fwhm, 256)
+        cr = compute_multipeak_fisher(
+            np.ones(3), centers, np.full(3, SIGMA), np.full(3, GAMMA),
+            energy, mode='3d', noise_model='gaussian', noise_std=noise_std,
+        )
+        assert cr.null_space_dim > 0
+        assert np.all(np.isinf(cr.crlb)), (
+            f"{int(np.isfinite(cr.crlb).sum())} axes escaped as finite"
+        )
+
+    @pytest.mark.parametrize("n_comp,easier,harder", [
+        (6, 0.3, 0.2),
+        (5, 0.20, 0.15),
+        (4, 0.20, 0.10),
+    ])
+    def test_pseudo_inverse_can_still_fall_as_information_is_lost(
+        self, n_comp, easier, harder
+    ):
+        """The artefact that makes `crlb_pseudo` unusable as a bound is live.
+
+        Dropping the null directions instead of letting them diverge
+        makes the remaining diagonal *smaller*, so between two
+        rank-deficient configurations the strictly less identifiable one
+        can report the smaller number. This is a property of the
+        pseudo-inverse itself, not of the units, and it survived the move
+        to the scaled metric unchanged.
+
+        It is pinned rather than fixed because `crlb_pseudo` is a
+        deliberately finite diagnostic; `crlb` is the bound, and it is
+        inf in both configurations here.
+        """
+        lo = self._fisher(n_comp=n_comp, overlap=easier)
+        hi = self._fisher(n_comp=n_comp, overlap=harder)
+        assert hi.null_space_dim > lo.null_space_dim > 0
+
+        dE = slice(1, None, 3)
+        assert hi.crlb_pseudo[dE].min() < lo.crlb_pseudo[dE].min(), (
+            "the artefact is expected here; if it has genuinely gone away, "
+            "the crlb_pseudo docstring and CHANGELOG need updating too"
+        )
+        assert np.all(np.isinf(hi.crlb[dE])) and np.all(np.isinf(lo.crlb[dE]))
+
+    def test_pseudo_inverse_flatters_a_configuration_the_bound_rejects(self):
+        """Why `crlb_pseudo` must never be presented as a bound.
 
         `process_multipeak` attaches a SolvabilityInfo to every result,
-        and the level comes from sqrt(CRLB[dE]) relative to sigma. At
-        SNR 1e6 the truncated diagonal for four peaks at overlap 0.2 is
-        small enough to classify as EASY -- "meV precision,
-        well-resolved" -- for a configuration with a 3-dimensional null
-        space. The bound classifies it IMPOSSIBLE.
+        and the level comes from sqrt(CRLB[dE]) relative to sigma. For
+        four peaks at overlap 0.2 at SNR 1e8 -- a configuration whose
+        Fisher matrix is rank deficient, so the individual centres are
+        not identifiable at all -- the pseudo-inverse diagonal is small
+        enough to be classified EASY, "meV precision, well-resolved".
+        The bound says IMPOSSIBLE. The gap widens with SNR, because the
+        bound scales as noise_std**2 and only the surviving directions
+        shrink.
+
+        The noise level is chosen for robustness, not for drama: at
+        1e-6 the pseudo classification flips between SHOULDER and
+        IMPOSSIBLE with the energy grid, so pinning a level there would
+        be a platform-dependent test. At 1e-8 it is EASY across
+        n_energy 128-1024 and padding 5-7 FWHM, and for three other
+        rank-deficient configurations besides this one.
         """
-        cr = self._fisher(n_comp=4, overlap=0.2, noise_std=1e-6)
-        assert cr.null_space_dim == 3
+        cr = self._fisher(n_comp=4, overlap=0.2, noise_std=1e-8)
+        assert cr.null_space_dim == 1
 
         n_comp = 4
         pseudo_dE = float(np.mean([cr.crlb_pseudo[k * 3 + 1] for k in range(n_comp)]))
         true_dE = float(np.mean([cr.crlb[k * 3 + 1] for k in range(n_comp)]))
 
-        assert _classify_crlb_dE(pseudo_dE, SIGMA) is SolvabilityLevel.EASY
         assert _classify_crlb_dE(true_dE, SIGMA) is SolvabilityLevel.IMPOSSIBLE
+        assert _classify_crlb_dE(pseudo_dE, SIGMA) is SolvabilityLevel.EASY
+
+
+class TestScaleInvariance:
+    """The rank decision must depend on the physics, not on the units.
+
+    The Fisher matrix mixes units -- amplitude in area, dE and dsigma in
+    eV -- so a threshold on its eigenvalues moves with the amplitude
+    parameterisation. `A -> cA` sends `g -> D g D`, which is not a
+    similarity transform. The bound itself transforms correctly; only
+    the numerical rank test did not, and `crlb_grid_sweep` made the
+    amplitude proportional to snr**2, putting that defect on its own
+    SNR axis.
+    """
+
+    @pytest.mark.parametrize("amplitude", [1e-3, 1e0, 1e3])
+    def test_identity_holds_for_several_peaks(self, amplitude):
+        """diag(inv(C))/d**2 == diag(inv(g)), which is what makes this safe.
+
+        The whole change rests on that identity. The single-peak
+        `test_crlb_matches_inverse` exercises a 3x3 at one amplitude,
+        which is where a scaling defect would be least visible.
+        """
+        centers = _build_equal_spacing_centers(3, 0.8, SIGMA, GAMMA)
+        fwhm = _voigt_fwhm(SIGMA, GAMMA)
+        energy = np.linspace(centers[0] - 5 * fwhm, centers[-1] + 5 * fwhm, 256)
+
+        cr = compute_multipeak_fisher(
+            np.full(3, amplitude), centers, np.full(3, SIGMA), np.full(3, GAMMA),
+            energy, mode='3d', noise_model='gaussian', noise_std=1e-2,
+        )
+        assert cr.null_space_dim == 0, "this configuration should be full rank"
+
+        np.testing.assert_allclose(
+            cr.crlb, np.diag(np.linalg.inv(cr.fisher)), rtol=1e-6,
+        )
+
+    def test_correlation_inverse_diagonal_is_at_least_one(self):
+        """[C^-1]_ii >= 1 identically for a correlation matrix.
+
+        A structural sanity check on the mapping back to the caller's
+        units: `crlb_pseudo * diag(g)` is `[C^-1]_ii` by construction, so
+        a sign error or a misplaced `d**2` shows up here immediately.
+
+        It is not a near-singularity guard, and the docstring should not
+        pretend otherwise: the margin is enormous everywhere measured --
+        1.0005 at two well-separated peaks, and 2.3e7 at four peaks,
+        overlap 0.3, where `cond(C)` is already 3.5e13. A negative bound
+        reaching `_classify_crlb_dE` (which floors at zero and would
+        return EASY) has not been observed in any configuration.
+        """
+        for n_comp, overlap in [(2, 3.0), (3, 0.8), (5, 0.5), (3, 0.3), (4, 0.3)]:
+            centers = _build_equal_spacing_centers(n_comp, overlap, SIGMA, GAMMA)
+            fwhm = _voigt_fwhm(SIGMA, GAMMA)
+            energy = np.linspace(centers[0] - 5 * fwhm, centers[-1] + 5 * fwhm, 256)
+            cr = compute_multipeak_fisher(
+                np.ones(n_comp), centers, np.full(n_comp, SIGMA),
+                np.full(n_comp, GAMMA), energy,
+                mode='3d', noise_model='gaussian', noise_std=1e-2,
+            )
+            scaled = cr.crlb_pseudo * np.diag(cr.fisher)
+            assert np.all(scaled >= 1.0 - 1e-6), (
+                f"n_comp={n_comp} overlap={overlap}: [C^-1]_ii dipped to "
+                f"{scaled.min():.6f}; the inversion is failing"
+            )
+
+    def test_rank_decision_is_invariant_under_amplitude_rescaling(self):
+        """Same physics, five amplitude units, one answer."""
+        centers = _build_equal_spacing_centers(3, 0.3, SIGMA, GAMMA)
+        fwhm = _voigt_fwhm(SIGMA, GAMMA)
+        energy = np.linspace(centers[0] - 5 * fwhm, centers[-1] + 5 * fwhm, 256)
+
+        results = [
+            compute_multipeak_fisher(
+                np.full(3, amp), centers, np.full(3, SIGMA), np.full(3, GAMMA),
+                energy, mode='3d', noise_model='gaussian', noise_std=1e-2,
+            )
+            for amp in (1e-2, 1e-1, 1e0, 1e1, 1e2)
+        ]
+
+        dims = {r.null_space_dim for r in results}
+        assert len(dims) == 1, f"null_space_dim moved with the amplitude unit: {dims}"
+
+        # The tolerance is set from the conditioning, not from what
+        # passes: cond(C) is 2.7e10 here, so the rounding floor on any
+        # quantity derived from it is eps * cond = 6.0e-6, and the
+        # measured spread is 7.0e-6. 1e-4 leaves ~14x over that floor
+        # while remaining far tighter than the defect it guards, where
+        # cond(g) moved from 2.6e12 to 2.1e14 across the same range.
+        conds = np.array([r.condition_number for r in results])
+        np.testing.assert_allclose(conds, conds[0], rtol=1e-4)
+
+    def test_bound_follows_the_inverse_square_snr_law(self):
+        """The swept CRLB scales exactly as 1/SNR**2 at fixed geometry.
+
+        `crlb_grid_sweep` passes no `noise_model`, so this is the
+        Poisson branch, whose 1/f weighting combined with the sweep's
+        `amplitude ~ snr**2` gives the exact inverse-square law. Under
+        Gaussian weighting at fixed `noise_std` the same amplitude law
+        would give 1/SNR**4.
+
+        `crlb_grid_sweep` sets the amplitude from snr**2, so before the
+        fix this ladder read [4.82e-1, 5.36e-2, inf, 2.87e-6, 2.59e-7]:
+        infinite at SNR 100, finite and 186x too small at 300 and above,
+        for a configuration whose correlation-matrix condition number is
+        2.48e4 at every point.
+        """
+        snr = np.array([10.0, 30.0, 100.0, 300.0, 1000.0])
+        sweep = crlb_grid_sweep(
+            n_comp_list=[2], overlap_ratios=np.array([0.5]), snr_levels=snr,
+            sigma=SIGMA, gamma=GAMMA,
+        )
+        crlb_dE = np.asarray(sweep['crlb_dE'][2])[0]
+
+        assert np.all(np.isfinite(crlb_dE)), f"not identifiable anywhere? {crlb_dE}"
+        assert np.all(np.diff(crlb_dE) < 0), f"not monotone in SNR: {crlb_dE}"
+        np.testing.assert_allclose(crlb_dE * snr ** 2, crlb_dE[0] * snr[0] ** 2, rtol=1e-6)
 
 
 class TestMeanEfficiency:
@@ -524,6 +763,34 @@ class TestMeanEfficiency:
         old = float(np.mean(crlb_per) / np.mean(rmse_per) ** 2)
         if len(set(crlb_per.tolist())) > 1:
             assert old > 1.0, "the old formula should be the one that inflates"
+
+    def test_efficiency_point_actually_uses_this_aggregation(self):
+        """`mean_efficiency` being right does not prove the caller uses it.
+
+        Reverting only the call site leaves the rest of the suite green,
+        because the solver-level smoke test sits at a symmetric two-peak
+        configuration where the per-component bounds are equal and both
+        formulas agree. This one picks a configuration where they do not.
+        """
+        try:
+            er = compute_efficiency_point(
+                n_comp=3, overlap_ratio=0.5, snr=100.0,
+                sigma=SIGMA, gamma=GAMMA,
+                n_energy=128, n_spectra=500, seed=42,
+            )
+        except ImportError:
+            pytest.skip("MLX not available")
+
+        crlb_per = np.array([er.crlb.crlb_per_component[k]['dE'] for k in range(3)])
+        rmse_per = np.asarray(er.rmse_dE_per)
+
+        per_component = float(np.mean(crlb_per / rmse_per ** 2))
+        pooled = float(np.mean(crlb_per) / np.mean(rmse_per) ** 2)
+
+        assert per_component != pytest.approx(pooled, rel=1e-3), (
+            "this configuration does not discriminate between the two formulas"
+        )
+        assert er.efficiency_dE == pytest.approx(per_component, rel=1e-9)
 
     def test_zero_rmse_is_floored_not_infinite(self):
         """A noiseless component must not turn the mean into inf."""

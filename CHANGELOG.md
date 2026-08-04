@@ -10,6 +10,79 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`voigtfit.crlb` decided identifiability from a quantity that
+  depended on the amplitude unit.** The Fisher matrix mixes units — the
+  amplitude block is in area units, `dE` and `dsigma` in eV — so
+  thresholding its eigenvalues asks a question about the
+  parameterisation rather than about the physics: `A → cA` sends
+  `g → D g D` with `D` diagonal, which is not a similarity transform, so
+  the spectrum and any rank decision taken from it move with `c` while
+  `[g⁻¹]ᵢᵢ` transforms correctly. `crlb_grid_sweep()` sets the amplitude
+  from `snr²`, putting that defect directly on its own SNR axis: two
+  peaks at overlap 0.5 reported `crlb_dE` of
+  `[4.82e-1, 5.36e-2, inf, 2.87e-6, 2.59e-7]` across SNR 10…1000 —
+  infinite at 100, then finite and 186× too small — for a configuration
+  whose correlation-matrix condition number is 2.48e4 at every point.
+  The same ladder now reads `[4.82e-1, 5.36e-2, 4.82e-3, 5.36e-4,
+  4.82e-5]`, monotone and following `1/SNR²` to six digits. The rank
+  decision and the inversion are now taken on the correlation matrix
+  `C = g/outer(d,d)` and mapped back by `diag(inv(C))/d²`, which is
+  algebraically identical to `diag(inv(g))` — the bound is evaluated in
+  scaled coordinates, not redefined. **The justification is invariance,
+  not conditioning.** Holding the rank threshold fixed and varying only
+  the matrix, the eigen-route residual `‖gM−I‖/√n` at three peaks,
+  overlap 0.3 does improve away from amplitude 1 — 6.8e-5 → 4.0e-6 at
+  amplitude 1e-2, 1.1e-2 → 8.9e-5 at 1e2, 3.3e-1 → 7.8e-4 at 1e3 — but
+  it costs about 1.5× at amplitude 1, and a plain `np.linalg.inv(g)` is
+  comparable or better at all four points (5.6e-6, 4.2e-7, 1.9e-5,
+  3.1e-4). What changes is that the rank decision no longer moves with
+  the units. `condition_number` is now this scale-free one; it differs
+  from the old value by at most 2.4% at amplitude 1 across the
+  configurations swept here, and is invariant where the old one swung
+  four orders of magnitude. The rank threshold is now `n·eps` relative,
+  the convention of `np.linalg.matrix_rank`,
+  instead of a hand-picked `1e-12` that was three orders more
+  conservative than double precision and called configurations
+  unbounded whose bound is computable — four peaks at overlap 0.3 have
+  `cond(C) = 3.5e13` and, by the route this module uses, an inverse
+  residual of 1.3e-3 to 2.4e-3 depending on the energy grid. Across a
+  140-configuration grid — `n_comp` 2–6 × overlap
+  {0.2, 0.3, 0.5, 0.8, 1.0, 1.5, 3.0} × `noise_std`
+  {1e-1, 1e-2, 1e-4, 1e-6}, amplitude 1, Gaussian, `n_energy` 256,
+  padding 5 FWHM — every configuration that was full rank stays full
+  rank: none is bit-identical, as two distinct float64 code paths would
+  not be, but the median relative difference is 2.4e-13, 88 of 112 agree
+  to better than 1e-9, and the largest is 3.3e-5. All 28 rank changes
+  are toward *fewer* null directions.
+
+  The projection half of the same decision was corrected too.
+  `crlb = inf` is applied to a parameter whose axis projects onto the
+  null space above a fixed tolerance, and that tolerance sat *inside*
+  the band where coupled axes live, so an axis participating at the
+  5e-12 level was read as decoupled and kept a finite bound lifted from
+  the truncated pseudo-inverse — and which axis it was moved with
+  `noise_std`, a scalar that multiplies the Fisher matrix and cannot
+  change identifiability. Measured at σ=0.5, γ=0.3, axes coupled into a
+  degeneracy project between 5.5e-12 and 5.0e-01, while genuinely
+  decoupled ones — two nearly coincident peaks plus a third 3 to 30
+  FWHM away, whose parameters stay estimable and must keep a finite
+  bound — stay at or below 8.8e-20. The tolerance moves from `1e-10` to
+  `1e-15`, near the geometric middle of that eight-order gap. Across 53
+  rank-deficient configurations no coupled axis now escapes as finite,
+  and the distant peak in the decoupled family still does.
+
+  Two returned arrays change meaning and are worth naming separately:
+  `eigenvalues`/`eigenvectors` are now the correlation matrix's, since
+  those are what the rank decision is taken on, and `crlb_pseudo` is
+  `diag(pinv(C))/d²`. Pseudo-inversion does not commute with diagonal
+  scaling, so on the rank-deficient branch `crlb_pseudo` differs from
+  `diag(pinv(g))` by anything from a couple of percent to nine orders of
+  magnitude; maps of the old and new arrays are not interchangeable.
+
+  This completes the fix begun in the previous entry, which reported
+  `inf` from the same unit-dependent test and so removed the
+  understatement at one grid point while leaving it elsewhere.
+
 - **`clear_cache()` deleted shipped reference data, and
   `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
   every `*.json` under `data/_cache/` — the package's own bundled
@@ -87,14 +160,17 @@ archived on Zenodo for a citable DOI.
   information contributed **nothing** to the diagonal instead of
   diverging. The reported `crlb` was therefore *smaller* than the true
   bound exactly where the configuration was hardest, and it fell as the
-  problem got worse: four peaks at σ=0.5, γ=0.3 go from a 1-dimensional
-  null space at overlap 0.3 to a 3-dimensional one at overlap 0.2, and
-  the reported bound drops by a factor of 26 across that step. The
-  consequence reached users: `process_multipeak()` attaches a
-  `SolvabilityInfo` to every result, and at SNR 1e6 that four-peak,
-  overlap-0.2 configuration — where the individual centres are not
-  identifiable at all — was classified **EASY**, "meV precision,
-  well-resolved". It is now IMPOSSIBLE. `crlb` entries are `inf` for any
+  problem got worse. The consequence reached users: `process_multipeak()`
+  attaches a `SolvabilityInfo` to every result, and a heavily overlapped
+  configuration at high SNR — where the individual centres are not
+  identifiable at all — could be classified **EASY**, "meV precision,
+  well-resolved". It is now IMPOSSIBLE. (This entry originally quoted
+  specific null-space dimensions, a 26× drop and an EASY classification
+  at four peaks / overlap 0.2 / SNR 1e6. Those figures described the
+  rank test as it stood at that commit; the entry above replaced that
+  test, so they no longer reproduce and have been removed rather than
+  left to contradict it. The live demonstration is pinned in
+  `TestSingularFisher`.) `crlb` entries are `inf` for any
   parameter whose axis projects onto the numerical null space, flagged
   in the new `unbounded` mask and counted by `null_space_dim`; the
   previous diagonal remains available as `crlb_pseudo`, documented as a

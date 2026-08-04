@@ -42,9 +42,12 @@ Three conditions, none of them automatic here:
    background, or unmodelled lineshape asymmetry all break it.
 3. *A non-singular Fisher matrix*, plus the usual regularity conditions
    (support independent of theta, differentiation under the integral).
-   Where the matrix is singular the bound on an individual parameter
-   diverges -- only some combination of parameters is estimable -- and
-   compute_multipeak_fisher() reports inf for it.
+   Where the matrix is numerically indistinguishable from singular,
+   only some combination of parameters is estimable and
+   compute_multipeak_fisher() reports inf for the individual ones. That
+   decision is taken on the correlation matrix, not on the raw Fisher
+   spectrum: the latter mixes units and moves with the amplitude
+   parameterisation.
 
 Beyond those, the bound conditions on everything not in theta. No
 background parameter appears in the Fisher matrix at all; mode='3d'
@@ -124,7 +127,8 @@ class SolvabilityInfo:
         level: Overall solvability classification
         crlb_dE_meV: sqrt(CRLB[dE]) in meV, averaged over components
         crlb_ds_meV: sqrt(CRLB[dsigma]) in meV, averaged over components
-        condition_number: Fisher matrix condition number
+        condition_number: Condition number of the correlation matrix
+            (scale-free); see CRLBResult.condition_number
         min_overlap_fwhm: Minimum inter-peak spacing in FWHM units
         n_comp: Number of components
         per_component: Per-component (level, crlb_dE_meV) list
@@ -301,21 +305,44 @@ class CRLBResult:
             matrix is singular along that parameter axis: the bound on
             an individual parameter diverges when only some combination
             of parameters is estimable. See ``unbounded``.
-        crlb_pseudo: Same diagonal taken from the thresholded
-            Moore-Penrose pseudo-inverse, i.e. with the null directions
-            dropped rather than diverging. **Not a bound** -- it is
-            smaller than the true one exactly where the configuration is
-            hardest, so a map of it can fall as peaks overlap further.
-            Kept because it stays finite and is useful as a regularized
-            diagnostic; never present it as a limit on precision.
+        crlb_pseudo: ``diag(pinv(C)) / d**2``, i.e. the same diagonal
+            with the null directions dropped rather than diverging.
+            **Not a bound** -- it is smaller than the true one exactly
+            where the configuration is hardest, so a map of it can still
+            fall as peaks overlap further; that artefact is unchanged by
+            the scaling and is why this must never be presented as a
+            limit on precision. Note also that the identity
+            ``diag(inv(C))/d**2 == diag(inv(g))`` holds only on the
+            full-rank branch: pseudo-inversion does not commute with
+            diagonal scaling. Where ``null_space_dim > 0`` this
+            therefore differs from ``diag(pinv(g))`` by anything from a
+            couple of percent (four peaks, overlap 0.2) to nine orders
+            of magnitude (three peaks, overlap 0.1), since the two also
+            apply different rank thresholds to the same eigenvalue. Do
+            not treat maps of the two as interchangeable. Kept because
+            it stays finite and is useful as a regularized diagnostic.
         unbounded: Boolean mask, shape (n_params_total,), true where
             ``crlb`` is inf
-        null_space_dim: Number of eigenvalues at or below the rank
-            threshold (0 when the Fisher matrix is numerically full rank)
+        null_space_dim: Number of correlation-matrix eigenvalues at or
+            below the rank threshold (0 when numerically full rank)
         crlb_per_component: Nested dict {comp_idx: {param_name: crlb_value}},
             following ``crlb`` including its infinities
-        condition_number: Condition number of Fisher matrix
-        eigenvalues: Eigenvalues in ascending order
+        condition_number: Condition number of the **correlation**
+            matrix, not of ``fisher``. The latter mixes units and its
+            condition number moves with the amplitude parameterisation
+            -- measured at 6.5 orders over amplitude 1e-3..1e6 for three
+            peaks at overlap 0.3 -- so it is not an indicator of
+            identifiability. The two agree to about 2% at amplitude 1
+            and sigma ~ 0.5, gamma ~ 0.3, but that is a property of
+            those widths, not a general one: cond(C)/cond(g) is 0.57 at
+            the C 1s nominal (sigma=0.4247, gamma=0.125) and 0.014 at
+            sigma=0.05. Note that
+            ``fisher_information.FisherResult.condition_number`` is
+            still taken from the raw Fisher spectrum, so the two classes
+            report different quantities under the same name.
+        eigenvalues: Correlation-matrix eigenvalues, ascending. These
+            are the ones the rank decision is taken on; for the Fisher
+            matrix's own spectrum use ``np.linalg.eigvalsh(fisher)``.
         eigenvectors: Corresponding eigenvectors (columns)
         param_names: Flat list of parameter names (e.g. ['amp_0', 'dE_0', ...])
         n_comp: Number of components
@@ -344,10 +371,30 @@ _PARAM_NAMES_3D = ('amp', 'dE', 'dsigma')
 _PARAM_NAMES_4D = ('amp', 'dE', 'dsigma', 'dgamma')
 
 # A parameter axis counts as lying in the null space when this much of
-# its unit vector projects there. Eigenvectors are orthonormal, so an
-# axis genuinely outside the null space projects at the 1e-30 level;
-# anything above this is structure, not round-off.
-_NULL_PROJECTION_TOL = 1e-10
+# its unit vector projects there, measured in the scaled coordinates of
+# compute_multipeak_fisher() where the axes are comparable.
+#
+# The distribution is continuous in [0, 1], but it is not featureless.
+# Measured at sigma=0.5, gamma=0.3 over rank-deficient configurations
+# (three to six peaks, overlap 0.10-0.40, n_energy 256 and 1024):
+#
+#   axes coupled into the degeneracy      5.5e-12 .. 5.0e-01
+#   axes genuinely decoupled from it      <= 8.8e-20
+#
+# where the second band is measured on a separate family -- two nearly
+# coincident peaks plus one placed 3 to 30 FWHM away, whose parameters
+# remain estimable and must keep a finite bound. Roughly eight orders
+# separate the two, and this constant is placed near the geometric
+# middle, leaving about three orders of margin on each side.
+#
+# The previous value, 1e-10, sat *inside* the coupled band and so
+# excluded axes that participate at the 5e-12 level: those kept a
+# finite crlb lifted from the truncated pseudo-inverse -- the number
+# this module says must never be read as a limit on precision -- and
+# the outcome moved when noise_std alone was varied, which cannot
+# change identifiability. Both bands and that failure are pinned by
+# TestSingularFisher.
+_NULL_PROJECTION_TOL = 1e-15
 
 
 def compute_multipeak_fisher(
@@ -390,14 +437,26 @@ def compute_multipeak_fisher(
         excludes. The noise model actually used is recorded in
         CRLBResult.config['noise_model'].
 
-        Eigenvalues at or below 1e-12 * lambda_max are treated as null.
-        A parameter whose axis projects onto that null space gets
+        The rank decision is taken on the correlation matrix rather
+        than on the Fisher matrix directly, because the latter mixes
+        units and its spectrum therefore moves with the amplitude
+        parameterisation. Eigenvalues of that scaled matrix at or below
+        `n_params_total * eps` relative to the largest are treated as
+        null, following the convention of `np.linalg.matrix_rank`. A
+        parameter whose axis projects onto that null space gets
         `crlb = inf`, flagged in `unbounded`, because only some
-        combination of parameters is estimable there and the bound on
-        the individual parameter genuinely diverges. `crlb_pseudo`
-        keeps the thresholded pseudo-inverse diagonal for callers that
-        need a finite diagnostic; it is smaller than the true bound in
-        exactly those configurations and is not a limit on precision.
+        combination of parameters is estimable there. In exact
+        arithmetic distinct Voigt components sampled on at least
+        ``n_params_total`` energy points give a nonsingular Fisher
+        matrix and every bound is finite (with fewer points it is
+        structurally rank deficient: four peaks in '3d' mode need 12,
+        and 6 points leave a 6-dimensional null space); what is detected here is that
+        the matrix is numerically indistinguishable from singular at a
+        disclosed threshold, and an infinite bound is reported in
+        preference to an underestimate. `crlb_pseudo` keeps the
+        thresholded pseudo-inverse diagonal for callers that need a
+        finite diagnostic; it is smaller than the true bound in exactly
+        those configurations and is not a limit on precision.
     """
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
     centers = np.asarray(centers, dtype=np.float64)
@@ -460,9 +519,38 @@ def compute_multipeak_fisher(
     Jw = J_full * sqrt_w[np.newaxis, :]  # (n_total, n_energy)
     fisher = Jw @ Jw.T  # (n_total, n_total)
 
-    # --- Step 5: CRLB = diag(inv(fisher)) ---
-    # Use pseudo-inverse for near-singular cases
-    eigenvalues, eigenvectors = np.linalg.eigh(fisher)
+    # --- Step 5: CRLB, computed in the dimensionless metric ---
+    # The Fisher matrix mixes units: the amplitude block is in area
+    # units, dE and dsigma in eV. A threshold on its eigenvalues is
+    # therefore a statement about the amplitude unit rather than about
+    # identifiability -- reparameterising A -> cA sends g -> D g D with
+    # D diagonal, which is not a similarity transform, so the spectrum
+    # (and any rank decision taken from it) moves with c while the
+    # physics does not.
+    #
+    # Rescaling to unit diagonal fixes that gauge. Rank is a property of
+    # the correlation matrix C = g / outer(d, d), and
+    #
+    #     diag(inv(g)) == diag(inv(C)) / d**2
+    #
+    # identically on the full-rank branch, so the bound is evaluated in
+    # the scaled coordinates and returned in the caller's units without
+    # being redefined.
+    #
+    # The justification is invariance, not conditioning. Holding the
+    # rank threshold fixed and varying only the matrix does improve the
+    # eigen-route residual ||g M - I||/sqrt(n) away from amplitude 1
+    # (three peaks, overlap 0.3: 6.8e-05 -> 4.0e-06 at amplitude 1e-2,
+    # 1.1e-02 -> 8.9e-05 at 1e2, 3.3e-01 -> 7.8e-04 at 1e3), but it
+    # costs about 1.5x at amplitude 1, and a plain np.linalg.inv(g) is
+    # comparable or better at every one of those points (5.6e-06,
+    # 4.2e-07, 1.9e-05, 3.1e-04). Conditioning is a side effect; what
+    # this buys is a rank decision that does not move with the units.
+    d = np.sqrt(np.maximum(np.diag(fisher), 0.0))
+    d_safe = np.where(d > 0.0, d, 1.0)
+    correlation = fisher / np.outer(d_safe, d_safe)
+
+    eigenvalues, eigenvectors = np.linalg.eigh(correlation)
     eig_positive = eigenvalues[eigenvalues > 0]
 
     if len(eig_positive) >= 2:
@@ -470,26 +558,33 @@ def compute_multipeak_fisher(
     else:
         condition_number = np.inf
 
-    # Moore-Penrose pseudo-inverse, thresholded at machine epsilon times
-    # the largest eigenvalue. This is a regularized diagnostic, not a
-    # bound: it drops the null directions instead of letting them
-    # diverge.
-    eig_threshold = max(eigenvalues[-1] * 1e-12, 1e-30)
+    # Moore-Penrose pseudo-inverse of C, thresholded relative to its
+    # largest eigenvalue. This is a regularized diagnostic, not a bound:
+    # it drops the null directions instead of letting them diverge.
+    #
+    # The relative threshold is numpy's own numerical-rank convention,
+    # n * eps (see np.linalg.matrix_rank), rather than a hand-picked
+    # constant. The previous 1e-12 was three orders more conservative
+    # than double precision and declared configurations unbounded whose
+    # bound is in fact computable: four peaks at overlap 0.3 give
+    # cond(C) = 3.5e13, where the inverse still carries a residual of
+    # 1.9e-03.
+    eig_threshold = max(eigenvalues[-1] * n_total * np.finfo(np.float64).eps, 1e-30)
     null_mask = eigenvalues <= eig_threshold
     eig_inv = np.where(null_mask, 0.0, 1.0 / eigenvalues)
-    fisher_inv = (eigenvectors * eig_inv[np.newaxis, :]) @ eigenvectors.T
-    crlb_pseudo = np.diag(fisher_inv).copy()
+    corr_inv = (eigenvectors * eig_inv[np.newaxis, :]) @ eigenvectors.T
+    crlb_pseudo = np.diag(corr_inv) / d_safe ** 2
 
-    # The bound itself. [g^-1]_ii diverges for any parameter whose unit
-    # basis vector has a component in the null space of g: only the
-    # estimable combinations are bounded, not the individual parameters
-    # entering them. Report that as inf rather than as the pseudo-inverse
-    # diagonal, which is *smaller* than the true bound exactly where the
-    # problem is hardest.
+    # The bound itself. [g^-1]_ii diverges for any parameter whose axis
+    # has a component in the null space: only the estimable combinations
+    # are bounded, not the individual parameters entering them. Report
+    # that as inf rather than as the pseudo-inverse diagonal, which is
+    # *smaller* than the true bound exactly where the problem is hardest.
     crlb = crlb_pseudo.copy()
     null_space_dim = int(null_mask.sum())
     if null_space_dim:
-        # Squared projection of each parameter axis onto the null space.
+        # Squared projection of each parameter axis onto the null space,
+        # taken in the scaled coordinates where the axes are comparable.
         null_weight = (eigenvectors[:, null_mask] ** 2).sum(axis=1)
         unbounded = null_weight > _NULL_PROJECTION_TOL
         crlb[unbounded] = np.inf
@@ -507,9 +602,9 @@ def compute_multipeak_fisher(
             comp_dict[name] = float(crlb[k * n_per + p])
         crlb_per_component[k] = comp_dict
 
-    # --- Step 7: Correlation matrix ---
-    diag_sqrt = np.sqrt(np.maximum(np.diag(fisher), 1e-30))
-    correlation = fisher / np.outer(diag_sqrt, diag_sqrt)
+    # Step 7 (correlation matrix) is folded into step 5: `correlation`
+    # is the metric the rank decision and the inversion are taken in,
+    # so the value reported here is exactly the one that was used.
 
     return CRLBResult(
         fisher=fisher,
@@ -691,7 +786,8 @@ def print_crlb_summary(cr: CRLBResult, title: str = "") -> None:
 
     print(f"  n_comp={cr.n_comp}, mode={'4d' if cr.n_params_per_comp==4 else '3d'}")
     print(f"  Condition number: {cr.condition_number:.2e}")
-    print(f"  Eigenvalue range: [{cr.eigenvalues[0]:.2e}, {cr.eigenvalues[-1]:.2e}]")
+    print(f"  Correlation eigenvalue range: "
+          f"[{cr.eigenvalues[0]:.2e}, {cr.eigenvalues[-1]:.2e}]")
     print()
 
     # Per-component CRLB (as standard deviation = sqrt(CRLB))
