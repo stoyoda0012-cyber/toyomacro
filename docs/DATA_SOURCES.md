@@ -251,6 +251,34 @@ them would state something untrue:
   read — three of them — and belongs in `investigation`, with its
   limits attached, not in the entry.
 
+The third `investigation` record answers a question that these
+comparisons make natural: *should the five entries with published
+counterparts simply be replaced by them?* **No, not as a blanket
+change** — and the reason is worth stating, because the obvious argument
+for it does not survive contact with the source.
+
+That argument was that a formula should be fed the parameter set it was
+fitted on, which would select the 1991 table over the 2019 one. The
+TPP-2M paper refutes it. Tanuma, Powell & Penn, *Surf. Interface Anal.*
+**21**, 165 (1994), p. 170 states that the modified formula was derived
+from the 27 elements and the 14 organic compounds, and that "the IMFPs
+for the group of 15 inorganic compounds have been excluded from this
+analysis because the optical data on which their IMFPs are based are
+much less reliable". Neither published generation is privileged by the
+fit, because neither was in it. And the differences are at most 2.7% in
+λ at 1 keV, inside the 18.9% RMS deviation TPP-2M shows for inorganic
+compounds — the group it was not fitted to.
+
+What that settles is the blanket change, and only that. It is **not** a
+finding that every bundled value is as good as its published
+counterpart: Al2O3's E_g of 7.6 eV differs from both published figures
+and has no recorded basis, and a case for changing it on its own
+evidence remains open. The SiC entry likewise stays internally
+inconsistent — its E_g is the 4H figure while its density discriminates
+no polytype — and resolving that by adopting the cubic values would
+silently redefine what the name `SiC` means here. Phase-specific
+entries would be the better route, and are not attempted.
+
 `phase` sits alongside the value fields because density depends on it
 and the table carries no phase label. It can be `unknown`, and for GeO2
 that is the largest uncertainty in the entry — its two forms differ by

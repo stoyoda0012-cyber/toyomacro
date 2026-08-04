@@ -35,6 +35,16 @@
       ],
       "result": "No. SESSA has no band-gap database outside its 100-entry TPP table, and none of the six is in that table. Its compound density table carries no per-entry source, and its HfO2 density is 9.68 -- the value already bundled here, so not an independent check. It did establish the GeO2 and TiO2 phase ambiguities recorded above.",
       "limits": "Read-only inspection of the shipped databases. SESSA was not run. Its own Si3N4 row attributes parameters to the 2019 paper, which states that it excluded Si3N4, so that attribution is not usable."
+    },
+    {
+      "date": "2026-08-04",
+      "question": "Should the bundled parameters for the five compounds with published counterparts be replaced by those published values?",
+      "scope": [
+        "the three compilations listed above",
+        "Tanuma, Powell & Penn, Surf. Interface Anal. 21, 165 (1994), p. 170 -- the paper that introduces TPP-2M, which is the formula implemented here"
+      ],
+      "result": "No blanket replacement. One argument for preferring the 1991 parameters was that a formula should be fed the parameter set it was fitted on; the 1994 paper refutes it. On p. 170 it states that TPP-2M was derived from the 27 elements and 14 organic compounds, and that 'the IMFPs for the group of 15 inorganic compounds have been excluded from this analysis because the optical data on which their IMFPs are based are much less reliable'. Neither generation is privileged by the fit, because neither was in it. Separately, replacing the values would not be an accuracy improvement: the differences are at most 2.7% in lambda at 1 keV, well inside the 18.9% RMS deviation TPP-2M shows for inorganic compounds -- the very group excluded from its fit.",
+      "limits": "This settles a blanket replacement, and nothing more. It is NOT a finding that every bundled value is as good as its published counterpart. Al2O3's Eg of 7.6 eV differs from both published figures (8.63 and 9.0) and has no recorded basis; a case for changing one value on its own evidence remains open and would need its own citation. The SiC entry is still internally inconsistent -- its Eg is the 4H figure while its density discriminates no polytype -- and adopting the cubic figures to resolve it would silently redefine what the name SiC means here. Phase-specific entries are the better route to that and were not attempted."
     }
   ],
   "comparisons": {

@@ -171,6 +171,25 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **The provenance table now records why the bundled parameters were
+  *not* replaced with their published counterparts.** Five compounds
+  have counterparts in the TPP series, and the natural next step was to
+  adopt them. A third `investigation` record says why that was not done.
+  The argument for it — feed a formula the parameter set it was fitted
+  on, which would select the 1991 table — is refuted by the TPP-2M paper
+  itself: Tanuma, Powell & Penn, *Surf. Interface Anal.* **21**, 165
+  (1994), p. 170 derives the modified formula from the 27 elements and
+  14 organic compounds and states that the 15 inorganic compounds "have
+  been excluded from this analysis because the optical data on which
+  their IMFPs are based are much less reliable". Neither generation is
+  privileged by the fit. The differences are also at most 2.7% in λ at
+  1 keV, inside the 18.9% RMS deviation TPP-2M shows for that same
+  excluded group. The record states its own limits: this settles a
+  blanket replacement and not the merit of any individual value —
+  Al2O3's E_g of 7.6 eV differs from both published figures with no
+  recorded basis, and SiC remains internally inconsistent. **No bundled
+  value changed.**
+
 - **`CompoundDB` now reports where each bundled value came from.**
   `get_provenance(name)` returns a record per field, `get_comparisons(name)`
   the published values found later that disagree with it, and
