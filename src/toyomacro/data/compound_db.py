@@ -134,12 +134,18 @@ class CompoundDB:
         Most entries are ``not_recorded`` with an ``asserted`` origin:
         somebody typed a number in and the basis was never written down.
         That a test can now re-derive the same number does not make its
-        origin ``derived``; only having been computed here does.
+        origin ``derived``; only having been computed here does. No
+        stored value qualifies -- the one field this project touched,
+        the Si3N4 molecular weight, is ``corrected``: a transposition
+        repaired, which records what the value was and what established
+        the new reading rather than claiming it was authored here.
 
         A ``phase`` record sits alongside the fields, because density
         depends on it and the table itself carries no phase label. It
         can be ``unknown`` — for GeO2 that is the largest uncertainty in
-        the entry, the two forms differing by about 48% in density.
+        the entry, its two forms differing by about 47% in density. It
+        does not always bear on density: for SiC the ambiguity is in the
+        band gap, which is what ``applies_to`` records.
 
         Args:
             compound: Compound or element name, as in
@@ -153,7 +159,7 @@ class CompoundDB:
             >>> CompoundDB.get_provenance('Si3N4')['Mw']['availability']
             'known'
             >>> CompoundDB.get_provenance('Si3N4')['Mw']['origin']['kind']
-            'derived'
+            'corrected'
             >>> CompoundDB.get_provenance('SiO2')['density']['availability']
             'not_recorded'
         """

@@ -749,7 +749,14 @@ def regenerate_cache() -> dict[str, str]:
         ("trzh2018_haxpes.json", _get_trzh2018_xlsx_path, _xlsx_to_json_trzh2018),
         ("trzh2019_inner.json", _get_trzh2019_xlsx_path, _xlsx_to_json_trzh2019),
     ):
-        xlsx_path = path_getter()
+        # The getters resolve through get_common_data_path(), which raises
+        # when the private Common/ tree is absent -- i.e. on every public
+        # install. Skipping is the documented outcome, not an exception.
+        try:
+            xlsx_path = path_getter()
+        except FileNotFoundError as exc:
+            results[cache_name] = f"skipped: {exc}"
+            continue
         if not xlsx_path.exists():
             results[cache_name] = f"skipped: {xlsx_path.name} not found"
             continue

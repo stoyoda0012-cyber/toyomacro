@@ -8,10 +8,9 @@ pinned here:
 * it never leaks into the values, so a calculation sees exactly the
   numbers it saw before.
 
-The vocabulary is aligned with the sibling ``xpsuncertainty`` project's
-availability states. That project is not public and its constant-source
-schema is unshipped, so it is not cited as authority: the names are
-shared so the two do not diverge, and nothing more.
+The availability state names are shared with another of the author's
+projects so the two do not drift apart. That is a naming convention
+only; nothing here rests on it.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from toyomacro.data import CompoundDB
 from toyomacro.data.paths import get_cache_dir, load_compound_data
 
 AVAILABILITY_STATES = {"known", "unknown", "not_recorded", "not_applicable"}
-ORIGIN_KINDS = {"derived", "cited", "asserted"}
+ORIGIN_KINDS = {"derived", "cited", "asserted", "corrected"}
 VALUE_FIELDS = ("Nv", "density", "Mw", "Eg")
 NON_MATERIALS = {"AVERAGE", "Oxide"}
 
@@ -126,12 +125,24 @@ def test_derived_origins_state_how_they_were_derived(provenance):
     assert found, "no derived origin present; the check would be vacuous"
 
 
+def _cited_origin_is_identified(origin: dict) -> bool:
+    return bool(origin.get("doi") or origin.get("citation"))
+
+
 def test_cited_origins_carry_an_identifier(provenance):
+    """No entry cites a source yet -- every value here is uncited.
+
+    The rule is still checked, on the shipped records and on a synthetic
+    one, so it is in force before the first real citation lands rather
+    than passing vacuously until then.
+    """
     for name, field, record in _records(provenance):
         origin = record.get("origin") or {}
-        if origin.get("kind") != "cited":
-            continue
-        assert origin.get("doi") or origin.get("citation"), f"{name}.{field}"
+        if origin.get("kind") == "cited":
+            assert _cited_origin_is_identified(origin), f"{name}.{field}"
+
+    assert _cited_origin_is_identified({"kind": "cited", "doi": "10.1002/sia.6598"})
+    assert not _cited_origin_is_identified({"kind": "cited", "name": "a paper"})
 
 
 def test_asserted_origin_may_coexist_with_not_recorded(provenance):
@@ -151,17 +162,45 @@ def test_non_materials_are_not_applicable(provenance):
             assert record.get("reason")
 
 
-def test_phase_records_what_the_density_depends_on(provenance):
-    """A known phase names it; an unknown one says why it matters."""
+def test_phase_records_what_it_bears_on(provenance):
+    """A known phase names it; an unknown one says why it matters.
+
+    ``applies_to`` is not a constant: for SiC the ambiguity is in the
+    band gap (2.31 eV cubic against the stored 3.26 eV, a 41% spread)
+    and *not* in the density, whose polytypes differ by under 1%.
+    """
     geo2 = provenance["entries"]["GeO2"]["phase"]
     assert geo2["availability"] == "unknown"
     assert "value" not in geo2
-    assert "48%" in geo2["reason"]
+    assert geo2["applies_to"] == ["density"]
 
     tio2 = provenance["entries"]["TiO2"]["phase"]
     assert tio2["availability"] == "known"
     assert tio2["value"] == "rutile"
     assert tio2["applies_to"] == ["density"]
+
+    sic = provenance["entries"]["SiC"]["phase"]
+    assert sic["availability"] == "unknown"
+    assert sic["applies_to"] == ["Eg"], "the SiC ambiguity is not a density one"
+
+
+def test_an_identified_phase_says_who_identified_it(provenance):
+    """A phase read off the density is an inference authored here.
+
+    It is held to the same standard as a value field: an entry that
+    names a phase must carry an origin saying how it was concluded.
+    """
+    named = [
+        (name, fields["phase"])
+        for name, fields in provenance["entries"].items()
+        if "value" in fields["phase"]
+    ]
+    assert named, "no identified phase present; the check would be vacuous"
+    for name, phase in named:
+        origin = phase.get("origin")
+        assert origin, f"{name} names a phase with no origin"
+        assert origin["kind"] == "derived", name
+        assert origin["derived_by"], name
 
 
 # --- comparisons and investigations are held apart from sources --------------
@@ -178,18 +217,34 @@ def test_comparisons_are_never_recorded_as_origins(provenance):
             )
 
 
-def test_comparisons_disagree_with_the_bundled_values(provenance):
-    """Pin the reason they are comparisons: they do not match."""
+def test_comparison_agreement_is_reported_accurately(provenance):
+    """A comparison may agree or disagree; what it must not do is misreport.
+
+    Some agree exactly -- SESSA's GeO2 and HfO2 densities are the bundled
+    numbers, most likely a shared handbook ancestor rather than
+    corroboration. Recording that honestly is the point, so the fields
+    are recomputed here from the values themselves.
+    """
     data = load_compound_data()
     for name, comparisons in provenance["comparisons"].items():
         for comparison in comparisons:
             assert comparison["source"]["name"]
-            differs = [
+            differs = sorted(
                 field
                 for field, value in comparison["values"].items()
                 if abs(data[name][field] - value) > 1e-9
-            ]
-            assert differs, f"{name} comparison matches the bundled values exactly"
+            )
+            agrees = sorted(set(comparison["values"]) - set(differs))
+            assert comparison["differs_in"] == differs, name
+            assert comparison["agrees_in"] == agrees, name
+
+
+def test_an_exact_agreement_is_not_called_corroboration(provenance):
+    """The GeO2/HfO2 SESSA matches must say why they prove nothing."""
+    for name in ("GeO2", "HfO2"):
+        comparison = provenance["comparisons"][name][0]
+        assert comparison["differs_in"] == []
+        assert "not independent" in comparison["source"]["note"]
 
 
 def test_investigations_state_their_limits(provenance):
@@ -210,10 +265,48 @@ def test_accessors_agree_with_the_file(provenance):
     assert CompoundDB.get_comparisons("TiO2") == []
 
 
-def test_si3n4_molecular_weight_is_the_one_derived_here():
-    """The single field this project authored rather than inherited."""
+def test_si3n4_molecular_weight_is_recorded_as_a_correction():
+    """Not `derived`: the digits were already here.
+
+    ``55d7afd`` changed 104.28346 to 140.28346, leaving the fractional
+    part untouched -- a transposition repaired, not a value computed
+    here. Calling it `derived` would claim an authorship the history
+    refutes, and would also misattribute the number to IUPAC 2021, whose
+    conventional weights give 140.283 rather than 140.28346.
+    """
     record = CompoundDB.get_provenance("Si3N4")["Mw"]
     assert record["availability"] == "known"
-    assert record["origin"]["kind"] == "derived"
-    assert record["origin"]["formula"] == "Si3N4"
-    assert "IUPAC" in record["origin"]["standard"]
+    origin = record["origin"]
+    assert origin["kind"] == "corrected"
+    assert origin["previous_value"] == 104.28346
+    assert origin["verified_against"]["result"] == 140.28346
+    assert "2021" in origin["note"], "the standard it is NOT on must be stated"
+
+
+def test_corrected_origins_say_what_they_changed_and_what_confirmed_it(provenance):
+    required = ("previous_value", "corrected_in", "correction", "verified_against")
+    found = 0
+    for name, field, record in _records(provenance):
+        origin = record.get("origin") or {}
+        if origin.get("kind") != "corrected":
+            continue
+        found += 1
+        for key in required:
+            assert origin.get(key) is not None, f"{name}.{field} corrected without {key}"
+        assert origin["previous_value"] != load_compound_data()[name][field]
+    assert found, "no corrected origin present; the check would be vacuous"
+
+
+def test_the_only_derived_origins_are_phase_identifications(provenance):
+    """Guard the distinction this schema exists to keep.
+
+    No stored *value* was computed here. If one ever is, this test
+    should be updated deliberately rather than quietly passing.
+    """
+    derived = [
+        (name, field)
+        for name, field, record in _records(provenance)
+        if (record.get("origin") or {}).get("kind") == "derived"
+    ]
+    assert derived
+    assert all(field == "phase" for _, field in derived), derived

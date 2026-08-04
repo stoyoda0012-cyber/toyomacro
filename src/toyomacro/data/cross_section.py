@@ -44,11 +44,14 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
+import warnings
 from typing import Any
 
 import numpy as np
 
 from toyomacro.data.paths import (
+    REGENERATE_ENV_VAR,
     get_cache_dir,
     get_common_data_path,
     load_cross_section_data,
@@ -248,23 +251,46 @@ class CrossSection:
 
     @staticmethod
     def _load_with_cache(cache_name: str, csv_name: str, parser) -> dict[str, Any]:
-        """Bundled-JSON-cache-first table load.
+        """Load one bundled cross-section table from ``data/_cache``.
 
-        The JSON caches under ``data/_cache`` ship with the package so that
-        lookups work on a clean install; the ``Common/data`` CSV sources are
-        only needed to regenerate them. Returns an empty table when neither
-        the cache nor the CSV source is available.
+        Same policy as :func:`toyomacro.data.paths._load_shipped_table`:
+        these files are shipped, reviewed reference data, so a missing one
+        raises rather than being rebuilt from a local CSV that is not part
+        of this repository. It used to return an **empty table** in that
+        case, which is worse than either — a lookup then reports "no such
+        line" for a table that is simply absent.
+
+        Raises:
+            FileNotFoundError: if the table is missing and regeneration
+                was not requested via ``TOYOMACRO_REGENERATE_DATA``.
         """
         cache_file = get_cache_dir() / cache_name
         if cache_file.exists():
             with open(cache_file, encoding="utf-8") as f:
                 return json.load(f)
-        try:
-            csv_path = get_common_data_path() / csv_name
-        except FileNotFoundError:
-            return {"photon_energies": [], "data": {}}
+
+        if not os.environ.get(REGENERATE_ENV_VAR):
+            raise FileNotFoundError(
+                f"Bundled reference table {cache_name} is missing from "
+                f"{get_cache_dir()}. It ships with this package and is not a "
+                f"disposable cache; restore it (e.g. `git checkout` the file, "
+                f"or reinstall). To rebuild it instead from a local "
+                f"{csv_name}, set {REGENERATE_ENV_VAR}=1."
+            )
+
+        csv_path = get_common_data_path() / csv_name
         if not csv_path.exists():
-            return {"photon_energies": [], "data": {}}
+            raise FileNotFoundError(
+                f"{cache_name} is missing and {csv_name} was not found at "
+                f"{csv_path}, so it cannot be rebuilt."
+            )
+        warnings.warn(
+            f"Rebuilding {cache_name} from {csv_name}. The result is "
+            f"unreviewed and may differ from the reference table this package "
+            f"ships; check the diff before committing it.",
+            UserWarning,
+            stacklevel=3,
+        )
         data = parser(csv_path)
         # Compact JSON: these caches are machine-read only, and the Scofield
         # table is large enough that indentation roughly doubles its size.

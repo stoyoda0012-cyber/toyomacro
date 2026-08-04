@@ -235,9 +235,14 @@ them would state something untrue:
   Almost every entry is `not_recorded` with an `asserted` origin —
   somebody typed a number in and the basis was never written down. That
   a test can now re-derive the same number does not make its origin
-  `derived`. Only one field in the whole table is `derived`: the Si3N4
-  molecular weight, computed here from the formula and IUPAC 2021
-  values, which is why it carries the expression and standard version.
+  `derived`. **No stored value is `derived`.** The one field this
+  project changed — the Si3N4 molecular weight — is `corrected`: the
+  commit repaired a digit transposition and left the fractional part
+  untouched, so the value is the one the original entry intended rather
+  than one authored here. The record says what it was, what was changed,
+  and that the check which settled it used the pre-2009 atomic weights
+  the original digits imply; the IUPAC 2021 conventional values give
+  140.283, 3 ppm away and immaterial to `U = N_v·ρ/M`.
 - **A source and a later comparison.** Shinotsuka *et al.* 2019 is not
   where SiO2's 2.2 g/cm³ came from; it is a table found afterwards that
   *disagrees*. It lives under `comparisons`, never in `origin`.
@@ -248,7 +253,12 @@ them would state something untrue:
 
 `phase` sits alongside the value fields because density depends on it
 and the table carries no phase label. It can be `unknown`, and for GeO2
-that is the largest uncertainty in the entry.
+that is the largest uncertainty in the entry — its two forms differ by
+about 47%. What it bears on is recorded too, and is not always density:
+for SiC the polytype densities differ by under 1% while the band gaps
+span 2.31–3.26 eV, so `applies_to` is `Eg` there. Where a phase *is*
+identified, the identification is an inference made here and carries an
+origin saying so.
 
 ## In-code constants
 

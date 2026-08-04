@@ -11,7 +11,8 @@
     "origin": {
       "derived": "Computed here from a stated expression and standard. Requires formula, expression, standard and standard_version.",
       "cited": "Taken from a identified publication. Requires a citation identifier.",
-      "asserted": "Recorded as a value with no basis captured. May coexist with availability not_recorded."
+      "asserted": "Recorded as a value with no basis captured. May coexist with availability not_recorded.",
+      "corrected": "The value was already here and was repaired. Records what it was, what was changed and what established the new reading. Distinct from derived, which claims the value was authored here."
     }
   },
   "investigation": [
@@ -23,7 +24,7 @@
         "Shinotsuka et al., Surf. Interface Anal. 51, 427 (2019)",
         "Shinotsuka et al., Surf. Interface Anal. 54, 534 (2022)"
       ],
-      "result": "Five of the eleven compounds appear: Al2O3, GaAs, SiC and SiO2 in the 2019 set, Si3N4 in the 1991 set. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the three.",
+      "result": "Five of the eleven compounds appear. Al2O3, GaAs, SiC and SiO2 are in both the 1991 and the 2019 sets, whose parameters differ from each other as well as from the bundled ones (Al2O3 Eg is 9.0 in 1991 and 8.63 in 2019 against 7.6 here); both are recorded under comparisons. Si3N4 is in the 1991 set only -- the 2019 study dropped it and LiF for sum-rule errors. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the three.",
       "limits": "Three parts of a series running to at least Part XIII were read. Later parts have not been surveyed, so an absence here is not an absence from the series."
     },
     {
@@ -49,7 +50,35 @@
           "Nv": 24,
           "Eg": 8.63
         },
-        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+        "differs_in": [
+          "Eg",
+          "Mw",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5",
+          "doi": null,
+          "note": "Pre-DOI; cited by volume and page. Table 5 has no molecular-weight column."
+        },
+        "values": {
+          "density": 3.97,
+          "Nv": 24,
+          "Eg": 9.0
+        },
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ],
     "GaAs": [
@@ -64,7 +93,69 @@
           "Nv": 8,
           "Eg": 1.47
         },
-        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Mw",
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5",
+          "doi": null,
+          "note": "Pre-DOI; cited by volume and page. Table 5 has no molecular-weight column."
+        },
+        "values": {
+          "density": 5.31,
+          "Nv": 8,
+          "Eg": 1.35
+        },
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      }
+    ],
+    "GeO2": [
+      {
+        "source": {
+          "name": "SESSA v2.2.2 (NIST SRD 100), materials/all_mat.nc",
+          "doi": "10.6028/NIST.NSRDS.100-2024",
+          "note": "That table carries no per-entry source, so an agreement with it is not independent corroboration -- most likely a shared handbook ancestor. Recorded because a reader comparing the two would otherwise mistake the agreement for confirmation."
+        },
+        "values": {
+          "density": 4.228
+        },
+        "differs_in": [],
+        "agrees_in": [
+          "density"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      }
+    ],
+    "HfO2": [
+      {
+        "source": {
+          "name": "SESSA v2.2.2 (NIST SRD 100), materials/all_mat.nc",
+          "doi": "10.6028/NIST.NSRDS.100-2024",
+          "note": "That table carries no per-entry source, so an agreement with it is not independent corroboration -- most likely a shared handbook ancestor. Recorded because a reader comparing the two would otherwise mistake the agreement for confirmation."
+        },
+        "values": {
+          "density": 9.68
+        },
+        "differs_in": [],
+        "agrees_in": [
+          "density"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ],
     "Si3N4": [
@@ -79,7 +170,14 @@
           "Nv": 32,
           "Eg": 5.25
         },
-        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ],
     "SiC": [
@@ -94,7 +192,35 @@
           "Nv": 8,
           "Eg": 2.31
         },
-        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+        "differs_in": [
+          "Eg",
+          "Mw"
+        ],
+        "agrees_in": [
+          "Nv",
+          "density"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5",
+          "doi": null,
+          "note": "Pre-DOI; cited by volume and page. Table 5 has no molecular-weight column."
+        },
+        "values": {
+          "density": 3.21,
+          "Nv": 8,
+          "Eg": 2.3
+        },
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ],
     "SiO2": [
@@ -109,7 +235,52 @@
           "Nv": 16,
           "Eg": 9.1
         },
-        "relation": "Published later and independently; not the origin of the bundled values, and disagrees with them in at least one field."
+        "differs_in": [
+          "Eg",
+          "Mw",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      },
+      {
+        "source": {
+          "name": "Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5",
+          "doi": null,
+          "note": "Pre-DOI; cited by volume and page. Table 5 has no molecular-weight column."
+        },
+        "values": {
+          "density": 2.19,
+          "Nv": 16,
+          "Eg": 9.1
+        },
+        "differs_in": [
+          "Eg",
+          "density"
+        ],
+        "agrees_in": [
+          "Nv"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
+      }
+    ],
+    "Ta2O5": [
+      {
+        "source": {
+          "name": "SESSA v2.2.2 (NIST SRD 100), materials/all_mat.nc",
+          "doi": "10.6028/NIST.NSRDS.100-2024",
+          "note": "That table carries no per-entry source, so an agreement with it is not independent corroboration -- most likely a shared handbook ancestor. Recorded because a reader comparing the two would otherwise mistake the agreement for confirmation."
+        },
+        "values": {
+          "density": 8.2
+        },
+        "differs_in": [],
+        "agrees_in": [
+          "density"
+        ],
+        "relation": "Found after this entry was written. Not its origin: agreement here is not evidence that the value came from this source, and disagreement is not evidence that it is wrong."
       }
     ]
   },
@@ -204,7 +375,7 @@
       },
       "phase": {
         "availability": "unknown",
-        "reason": "Two forms differ by ~48% in density: hexagonal quartz-like ~4.25 and tetragonal rutile-type ~6.24 g/cm3. The stored 4.228 matches the hexagonal form, but nothing records which was intended, and the wrong choice would move lambda by far more than any other uncertainty in this table.",
+        "reason": "Two forms differ by ~47% in density: hexagonal quartz-like ~4.25 and tetragonal rutile-type ~6.24 g/cm3 (a 46.8% spread; 47.6% between the pair SESSA tabulates, 4.228 and 6.239). The stored 4.228 matches the hexagonal form, but nothing records which was intended, and the wrong choice would move lambda by far more than any other uncertainty in this table.",
         "applies_to": [
           "density"
         ]
@@ -242,6 +413,14 @@
       "phase": {
         "availability": "known",
         "reason": "The stored 4.23 g/cm3 is the rutile density; anatase is 3.79-3.89 and brookite 4.12. Identified here from the density alone -- the table records no phase, and the original entry did not state one.",
+        "origin": {
+          "kind": "derived",
+          "formula": "TiO2",
+          "expression": "stored density matched against the tabulated densities of the known forms",
+          "standard": "crystallographic densities of the phases named in the reason",
+          "standard_version": "n/a: identification, not a tabulated constant",
+          "derived_by": "this project, 2026-08-04"
+        },
         "value": "rutile",
         "applies_to": [
           "density"
@@ -317,6 +496,14 @@
       "phase": {
         "availability": "known",
         "reason": "The stored 5.68 g/cm3 is the monoclinic (baddeleyite) density; tetragonal and cubic forms are ~6.1. Identified from the density.",
+        "origin": {
+          "kind": "derived",
+          "formula": "ZrO2",
+          "expression": "stored density matched against the tabulated densities of the known forms",
+          "standard": "crystallographic densities of the phases named in the reason",
+          "standard_version": "n/a: identification, not a tabulated constant",
+          "derived_by": "this project, 2026-08-04"
+        },
         "value": "monoclinic",
         "applies_to": [
           "density"
@@ -355,6 +542,14 @@
       "phase": {
         "availability": "known",
         "reason": "The stored 9.68 g/cm3 is the bulk monoclinic density. Amorphous ALD films are commonly lower, which matters here: this is the most density-sensitive entry in the table.",
+        "origin": {
+          "kind": "derived",
+          "formula": "HfO2",
+          "expression": "stored density matched against the tabulated densities of the known forms",
+          "standard": "crystallographic densities of the phases named in the reason",
+          "standard_version": "n/a: identification, not a tabulated constant",
+          "derived_by": "this project, 2026-08-04"
+        },
         "value": "monoclinic",
         "applies_to": [
           "density"
@@ -475,12 +670,17 @@
       "Mw": {
         "availability": "known",
         "origin": {
-          "kind": "derived",
-          "formula": "Si3N4",
-          "expression": "3*A(Si) + 4*A(N)",
-          "standard": "IUPAC conventional standard atomic weights",
-          "standard_version": "2021",
-          "derived_by": "this project, 2026-08-04"
+          "kind": "corrected",
+          "previous_value": 104.28346,
+          "corrected_in": "commit 55d7afd, 2026-08-03",
+          "correction": "Digit transposition repaired. The fractional part was unchanged, so the corrected value is the one the original entry intended, not a value authored here.",
+          "verified_against": {
+            "formula": "Si3N4",
+            "expression": "3*A(Si) + 4*A(N)",
+            "standard": "the atomic weights the original entry itself implies: Si 28.0855, N 14.00674 (pre-2009 IUPAC values), which reproduce 140.28346 exactly",
+            "result": 140.28346
+          },
+          "note": "The IUPAC 2021 conventional values (Si 28.085, N 14.007) give 140.283, 4.6e-4 g/mol below the stored value -- 3 ppm, immaterial to U = Nv*rho/M. The stored value is not on the 2021 standard and is not claimed to be. Two further independent checks agree at that level: inverting Ep = 28.8*sqrt(Nv*rho/M) from Tanuma, Powell & Penn, Surf. Interface Anal. 17, 927 (1991), Table 5 gives M ~ 140.4, and SESSA v2.2.2's tpp2023 table carries 140.283."
         }
       },
       "Eg": {
@@ -529,9 +729,9 @@
       },
       "phase": {
         "availability": "unknown",
-        "reason": "The stored band gap 3.26 eV is a 4H/6H polytype value while the TPP-series tables carry the cubic 3C figure (2.31 eV), so the entry is not internally consistent with a single polytype. The density 3.22 does not discriminate: the polytypes differ by under 1%.",
+        "reason": "The stored band gap 3.26 eV is the 4H figure (6H is ~3.0) while the TPP-series tables carry the cubic 3C value 2.31 eV, so the entry is not internally consistent with a single polytype. Here the phase bears on Eg, not density: the polytype densities differ by under 1% and 3.22 discriminates nothing, whereas the band gaps span 2.31-3.26 eV.",
         "applies_to": [
-          "density"
+          "Eg"
         ]
       }
     },

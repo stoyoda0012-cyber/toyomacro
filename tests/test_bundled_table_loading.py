@@ -197,8 +197,20 @@ def test_every_shipped_table_is_present_on_disk():
         "trzhaskovskaya.json",
         "trzh2018_haxpes.json",
         "trzh2019_inner.json",
+        "compounds_provenance.json",
     ):
         assert (cache_dir / name).exists(), f"{name} missing from the bundled data"
+
+
+def test_missing_provenance_table_raises(empty_cache):
+    """It is hand-authored: there is no source to rebuild it from.
+
+    With the loader no longer rebuilding anything, a packaging regression
+    that dropped this file would be an import-time failure for any caller
+    of get_provenance(), so the error must name the file.
+    """
+    with pytest.raises(FileNotFoundError, match="compounds_provenance.json"):
+        paths.load_compound_provenance()
 
 
 def test_shipped_compound_table_is_the_reviewed_one():

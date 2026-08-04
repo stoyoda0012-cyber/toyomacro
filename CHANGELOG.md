@@ -187,9 +187,14 @@ archived on Zenodo for a citable DOI.
   is. Almost every field is `not_recorded` with an `asserted` origin —
   a number was typed in and the basis was never written down — and a
   test being able to re-derive that number now does not make its origin
-  `derived`. Exactly one field in the table is `derived`: the Si3N4
-  molecular weight corrected above, which carries its expression and the
-  standard version it was computed from. **A source vs a later
+  `derived`. **No stored value is `derived`**: the one field this change
+  set touched, the Si3N4 molecular weight, is `corrected`, because the
+  commit repaired a digit transposition and left the fractional part
+  untouched — the value is the one the original entry intended, not one
+  authored here. Its record carries the previous value, the commit, and
+  the check that settled it, including that the check used the pre-2009
+  atomic weights those digits imply rather than IUPAC 2021, which gives
+  140.283 (3 ppm away, immaterial to `U = N_v·ρ/M`). **A source vs a later
   comparison**: Shinotsuka *et al.* 2019 is not where SiO2's 2.2 g/cm³
   came from, so it appears under `comparisons`, never as an origin; a
   test fails if any entry with only a comparison acquires a `cited`
@@ -198,13 +203,18 @@ archived on Zenodo for a citable DOI.
   and is recorded with its limits under `investigation`. A `phase`
   record sits beside the value fields because density depends on it and
   the table has no phase label — `rutile` for TiO2 and `monoclinic` for
-  HfO2 and ZrO2, but **`unknown` for GeO2**, whose two forms differ by
-  about 48% in density and which is therefore the largest unrecorded
-  uncertainty in the table. `tests/test_compound_provenance.py` (18
+  HfO2 and ZrO2, each recording that the identification is an inference
+  made here, but **`unknown` for GeO2**, whose two forms differ by about
+  47% in density and which is therefore the largest unrecorded
+  uncertainty in the table. What the ambiguity bears on is recorded and
+  is not always density: for SiC the polytype densities differ by under
+  1% while the band gaps span 2.31–3.26 eV. `tests/test_compound_provenance.py` (18
   tests) pins key parity with `compounds.json`, coverage of every field,
   a mandatory reason on every non-`known` state, the required members of
-  a `derived` or `cited` origin, and that the values themselves are
-  unchanged.
+  a `derived`, `cited` or `corrected` origin, that a comparison reports
+  agreement and disagreement accurately — some agree exactly, and an
+  exact agreement with a table that carries no sources of its own is not
+  corroboration — and that the values themselves are unchanged.
 
 - **`AngularCorrection` now warns when the x-ray incidence angle was
   never stated.** `angular_distribution()` and
