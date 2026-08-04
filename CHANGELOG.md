@@ -178,17 +178,24 @@ archived on Zenodo for a citable DOI.
   The argument for it — feed a formula the parameter set it was fitted
   on, which would select the 1991 table — is refuted by the TPP-2M paper
   itself: Tanuma, Powell & Penn, *Surf. Interface Anal.* **21**, 165
-  (1994), p. 170 derives the modified formula from the 27 elements and
-  14 organic compounds and states that the 15 inorganic compounds "have
-  been excluded from this analysis because the optical data on which
-  their IMFPs are based are much less reliable". Neither generation is
-  privileged by the fit. The differences are also at most 2.7% in λ at
-  1 keV, inside the 18.9% RMS deviation TPP-2M shows for that same
-  excluded group. The record states its own limits: this settles a
-  blanket replacement and not the merit of any individual value —
-  Al2O3's E_g of 7.6 eV differs from both published figures with no
-  recorded basis, and SiC remains internally inconsistent. **No bundled
-  value changed.**
+  (1994), p. 170 derives the modified expression for β from the 27
+  elements and 14 organic compounds and states that the 15 inorganic
+  compounds "have been excluded from this analysis because the optical
+  data on which their IMFPs are based are much less reliable than for
+  the other two groups of materials". Neither generation was in that
+  fit, so adopting either would be a preference rather than a
+  correction. The size of the effect is recorded separately from the
+  argument, because it does not carry it: substituting either set moves
+  λ by at most 3.8% at 1 keV and 7.6% at 50 eV, and the yardstick is not
+  the 18.9% group average but the per-compound RMS deviations the same
+  paper tabulates (Table 8: SiC 3.2, SiO2 3.6, Si3N4 11.8, Al2O3 15.3,
+  GaAs 39.6) — against which the differences are **about 3× below the
+  formula's own error for SiC and SiO2**, not negligible. The record
+  states its own limits: this settles a blanket replacement and not the
+  merit of any individual value — Al2O3's E_g of 7.6 eV differs from
+  both published figures with no recorded basis, and SiC remains
+  unlabelled with an E_g implying a different polytype from its
+  counterparts. **No bundled value changed.**
 
 - **`CompoundDB` now reports where each bundled value came from.**
   `get_provenance(name)` returns a record per field, `get_comparisons(name)`
@@ -383,7 +390,7 @@ archived on Zenodo for a citable DOI.
   somewhere in that series — Al2O3, GaAs, SiC and SiO2 in Shinotsuka
   *et al.* 2019, and Si3N4 in Tanuma, Powell &amp; Penn 1991 — and where a
   published set exists the hand-entered parameters give λ within 2.6% of
-  it. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the
+  it, against the one generation compared per entry. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the
   three compilations checked, so no published parameter set is available
   there. A measured sensitivity table (TPP-2M at 1 keV, inside the
   fitted range) shows

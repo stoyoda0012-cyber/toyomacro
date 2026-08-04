@@ -164,7 +164,9 @@ parameter set here to check them against; later parts of the series have
 not been surveyed. They are uncited and will stay uncited until sourced
 individually. Note what the table above does *not* license: agreement
 within 2.6% on five entries that happen to have published counterparts
-says nothing about the six that do not.
+says nothing about the six that do not. (2.6% is the spread against the
+one generation each row compares. Taking both generations, as the
+adoption question below does, the largest is 3.8%.)
 
 One class of error is checkable without any source, and one instance was
 found: `Si3N4` carried M = 104.28346 g/mol, a digit transposition of the
@@ -260,23 +262,43 @@ for it does not survive contact with the source.
 That argument was that a formula should be fed the parameter set it was
 fitted on, which would select the 1991 table over the 2019 one. The
 TPP-2M paper refutes it. Tanuma, Powell & Penn, *Surf. Interface Anal.*
-**21**, 165 (1994), p. 170 states that the modified formula was derived
-from the 27 elements and the 14 organic compounds, and that "the IMFPs
-for the group of 15 inorganic compounds have been excluded from this
-analysis because the optical data on which their IMFPs are based are
-much less reliable". Neither published generation is privileged by the
-fit, because neither was in it. And the differences are at most 2.7% in
-λ at 1 keV, inside the 18.9% RMS deviation TPP-2M shows for inorganic
-compounds — the group it was not fitted to.
+**21**, 165 (1994), p. 170 states that the modified expression for β —
+the one change TPP-2M makes to TPP-2 — was derived from the 27 elements
+and the 14 organic compounds, and that "the IMFPs for the group of 15
+inorganic compounds have been excluded from this analysis because the
+optical data on which their IMFPs are based are much less reliable than
+for the other two groups of materials". Neither published generation was
+in that fit, so neither is privileged by it, and **adopting either would
+be a preference rather than a correction.**
+
+For scale — not as the argument — substituting either published set
+moves λ by at most **3.8% at 1 keV** (Al2O3 against the 1991 set,
+relative to the bundled value) and **7.6% at 50 eV**; the differences
+grow toward low energy, so a single-energy figure understates them. The
+yardstick to set that against is not the 18.9% group average but the
+per-compound RMS deviations the same paper tabulates (Table 8, p. 173):
+
+| | SiC | SiO2 | Si3N4 | Al2O3 | GaAs |
+|---|---:|---:|---:|---:|---:|
+| TPP-2M RMS vs optical data | 3.2% | 3.6% | 11.8% | 15.3% | 39.6% |
+| parameter-induced Δλ at 1 keV | 1.1% | 1.0% | 1.6% | 2.7–3.8% | ~0% |
+
+The group average is inflated by LiF (49.2%) and GaAs (39.6%). Against
+their own compounds' figures the differences are smaller but **not
+negligible**: about 3× below the formula's own error for SiC and SiO2,
+the two whose optical data the authors judged best, and SiO2 is this
+package's own example matrix.
 
 What that settles is the blanket change, and only that. It is **not** a
 finding that every bundled value is as good as its published
 counterpart: Al2O3's E_g of 7.6 eV differs from both published figures
-and has no recorded basis, and a case for changing it on its own
-evidence remains open. The SiC entry likewise stays internally
-inconsistent — its E_g is the 4H figure while its density discriminates
-no polytype — and resolving that by adopting the cubic values would
-silently redefine what the name `SiC` means here. Phase-specific
+and has no recorded basis (nor does its density, 3.95 against 3.97 in
+both, though the band gap dominates), and a case for changing it on its
+own evidence remains open. The SiC entry likewise stays **unlabelled**,
+with an E_g implying a different polytype from its published
+counterparts — 3.26 eV is the 4H figure against the cubic 3C 2.31 — while
+its density discriminates no polytype, so resolving that by adopting the
+cubic values would silently redefine what the name `SiC` means here. Phase-specific
 entries would be the better route, and are not attempted.
 
 `phase` sits alongside the value fields because density depends on it
