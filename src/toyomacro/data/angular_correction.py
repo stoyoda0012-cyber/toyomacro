@@ -27,7 +27,9 @@ P₂(x) = (3x² − 1) / 2  (2nd Legendre polynomial).
 Which angle is which
 --------------------
 
-Three angles are easy to confuse. Only the first is measured::
+Six symbols appear below and only θ is measured. Note that
+``α_xray`` and ``σ_s`` are the same quantity — where the source sits —
+and that ``α`` and ``α_xray`` differ by more than a subscript::
 
      hν                        normal        e⁻
                                   ^
@@ -49,30 +51,93 @@ on the font's character-cell aspect ratio; the drawing assumes 2:1.)
 
 - **θ** — emission angle from the surface normal. Measured; the
   analyzer's angle axis.
-- **α_xray** — x-ray incidence angle from the normal. An instrument
-  property; confirm it, there is no safe default.
-- **ψ** — angle from the photon direction to the emission direction.
-  Derived, and what ``L_dipole`` / ``L_full`` / ``L_unpolarized`` take.
+- **α_xray** — where the *source* sits, as an incidence angle from the
+  normal. An instrument property; confirm it, there is no safe default.
+- **ψ** — angle from the direction *toward the source* to the emission
+  direction. As drawn, 56° + 27° = 83°.
+- **α** — angle from the beam's *propagation direction* **k** to the
+  emission direction. As drawn, 180° − 83° = **97°**.
 
-As magnitudes: ψ = α_xray + θ when source and analyzer sit on opposite
-sides of the normal, as drawn (56° + 27° = 83°); ψ = |α_xray − θ| on
-the same side.
+ψ and α are supplements, not synonyms, and ``cos α = −cos ψ``. Which of
+the two a formula wants is not a matter of taste:
 
-The API takes a *signed* incidence angle instead:
-``angular_distribution()`` computes ``psi = xray - theta``, so pass a
-negative ``xray_from_normal_deg`` for the geometry drawn above
-(ψ = −83° here). ``L_dipole`` and ``L_unpolarized`` are even in ψ, so
-the sign cannot reach them. ``L_full`` is not even: its non-dipole term
-flips with the sign. Over the full range it is negative for 23% of ψ —
-on −178.8°…−137.8° and −42.2°…−1.2° for the Si 1s 9.25 keV parameters —
-where it is not a correction factor at all. The drawn geometry
-(ψ = −83°) sits outside those bands, but nothing in the API checks, so
-verify the sign before using ``L_full``.
+- ``L_dipole`` cannot tell them apart. P₂ is even under ``cos → −cos``,
+  so ψ and α give the same number. Nothing you do here is observable.
+- ``L_unpolarized`` **wants α, from k**. Its non-dipole term carries a
+  bare ``cos α``, so it is *odd about 90°*: feeding it ψ instead leaves
+  the dipole part alone and reverses that term exactly.
+- ``L_full`` is unresolved; see its docstring. Do not settle it by
+  analogy with either of the above.
 
-``L_dipole``, ``L_full`` and ``L_unpolarized`` all want the derived
-angle. ``angular_distribution`` and ``angular_distribution_unpolarized``
-take θ and derive it for you — prefer them. Passing θ where ψ belongs
-does not raise; it returns a plausible wrong number (see ``L_dipole``).
+What fixes α to k, rather than to the direction toward the source, is
+the polarization average this module already claims. Averaging the
+polarized form above over ε ⊥ k, the factor ``sin θ_ε cos φ`` is the
+coordinate-free ``k̂·p̂``; carrying the average through gives
+``⟨P₂(cos θ_ε)⟩ = −P₂(cos α)/2`` and
+``⟨(δ + γ cos²θ_ε)(k̂·p̂)⟩ = (δ + γ/2 sin²α) cos α`` — which is
+``L_unpol`` with **α measured from k**. The derivation holds for any
+signs of β, γ and δ, and ``test_angular_geometry.py`` carries it out
+numerically.
+
+Do **not** use "forward emission is enhanced" as the diagnostic. It is
+the generic expectation, not a law. The non-dipole factor
+``δ + γ/2 sin²α`` is linear in ``sin²α``, so it dips below zero
+somewhere in 0° < α < 90° exactly when ``min(δ, δ + γ/2) < 0`` — and
+that holds for **35.3% of the (element, orbital, energy) rows** in the
+bundled 2018/2019 tables, or 71.9% of the distinct subshells at one
+energy or more. Forward emission is *suppressed* there. Nor is
+``γ > 0`` sufficient: δ can reverse it alone, which happens on 21.4% of
+rows. A reader who checks their geometry against forward-peaking will
+conclude their κ is wrong on those subshells when it is right.
+``test_angular_geometry.py`` recomputes these fractions from the
+bundled tables rather than trusting them.
+
+Getting α from the API
+----------------------
+
+``angular_distribution`` and ``angular_distribution_unpolarized`` both
+compute ``xray_from_normal_deg - theta``. For the unpolarized entry
+point that difference is α, so ``xray_from_normal_deg`` must be **κ,
+the propagation direction measured from the outward normal**, signed in
+the same sense as θ. Writing σ_s for the signed angle at which the
+source sits::
+
+    κ = σ_s + 180°  (σ_s ≤ 0)         α = κ − θ
+    κ = σ_s − 180°  (σ_s > 0)
+
+That is a *reversal*, not a change of sign and not a supplement — both
+of those give a different, and wrong, κ. Normal incidence is the case
+that catches the tidier-looking ``σ_s − 180°·sign(σ_s)``: at σ_s = 0
+it returns 0, which points out of the sample.
+
+The beam has to travel *into* the sample, so a physical κ always has
+**|κ| > 90°**. That is a check you can apply without knowing anything
+about the instrument, and ``angular_distribution_unpolarized`` warns
+when it fails.
+
+Worked from the sketch: the source sits at σ_s = −56°, so κ = +124° and
+α = 124° − 27° = 97°. Note that κ is *not* α_xray, and not −α_xray
+either: passing −56° gives ψ = −83°, whose cosine has the wrong sign,
+and passing +56° gives 29°, which is neither angle in the picture.
+For a source mirrored onto the other side (σ_s = +56°) the answer is
+κ = −124°, not +124°.
+
+Two traps, in order of how much they cost:
+
+1. **Passing θ where the derived angle belongs.** Does not raise;
+   returns a plausible wrong number, off by a factor of 20 in the
+   recorded case (see ``L_dipole``).
+2. **Passing ψ where α belongs.** Does not raise; leaves ``L_dipole``
+   unchanged to within rounding and inverts the non-dipole term in
+   ``L_unpolarized``. Because the magnitudes 83° and 97° are both
+   unremarkable and the dipole part is unchanged, nothing downstream
+   looks wrong.
+
+``L_full`` is not even in ψ: its non-dipole term flips with the sign.
+Over the full range it is negative for 23% of ψ — on −178.8°…−137.8°
+and −42.2°…−1.2° for the Si 1s 9.25 keV parameters — where it is not a
+correction factor at all. Nothing in the API checks, so verify the sign
+before using ``L_full``.
 
 Sign convention
 ---------------
@@ -165,6 +230,41 @@ def _warn_if_geometry_unstated(xray_from_normal_deg: float) -> None:
         "9.25 keV the spread of L_dipole across a 51°–9° emission fan is "
         "85% at 88° incidence and 216% at 55°. Pass the angle your "
         "instrument actually uses.",
+        UserWarning,
+        stacklevel=3,
+    )
+
+
+def _warn_if_beam_leaves_the_sample(xray_from_normal_deg: float) -> None:
+    """Warn when κ describes a beam travelling out of the surface.
+
+    Only the unpolarized path calls this. There ``xray_from_normal_deg``
+    is κ, the propagation direction from the outward normal, and a beam
+    that enters the sample has ``|κ| > 90°``. Passing the source's own
+    position instead — the natural mistake, since that is the number an
+    instrument datasheet quotes — gives ``|κ| < 90°`` and silently
+    inverts the non-dipole term. The dipole part is unchanged, so
+    nothing downstream looks wrong.
+
+    Not raised: the check cannot distinguish a genuine convention error
+    from an exactly-grazing geometry, and the polarized entry point uses
+    the same parameter under a convention that is still unresolved.
+    """
+    if type(xray_from_normal_deg) is _UnstatedAngle:
+        return  # already warned about, and more specifically
+    kappa = np.abs(np.asarray(xray_from_normal_deg, dtype=float)) % 360.0
+    kappa = np.where(kappa > 180.0, 360.0 - kappa, kappa)
+    if np.all(kappa > 90.0):
+        return
+    warnings.warn(
+        f"xray_from_normal_deg={xray_from_normal_deg}° describes a beam "
+        f"propagating out of the sample (|κ| = {np.min(kappa):g}° ≤ 90°). This "
+        "parameter is the propagation direction κ from the outward "
+        "normal, not the angle at which the source sits: for a source "
+        "at signed incidence σ_s, κ = σ_s + 180° if σ_s <= 0, else "
+        "σ_s − 180°. Passing the "
+        "source angle leaves L_dipole unchanged and inverts the "
+        "non-dipole term of L_unpolarized, because cos α = −cos ψ.",
         UserWarning,
         stacklevel=3,
     )
@@ -343,8 +443,12 @@ class AngularCorrection:
         beta : float
             Angular asymmetry parameter.
         psi_deg : float or array
-            Angle between photon direction and emission direction
-            (degrees).
+            Angle between the photon direction and the emission
+            direction (degrees). Even under ``cos → −cos``, so it
+            does not matter here whether that is measured from the
+            beam k or from the direction toward the source — the
+            distinction the module docstring draws is invisible to
+            this function, and load-bearing for ``L_unpolarized``.
 
             **Not the emission angle from the surface normal.** In
             angle-resolved work θ (from the normal) is the measured
@@ -412,9 +516,11 @@ class AngularCorrection:
         beta, gamma, delta : float
             Angular distribution parameters.
         psi_deg : float or array
-            Angle from photon direction (degrees) — but see the warning
-            above: which axis this is measured from is the open question.
-            Not the emission angle from the surface normal.
+            Angle from the photon direction (degrees) — but see the
+            warning above: which axis this is measured from is the
+            open question, and unlike ``L_dipole`` this function is
+            not even in it, so the choice changes the value. Not the
+            emission angle from the surface normal.
         phi_deg : float
             Azimuthal angle (degrees). 0 = scattering plane.
         """
@@ -447,15 +553,26 @@ class AngularCorrection:
         beta, gamma, delta : float
             Angular distribution parameters.
         alpha_deg : float or array
-            Angle from the X-ray beam direction k to the electron
-            emission direction (degrees). α = 90° when the detector is
-            perpendicular to the beam.
+            Angle from the beam's **propagation direction k** to the
+            electron emission direction (degrees). α = 90° when the
+            detector is perpendicular to the beam.
 
-            **Not the emission angle from the surface normal.** For a
-            coplanar setup ``alpha = xray_from_normal - theta``; the
-            factor-of-20 trap described in ``L_dipole`` applies here
-            too. ``angular_distribution_unpolarized()`` takes θ and does
-            the conversion for you.
+            **Not the emission angle from the surface normal**, and
+            **not the angle from the direction toward the source**. The
+            two mistakes cost different things:
+
+            - θ for α — the factor-of-20 trap described in
+              ``L_dipole``.
+            - ψ (from the source, the supplement of α) for α — the
+              dipole part is unchanged and the non-dipole term inverts,
+              because ``cos α = −cos ψ``. Silent, and the reason this
+              parameter names the propagation direction explicitly.
+
+            For a coplanar setup ``alpha = kappa - theta`` where κ is
+            the propagation direction from the outward normal, with
+            ``|κ| > 90°``. See the module docstring;
+            ``angular_distribution_unpolarized()`` takes θ and does the
+            conversion for you.
 
         Returns
         -------
@@ -498,12 +615,24 @@ class AngularCorrection:
         emission_angles_deg : array-like
             Emission angles θ from surface normal (degrees).
         xray_from_normal_deg : float
-            X-ray angle from surface normal (degrees). The default 88°
-            (2° grazing) is a **placeholder, not an instrument value**,
-            and leaving it in place emits a ``UserWarning``. A lab source
-            — which is what this unpolarized form is for — is rarely at
-            grazing incidence, so the placeholder is a poor fit here in
-            particular. State your instrument's angle.
+            **κ, the beam's propagation direction**, measured from the
+            outward surface normal and signed in the same sense as θ.
+            α is formed as ``kappa - theta``.
+
+            This is not where the source sits: for a source at signed
+            incidence σ_s, κ is σ_s *reversed* — ``σ_s + 180°`` if
+            σ_s ≤ 0, else ``σ_s − 180°``. A beam that
+            enters the sample always has ``|κ| > 90°``, and a value
+            failing that emits a ``UserWarning`` — it describes a beam
+            travelling back out of the surface, and inverts the
+            non-dipole term. See the module docstring.
+
+            The default 88° is a **placeholder, not an instrument
+            value**, and leaving it in place emits a ``UserWarning``. It
+            is also not a valid κ (it reads as 2° grazing expressed as a
+            source position; the matching κ is −92°), which is why the
+            placeholder is a particularly poor fit here. State your
+            instrument's geometry.
 
         Returns
         -------
@@ -522,9 +651,10 @@ class AngularCorrection:
             return None
 
         _warn_if_geometry_unstated(xray_from_normal_deg)
+        _warn_if_beam_leaves_the_sample(xray_from_normal_deg)
 
         theta = np.asarray(emission_angles_deg, dtype=np.float64)
-        # α = angle from beam = xray_from_normal - θ (coplanar geometry)
+        # α = angle from the propagation direction k = κ − θ (coplanar)
         alpha = xray_from_normal_deg - theta
 
         beta = params["beta"]
@@ -583,11 +713,25 @@ class AngularCorrection:
         emission_angles_deg : array-like
             Emission angles θ from surface normal (degrees).
         xray_from_normal_deg : float
-            X-ray angle from surface normal (degrees). The default 88°
-            (2° grazing) is a **placeholder, not an instrument value**,
-            and leaving it in place emits a ``UserWarning``. The assumed
-            incidence angle sets the shape of the angular dependence, not
-            just its scale — verify it against your instrument.
+            X-ray angle from surface normal (degrees), signed, forming
+            ``ψ = xray_from_normal_deg − θ``.
+
+            **This is not the same quantity the unpolarized entry point
+            takes under the same parameter name.** There it is κ, the
+            beam's propagation direction. Here ψ is the angle from the
+            direction *toward the source*, so pass the source's own
+            signed position — negative for a source on the opposite side
+            of the normal from the analyzer, giving ψ = −(α_xray + θ).
+            ``L_dipole`` is even in ψ and cannot see the difference;
+            ``L_full`` is not, and its convention is unresolved, so this
+            instruction is **provisional** and settles nothing about
+            ``L_full``. See the module docstring.
+
+            The default 88° (2° grazing) is a **placeholder, not an
+            instrument value**, and leaving it in place emits a
+            ``UserWarning``. The assumed incidence angle sets the shape
+            of the angular dependence, not just its scale — verify it
+            against your instrument.
         phi_deg : float
             Azimuthal angle (degrees). 0 = scattering plane.
 

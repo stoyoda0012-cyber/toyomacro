@@ -114,6 +114,50 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`data.angular_correction` documented two different reference axes
+  for the same parameter, and the unpolarized path needed the one the
+  module docstring did not teach.** `L_unpolarized` measures its angle
+  α from the beam's *propagation direction* **k**, but the module's
+  "Which angle is which" section defined the derived angle as running
+  from the direction *toward the source* and gave the rule
+  `ψ = α_xray + θ` to build it. The two are supplements, so
+  `cos α = −cos ψ` and the non-dipole term
+  `(δ + γ/2·sin²α)·cos α` **inverts exactly** between them — the error
+  is precisely twice that term. Nothing caught it: `L_dipole` is even
+  under `cos → −cos` and comes back unchanged to within rounding, both
+  magnitudes are unremarkable (83° against 97° for the documented
+  sketch), and no constant in the suite fixed which axis the derived
+  angle was measured from. Following the module docstring for a
+  lab-source geometry therefore produced a correction with the
+  forward/backward asymmetry the wrong way round.
+  `xray_from_normal_deg` is now documented, for the unpolarized entry
+  point, as **κ, the propagation direction from the outward normal**,
+  with `α = κ − θ` and κ obtained by *reversing* the source's signed
+  position `σ_s` (`σ_s + 180°` if `σ_s ≤ 0`, else `σ_s − 180°`) — not
+  by negating it and not by taking its supplement, both of which give a
+  different and wrong κ. A beam that enters the sample always has
+  `|κ| > 90°`, so `angular_distribution_unpolarized` now warns when the
+  value passed fails that — which is exactly what happens if the
+  source's own angle is passed instead. **No returned number changed**
+  (verified byte-identical across the public surface): the warning is
+  advisory and the formulae are untouched. Callers of `L_dipole` are
+  unaffected in every case; the polarized `L_full` convention remains
+  open and out of scope, and `angular_distribution` takes ψ under the
+  same parameter name — which its own docstring, and `docs/API.md`,
+  now state explicitly.
+  `docs/API.md` carried the same repudiated rule and is corrected with
+  it. The convention is pinned by carrying out the polarization average
+  the module claims — over randomised β, γ and δ, including negative
+  values — which lands on α measured from k for *any* parameters. The
+  seductive shortcut, "forward emission is enhanced", is not used and is
+  now warned against: `δ + γ/2·sin²α` goes negative below 90° — forward
+  emission *suppressed* — on **35.3% of the (element, orbital, energy)
+  rows** of the bundled tables, 71.9% of the distinct subshells at one
+  energy or more, with Tm 2p3/2 at 9.25 keV pinned as a worked
+  counter-example. `γ > 0` is not sufficient either, since δ can
+  reverse the sign alone on 21.4% of rows. Those fractions are
+  recomputed from the bundled tables by a test, under a stated
+  definition, rather than quoted.
 - **`voigtfit.crlb` decided identifiability from a quantity that
   depended on the amplitude unit.** The Fisher matrix mixes units — the
   amplitude block is in area units, `dE` and `dsigma` in eV — so
