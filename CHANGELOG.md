@@ -37,6 +37,36 @@ archived on Zenodo for a citable DOI.
   tags that say which IMFP formula and which elastic cross sections the
   run used. Code only — no SESSA data is bundled, SESSA is not a
   dependency, and the fixtures are invented text in SESSA's layout.
+- **Experimental** `data.elastic_scattering` gained the two remaining
+  albedo-corrected depths, from Jablonski & Powell, *J. Vac. Sci.
+  Technol. A* **27**, 253 (2009), DOI 10.1116/1.3071947:
+  `mean_escape_depth` (Eq. 28, slope 0.736) and `information_depth`
+  (Eq. 29, slope 0.787), with ratio and report forms alongside. They
+  are deliberately a separate namespace from the overlayer-thickness
+  EAL, with their own model tables, because the three quantities differ
+  by more than their uncertainties and their slopes — 0.736, 0.787,
+  0.738 — are close enough to be confused; an EAL model name is
+  rejected by the depth functions and vice versa. Two structural
+  differences from `overlayer_eal`: the emission angle is *required*,
+  because these carry an explicit `cos(alpha)` rather than being an
+  average over an angle range, and the information depth also requires
+  the signal percentage, which scales it by a factor of two between
+  90% and 99%. The 2009 relations were fitted over 61–2016 eV and are
+  recommended for albedos of 0.1–0.5, so a HAXPES energy comes back with
+  `kinetic_energy_check == "outside"` and an extrapolation warning
+  rather than a bare number. `SamplingDepthReport.to_dict()` names the
+  quantity in its `length_concept` block and states which elastic-free
+  baseline its `ratio` is relative to. The 2020 review that supersedes
+  2009 for the EAL slope restates both of these unchanged as its
+  Eqs. (A5) and (A12), so they are current; the models keep the
+  `jp2009` name of the paper that derived them. A polarized-x-ray mean
+  escape depth also exists (2020 Eq. (A8), slope 0.831) and is **not**
+  implemented — the review does not state its fitted energy range and
+  the underlying paper has not been read, so the module docstring
+  records it rather than shipping an inferred validity limit.
+  `IMFP.sampling_depth()` is the elastic-free limit of the new
+  information depth at normal emission, and a test pins that the two
+  agree.
 - **Experimental** `data.elastic_scattering` grew a provenance-carrying
   layer: `DescribedLength` (a length plus its declared unit, source,
   material and kinetic energy) and `overlayer_eal_report`, which

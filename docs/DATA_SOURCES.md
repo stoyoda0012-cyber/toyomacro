@@ -418,13 +418,12 @@ directly in source (no external database is extracted or shipped):
   calculations — in the same unit, for the same material, at the same
   kinetic energy as the IMFP they pair it with (NIST SRD 71 supplies
   only the paired IMFP, not the TRMFP).
-  `DescribedLength` and `overlayer_eal_report` exist to record exactly
+  `DescribedLength` and the report functions exist to record exactly
   those three declarations plus the source, and to check the pair where
   declared. Revisiting the decision requires documented permission from
   NIST covering redistribution, plus the usual bar for a bundled
   dataset: primary-source verification, numerical examples as tests,
   and an independent audit.
-
 - **SESSA output** (`data/sessa.py`): a reader for the `sam_par.txt`
   that SESSA's `PROJECT SAVE OUTPUT` writes, which is the first of the
   three routes above. Code only, in the same arrangement as the Scienta
@@ -434,6 +433,7 @@ directly in source (no external database is extracted or shipped):
   output file. The user runs SESSA under their own NIST SRD 100 licence
   and this package reads the file they produced, exactly as it reads
   their spectra.
+
 ## Rebuilding a table
 
 The directory is called `_cache/` for historical reasons. Its contents

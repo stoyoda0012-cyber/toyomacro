@@ -300,13 +300,21 @@ class IMFP:
         approximation at normal emission — the SLA information depth, not
         an elastic-scattering-corrected sampling or information depth.
 
-        Do **not** correct it with ``data.elastic_scattering``: the slopes
-        there are for the overlayer-thickness attenuation length L_TH, and
-        the information depth follows a different one (1 - 0.787 omega in
-        Jablonski & Powell 2009 Eq. (29), against 1 - 0.735 omega for the
-        EAL). Those quantities are defined separately and are not
-        interchangeable. A corrected information depth is not implemented
-        here.
+        Do **not** correct it with the *EAL* slopes of
+        ``data.elastic_scattering``: those are for the
+        overlayer-thickness attenuation length L_TH, and the information
+        depth follows a different one. For an elastic-scattering
+        corrected information depth use
+        ``data.elastic_scattering.information_depth`` (Jablonski & Powell
+        2009 Eq. (29), 1 - 0.787 omega), which needs a TRMFP as well as
+        this IMFP and reduces to exactly this function at normal
+        emission when elastic scattering is switched off.
+
+        **Note the different convention on the way across.** This method
+        takes ``fraction`` in [0, 1); ``information_depth`` takes
+        ``percentage`` in (0, 100). 95% is ``fraction=0.95`` here and
+        ``percentage=95.0`` there. Both reject the other's units, so the
+        confusion fails loudly rather than returning a wrong depth.
 
         Args:
             kinetic_energy: Electron kinetic energy in the solid, in eV.

@@ -64,7 +64,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.dictionary_solver_3d` | δE × δσ × δγ dictionary (2-D version is the supported path) |
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
 | `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
-| `data.elastic_scattering` | overlayer-thickness effective attenuation length from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
+| `data.elastic_scattering` | overlayer-thickness effective attenuation length, mean escape depth and information depth from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
 | `data.sessa` | reads an IMFP/TRMFP pair out of a `sam_par.txt` the user generated with their own SESSA licence; no SESSA dependency, no SESSA data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
@@ -394,7 +394,7 @@ compose yourself:
 | σ(hν) | `CrossSection.lookup()` | supported, with the two table caveats above |
 | angular/polarization | `AngularCorrection` (`data.angular_correction`) — dipole, unpolarized and full β/γ/δ forms from the bundled Trzhaskovskaya 2018/2019 tables. **only j-resolved input is defined** | **experimental** — see below |
 | λ | `IMFP.tpp2m()` — for the *specific* compound, not an averaged matrix | supported |
-| `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair | experimental |
+| `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair, which `data.sessa` can read from a SESSA run | experimental |
 
 **Angles: which one you have, and which one the formulas want.** Three
 angles are involved, and only the first is something you measured.
@@ -544,27 +544,53 @@ SiO₂ belongs to — is for a group that was *excluded* from the TPP-2M
 fit, on the authors' judgement that its optical data was less reliable.
 
 `IMFP.sampling_depth()` is likewise IMFP-based: the straight-line
-approximation at normal emission, excluding elastic scattering. Do not
-correct it with the module below — those slopes are for the
-overlayer-thickness attenuation length, and sampling/information depth is
-a separately defined quantity with a different slope.
+approximation at normal emission, excluding elastic scattering.
 
-For that attenuation length see `data.elastic_scattering`
-(experimental). It takes an IMFP/TRMFP pair and a required `model`,
-because the L/IMFP slope differs between unpolarized XPS (0.738) and
-linearly polarized HAXPES (0.836) — a 2.4% difference in the result for
-gold at 7.4 keV. Supplying both lengths keeps the albedo tied to the IMFP
-it is applied to, but the scalar functions cannot check that the two came
-from the same source, material and energy. To have that checked, wrap
-each length in a `DescribedLength` (value, unit, and optionally source,
-material, kinetic energy) and call `overlayer_eal_report`: declared
+**Elastic scattering: three depths, three slopes.** `data.elastic_scattering`
+(experimental) implements all three, and they are not interchangeable —
+one material at one kinetic energy has a different overlayer-thickness
+EAL, mean escape depth and information depth:
+
+| Quantity | Function | Relative to | Slope |
+|---|---|---|---|
+| Overlayer-thickness EAL `L_TH` | `overlayer_eal` | IMFP | 0.738 unpolarized / 0.836 polarized HAXPES (J&P 2020) |
+| Mean escape depth `D` | `mean_escape_depth` | IMFP·cos α | 0.736 (J&P 2009) |
+| Information depth `S` | `information_depth` | IMFP·cos α·ln[1/(1−P/100)] | 0.787 (J&P 2009) |
+
+Every one takes an IMFP/TRMFP pair and a required `model`; there is no
+default, because for the EAL the slope depends on whether the x rays are
+polarized (a 2.4% difference in the result for gold at 7.4 keV) and
+because an EAL model name must not be usable for a depth. `L_TH` is an
+average over an emission-angle range, so the angle there is metadata;
+`D` and `S` carry an explicit `cos α` and **require** the angle. `S`
+also requires the signal percentage — 99% is twice 90%.
+
+The J&P 2009 relations were fitted for 61–2016 eV and are recommended
+for albedos of 0.1–0.5, so HAXPES energies come back flagged as an
+extrapolation rather than silently accepted. The scalar functions do
+not range-check; the report functions do.
+
+Only the EAL has a polarized-HAXPES model. A polarized mean escape
+depth exists in the literature (J&P 2020 Eq. (A8), slope 0.831) but is
+not shipped, because the review does not state the energy range it was
+fitted over and the underlying paper has not been read; there is no
+polarized information depth at all. `data.elastic_scattering`'s module
+docstring carries the detail.
+
+Supplying both lengths keeps the albedo tied to the IMFP it is applied
+to, but the scalar functions cannot check that the two came from the
+same source, material and energy. To have that checked, wrap each
+length in a `DescribedLength` (value, unit, and optionally source,
+material, kinetic energy) and call `overlayer_eal_report`,
+`mean_escape_depth_report` or `information_depth_report`: declared
 units, materials and kinetic energies are enforced, a declared kinetic
 energy or emission angle is checked against the model's fitted range,
-and the result comes back as an `OverlayerEALReport` whose `to_dict()`
-carries the value together with the model, the inputs, the validity
-checks and the warnings — the record a consumer should store next to
-any derived thickness. Facts you do not declare are reported as
-`"not_recorded"`, which is not a pass.
+and the albedo against the range the model is recommended for, and the result comes back as a report whose `to_dict()` carries
+the value together with the model, the inputs, the validity checks, the
+warnings, and a `length_concept` block naming which of the three
+lengths it is — the record a consumer should store next to any derived
+thickness. Facts you do not declare are reported as `"not_recorded"`,
+which is not a pass.
 
 `data.sessa` supplies the pair. It reads the `sam_par.txt` written by
 SESSA's `PROJECT SAVE OUTPUT` — a file the user generates under their
