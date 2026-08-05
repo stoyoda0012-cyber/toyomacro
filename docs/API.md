@@ -65,6 +65,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
 | `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
 | `data.elastic_scattering` | overlayer-thickness effective attenuation length from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
+| `data.sessa` | reads an IMFP/TRMFP pair out of a `sam_par.txt` the user generated with their own SESSA licence; no SESSA dependency, no SESSA data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
 any value other than the default `"raw"`.
@@ -564,6 +565,34 @@ carries the value together with the model, the inputs, the validity
 checks and the warnings — the record a consumer should store next to
 any derived thickness. Facts you do not declare are reported as
 `"not_recorded"`, which is not a pass.
+
+`data.sessa` supplies the pair. It reads the `sam_par.txt` written by
+SESSA's `PROJECT SAVE OUTPUT` — a file the user generates under their
+own NIST SRD 100 licence — and hands back both lengths from a single
+row, so spreading one row into a report cannot pair two different
+electrons:
+
+```python
+from toyomacro.data.elastic_scattering import overlayer_eal_report
+from toyomacro.data.sessa import read_sam_par, select_row
+
+rows = read_sam_par("runsam_par.txt", layer_materials={1: "Au", 2: "Si"},
+                    version="2.2.2", imfp_model="JTP")
+row = select_row(rows, layer=1, peak_id="si2p1")
+report = overlayer_eal_report(*row.lengths(), model="jp2020_polarized_haxpes")
+```
+
+Splitting the pair across two rows still can, and the report's other
+checks are weaker against that than they look — SESSA writes the same
+kinetic energy for a peak in every layer, and an overlayer on a
+substrate of the same material passes the material check. The lengths
+therefore carry the row, not just the run, in their `source`, so a
+split pair is reported as `source_consistency == "inconsistent"` with a
+warning.
+
+The file does not record the layer compositions or the SESSA version, so
+those are caller declarations; columns and units are read from the
+file's own headers rather than assumed.
 
 There is no `IMFP.attenuation_length()` — a method that multiplied the
 IMFP by a fixed 0.9 under that name was removed rather than published.

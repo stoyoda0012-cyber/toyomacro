@@ -425,6 +425,15 @@ directly in source (no external database is extracted or shipped):
   dataset: primary-source verification, numerical examples as tests,
   and an independent audit.
 
+- **SESSA output** (`data/sessa.py`): a reader for the `sam_par.txt`
+  that SESSA's `PROJECT SAVE OUTPUT` writes, which is the first of the
+  three routes above. Code only, in the same arrangement as the Scienta
+  transmission adapter: no SESSA data is bundled, SESSA is not a
+  dependency, the package never runs it, and the test fixtures are
+  invented text in SESSA's layout rather than any fragment of a real
+  output file. The user runs SESSA under their own NIST SRD 100 licence
+  and this package reads the file they produced, exactly as it reads
+  their spectra.
 ## Rebuilding a table
 
 The directory is called `_cache/` for historical reasons. Its contents

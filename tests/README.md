@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **1,608 automated tests** across **69 files**, in two
+This suite has **1,758 automated tests** across **73 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 33 | 762 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 846 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 37 | 890 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only`.
@@ -16,11 +16,11 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,176 tests, 73%) — guarantee the library
+- **Contract / regression** (1,326 tests, 75%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 27%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 25%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (762)
+## Library body — `tests/` (890)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -85,13 +85,17 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (255)
+### Quantification data (383)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
 | 45 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
 | 26 | `test_element_dedup.py` | Element-name dedup + `ElementInfo` utilities |
-| 23 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits |
+| 53 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits, and the `DescribedLength` / report provenance contract |
+| 37 | `test_sessa_sam_par.py` | SESSA `sam_par.txt` reader — header-driven columns and units, the one-row pairing and the detection of a pair split across rows, caller-declared material and version (invented fixtures only; no SESSA data bundled) |
+| 25 | `test_compound_parameters.py` | `compounds.json` entries are arithmetically coherent with their own formulas — the one thing checkable without a recorded source |
+| 22 | `test_compound_provenance.py` | `compounds_provenance.json` stays in step with `compounds.json` field by field, and never leaks into the values |
+| 14 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 16 | `test_angular_geometry.py` | θ (measured) vs ψ (derived): the magic-angle identity, the factor-of-20 cost of confusing them, the unstated-incidence-angle warning, and `L_full`'s present values pinned as a record while its convention is unresolved |
@@ -102,7 +106,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (846)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (868)
 
 ### Solvers & fitting core (297)
 | Tests | File | Guards |
@@ -133,12 +137,12 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (236)
+### Statistics & information theory (258)
 | Tests | File | Guards |
 |--:|---|---|
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
-| 32 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |
+| 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |
 | 27 | `test_grids.py` | Uniform / sinh / Chebyshev grids |
 | 26 | `test_exact_k.py` | Component-count selection: candidate fits, residual gate, background handling |
 | 24 | `test_extended_svd.py` | Extended SVD on Voigt spectra |

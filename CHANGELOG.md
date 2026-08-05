@@ -10,6 +10,33 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **Experimental** `data.sessa`: a reader for the `sam_par.txt` that
+  SESSA (NIST SRD 100) writes on `PROJECT SAVE OUTPUT`, which is the
+  practical way to obtain the IMFP/TRMFP pair `data.elastic_scattering`
+  requires and does not bundle. `read_sam_par` returns one row per
+  layer and peak, and `SessaInteractionParameters.lengths()` builds
+  both `DescribedLength` objects from that single row, so
+  `overlayer_eal_report(*row.lengths(), ...)` cannot pair two different
+  electrons — the requirement the scalar functions state but cannot
+  enforce. Splitting the pair across two rows still can, and the other
+  checks are weak against exactly that: SESSA writes the same kinetic
+  energy for a peak in every layer, and an overlayer on a substrate of
+  the same material passes the material check. So the lengths carry the
+  row, not just the run, in their `source`, and a split pair comes back
+  `source_consistency == "inconsistent"` with a warning instead of a
+  plausible wrong number — on a real two-layer file, +15.0% for
+  `jp2020_unpolarized` in one direction and −23.0% in the other. Two
+  runs given the same declared label are still indistinguishable, which
+  the module docstring states along with the remedy. Columns and units
+  are taken from the file's own
+  headers rather than assumed: a file missing the TRMFP column, or
+  declaring a length in an unrecognised unit, raises instead of being
+  read approximately. Layer compositions and the SESSA version are not
+  in the file, so they are caller declarations and are otherwise left
+  as `not_recorded`; `read_remarks` resolves the per-value reference
+  tags that say which IMFP formula and which elastic cross sections the
+  run used. Code only — no SESSA data is bundled, SESSA is not a
+  dependency, and the fixtures are invented text in SESSA's layout.
 - **Experimental** `data.elastic_scattering` grew a provenance-carrying
   layer: `DescribedLength` (a length plus its declared unit, source,
   material and kinetic energy) and `overlayer_eal_report`, which
