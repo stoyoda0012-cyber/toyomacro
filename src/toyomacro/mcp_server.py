@@ -23,8 +23,9 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("toyomacro", instructions=(
     "XPS (X-ray Photoelectron Spectroscopy) analysis engine. "
-    "Look up binding energies and sensitivity factors, list fitting "
-    "templates, fit spectrum files, and run GVRT image-roundtrip "
+    "Look up binding energies, compute simplified intrinsic "
+    "sensitivities (cross-section x IMFP, no instrument response), list "
+    "fitting templates, fit spectrum files, and run GVRT image-roundtrip "
     "experiments to characterize solver accuracy vs. noise."
 ))
 
@@ -57,12 +58,74 @@ def calculate_sensitivity(
     photon_energy: float = 9251.7,
     compound: str = "SiO2",
 ) -> str:
-    """Calculate the XPS sensitivity factor sigma x lambda for quantification.
+    """Calculate a simplified intrinsic sensitivity, sigma x lambda.
 
-    sigma is the Scofield photoionization cross-section and lambda the
-    TPP-2M inelastic mean free path in the given matrix compound.
-    Divide a measured peak area by the sensitivity to get a quantity
-    proportional to atomic concentration.
+    sigma is the photoionization cross-section from whichever table is
+    the process default (reported as `cross_section_table` in the result;
+    Yeh & Lindau 1985 unless changed) and lambda the TPP-2M inelastic
+    mean free path in the given matrix compound. Divide a measured peak
+    area by the sensitivity to get a quantity proportional to atomic
+    concentration.
+
+    The result is NOT a complete AMRSF and NOT an instrument-specific
+    sensitivity factor. It omits analyzer transmission, detector
+    response, elastic-scattering / EAL corrections, the photoelectron
+    angular distribution, x-ray polarization, and the source/analyzer
+    geometry. Absolute composition from this number alone is not
+    traceable; use it for relative comparisons, or supply the instrument
+    factors yourself.
+
+    Analyzer transmission T(KE/Ep) is a separate, instrument- and
+    configuration-specific factor that this tool never applies. Do not
+    apply it twice: if the peak areas were taken from a
+    transmission-corrected spectrum, leave this sensitivity as it is.
+
+    The tables are not on a common scale, and one of them has no
+    confirmed unit. `cross_section_unit` and `sensitivity_unit` are
+    populated only where the unit was read from the primary source; for
+    an inferred unit they are null and the candidate travels in
+    `cross_section_inferred_unit` / `sensitivity_inferred_unit`, with
+    `cross_section_unit_status` saying which case you are in. Do not
+    convert on an inferred unit. Sensitivities are comparable only
+    between calls that used the same table. A ratio within one table
+    cancels the unknown unit factor and only that — the Trzhaskovskaya
+    table also carries a photoelectron-vs-photon energy axis error that
+    a ratio between lines of different binding energy does not remove.
+
+    A bare orbital such as '2p' is the summed spin-orbit doublet, which
+    is what a measured peak envelope contains; pass '2p3/2' for one
+    component.
+
+    Both factors extrapolate at HAXPES energies, and the default
+    photon energy is a HAXPES line, so the *default* call extrapolates
+    both:
+
+    - lambda excludes elastic scattering, so it is an IMFP and not an
+      effective attenuation length. TPP-2M is fitted over 50-2000 eV
+      kinetic energy; outside that the returned lambda is an
+      extrapolation, flagged as `imfp_extrapolated`.
+    - sigma is interpolated from a finite table grid, reported as
+      `cross_section_table_range_eV`. Above the top grid energy the
+      value is a power law fitted to the last few points, flagged as
+      `cross_section_extrapolated`. The default Yeh & Lindau table
+      stops at 8047.8 eV, below the 9251.7 eV default.
+
+    `cross_section_extrapolated` only covers the energy axis, and only
+    one-sidedly. False does NOT mean the value came from the table:
+
+    - within the range, sigma is a polynomial fit in log-log space over
+      the whole grid, not a local interpolation, and a sparsely
+      tabulated orbital can still be extrapolated;
+    - where the table lacks the requested orbital and the reason is not
+      established, `lookup` may still fall back to a cross-element fit
+      in log(Z), and this flag stays False for that value.
+
+    A j-resolved request the table cannot answer is refused rather than
+    reconstructed. The default table (Yeh & Lindau) stores no j-resolved
+    key, so asking it for '2p3/2' returns an error rather than a value
+    split from the doublet by an assumed branching ratio. Ask for the
+    bare orbital, or select 'scofield' / 'trzhaskovskaya'. See
+    `docs/API.md` section 5 for the per-table behavior.
 
     Args:
         element: Element symbol (e.g. 'Si', 'O').
@@ -72,6 +135,7 @@ def calculate_sensitivity(
         compound: Matrix compound for the IMFP (e.g. 'SiO2', 'Si').
     """
     from toyomacro.data import IMFP, BindingEnergy, CrossSection
+    from toyomacro.data.imfp import TPP2M_FITTED_RANGE_EV
 
     be = BindingEnergy.lookup(element, orbital)
     if be is None:
@@ -83,6 +147,22 @@ def calculate_sensitivity(
             "error": f"No cross-section for {element} {orbital} at {photon_energy} eV"
         })
     lam = IMFP.tpp2m(kinetic_energy=ke, compound=compound)
+    lo, hi = TPP2M_FITTED_RANGE_EV
+    # Report sigma's grid limits alongside lambda's. Flagging only the
+    # IMFP would imply the cross-section is on firmer ground at the same
+    # energy, and at the HAXPES default it is not.
+    grid = CrossSection.get_available_photon_energies()
+    cs_lo, cs_hi = (min(grid), max(grid)) if grid else (None, None)
+    # Carry the unit through with its status intact. Collapsing an
+    # inferred unit into a single confirmed-looking string here would
+    # undo the separation `unit_info()` exists to keep — so a unit that
+    # was never read from a primary source stays None, and the candidate
+    # travels in its own field.
+    units = CrossSection.unit_info()
+    sens_unit = f"{units['unit']}*nm" if units["unit"] else None
+    sens_inferred = (
+        f"{units['inferred_unit']}*nm" if units["inferred_unit"] else None
+    )
     return json.dumps({
         "element": element,
         "orbital": orbital,
@@ -90,8 +170,27 @@ def calculate_sensitivity(
         "binding_energy_eV": be,
         "kinetic_energy_eV": ke,
         "cross_section": sigma,
+        "cross_section_table": CrossSection.get_default_table(),
+        "cross_section_unit": units["unit"],
+        "cross_section_inferred_unit": units["inferred_unit"],
+        "cross_section_unit_status": units["status"],
+        "cross_section_table_range_eV": [cs_lo, cs_hi],
+        "cross_section_extrapolated": (
+            cs_lo is None or not (cs_lo <= photon_energy <= cs_hi)
+        ),
         "imfp_nm": lam,
+        "imfp_model": "TPP-2M (Tanuma, Powell & Penn 1994); inelastic only",
+        "imfp_fitted_range_eV": [lo, hi],
+        "imfp_extrapolated": not (lo <= ke <= hi),
         "sensitivity": sigma * lam,
+        "sensitivity_unit": sens_unit,
+        "sensitivity_inferred_unit": sens_inferred,
+        "sensitivity_model": (
+            "simplified intrinsic sensitivity = cross-section x IMFP; "
+            "not a complete AMRSF. Excludes analyzer transmission, "
+            "detector response, elastic scattering/EAL, angular "
+            "distribution, polarization and geometry"
+        ),
         "compound": compound,
     })
 

@@ -19,11 +19,10 @@ Pipeline:
     6. Per-channel PSNR evaluation (R/G/B independently)
 
 Usage:
-    python -m voigtfit.benchmarks.param_roundtrip_benchmark \\
+    python -m toyomacro.voigtfit.benchmarks.param_roundtrip_benchmark \\
         --image /path/to/image.jpg \\
         --noise-levels None Moderate Strong \\
         --output /path/to/outputs/
-Date: 2026-02-20
 """
 
 import argparse
@@ -48,7 +47,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

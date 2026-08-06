@@ -31,8 +31,7 @@ Note: MATLAB files use float32 and contiguous layout (chunks=None).
 
 Memory-aware batch size calculation:
     Batch size is automatically calculated based on available physical memory.
-    Based on MATLAB DepthProfiler.m division logic (line 4018-4022).
-Date: 2026-01-23
+    Based on MATLAB DepthProfiler.m division logic.
 """
 
 import platform
@@ -70,7 +69,7 @@ def get_available_memory_gb() -> float:
     Get available physical memory in GB.
 
     Works on macOS, Linux, and Windows.
-    Based on MATLAB DepthProfiler.m line 4018-4022.
+    Based on MATLAB DepthProfiler.m.
 
     Returns:
         Available memory in GB (defaults to 8.0 on failure)

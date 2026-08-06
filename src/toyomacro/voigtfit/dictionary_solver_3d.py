@@ -30,7 +30,7 @@ try:
     import mlx.core as mx
 
     from ._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -839,7 +839,9 @@ def _solve_dict3d_chunked(
 
 
 # ---------------------------------------------------------------------------
-# 2-Stage Hybrid: Dict3D (global γ) → Dict2D (precision fit)
+# Two-phase γ calibration: Dict3D (global γ) → Dict2D (precision fit).
+# "Two-phase", not "2-Stage": this is unrelated to the Stage 1 / Stage 2
+# screening pipeline, and uses no Stage 2 fallback.
 # ---------------------------------------------------------------------------
 
 @dataclass

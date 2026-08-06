@@ -10,8 +10,10 @@
 > of **478 M spectrum-vectors per second** (range 453–490 over nine
 > repetitions; full provenance record committed under
 > [`paper/figures/results/`](paper/figures/results/)) on an Apple
-> M3 Max with MLX, and previously completed the full GVRT 8K UHD
-> round-trip — ≈265 M Voigt fits across eight shot-noise severities —
+> M3 Max with MLX, and previously completed the full GVRT (Giga Voigt
+> Round Trip: image → Voigt spectra → noise → fit → reconstructed
+> image) benchmark on an 8K UHD source
+> — ≈265 M Voigt fits across eight shot-noise severities —
 > in about ten minutes on the same hardware. A pure-NumPy fallback
 > runs the identical algorithms anywhere CPython runs.
 >
@@ -23,11 +25,23 @@
 | Subpackage | What it does | Install extra |
 |---|---|---|
 | `toyomacro.voigtfit` | The dictionary + Newton Voigt solvers, MLX backends, CRLB analysis, benchmarks. Standalone (numpy/scipy/h5py/matplotlib). | (core) |
-| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), analyzer-transmission loader, HDF5/MAT readers. | (core) |
-| MLX GPU backend | Apple-Silicon accelerated Faddeeva, Stage 2 refinement, multipeak solver. | `[mlx]` |
+| `toyomacro.{core, lineshape, background, data, fitting, io}` | XPS analysis foundation: lineshapes, Shirley/Tougaard backgrounds, cross-sections (Scofield, Yeh-Lindau, Trzhaskovskaya 2018/2019), IMFP (TPP-2M), an analyzer-transmission loader for user-supplied vendor curves (no transmission data is bundled), HDF5/MAT readers. Also an **experimental** overlayer-thickness EAL correction computed from a caller-supplied IMFP/TRMFP pair — no TRMFP or albedo tables are bundled (see [`docs/API.md`](docs/API.md#5-quantification-inputs) and [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md)). | (core) |
 
 The Voigt engine is the part the project is being prepared for JOSS
 submission as a standalone tool.
+
+### Backend support status
+
+| Backend | Status | Installation | Notes |
+|---|---|---|---|
+| NumPy / CPU | **Supported** | base install | Runs the identical algorithms anywhere CPython runs. This is the path CI covers — the hosted runners are headless, so no CI job exercises a GPU. |
+| MLX / Apple Metal | **Supported accelerator** | `[mlx]` | Accelerates the Faddeeva kernel, the legacy compatibility fallback (Stage 2) and the multipeak solver. Every MLX number quoted below was recorded here; correctness rests on the MLX↔NumPy parity tests, which run only where `mlx_usable()` is True. |
+| MLX / CUDA | **Experimental validation** — not a supported install target | manual setup; no extra ships for it | The MLX↔NumPy parity suite passed once on an RTX 5070 Laptop under WSL2. Requires `MLX_ENABLE_TF32=0` (TF32 is on by default and silently costs precision) and multipeak batches ≤ 65,535 (upstream crash). No CUDA CI, no committed performance record. See [`docs/CUDA_BACKEND_POC.md`](docs/CUDA_BACKEND_POC.md). |
+
+The backend probe (`mlx_usable()`) is device-agnostic — it checks
+whether MLX can execute work on its default device, not whether that
+device is Metal. Supported packaging and published benchmarks currently
+stop at Apple.
 
 ## How fast
 
@@ -42,9 +56,9 @@ submission as a standalone tool.
 > rows are previously recorded values, regenerable with the bundled
 > benchmarks. The pure-NumPy fallback runs the same algorithms with
 > numerically equivalent results (≲10⁻³ relative agreement on the
-> shared solver paths) at roughly **3–5× lower throughput**
-> on the same hardware (and 5–10× lower on a typical Linux x86_64
-> CI runner).
+> shared solver paths) at roughly **4× lower throughput** on the same
+> hardware — measured, see
+> [without Apple Silicon](#without-apple-silicon-numpy-backend) below.
 
 ### Per-solver throughput (MLX, M3 Max)
 
@@ -87,13 +101,50 @@ Committed record (exact figures, input hash, environment):
 
 | Solver | Throughput | Notes |
 |---|---:|---|
-| voigtfit `dict2d_parabola` | **6.5 M spec/s** | MLX GPU batch |
-| `scipy.optimize.curve_fit` | 798 spec/s | bounded TRF, single-thread CPU |
-| `lmfit` | 783 spec/s | bounded, single-thread CPU |
+| voigtfit `dict2d_parabola` | **6.6 M spec/s** | MLX GPU batch |
+| `scipy.optimize.curve_fit` | 845 spec/s | bounded TRF, single-thread CPU |
+| `lmfit` | 801 spec/s | bounded, single-thread CPU |
 
 Matching accuracy on the common subset (MAE amplitude 0.022 vs
 0.022), a factor of about 8,000 in throughput — that ratio, not the kernel headline, is
 the relevant comparison with the conventional workflow.
+
+#### Without the GPU (NumPy backend)
+
+The GPU is an accelerator here, not the source of the speedup. Rerun
+the same benchmark with `TOYOMACRO_DISABLE_MLX=1` and it takes the
+pure-NumPy path through the same solver code; the record is committed
+next to the accelerated one
+([`solver_comparison_numpy.json`](paper/figures/results/solver_comparison_numpy.json)),
+same host, same day, **same input hash** — the backend is the only
+difference.
+
+| Solver | MLX (GPU) | NumPy (CPU) | MAE amplitude |
+|---|---:|---:|---|
+| voigtfit `dict2d_parabola` | 6.6 M spec/s | **1.6 M spec/s** | 0.0222 / 0.0222 |
+| `scipy.optimize.curve_fit` | 845 spec/s | 822 spec/s | 0.0219 |
+| `lmfit` | 801 spec/s | 808 spec/s | 0.0219 |
+
+So the batch formulation alone — no GPU — is worth about **2,000×**
+over the per-spectrum workflow, and MLX contributes a further ~4×.
+Accuracy is unchanged (MAE δE 0.0134 GPU vs 0.0146 CPU, both against
+a peak-count SNR of 10).
+
+Read this as isolating the *backend*, not the vendor: both columns come
+from the same M3 Max, so the NumPy row is what that machine's CPU and
+BLAS deliver. Another host will land elsewhere in absolute terms — but
+it runs the identical code path, and `--out` writes the same record
+format, so you can generate the comparable row on your own machine in
+about a minute:
+
+```bash
+TOYOMACRO_DISABLE_MLX=1 python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark --out my_host.json
+```
+
+> The amplitude-only projection row is BLAS-on-CPU in *both* records
+> (that kernel is not routed through MLX in this benchmark), so its
+> two columns differ only by run-to-run noise. The MLX headline for
+> that kernel is the separate `figure1_throughput.json` record.
 
 ### End-to-end image roundtrip
 
@@ -104,7 +155,7 @@ generation + fit time, not the solver alone.
 
 | Image | Noise sweep | Total fits | Wall time (MLX, M3 Max) | PSNR (noise-free) δa / δc / δσ |
 |---|---|---:|---:|---|
-| 540p Fuji (960×540, 6 components) | none | ~0.52 M × 5 = **2.6 M** | ~0.9 s | 59.8 dB (image-level) |
+| 540p demo image (960×540, 6 components) | none | ~0.52 M × 5 = **2.6 M** | ~0.9 s | 59.8 dB (image-level) |
 | 4K UHD | 8 Poisson levels | **66 M** | 1.4 min | 64.1 / 61.3 / 56.9 dB |
 | 8K UHD (7680×4320) | 8 Poisson levels | **265 M** | ~10.4 min | 60.8 / 61.3 / 55.1 dB |
 
@@ -229,8 +280,9 @@ per channel; `--inspect X,Y` adds a spectrum-space plot of one pixel
 
 The engine is exposed as an [MCP](https://modelcontextprotocol.io)
 server so AI agents (Claude Code, Claude Desktop, ...) can drive it —
-look up binding energies and sensitivity factors, fit spectrum files,
-and run GVRT accuracy experiments:
+look up binding energies, compute simplified intrinsic sensitivities
+(cross-section × IMFP, with no instrument response), fit spectrum
+files, and run GVRT accuracy experiments:
 
 ```bash
 pip install -e ".[mcp]"
@@ -256,6 +308,20 @@ test suite need no external tools or data.
 - `toyomacro.fitting` — high-level peak-fitting templates that wrap
   the engine for common XPS analyses.
 
+### Quantification boundary in v0.1
+
+The v0.1 release includes quantification-oriented reference utilities: binding-energy and
+photoionization cross-section lookup, TPP-2M IMFP calculation, and interpolation of a
+user-supplied, authorized analyzer-transmission curve. Their outputs retain the selected source,
+units, energy range, extrapolation status, and instrument-specific assumptions where available.
+
+These utilities provide peak observables and declared sensitivity terms for relative comparisons.
+They do not claim traceable absolute composition from a universal sensitivity factor. In
+particular, `cross-section × IMFP`, even with transmission applied, omits factors such as
+elastic-scattering/EAL, detector response, angular distribution, polarization, geometry, and
+matrix assumptions. A future composition workflow will require an explicit input contract,
+uncertainty/assumption reporting, and redistributable validation data.
+
 GUI front-ends and a depth-profiling solver built on this engine are
 maintained separately; nothing in this repository depends on them.
 If you are evaluating the JOSS submission, the entry point is
@@ -266,16 +332,16 @@ file guards.
 ## Architecture
 
 ```
-toyomacro-python/
+toyomacro/
 ├── src/toyomacro/
 │   ├── voigtfit/        # Voigt-fitting engine (the JOSS target)
-│   │   ├── pipeline.py            # HybridPipeline (Stage1 + Stage2)
+│   │   ├── pipeline.py            # HybridPipeline (Stage 1 screening + legacy compatibility fallback)
 │   │   ├── dictionary_solver.py   # Dict1D / Dict2D / parabola
 │   │   ├── dictionary_solver_3d.py # δE × δσ × δγ joint
 │   │   ├── multipeak_solver.py    # Alternating projection
 │   │   ├── crlb.py                # Cramer-Rao Lower Bound
 │   │   ├── benchmarks/            # GVRT 1B, multi-image, noise sweep
-│   │   └── tests/                 # 701 unit tests
+│   │   └── tests/                 # 839 unit tests
 │   ├── core/            # Spectrum, FittingResult
 │   ├── lineshape/       # Voigt, Gaussian, Lorentzian, PseudoVoigt, Doniach-Sunjic
 │   ├── background/      # Shirley / Tougaard / Linear
@@ -289,6 +355,11 @@ toyomacro-python/
 The engine has **zero circular dependencies** between subpackages and
 each layer can be imported in isolation.
 
+The principles behind these choices — throughput as a design
+constraint, honest benchmark numbers, round-trip validation, models
+as data — are written up in
+[`docs/DESIGN_PHILOSOPHY.md`](docs/DESIGN_PHILOSOPHY.md).
+
 ## Compatibility
 
 - **HDF5**: ships streaming/chunked writers compatible with the
@@ -301,7 +372,7 @@ each layer can be imported in isolation.
 
 ```bash
 uv sync --extra dev --extra mlx
-uv run pytest                                    # 1,146+ tests (see tests/README.md)
+uv run pytest                                    # 1,608 tests (see tests/README.md)
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check src/ tests/                    # lint
 ```

@@ -1,6 +1,6 @@
 """
-Weight Matrix Cache for 2-Stage Hybrid Pipeline
-================================================
+Weight Matrix Cache for the Stage 1 screening pipeline
+=======================================================
 
 Pre-computes and caches weight matrices for each element/orbital combination.
 
@@ -39,7 +39,7 @@ try:
     import mlx.core as mx
 
     from ._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

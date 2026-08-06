@@ -53,8 +53,9 @@ Notes:
   when unset — no data transfer is required for the PoC.
 - The capability probe (`toyomacro.voigtfit._mlx_support.mlx_usable`)
   runs a tiny kernel on the **default device** and is device-agnostic:
-  it is expected to return True on CUDA unchanged. Its error messages
-  still say "Apple Silicon only" — update them once CUDA is confirmed.
+  it is expected to return True on CUDA unchanged. (Its error messages
+  said "Apple Silicon only" when this recipe was written; they were
+  reworded after the run below — see follow-up 2.)
 
 ## Step 0 — NumPy baseline (should already pass)
 
@@ -421,7 +422,16 @@ dictionaries are constant across the batch loop.
    precision loss is a bad default for a fitting engine. Prefer setting
    it in-process at CUDA-backend init, or gate the argmax paths, and
    measure what TF32 actually buys before trading accuracy for it.
-2. Reword the `_mlx_support` "Apple Silicon only" messages.
+2. ~~Reword the `_mlx_support` "Apple Silicon only" messages.~~ —
+   **DONE.** `_mlx_support` now describes the probe as running on MLX's
+   default device, and neither `require_mlx()` message claims MLX is
+   Apple-only or that the probe looks for a Metal device. The same
+   correction was applied to the 33 `HAS_MLX = _mlx_usable()` comments
+   that repeated the claim, to the `test_compression.py` skip messages,
+   and to the `solver_comparison_benchmark` provenance label, which had
+   hardcoded `"mlx (Apple Silicon GPU)"` for any accelerated run.
+   `tests/test_mlx_support.py` now pins the messages against a
+   regression. Detection behavior is unchanged.
 3. Fold the header install + `CUDA_HOME` into the setup recipe above.
 4. Investigate the NumPy-baseline `decode_speed` gap on this machine.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.

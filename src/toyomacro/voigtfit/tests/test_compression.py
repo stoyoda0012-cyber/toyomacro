@@ -14,9 +14,7 @@ from scipy.ndimage import gaussian_filter
 IN_CI = os.environ.get("CI") == "true"
 skip_in_ci = pytest.mark.skipif(IN_CI, reason="speed assertion is sensitive to CI hardware")
 
-sys.path.insert(0, str(__file__).rsplit('/tests/', 1)[0])
-
-from h5io import (
+from toyomacro.voigtfit.h5io import (
     HAS_LZ4,
     FitparaCodec,
     FitparaCodecConfig,
@@ -464,7 +462,7 @@ class TestSpecdataUint16:
         """Test that uint16 data can be directly transferred to MLX."""
         from toyomacro.voigtfit._mlx_support import mlx_usable
         if not mlx_usable():
-            pytest.skip("MLX not usable (not installed, or no Metal device)")
+            pytest.skip("MLX not usable (not installed, or the default device failed the probe)")
         import mlx.core as mx
 
         n_spectra = 10_000
@@ -500,7 +498,7 @@ class TestSpecdataUint16:
         """Test MLX throughput with uint16 data."""
         from toyomacro.voigtfit._mlx_support import mlx_usable
         if not mlx_usable():
-            pytest.skip("MLX not usable (not installed, or no Metal device)")
+            pytest.skip("MLX not usable (not installed, or the default device failed the probe)")
         import time
 
         import mlx.core as mx

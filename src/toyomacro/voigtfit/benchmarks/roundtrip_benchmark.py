@@ -13,7 +13,7 @@ Workflow:
     6. PSNR Evaluation vs Original and vs Noise-Free
 
 Usage:
-    from benchmark import run_noise_sweep, run_roundtrip_benchmark
+    from toyomacro.voigtfit import run_noise_sweep, run_roundtrip_benchmark
 
     # Quick benchmark
     result = run_roundtrip_benchmark(image_path='my_image.jpg')
@@ -25,7 +25,6 @@ Usage:
         save_spectra=True,  # Keep H5 files
     )
     print(results.summary_table)
-Date: 2026-01-23
 """
 
 import gc
@@ -216,7 +215,7 @@ class RoundtripBenchmark:
         image_path: str | Path,
         output_dir: str | Path | None = None,
         generator_config: GeneratorConfig | None = None,
-        elements: str | ElementPreset = 'fuji',
+        elements: str | ElementPreset = 'demo',
         batch_size: int = 2_000_000,
         use_mlx: bool = True,
         verbose: bool = True,
@@ -228,8 +227,8 @@ class RoundtripBenchmark:
             image_path: Path to input image (RGB)
             output_dir: Base directory for output (timestamp subfolder created)
             generator_config: Custom generator configuration
-            elements: Preset name (e.g., 'fuji') or ElementPreset object.
-                      Default is 'fuji' (6-component Si/Ti/Al/C/O mapping).
+            elements: Preset name (e.g., 'demo') or ElementPreset object.
+                      Default is 'demo' (6-component Si/Ti/Al/C/O mapping).
             batch_size: Spectra per batch for processing
             use_mlx: Use MLX GPU acceleration
             verbose: Print progress
@@ -989,18 +988,18 @@ class RoundtripBenchmark:
 # Convenience Functions
 # ============================================================================
 
-from ._data_paths import roundtrip_image_dir
+from ._data_paths import find_default_image, roundtrip_image_dir
 
-_DEFAULT_IMAGE_PATH = (
-    roundtrip_image_dir() / 'fuji' / 'churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg'
-)
+# First image found under the (unbundled) roundtrip data tree; None when
+# the user has not pointed VOIGTFIT_DATA_ROOT at a dataset yet.
+_DEFAULT_IMAGE_PATH = find_default_image()
 
 
 def run_roundtrip_benchmark(
     image_path: str | Path | None = None,
     noise_level: str | float = 'None',
     output_dir: str | Path | None = None,
-    elements: str | ElementPreset = 'fuji',
+    elements: str | ElementPreset = 'demo',
     save_spectra: bool = True,
     use_inmemory: bool | str = False,
     verbose: bool = True,
@@ -1009,10 +1008,10 @@ def run_roundtrip_benchmark(
     Run a single roundtrip benchmark.
 
     Args:
-        image_path: Input image path (default: Roundtrip/image/fuji 8K image)
+        image_path: Input image path (default: first image under the roundtrip data tree)
         noise_level: 'None', 'Moderate', etc. or numeric value
         output_dir: Output directory for results
-        elements: Preset name or ElementPreset object (default: 'fuji')
+        elements: Preset name or ElementPreset object (default: 'demo')
         save_spectra: Keep H5 files
         use_inmemory: False, True/'inmemory', or 'streaming' (fused gen+fit)
         verbose: Print progress
@@ -1041,7 +1040,7 @@ def run_noise_sweep(
     image_path: str | Path | None = None,
     noise_levels: list[str] | None = None,
     output_dir: str | Path | None = None,
-    elements: str | ElementPreset = 'fuji',
+    elements: str | ElementPreset = 'demo',
     save_spectra: bool = True,
     verbose: bool = True,
 ) -> NoiseSweepResult:
@@ -1049,10 +1048,10 @@ def run_noise_sweep(
     Run roundtrip benchmark across multiple noise levels.
 
     Args:
-        image_path: Input image path (default: Roundtrip/image/fuji 8K image)
+        image_path: Input image path (default: first image under the roundtrip data tree)
         noise_levels: List of noise levels (default: all 11 levels)
         output_dir: Output directory for results
-        elements: Preset name or ElementPreset object (default: 'fuji')
+        elements: Preset name or ElementPreset object (default: 'demo')
         save_spectra: Keep H5 files
         verbose: Print progress
 
@@ -1080,7 +1079,7 @@ def run_media_roundtrip(
     output_path: str | Path | None = None,
     noise_levels: list[str] | None = None,
     noise_labels: list[str] | None = None,
-    elements: str | ElementPreset = 'fuji',
+    elements: str | ElementPreset = 'demo',
     duration: int = 50,
     verbose: bool = True,
     denoise_fn: Callable[[np.ndarray], np.ndarray] | None = None,
@@ -1655,7 +1654,7 @@ def run_gif_roundtrip(
     output_path: str | Path | None = None,
     noise_levels: list[str] | None = None,
     noise_labels: list[str] | None = None,
-    elements: str | ElementPreset = 'fuji',
+    elements: str | ElementPreset = 'demo',
     duration: int = 50,
     verbose: bool = True,
     denoise_fn: Callable[[np.ndarray], np.ndarray] | None = None,
@@ -1720,8 +1719,8 @@ if __name__ == '__main__':
     parser.add_argument('--sweep', '-s', action='store_true',
                        help='Run all noise levels')
     parser.add_argument('--output', '-o', type=str, help='Output directory')
-    parser.add_argument('--elements', '-e', type=str, default='fuji',
-                       help='Element preset name (default: fuji)')
+    parser.add_argument('--elements', '-e', type=str, default='demo',
+                       help='Element preset name (default: demo)')
     parser.add_argument('--no-save', action='store_true',
                        help='Do not save H5 files')
     mode_group = parser.add_mutually_exclusive_group()

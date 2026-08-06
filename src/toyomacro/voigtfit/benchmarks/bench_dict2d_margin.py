@@ -7,7 +7,7 @@ Investigates:
 3. What is the optimal threshold for adaptive switching?
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d_margin
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d_margin
 """
 
 import numpy as np
@@ -24,7 +24,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

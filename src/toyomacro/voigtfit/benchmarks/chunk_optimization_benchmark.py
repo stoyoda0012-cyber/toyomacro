@@ -10,10 +10,9 @@ Python loop) is amortized over more spectra, revealing the asymptotic
 throughput ceiling.
 
 Usage:
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark --quick
-    python -m voigtfit.benchmarks.chunk_optimization_benchmark --resolutions 320x180 640x360 1280x720
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark --quick
+    python -m toyomacro.voigtfit.benchmarks.chunk_optimization_benchmark --resolutions 320x180 640x360 1280x720
 """
 
 import gc
@@ -99,7 +98,7 @@ def _load_or_synthesize(resolution: str, gif_dir: Path | None) -> np.ndarray:
 def run_chunk_benchmark(
     frames: np.ndarray,
     chunk_spectra: int,
-    elements: str = 'fuji',
+    elements: str = 'demo',
     noise_levels: list[str] | None = None,
 ) -> ChunkBenchmarkResult:
     """Run a single chunk-size benchmark measurement.

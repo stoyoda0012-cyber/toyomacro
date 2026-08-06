@@ -256,7 +256,9 @@ class FastVoigtFitter:
             self._pipeline = HybridPipeline(
                 cache=self._cache,
                 use_mlx=self.config.use_mlx,
-                enable_stage2=False,  # Stage2 deprecated; use 4-step/adaptive
+                # Stage 2 is a legacy compatibility path; this fitter uses
+                # the 4-step / adaptive dictionary solvers instead.
+                enable_stage2=False,
                 chi2_threshold=self.config.chi2_threshold,
             )
         return self._pipeline

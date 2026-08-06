@@ -30,7 +30,7 @@ from .benchmarks.reconstruction_benchmark import (
     BenchmarkResult,
     ElementConfig,
     ReconstructionBenchmark,
-    run_fuji_benchmark,
+    run_demo_benchmark,
 )
 
 # Roundtrip Benchmark (Image -> Spectra -> VoigtFit -> Image)
@@ -76,7 +76,7 @@ from .image_utils import (
     compare_images,
     fitpara_to_rgb,
     get_color_mapping,
-    get_fuji_color_mapping,
+    get_demo_color_mapping,
     load_image,
     psnr,
     save_gif,
@@ -86,7 +86,7 @@ from .image_utils import (
 )
 from .pipeline import FitResult, HybridPipeline
 from .spectra_generator import (
-    FUJI_PRESET,
+    DEMO_PRESET,
     NOISE_LEVELS,
     ElementPreset,
     ElementSpec,
@@ -117,7 +117,7 @@ try:
         voigt_with_jacobian_mlx,
     )
     from .stage2_mlx import Stage2MLXConfig, Stage2MLXRefiner, Stage2MLXResult
-    HAS_MLX = mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -138,7 +138,7 @@ __all__ = [
     "GaussNewtonRefiner",
     "RefineMode",
     "RefineResult",
-    # VarPro (legacy)
+    # VarPro reference fitter (per-spectrum, SciPy; not the batch path)
     "VarProFitter",
     # Voigt functions
     "voigt_profile",
@@ -159,21 +159,21 @@ __all__ = [
     "fitpara_to_rgb",
     "load_image",
     "save_image",
-    "get_fuji_color_mapping",
+    "get_demo_color_mapping",
     "get_color_mapping",
     "PSNRResult",
     # Benchmark
     "ReconstructionBenchmark",
     "BenchmarkResult",
     "ElementConfig",
-    "run_fuji_benchmark",
+    "run_demo_benchmark",
     # Spectra Generation
     "SpectraGenerator",
     "NoiseConfig",
     "GeneratorConfig",
     "ElementSpec",
     "ElementPreset",
-    "FUJI_PRESET",
+    "DEMO_PRESET",
     "get_element_preset",
     "register_element_preset",
     "list_element_presets",

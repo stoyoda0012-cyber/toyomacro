@@ -1,0 +1,135 @@
+{
+  "description": "Same-problem comparison: voigtfit solvers vs SciPy/lmfit fitting.",
+  "problem": {
+    "n_energy": 151,
+    "center": 0.0,
+    "sigma": 0.5,
+    "gamma": 0.2,
+    "dE_range_sigma": 0.3,
+    "dsigma_range_sigma": 0.1,
+    "bounds": {
+      "lo": [
+        0.0,
+        -0.15,
+        0.45
+      ],
+      "hi": [
+        5.0,
+        0.15,
+        0.55
+      ],
+      "note": "identical for all full-fit solvers"
+    },
+    "noise_level": 1000.0,
+    "peak_snr": 10.0,
+    "seed": 0,
+    "noise_seeded": true,
+    "input_sha256": "53b9dda5b901e7daf33eb1bbbeeaa47070e5bb2b476315b3c9e0fcf7a37ee026",
+    "n_batch": 200000,
+    "n_common_accuracy_subset": 500,
+    "dtype": "float32 spectra, float64 reference fits"
+  },
+  "fairness_note": "Workflow-vs-workflow comparison on one machine: batch solver uses the GPU when usable, per-spectrum tools run their normal single-thread CPU loop. Accuracy compared on the identical first n_common spectra.",
+  "results": [
+    {
+      "solver": "projection_amp_only",
+      "problem": "amplitude only (center/width fixed at nominal) \u2014 NOT comparable to full fits below",
+      "backend": "numpy (multi-thread BLAS), CPU",
+      "n_spectra": 200000,
+      "setup_s": 0.0008,
+      "repeats": 5,
+      "timings_s": [
+        0.003332,
+        0.001762,
+        0.001816,
+        0.001909,
+        0.001809
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 110127063.00873658,
+      "mae_amp": 0.0294410898901165,
+      "mae_dE": null,
+      "mae_dsigma": null
+    },
+    {
+      "solver": "dict2d_parabola",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "numpy (CPU)",
+      "n_spectra": 200000,
+      "setup_s": 0.0048,
+      "repeats": 5,
+      "timings_s": [
+        0.1268,
+        0.119627,
+        0.123544,
+        0.125137,
+        0.123529
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 1618857.527811633,
+      "mae_amp": 0.022231288769684086,
+      "mae_dE": 0.014557544498444045,
+      "mae_dsigma": 0.012997139068111764,
+      "mae_amp_full_batch": 0.021605779529908224,
+      "mae_dE_full_batch": 0.014918286800311846,
+      "mae_dsigma_full_batch": 0.013484806354502261
+    },
+    {
+      "solver": "scipy_curve_fit",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "scipy curve_fit, bounded trust-region reflective (TRF), single-thread CPU per-spectrum loop",
+      "n_spectra": 500,
+      "setup_s": 0.0,
+      "repeats": 3,
+      "timings_s": [
+        0.614,
+        0.608,
+        0.606
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 822.2042276835834,
+      "mae_amp": 0.021946428478387483,
+      "mae_dE": 0.01308599968456347,
+      "mae_dsigma": 0.012530243647359886
+    },
+    {
+      "solver": "lmfit",
+      "problem": "amplitude + dE + dsigma (gamma fixed)",
+      "backend": "lmfit Model.fit (leastsq with bounds), single-thread CPU per-spectrum loop",
+      "n_spectra": 500,
+      "setup_s": 0.0,
+      "repeats": 3,
+      "timings_s": [
+        0.641,
+        0.617,
+        0.619
+      ],
+      "aggregation": "median",
+      "throughput_spec_per_s": 808.0610554104437,
+      "mae_amp": 0.021946305106439398,
+      "mae_dE": 0.013085977925327284,
+      "mae_dsigma": 0.012530236958096382
+    }
+  ],
+  "environment": {
+    "timestamp_utc": "2026-07-28T04:57:36+00:00",
+    "os": "Darwin 25.5.0",
+    "machine": "arm64",
+    "python": "3.12.11",
+    "numpy": "2.3.5",
+    "cpu_count": 16,
+    "command": "python -m toyomacro.voigtfit.benchmarks.solver_comparison_benchmark --out paper/figures/results/solver_comparison_numpy.json",
+    "scipy": "1.17.0",
+    "lmfit": "1.3.4",
+    "mlx": "0.31.2",
+    "mlx_usable": false,
+    "TOYOMACRO_DISABLE_MLX": "1",
+    "cpu": "Apple M3 Max",
+    "git_commit": "534d7095ea90d8fd21d23139eaf9be9a6c121439",
+    "git_tracked_dirty": true,
+    "git_dirty_files": [
+      "M paper/figures/results/solver_comparison.json",
+      " M src/toyomacro/voigtfit/benchmarks/solver_comparison_benchmark.py"
+    ]
+  }
+}

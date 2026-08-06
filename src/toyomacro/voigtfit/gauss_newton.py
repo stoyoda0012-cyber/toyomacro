@@ -255,10 +255,18 @@ class GaussNewtonRefiner:
             r = y - Phi @ A
             residual_norm = np.linalg.norm(r)
 
-            # Check convergence
-            rel_change = abs(prev_residual_norm - residual_norm) / (prev_residual_norm + 1e-10)
-            if rel_change < self.tol and iteration > 0:
-                break
+            # Check convergence. Skipped on the first pass: there is no
+            # previous norm to compare against, and computing the ratio
+            # from the inf sentinel gives inf/inf = nan. `rel_change` is
+            # read again after the loop, under the same `iteration > 0`
+            # guard, so it is always bound where it is used.
+            if iteration > 0:
+                rel_change = (
+                    abs(prev_residual_norm - residual_norm)
+                    / (prev_residual_norm + 1e-10)
+                )
+                if rel_change < self.tol:
+                    break
             prev_residual_norm = residual_norm
 
             # Build Jacobian for Gauss-Newton

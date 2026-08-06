@@ -5,16 +5,16 @@ VoigtFit CLI - Command-line interface for VoigtFit processing
 
 Usage:
     # Process synthetic data (benchmark mode)
-    python -m voigtfit.cli benchmark --n-spectra 1000000
+    python -m toyomacro.voigtfit.cli benchmark --n-spectra 1000000
 
     # Process from HDF5 file
-    python -m voigtfit.cli process input.h5 --output result.npz
+    python -m toyomacro.voigtfit.cli process input.h5 --output result.npz
 
     # GVRT roundtrip demo (image -> spectra -> fit -> image)
     python -m toyomacro.voigtfit.cli gvrt --noise Moderate --inspect 192,192
 
     # Interactive REPL mode
-    python -m voigtfit.cli repl
+    python -m toyomacro.voigtfit.cli repl
 """
 
 import argparse
@@ -28,7 +28,7 @@ try:
     import mlx.core as mx
 
     from ._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

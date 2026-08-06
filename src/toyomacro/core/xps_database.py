@@ -44,7 +44,9 @@ _BRANCH_RATIOS = {
 # SO splitting values (eV) for common elements.
 # Keys: element symbol + orbital (e.g. "Si2p").
 # Values: splitting in eV (positive).
-# Sources: various XPS handbooks, NIST XPS database.
+# Representative values from the standard XPS literature; spin-orbit
+# splittings are element-level physical constants tabulated in many
+# primary references (see docs/DATA_SOURCES.md, "In-code constants").
 _SO_SPLITS: dict[str, float] = {
     # 2p orbitals
     "Si2p": 0.6,

@@ -24,26 +24,19 @@ output/
 outputs
 outputs/
 
-# MATLAB Drive sync markers
-.MATLABDriveTag
-
-# Ephemeral planning and obsolete archives
-.plan
-files.zip
-
 # User-specific MCP config (contains absolute paths)
 .mcp.json
 
-# Archived legacy implementations
-_archived/
-
-# Web build artifacts
+# JS tooling, should any be introduced
 node_modules/
-web/dist/
+
+# Superseded internal notes kept beside the code they describe
+# (docs/_archived, voigtfit/_archived). Matches at any depth.
+_archived/
 
 # Personal analysis / paper-figure scripts — kept out of the public
 # repo pending case-by-case review of what is shareable.
-scripts/
+/scripts/
 
 # Internal-only documents (proposal drafts, business notes). Never
 # pushed to the public repo.
@@ -53,39 +46,30 @@ _internal/
 # pushed to the public repo.
 IMPLEMENTATION_PLAN.md
 
-# Uncertainty-quantification backbone audit. References private deppro
-# internals; held for a dedicated public release alongside the
-# xps-uncertainty work rather than shipping with the current engine.
-docs/uncertainty_backbone_audit.md
-
-# --- Private companion layers: not part of the public engine distribution.
-# Developed locally in this worktree; excluded from the public repository.
-src/toyomacro/gui/
-src/toyomacro/api/
-src/toyomacro/agent/
-src/toyomacro/piar/
-src/toyomacro/depth/
-tests/test_gvrt_playground_tab.py
-web/
+# Working notes, handoffs, audits and design records live under
+# docs/_internal/ and are covered by the `_internal/` rule above. They
+# are named there rather than here: listing each one individually put
+# the filenames themselves in a public file, and did not catch new ones.
+#
+# Local working notes and handoffs. The GUI, web front end and depth
+# pipeline that used to live here moved out on 2026-07-28 (see README);
+# their ignore entries went with them.
+#
+# CLAUDE.md is unanchored on purpose: nested agent notes kept beside the
+# code they describe (e.g. src/toyomacro/voigtfit/CLAUDE.md) stay local.
+# Only the repository-root entry point is tracked.
 CLAUDE.md
-docs/ROADMAP.md
-docs/HANDOFF_FULL_SURVEY_CRLB.md
-docs/SESSION_GVRT_RESOLUTION_SCALING.md
-tests/piar/
-tests/unit/
-tests/test_depth_bridges.py
-tests/test_depth_inference.py
-tests/test_depth_maps.py
-tests/test_gui_solver_integration.py
-tests/test_pipeline_bridge.py
-tests/test_profile_chart.py
-tests/test_semifree_thickness_fix.py
-tests/test_solve_pipeline.py
-tests/test_spatial_map.py
-tests/test_tab_auto_connect.py
-tests/test_viewer_4d.py
+!/CLAUDE.md
 
-# Local AI-agent working files (never ship)
+# Local AI-agent working files. None of these ship in the sdist or
+# wheel (see [tool.hatch.build.targets.sdist] and the CI archive
+# assertion) — but the root AGENTS.md is tracked, as the shared,
+# tool-agnostic instructions for this repository. Same unanchored
+# pattern plus root exception as CLAUDE.md above.
 .codex/
 AGENTS.md
-docs/JOSS_IMPLEMENTATION_BRIEF.md
+!/AGENTS.md
+
+# Generated example data (regenerate: examples/data/make_example_data.py)
+examples/data/*.h5
+examples/output/

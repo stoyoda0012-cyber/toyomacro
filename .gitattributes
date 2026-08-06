@@ -1,5 +1,7 @@
 # Normalize all text files to LF in the repository.
-# (One-time normalization of legacy CRLF files happened in 78bdab1.)
+# (78bdab1 attempted a one-time normalization but missed blobs that were
+# already CRLF in the index; `git add --renormalize .` completed it later.)
 * text=auto eol=lf
 *.png binary
 *.h5 binary
+*.npz binary

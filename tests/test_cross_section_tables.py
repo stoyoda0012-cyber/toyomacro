@@ -44,3 +44,18 @@ def test_scofield_haxpes_range(no_common_data):
 def test_rsf_from_bundled_cache(no_common_data):
     rsf = CrossSection.get_rsf("Si", "2p", "C", "1s", 1486.6, table="scofield")
     assert rsf is not None and rsf > 0
+
+
+def test_get_rsf_is_only_a_cross_section_ratio(no_common_data):
+    """`get_rsf` is sigma1/sigma2 and nothing else.
+
+    The name invites reading it as a complete relative sensitivity
+    factor. Pin the arithmetic so that anything folded in later — IMFP,
+    elastic scattering, transmission — has to break this test and be
+    argued for, rather than arriving as a silent change of meaning.
+    """
+    ratio = CrossSection.get_rsf("Si", "2p", "C", "1s", 1486.6, table="scofield")
+    sigma_si = CrossSection.lookup("Si", "2p", 1486.6, table="scofield")
+    sigma_c = CrossSection.lookup("C", "1s", 1486.6, table="scofield")
+
+    assert ratio == pytest.approx(sigma_si / sigma_c)

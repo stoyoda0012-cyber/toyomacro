@@ -285,7 +285,7 @@ def build_noise_comparison_data(
     preset: SinglePeakPreset = C1S_SINGLE_PRESET,
     noise_levels: list[dict] | None = None,
     max_height: int = 540,
-    roi_preset: str = 'fuji',
+    roi_preset: str = 'demo',
     roi_name: str = 'sky',
     n_roi_samples: int = 500,
     seed: int = 42,
@@ -527,7 +527,7 @@ def _get_roi_rect(data: NoiseComparisonData) -> tuple[int, int, int, int]:
     H, W = data.image.shape[:2]
     rows = np.arange(H * W)  # unused
     # We don't store the rect directly, so re-select
-    roi_defs = select_rois(data.image, preset_name='fuji')
+    roi_defs = select_rois(data.image, preset_name='demo')
     for rname, rcolor, rrect, rflat in roi_defs:
         if rname == roi.name:
             return rrect

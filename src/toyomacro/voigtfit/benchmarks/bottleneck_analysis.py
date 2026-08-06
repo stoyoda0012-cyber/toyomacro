@@ -26,9 +26,8 @@ Phases measured:
   8. GC
 
 Usage:
-    python -m voigtfit.benchmarks.bottleneck_analysis
-    python -m voigtfit.benchmarks.bottleneck_analysis --frames 20
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.bottleneck_analysis
+    python -m toyomacro.voigtfit.benchmarks.bottleneck_analysis --frames 20
 """
 
 import gc
@@ -43,7 +42,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -125,9 +124,15 @@ def run_bottleneck_analysis(
     # Resolve input path (--input takes precedence over --gif)
     media_path = input_path or gif_path
     if media_path is None:
-        media_path = str(
-            roundtrip_image_dir() / 'fuji' / 'fuji_sakura_960x540.gif'
-        )
+        from ._data_paths import find_default_image
+
+        found = find_default_image()
+        if found is None:
+            raise SystemExit(
+                'No input media found — pass --input/--gif or set '
+                'VOIGTFIT_DATA_ROOT to a tree containing images.'
+            )
+        media_path = str(found)
 
     frames = load_image(media_path, all_frames=True)
     n_frames, h, w, _ = frames.shape
@@ -137,7 +142,7 @@ def run_bottleneck_analysis(
           f"{n_test * 2 * 5:,} fit calls")
     print(f"Total spectra: {n_test * n_pixels * 2 * 5:,}")
 
-    preset = get_element_preset('fuji')
+    preset = get_element_preset('demo')
     config = GeneratorConfig()
     color_mapping = preset.color_mapping
 

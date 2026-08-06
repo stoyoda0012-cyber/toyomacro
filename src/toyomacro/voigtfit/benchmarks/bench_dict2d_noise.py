@@ -8,7 +8,7 @@ Key question: Does Dict2D's dense grid become fragile at high noise?
 dev-log 44 showed Dict1D vs 6-step crossover at SNR≈3. Where does Dict2D cross?
 
 Usage:
-    PYTHONPATH=python python -m voigtfit.benchmarks.bench_dict2d_noise
+    python -m toyomacro.voigtfit.benchmarks.bench_dict2d_noise
 """
 import time
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 

@@ -58,7 +58,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -601,7 +601,7 @@ class TestSi2pGVRTStepC:
 
 
 # ============================================================================
-# Hierarchical 2-Stage Si 2p Solver
+# Hierarchical two-phase Si 2p solver (not the Stage 2 fallback)
 # ============================================================================
 #
 # Insight: Si⁰ and Si⁴⁺ are 8σ apart → fit as 2-comp with high precision.

@@ -8,9 +8,8 @@ Before: NumPy(matmul) → np→mx(poisson) → mx→np(copy) → np→mx(fit)
 After:  mx(matmul → poisson) → mx(fit) — only 1 transfer in, 1 out
 
 Usage:
-    python -m voigtfit.benchmarks.benchmark_mlx_pipeline
-    python -m voigtfit.benchmarks.benchmark_mlx_pipeline --frames 20
-Date: 2026-02-17
+    python -m toyomacro.voigtfit.benchmarks.benchmark_mlx_pipeline
+    python -m toyomacro.voigtfit.benchmarks.benchmark_mlx_pipeline --frames 20
 """
 
 import gc
@@ -26,7 +25,7 @@ try:
     import mlx.core as mx
 
     from toyomacro.voigtfit._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -315,16 +314,22 @@ def run_benchmark(
     # Resolve input path (--input takes precedence over --gif)
     media_path = input_path or gif_path
     if media_path is None:
-        media_path = str(
-            roundtrip_image_dir() / 'fuji' / 'fuji_sakura_960x540.gif'
-        )
+        from ._data_paths import find_default_image
+
+        found = find_default_image()
+        if found is None:
+            raise SystemExit(
+                'No input media found — pass --input/--gif or set '
+                'VOIGTFIT_DATA_ROOT to a tree containing images.'
+            )
+        media_path = str(found)
 
     frames = load_image(media_path, all_frames=True)
     n_frames, h, w, _ = frames.shape
     n_pixels = h * w
     print(f"Loaded: {w}x{h}, {n_frames} frames, {n_pixels:,} px/frame")
 
-    preset = get_element_preset('fuji')
+    preset = get_element_preset('demo')
     config = GeneratorConfig()
 
     color_mapping = preset.color_mapping

@@ -3,23 +3,76 @@ Cramer-Rao Lower Bound (CRLB) for Multi-Peak Voigt Spectra
 ===========================================================
 
 Computes the theoretical minimum variance for parameter estimation
-of overlapping Voigt peaks under Poisson noise.
+of overlapping Voigt peaks.
 
 For n_comp peaks with parameters theta_k = (A_k, dE_k, dsigma_k [, dgamma_k]),
 the total parameter vector is theta = (theta_0, theta_1, ..., theta_{n-1}).
 
-The Fisher Information Matrix is:
+The Fisher Information Matrix depends on the noise model, and the two
+supported here give different numbers for the same spectrum:
 
-    g_ij = sum_E (df/dtheta_i)(df/dtheta_j) / f(E; theta)
+    poisson:   g_ij = sum_E (df/dtheta_i)(df/dtheta_j) / f(E; theta)
+    gaussian:  g_ij = (1/noise_std^2) sum_E (df/dtheta_i)(df/dtheta_j)
 
-where f(E) = sum_k A_k V_k(E) is the composite spectrum (Poisson mean).
+where f(E) = sum_k A_k V_k(E) is the composite spectrum (the Poisson
+mean under the first model). Photon counting is Poisson; the Gaussian
+form is the convention the multipeak benchmarks use. The Poisson branch
+is a Fisher matrix only if the amplitudes are scaled so that f(E) is
+expected counts per channel -- normalised or arbitrary-unit amplitudes
+rescale the bound silently, and nothing here checks.
+
+Which model produced a given number is not uniform across this module:
+compute_multipeak_fisher() defaults to 'poisson', crlb_grid_sweep()
+inherits that default, classify_solvability() defaults to 'gaussian',
+and compute_efficiency_point() hardcodes 'gaussian' with no way to
+override it. Read CRLBResult.config['noise_model'] rather than assuming.
+Where a SolvabilityInfo is what you hold, the same field is at
+info.detail.config['noise_model']; its __str__ does not disclose which
+model produced the meV figure it prints.
 
 The CRLB states: Var(theta_hat_i) >= [g^{-1}]_ii
 
-Key insight: overlapping peaks share the Poisson denominator f(E),
-creating off-diagonal blocks that couple parameters of different peaks.
-As overlap increases, the Fisher matrix becomes ill-conditioned and
-CRLB diverges -- quantifying the fundamental limit of peak separation.
+Three conditions, none of them automatic here:
+
+1. *Unbiasedness.* Regularization biases the estimator by design, and
+   box constraints bias it whenever a bound can bind -- which for the
+   auto-constrained solver in the efficiency harness is not hypothetical
+   but routine at the overlaps it sweeps.
+2. *Correct specification.* A wrong component count, a mis-modelled
+   background, or unmodelled lineshape asymmetry all break it.
+3. *A non-singular Fisher matrix*, plus the usual regularity conditions
+   (support independent of theta, differentiation under the integral).
+   Where the matrix is numerically indistinguishable from singular,
+   only some combination of parameters is estimable and
+   compute_multipeak_fisher() reports inf for the individual ones. That
+   decision is taken on the correlation matrix, not on the raw Fisher
+   spectrum: the latter mixes units and moves with the amplitude
+   parameterisation.
+
+Beyond those, the bound conditions on everything not in theta. No
+background parameter appears in the Fisher matrix at all; mode='3d'
+treats the Lorentzian widths as exactly known; the component count is
+assumed known. Estimating any of them jointly raises the true bound,
+and this number does not move. So a bound computed here can be below
+the bound for the problem actually being solved even when the estimator
+is unbiased and the model is right.
+
+Where a condition fails, the bound is not a target the solver failed to
+reach -- it is a bound on a different estimation problem. Nothing in
+this module estimates the bias, so nothing here can tell you which case
+you are in.
+
+A CRLB is computed from a model; it is not a measurement. It states
+what an ideal estimator could achieve on data generated from these
+parameters, not what any particular fit achieved on real data.
+
+Key insight: the off-diagonal blocks coupling parameters of different
+peaks come from the overlap of their Jacobian columns, and are present
+under both weightings; the Poisson denominator modulates them rather
+than creating them. As overlap increases the Fisher matrix becomes
+ill-conditioned and the bound diverges -- the fundamental limit of peak
+separation -- until the matrix is numerically singular and the bound on
+the individual parameters is infinite.
 
 References:
     Rao (1945), Cramer (1946)
@@ -51,6 +104,14 @@ class SolvabilityLevel(Enum):
         HARD:       2-10% of sigma — tens of meV, valley visible but shallow
         SHOULDER:   10-40% of sigma — shoulder visible, position uncertain
         IMPOSSIBLE: > 40% of sigma — peaks merge into one feature
+
+    The thresholds are dimensionless fractions of sigma, so the "meV"
+    readings above hold only near sigma ~ 0.5 eV; at sigma = 2 eV, EASY
+    admits 40 meV. They are thresholds on the bound, not on any
+    solver's realized error, and they inherit the bound's conditions
+    (see the module docstring). EASY says the configuration does not
+    itself forbid that precision; it does not promise a fit will
+    reach it.
     """
     EASY = "easy"
     HARD = "hard"
@@ -66,7 +127,8 @@ class SolvabilityInfo:
         level: Overall solvability classification
         crlb_dE_meV: sqrt(CRLB[dE]) in meV, averaged over components
         crlb_ds_meV: sqrt(CRLB[dsigma]) in meV, averaged over components
-        condition_number: Fisher matrix condition number
+        condition_number: Condition number of the correlation matrix
+            (scale-free); see CRLBResult.condition_number
         min_overlap_fwhm: Minimum inter-peak spacing in FWHM units
         n_comp: Number of components
         per_component: Per-component (level, crlb_dE_meV) list
@@ -134,7 +196,19 @@ def classify_solvability(
         noise_model: 'poisson' or 'gaussian'
 
     Returns:
-        SolvabilityInfo with classification and CRLB bounds
+        SolvabilityInfo with classification and CRLB bounds. These
+        describe the configuration **at the assumed amplitudes and
+        snr**, not a fit, and they are not confidence intervals for any
+        fitted parameter. Both assumptions are defaulted here (unit
+        amplitudes, SNR 100) and the bound scales as 1/SNR^2, so the
+        level is as much a statement about those defaults as about the
+        peak geometry.
+
+        This matters because process_multipeak() attaches such an object
+        to every result with the defaults in place: the meV figure
+        printed beside a fit of real data was not computed from that
+        data. Note also that the default noise model here is 'gaussian',
+        unlike compute_multipeak_fisher().
     """
     centers = np.asarray(centers, dtype=np.float64)
     sigmas = np.asarray(sigmas, dtype=np.float64)
@@ -226,10 +300,49 @@ class CRLBResult:
 
     Attributes:
         fisher: Fisher Information Matrix (n_params_total, n_params_total)
-        crlb: CRLB per parameter = diag(inv(fisher)), shape (n_params_total,)
-        crlb_per_component: Nested dict {comp_idx: {param_name: crlb_value}}
-        condition_number: Condition number of Fisher matrix
-        eigenvalues: Eigenvalues in ascending order
+        crlb: CRLB per parameter = diag(inv(fisher)), shape
+            (n_params_total,). Entries are ``inf`` where the Fisher
+            matrix is singular along that parameter axis: the bound on
+            an individual parameter diverges when only some combination
+            of parameters is estimable. See ``unbounded``.
+        crlb_pseudo: ``diag(pinv(C)) / d**2``, i.e. the same diagonal
+            with the null directions dropped rather than diverging.
+            **Not a bound** -- it is smaller than the true one exactly
+            where the configuration is hardest, so a map of it can still
+            fall as peaks overlap further; that artefact is unchanged by
+            the scaling and is why this must never be presented as a
+            limit on precision. Note also that the identity
+            ``diag(inv(C))/d**2 == diag(inv(g))`` holds only on the
+            full-rank branch: pseudo-inversion does not commute with
+            diagonal scaling. Where ``null_space_dim > 0`` this
+            therefore differs from ``diag(pinv(g))`` by anything from a
+            couple of percent (four peaks, overlap 0.2) to nine orders
+            of magnitude (three peaks, overlap 0.1), since the two also
+            apply different rank thresholds to the same eigenvalue. Do
+            not treat maps of the two as interchangeable. Kept because
+            it stays finite and is useful as a regularized diagnostic.
+        unbounded: Boolean mask, shape (n_params_total,), true where
+            ``crlb`` is inf
+        null_space_dim: Number of correlation-matrix eigenvalues at or
+            below the rank threshold (0 when numerically full rank)
+        crlb_per_component: Nested dict {comp_idx: {param_name: crlb_value}},
+            following ``crlb`` including its infinities
+        condition_number: Condition number of the **correlation**
+            matrix, not of ``fisher``. The latter mixes units and its
+            condition number moves with the amplitude parameterisation
+            -- measured at 6.5 orders over amplitude 1e-3..1e6 for three
+            peaks at overlap 0.3 -- so it is not an indicator of
+            identifiability. The two agree to about 2% at amplitude 1
+            and sigma ~ 0.5, gamma ~ 0.3, but that is a property of
+            those widths, not a general one: cond(C)/cond(g) is 0.57 at
+            the C 1s nominal (sigma=0.4247, gamma=0.125) and 0.014 at
+            sigma=0.05. Note that
+            ``fisher_information.FisherResult.condition_number`` is
+            still taken from the raw Fisher spectrum, so the two classes
+            report different quantities under the same name.
+        eigenvalues: Correlation-matrix eigenvalues, ascending. These
+            are the ones the rank decision is taken on; for the Fisher
+            matrix's own spectrum use ``np.linalg.eigvalsh(fisher)``.
         eigenvectors: Corresponding eigenvectors (columns)
         param_names: Flat list of parameter names (e.g. ['amp_0', 'dE_0', ...])
         n_comp: Number of components
@@ -239,6 +352,9 @@ class CRLBResult:
     """
     fisher: np.ndarray
     crlb: np.ndarray
+    crlb_pseudo: np.ndarray
+    unbounded: np.ndarray
+    null_space_dim: int
     crlb_per_component: dict[int, dict[str, float]]
     condition_number: float
     eigenvalues: np.ndarray
@@ -253,6 +369,32 @@ class CRLBResult:
 # Parameter name templates
 _PARAM_NAMES_3D = ('amp', 'dE', 'dsigma')
 _PARAM_NAMES_4D = ('amp', 'dE', 'dsigma', 'dgamma')
+
+# A parameter axis counts as lying in the null space when this much of
+# its unit vector projects there, measured in the scaled coordinates of
+# compute_multipeak_fisher() where the axes are comparable.
+#
+# The distribution is continuous in [0, 1], but it is not featureless.
+# Measured at sigma=0.5, gamma=0.3 over rank-deficient configurations
+# (three to six peaks, overlap 0.10-0.40, n_energy 256 and 1024):
+#
+#   axes coupled into the degeneracy      5.5e-12 .. 5.0e-01
+#   axes genuinely decoupled from it      <= 8.8e-20
+#
+# where the second band is measured on a separate family -- two nearly
+# coincident peaks plus one placed 3 to 30 FWHM away, whose parameters
+# remain estimable and must keep a finite bound. Roughly eight orders
+# separate the two, and this constant is placed near the geometric
+# middle, leaving about three orders of margin on each side.
+#
+# The previous value, 1e-10, sat *inside* the coupled band and so
+# excluded axes that participate at the 5e-12 level: those kept a
+# finite crlb lifted from the truncated pseudo-inverse -- the number
+# this module says must never be read as a limit on precision -- and
+# the outcome moved when noise_std alone was varied, which cannot
+# change identifiability. Both bands and that failure are pinned by
+# TestSingularFisher.
+_NULL_PROJECTION_TOL = 1e-15
 
 
 def compute_multipeak_fisher(
@@ -289,7 +431,32 @@ def compute_multipeak_fisher(
         noise_std: Standard deviation of Gaussian noise (required if noise_model='gaussian')
 
     Returns:
-        CRLBResult with Fisher matrix, CRLB, and diagnostics
+        CRLBResult with Fisher matrix, CRLB, and diagnostics. The CRLB
+        entries bound the variance of an unbiased estimator of this
+        exact model; see the module docstring for what else that
+        excludes. The noise model actually used is recorded in
+        CRLBResult.config['noise_model'].
+
+        The rank decision is taken on the correlation matrix rather
+        than on the Fisher matrix directly, because the latter mixes
+        units and its spectrum therefore moves with the amplitude
+        parameterisation. Eigenvalues of that scaled matrix at or below
+        `n_params_total * eps` relative to the largest are treated as
+        null, following the convention of `np.linalg.matrix_rank`. A
+        parameter whose axis projects onto that null space gets
+        `crlb = inf`, flagged in `unbounded`, because only some
+        combination of parameters is estimable there. In exact
+        arithmetic distinct Voigt components sampled on at least
+        ``n_params_total`` energy points give a nonsingular Fisher
+        matrix and every bound is finite (with fewer points it is
+        structurally rank deficient: four peaks in '3d' mode need 12,
+        and 6 points leave a 6-dimensional null space); what is detected here is that
+        the matrix is numerically indistinguishable from singular at a
+        disclosed threshold, and an infinite bound is reported in
+        preference to an underestimate. `crlb_pseudo` keeps the
+        thresholded pseudo-inverse diagonal for callers that need a
+        finite diagnostic; it is smaller than the true bound in exactly
+        those configurations and is not a limit on precision.
     """
     amplitudes = np.asarray(amplitudes, dtype=np.float64)
     centers = np.asarray(centers, dtype=np.float64)
@@ -352,9 +519,38 @@ def compute_multipeak_fisher(
     Jw = J_full * sqrt_w[np.newaxis, :]  # (n_total, n_energy)
     fisher = Jw @ Jw.T  # (n_total, n_total)
 
-    # --- Step 5: CRLB = diag(inv(fisher)) ---
-    # Use pseudo-inverse for near-singular cases
-    eigenvalues, eigenvectors = np.linalg.eigh(fisher)
+    # --- Step 5: CRLB, computed in the dimensionless metric ---
+    # The Fisher matrix mixes units: the amplitude block is in area
+    # units, dE and dsigma in eV. A threshold on its eigenvalues is
+    # therefore a statement about the amplitude unit rather than about
+    # identifiability -- reparameterising A -> cA sends g -> D g D with
+    # D diagonal, which is not a similarity transform, so the spectrum
+    # (and any rank decision taken from it) moves with c while the
+    # physics does not.
+    #
+    # Rescaling to unit diagonal fixes that gauge. Rank is a property of
+    # the correlation matrix C = g / outer(d, d), and
+    #
+    #     diag(inv(g)) == diag(inv(C)) / d**2
+    #
+    # identically on the full-rank branch, so the bound is evaluated in
+    # the scaled coordinates and returned in the caller's units without
+    # being redefined.
+    #
+    # The justification is invariance, not conditioning. Holding the
+    # rank threshold fixed and varying only the matrix does improve the
+    # eigen-route residual ||g M - I||/sqrt(n) away from amplitude 1
+    # (three peaks, overlap 0.3: 6.8e-05 -> 4.0e-06 at amplitude 1e-2,
+    # 1.1e-02 -> 8.9e-05 at 1e2, 3.3e-01 -> 7.8e-04 at 1e3), but it
+    # costs about 1.5x at amplitude 1, and a plain np.linalg.inv(g) is
+    # comparable or better at every one of those points (5.6e-06,
+    # 4.2e-07, 1.9e-05, 3.1e-04). Conditioning is a side effect; what
+    # this buys is a rank decision that does not move with the units.
+    d = np.sqrt(np.maximum(np.diag(fisher), 0.0))
+    d_safe = np.where(d > 0.0, d, 1.0)
+    correlation = fisher / np.outer(d_safe, d_safe)
+
+    eigenvalues, eigenvectors = np.linalg.eigh(correlation)
     eig_positive = eigenvalues[eigenvalues > 0]
 
     if len(eig_positive) >= 2:
@@ -362,12 +558,38 @@ def compute_multipeak_fisher(
     else:
         condition_number = np.inf
 
-    # Regularized inverse for CRLB
-    # Threshold at machine epsilon * max eigenvalue
-    eig_threshold = max(eigenvalues[-1] * 1e-12, 1e-30)
-    eig_inv = np.where(eigenvalues > eig_threshold, 1.0 / eigenvalues, 0.0)
-    fisher_inv = (eigenvectors * eig_inv[np.newaxis, :]) @ eigenvectors.T
-    crlb = np.diag(fisher_inv)
+    # Moore-Penrose pseudo-inverse of C, thresholded relative to its
+    # largest eigenvalue. This is a regularized diagnostic, not a bound:
+    # it drops the null directions instead of letting them diverge.
+    #
+    # The relative threshold is numpy's own numerical-rank convention,
+    # n * eps (see np.linalg.matrix_rank), rather than a hand-picked
+    # constant. The previous 1e-12 was three orders more conservative
+    # than double precision and declared configurations unbounded whose
+    # bound is in fact computable: four peaks at overlap 0.3 give
+    # cond(C) = 3.5e13, where the inverse still carries a residual of
+    # 1.9e-03.
+    eig_threshold = max(eigenvalues[-1] * n_total * np.finfo(np.float64).eps, 1e-30)
+    null_mask = eigenvalues <= eig_threshold
+    eig_inv = np.where(null_mask, 0.0, 1.0 / eigenvalues)
+    corr_inv = (eigenvectors * eig_inv[np.newaxis, :]) @ eigenvectors.T
+    crlb_pseudo = np.diag(corr_inv) / d_safe ** 2
+
+    # The bound itself. [g^-1]_ii diverges for any parameter whose axis
+    # has a component in the null space: only the estimable combinations
+    # are bounded, not the individual parameters entering them. Report
+    # that as inf rather than as the pseudo-inverse diagonal, which is
+    # *smaller* than the true bound exactly where the problem is hardest.
+    crlb = crlb_pseudo.copy()
+    null_space_dim = int(null_mask.sum())
+    if null_space_dim:
+        # Squared projection of each parameter axis onto the null space,
+        # taken in the scaled coordinates where the axes are comparable.
+        null_weight = (eigenvectors[:, null_mask] ** 2).sum(axis=1)
+        unbounded = null_weight > _NULL_PROJECTION_TOL
+        crlb[unbounded] = np.inf
+    else:
+        unbounded = np.zeros(n_total, dtype=bool)
 
     # --- Step 6: Per-component CRLB and parameter names ---
     param_names = []
@@ -380,13 +602,16 @@ def compute_multipeak_fisher(
             comp_dict[name] = float(crlb[k * n_per + p])
         crlb_per_component[k] = comp_dict
 
-    # --- Step 7: Correlation matrix ---
-    diag_sqrt = np.sqrt(np.maximum(np.diag(fisher), 1e-30))
-    correlation = fisher / np.outer(diag_sqrt, diag_sqrt)
+    # Step 7 (correlation matrix) is folded into step 5: `correlation`
+    # is the metric the rank decision and the inversion are taken in,
+    # so the value reported here is exactly the one that was used.
 
     return CRLBResult(
         fisher=fisher,
         crlb=crlb,
+        crlb_pseudo=crlb_pseudo,
+        unbounded=unbounded,
+        null_space_dim=null_space_dim,
         crlb_per_component=crlb_per_component,
         condition_number=condition_number,
         eigenvalues=eigenvalues,
@@ -561,7 +786,8 @@ def print_crlb_summary(cr: CRLBResult, title: str = "") -> None:
 
     print(f"  n_comp={cr.n_comp}, mode={'4d' if cr.n_params_per_comp==4 else '3d'}")
     print(f"  Condition number: {cr.condition_number:.2e}")
-    print(f"  Eigenvalue range: [{cr.eigenvalues[0]:.2e}, {cr.eigenvalues[-1]:.2e}]")
+    print(f"  Correlation eigenvalue range: "
+          f"[{cr.eigenvalues[0]:.2e}, {cr.eigenvalues[-1]:.2e}]")
     print()
 
     # Per-component CRLB (as standard deviation = sqrt(CRLB))
@@ -737,6 +963,32 @@ def _correct_swaps_ncomp(
     return dE_corr, ds_corr, amp_corr, n_swapped
 
 
+def mean_efficiency(crlb_per: np.ndarray, rmse_per: np.ndarray) -> float:
+    """Mean over components of the per-component efficiency CRLB_k / RMSE_k^2.
+
+    An estimator that attains the bound in every component returns
+    exactly 1.0, whatever the spread of the per-component bounds.
+
+    The obvious alternative, mean_k(CRLB_k) / (mean_k RMSE_k)^2, does
+    not: it divides a mean of variances by the square of a mean of
+    standard deviations, which by Jensen is >= 1 for that same ideal
+    estimator, with equality only when the per-component bounds are all
+    equal. At sigma=0.5, gamma=0.3 that inflation reaches 1.16 for three
+    peaks at overlap 0.3 and 1.51 for five at overlap 0.5 -- largest in
+    the overlapped regime the efficiency harness exists to study.
+
+    Args:
+        crlb_per: Per-component CRLB (variance units), shape (n_comp,)
+        rmse_per: Per-component RMSE (standard-deviation units), same shape
+
+    Returns:
+        Mean per-component efficiency. Zero RMSE entries are floored
+        rather than raising, so a noiseless run returns a large finite
+        number instead of inf.
+    """
+    return float(np.mean(crlb_per / np.maximum(rmse_per ** 2, 1e-30)))
+
+
 @dataclass
 class EfficiencyResult:
     """Result of CRLB vs empirical RMSE comparison at one grid point.
@@ -746,13 +998,60 @@ class EfficiencyResult:
         overlap_ratio: Δcenter / FWHM
         snr: Signal-to-noise ratio
         crlb: CRLBResult (theoretical)
-        rmse_dE: Empirical RMSE for center shift (eV), averaged over components
-        rmse_ds: Empirical RMSE for sigma shift (eV), averaged over components
-        rmse_amp: Empirical RMSE for amplitude, averaged over components
-        efficiency_dE: CRLB[dE] / RMSE²[dE] (1.0 = theoretical limit)
-        efficiency_ds: CRLB[ds] / RMSE²[ds]
-        efficiency_amp: CRLB[amp] / RMSE²[amp]
-        n_swapped: Number of spectra with component swap correction
+        rmse_dE: Mean over components of rmse_dE_per (eV). Descriptive
+            only -- the efficiencies are not derived from it.
+        rmse_ds: Mean over components of rmse_ds_per (eV), same caveat
+        rmse_amp: Mean over components of rmse_amp_per, same caveat
+        rmse_dE_per: Per-component RMSE for center shift (eV), shape
+            (n_comp,). Oracle-matched, as below.
+        rmse_ds_per: Per-component RMSE for sigma shift (eV)
+        rmse_amp_per: Per-component RMSE for amplitude
+        efficiency_dE: mean_k(CRLB_k[dE] / RMSE_k²[dE]) -- the mean of
+            per-component efficiencies, so an ideal estimator returns
+            1.0 whether or not the per-component bounds are equal.
+
+            **This number is oracle-matched.** The RMSE behind it is
+            computed after _correct_swaps_ncomp(), which picks, per
+            spectrum, the component permutation minimising squared error
+            against the ground truth. No estimator has that information;
+            the step can only lower RMSE and raise this ratio. It is
+            kept as the primary figure because without it the RMSE at
+            high overlap is dominated by label permutation rather than
+            by estimation error, which is not what this harness is
+            measuring -- but the cost is not hidden: compare against
+            efficiency_*_unmatched, and see swap_fraction for how often
+            the permutation was actually used.
+
+            Two effects remain, and only the first is about the solver:
+
+            - *Bias.* RMSE² is Var + bias². The bias² term lowers the
+              ratio; separately, the variance of a biased estimator is
+              not bounded by the unbiased CRLB at all and can fall below
+              it. So bias alone can move the ratio either way.
+            - *Ensemble mismatch.* The CRLB is evaluated once at the
+              nominal parameters while RMSE is pooled over spectra whose
+              true parameters are drawn across +/-dE_range and
+              +/-ds_range, so the two refer to different points in
+              parameter space.
+
+            Finally, at n_spectra=10_000 the Monte Carlo error on RMSE²
+            is already of order a percent, so exact equality with 1.0 is
+            not a meaningful target.
+
+            Where the Fisher matrix is singular the bound is infinite
+            and so is this ratio. That is the correct answer -- there is
+            no efficiency to quote against an unbounded target -- and it
+            marks the grid point as non-identifiable rather than merely
+            difficult. See CRLBResult.null_space_dim.
+        efficiency_ds: same for sigma shift
+        efficiency_amp: same for amplitude
+        efficiency_dE_unmatched: efficiency_dE computed in the solver's
+            own component order, with no appeal to the ground truth. The
+            gap between the two is what the oracle step buys.
+        efficiency_ds_unmatched: same for sigma shift
+        efficiency_amp_unmatched: same for amplitude
+        n_swapped: Number of spectra whose components were permuted
+        swap_fraction: n_swapped / n_spectra
         solver_time: Solver wall time (seconds)
     """
     n_comp: int
@@ -762,10 +1061,17 @@ class EfficiencyResult:
     rmse_dE: float
     rmse_ds: float
     rmse_amp: float
+    rmse_dE_per: np.ndarray
+    rmse_ds_per: np.ndarray
+    rmse_amp_per: np.ndarray
     efficiency_dE: float
     efficiency_ds: float
     efficiency_amp: float
+    efficiency_dE_unmatched: float
+    efficiency_ds_unmatched: float
+    efficiency_amp_unmatched: float
     n_swapped: int
+    swap_fraction: float
     solver_time: float
 
 
@@ -785,10 +1091,15 @@ def compute_efficiency_point(
 ) -> EfficiencyResult:
     """Compute CRLB efficiency at a single (n_comp, overlap, SNR) point.
 
-    1. Compute theoretical CRLB (Gaussian noise model)
+    1. Compute theoretical CRLB (Gaussian noise model, hardcoded here)
     2. Generate synthetic spectra with controlled noise
     3. Run multipeak solver
     4. Compare empirical RMSE with theoretical CRLB
+
+    Read EfficiencyResult before interpreting the efficiency_* fields:
+    the RMSE in step 4 is oracle-matched against the ground truth, which
+    is not something an estimator can do. efficiency_*_unmatched is the
+    same comparison without that step.
 
     Args:
         n_comp: Number of peaks
@@ -819,7 +1130,11 @@ def compute_efficiency_point(
     e_max = centers[-1] + energy_padding * fwhm
     energy = np.linspace(e_min, e_max, n_energy, dtype=np.float32)
 
-    # Amplitude: use 1.0 (peak-normalized profiles)
+    # Amplitude 1.0 as the coefficient of a unit-area Voigt. This has to
+    # match the solver: its basis is Re[w]/(sigma*sqrt(2pi)) (see
+    # weight_cache.build_basis), the same normalisation the Fisher matrix
+    # is built from, so gt['amp'] and the recovered amplitudes are the
+    # same quantity.
     amp_val = 1.0
     amps = np.full(n_comp, amp_val)
 
@@ -831,6 +1146,7 @@ def compute_efficiency_point(
         gammas=np.full(n_comp, gamma),
         amplitudes=amps,
         energy=energy,
+        peak_normalize=False,
         snr=snr,
         dE_range=dE_range,
         ds_range=ds_range,
@@ -889,24 +1205,42 @@ def compute_efficiency_point(
         result.delta_E, result.delta_sigma, result.amplitudes, gt,
     )
 
-    # Per-component RMSE, then average
-    rmse_dE_per = np.sqrt(np.mean((dE_corr - gt['dE']) ** 2, axis=0))
-    rmse_ds_per = np.sqrt(np.mean((ds_corr - gt['ds']) ** 2, axis=0))
-    rmse_amp_per = np.sqrt(np.mean((amp_corr - gt['amp']) ** 2, axis=0))
+    def _rmse_per(est: np.ndarray, truth: np.ndarray) -> np.ndarray:
+        return np.sqrt(np.mean((est - truth) ** 2, axis=0))
+
+    # Oracle-matched: after _correct_swaps_ncomp, which uses the ground
+    # truth to choose the permutation.
+    rmse_dE_per = _rmse_per(dE_corr, gt['dE'])
+    rmse_ds_per = _rmse_per(ds_corr, gt['ds'])
+    rmse_amp_per = _rmse_per(amp_corr, gt['amp'])
+
+    # Same quantities in the solver's own component order, with no
+    # appeal to the ground truth. The gap between the two is what the
+    # oracle step buys.
+    rmse_dE_per_un = _rmse_per(result.delta_E, gt['dE'])
+    rmse_ds_per_un = _rmse_per(result.delta_sigma, gt['ds'])
+    rmse_amp_per_un = _rmse_per(result.amplitudes, gt['amp'])
 
     rmse_dE = float(np.mean(rmse_dE_per))
     rmse_ds = float(np.mean(rmse_ds_per))
     rmse_amp = float(np.mean(rmse_amp_per))
 
-    # --- Step 5: Efficiency = CRLB / RMSE² ---
-    # Average CRLB over components
-    avg_crlb_dE = np.mean([cr.crlb_per_component[k]['dE'] for k in range(n_comp)])
-    avg_crlb_ds = np.mean([cr.crlb_per_component[k]['dsigma'] for k in range(n_comp)])
-    avg_crlb_amp = np.mean([cr.crlb_per_component[k]['amp'] for k in range(n_comp)])
+    # --- Step 5: Efficiency, averaged over per-component ratios ---
+    # mean_k(CRLB_k / RMSE_k^2), not mean_k(CRLB_k) / (mean_k RMSE_k)^2:
+    # the latter divides a mean of variances by the square of a mean of
+    # standard deviations, which Jensen puts at >= 1 for an ideal
+    # estimator whenever the per-component bounds differ.
+    crlb_dE_per = np.array([cr.crlb_per_component[k]['dE'] for k in range(n_comp)])
+    crlb_ds_per = np.array([cr.crlb_per_component[k]['dsigma'] for k in range(n_comp)])
+    crlb_amp_per = np.array([cr.crlb_per_component[k]['amp'] for k in range(n_comp)])
 
-    eff_dE = float(avg_crlb_dE / max(rmse_dE ** 2, 1e-30))
-    eff_ds = float(avg_crlb_ds / max(rmse_ds ** 2, 1e-30))
-    eff_amp = float(avg_crlb_amp / max(rmse_amp ** 2, 1e-30))
+    eff_dE = mean_efficiency(crlb_dE_per, rmse_dE_per)
+    eff_ds = mean_efficiency(crlb_ds_per, rmse_ds_per)
+    eff_amp = mean_efficiency(crlb_amp_per, rmse_amp_per)
+
+    eff_dE_un = mean_efficiency(crlb_dE_per, rmse_dE_per_un)
+    eff_ds_un = mean_efficiency(crlb_ds_per, rmse_ds_per_un)
+    eff_amp_un = mean_efficiency(crlb_amp_per, rmse_amp_per_un)
 
     return EfficiencyResult(
         n_comp=n_comp,
@@ -916,10 +1250,17 @@ def compute_efficiency_point(
         rmse_dE=rmse_dE,
         rmse_ds=rmse_ds,
         rmse_amp=rmse_amp,
+        rmse_dE_per=rmse_dE_per,
+        rmse_ds_per=rmse_ds_per,
+        rmse_amp_per=rmse_amp_per,
         efficiency_dE=eff_dE,
         efficiency_ds=eff_ds,
         efficiency_amp=eff_amp,
+        efficiency_dE_unmatched=eff_dE_un,
+        efficiency_ds_unmatched=eff_ds_un,
+        efficiency_amp_unmatched=eff_amp_un,
         n_swapped=n_swapped,
+        swap_fraction=float(n_swapped) / max(n_spectra, 1),
         solver_time=solver_time,
     )
 

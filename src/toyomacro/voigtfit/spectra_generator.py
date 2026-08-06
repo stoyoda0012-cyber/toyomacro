@@ -8,9 +8,8 @@ real imaging XPS conditions.
 Workflow:
     Original Image → Color Decomposition → Voigt Spectra + Noise → H5 Files
 
-Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback (line 3744)
+Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback
 and NoiseGenerator.m
-Date: 2026-01-22
 """
 
 import time
@@ -28,7 +27,7 @@ try:
     import mlx.core as mx
 
     from ._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -134,8 +133,8 @@ class ElementPreset:
 # Built-in Presets
 # ============================================================================
 
-FUJI_PRESET = ElementPreset(
-    name='fuji',
+DEMO_PRESET = ElementPreset(
+    name='demo',
     elements=[
         ElementSpec('Si', '1s', 1839.1, gaussian_fwhm=1.0, lorentzian_fwhm=0.25),   # Si(0)
         ElementSpec('Si', '1s', 1843.8, gaussian_fwhm=1.0, lorentzian_fwhm=0.25),   # Si(+4)
@@ -160,7 +159,7 @@ FUJI_PRESET = ElementPreset(
 )
 
 # Preset registry
-_PRESETS: dict[str, ElementPreset] = {'fuji': FUJI_PRESET}
+_PRESETS: dict[str, ElementPreset] = {'demo': DEMO_PRESET}
 
 
 def register_element_preset(preset: ElementPreset) -> None:
@@ -172,7 +171,7 @@ def get_element_preset(name: str) -> ElementPreset:
     """Get a registered element preset by name.
 
     Args:
-        name: Preset name (e.g., 'fuji')
+        name: Preset name (e.g., 'demo')
 
     Returns:
         ElementPreset
@@ -228,7 +227,7 @@ class SpectralConfig:
     """
     Spectral generation parameters with strict defaults.
 
-    Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback (line 3744-3894)
+    Based on MATLAB DepthProfiler.m SaveAngleProfileSpectra_Callback
     and ToyomacroSchema definitions.
 
     Default values selected for:
@@ -778,7 +777,7 @@ def decompose_image_to_amplitudes(
     """
     Decompose RGB image to element amplitudes using color mapping.
 
-    Based on MATLAB DepthProfiler.m line 3911-3950
+    Based on MATLAB DepthProfiler.m.
 
     Args:
         image: (H, W, 3) RGB image, values 0-255 or 0-1
@@ -839,7 +838,7 @@ class SpectraGenerator:
             output_dir='/path/to/output',
             image_path='/path/to/image.jpg',
         )
-        generator.configure_fuji_elements()
+        generator.configure_demo_elements()
         generator.generate(noise_config=NoiseConfig(poisson_level=1e3))
     """
 
@@ -882,16 +881,16 @@ class SpectraGenerator:
 
         print(f"Loaded image: {self.width} x {self.height} ({self.n_pixels:,} pixels)")
 
-    def configure_elements(self, preset: Union[str, 'ElementPreset'] = 'fuji') -> None:
+    def configure_elements(self, preset: Union[str, 'ElementPreset'] = 'demo') -> None:
         """
         Configure element specs, color mapping, and component order.
 
         Args:
-            preset: Preset name (e.g., 'fuji') or an ElementPreset object.
-                    Default is 'fuji' (6-component Si/Ti/Al/C/O mapping).
+            preset: Preset name (e.g., 'demo') or an ElementPreset object.
+                    Default is 'demo' (6-component Si/Ti/Al/C/O mapping).
 
         Example:
-            generator.configure_elements('fuji')           # built-in preset
+            generator.configure_elements('demo')           # built-in preset
             generator.configure_elements(my_custom_preset) # custom ElementPreset
         """
         if isinstance(preset, str):
@@ -903,12 +902,12 @@ class SpectraGenerator:
 
         print(f"Configured {len(self.elements)} element components (preset: {preset.name})")
 
-    def configure_fuji_elements(self) -> None:
-        """Configure for Fuji 8K test data with standard 6 components.
+    def configure_demo_elements(self) -> None:
+        """Configure the built-in 6-component demo preset.
 
-        Backward-compatible wrapper around configure_elements('fuji').
+        Backward-compatible wrapper around configure_elements('demo').
         """
-        self.configure_elements('fuji')
+        self.configure_elements('demo')
 
     def _create_output_dir(self, noise_config: NoiseConfig) -> Path:
         """Create output directory with noise info in name."""
@@ -1450,7 +1449,7 @@ def generate_noise_sweep(
             image_path=image_path,
             project_name=project_name,
         )
-        generator.configure_fuji_elements()
+        generator.configure_demo_elements()
 
         output_path = generator.generate(
             noise_config=noise_config,
@@ -1568,7 +1567,7 @@ def generate_with_noise_levels(
             project_name=project_name,
             config=gen_config,
         )
-        generator.configure_fuji_elements()
+        generator.configure_demo_elements()
 
         # Generate (files go directly into noise_dir, not a subdirectory)
         generator.generate(
@@ -1595,7 +1594,7 @@ def create_prj_file(
     """
     Create MATLAB .prj file for compatibility.
 
-    Based on DepthProfiler.m line 4396-4401
+    Based on DepthProfiler.m.
 
     Args:
         output_dir: Output directory
@@ -1657,7 +1656,7 @@ if __name__ == '__main__':
             output_dir=args.output,
             image_path=args.image,
         )
-        generator.configure_fuji_elements()
+        generator.configure_demo_elements()
 
         output_path = generator.generate(noise_config=noise_config)
         print(f"\nOutput: {output_path}")

@@ -3,7 +3,8 @@
 Demonstrates the bundled reference data in ``toyomacro.data``:
 
 - ``BindingEnergy``  — core-level binding energies
-- ``CrossSection``   — Scofield photoionization cross-sections
+- ``CrossSection``   — photoionization cross-sections (package default
+                       table: Yeh & Lindau 1985)
 - ``IMFP``           — TPP-2M inelastic mean free path
 
 A SiO2 sample (true O/Si = 2.0) is forward-modelled: the "measured"
@@ -12,12 +13,38 @@ The composition is then recovered at increasing correction levels,
 
 - Level 0:   raw area ratio
 - Level 1:   / sigma           (cross-section)
-- Level 1.5: / (sigma*lambda)  (+ IMFP; AMRSF-equivalent)
+- Level 1.5: / (sigma*lambda)  (+ IMFP)
 
-for both a lab source (Al Ka) and a HAXPES source (Ga Ka). The
-analyzer transmission correction T(KE/Ep) is also available
-(``toyomacro.data.transmission``) but requires vendor data files that
-are not bundled.
+for both a lab source (Al Ka) and a HAXPES source (Ga Ka).
+
+sigma*lambda is an *intrinsic* sensitivity, **not** a complete AMRSF and
+not an instrument-specific sensitivity factor. It omits analyzer
+transmission, detector response, elastic-scattering / EAL corrections,
+the photoelectron angular distribution, x-ray polarization and the
+source/analyzer geometry — hence "Level 1.5" rather than a level number
+implying the chain is finished. An analyzer transmission adapter exists
+(``toyomacro.data.transmission``) but the vendor curves it reads are
+instrument-specific and are not bundled; it is deliberately not used
+here. If you do use it, apply T either to the spectrum or to the
+sensitivity, never to both.
+
+Note on the IMFP. Tanuma, Powell & Penn fit TPP-2M over 50-2000 eV and
+state it should not be used above 2000 eV, so the ~8-9 keV Ga Ka values
+here are extrapolations, and in the non-relativistic form at that (see
+``docs/API.md``). This matters more than it may look: sigma cancels
+identically once both lines are divided by it, so **Level 1 is nothing
+but 2 x lambda_O/lambda_Si** — the IMFP is its sole driver, not a minor
+correction. Level 1.5 then returns 2.0 because lambda cancels too, up to
+the 1% per-line noise injected below (which does not cancel: the printed
+values are 1.973 and 2.004, not 2.000); that is arithmetic, not evidence
+that the IMFPs are right. The
+figure shows how the correction *chain* behaves, not that HAXPES IMFPs
+from TPP-2M are validated.
+
+The forward model is deliberately circular — areas are built from
+n * sigma * lambda and then divided by the same sigma * lambda — so
+Level 1.5 recovering the input stoichiometry demonstrates that the
+bookkeeping is self-consistent, and nothing about physical accuracy.
 
 Run from the repository root::
 
@@ -98,7 +125,21 @@ def main():
     ax.set_xticks(x)
     ax.set_xticklabels(levels, fontsize=9)
     ax.set_ylabel("recovered O/Si atomic ratio")
-    ax.set_title("SiO2 quantification vs. correction level")
+    ax.set_title(
+        "SiO2 quantification vs. correction level\n"
+        "synthetic: areas built from the same sigma and lambda used to "
+        "correct them",
+        fontsize=10,
+    )
+    ax.text(
+        0.5, -0.16,
+        "Level 1 is 2 x lambda_O/lambda_Si (sigma cancels); Level 1.5 "
+        "returns 2.0 by construction, up to the 1% injected noise.\n"
+        "Ga Ka lambda values are TPP-2M extrapolated beyond its "
+        "50-2000 eV fitted range.",
+        transform=ax.transAxes, ha="center", va="top", fontsize=7.5,
+        color="0.35",
+    )
     ax.legend(fontsize=9)
     fig.tight_layout()
 

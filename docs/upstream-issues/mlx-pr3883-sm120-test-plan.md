@@ -4,6 +4,14 @@ Verifies the CUDA half of ml-explore/mlx#3883 (one-time TF32 warning),
 which the author could only compile-check (no NVIDIA hardware). We
 promised this run in ml-explore/mlx#3860.
 
+**Outcome (2026-08-03): ml-explore/mlx#3883 was closed unmerged.** Not
+on technical grounds — none of the verification below was disputed —
+but on policy: warning on TF32 was judged not to be common practice,
+with documentation and a programmable switch preferred instead. The
+measurements here stand as a record of what was run and found; they are
+not a description of current MLX behaviour, and nothing in this
+repository depends on the warning existing.
+
 ## Review summary (Mac-side code read, 2026-07-19)
 
 Design is sound: every call site reorders the existing short-circuit

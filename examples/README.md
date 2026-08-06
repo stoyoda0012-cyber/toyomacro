@@ -23,3 +23,15 @@ python examples/04_projection_law_validation.py   # ~1-2 min
 All examples run on the pure-numpy backend. Installing the `mlx` extra
 (`pip install toyomacro[mlx]`) accelerates example 02 on Apple Silicon,
 same code.
+
+## Data
+
+Nothing to download: every script above synthesizes its own data, so a
+fresh clone runs them as-is. If you want a data *file* — to exercise the
+readers, or to see the layout the batch pipeline expects — generate the
+small synthetic pair described in
+[`data/README.md`](data/README.md):
+
+```bash
+python examples/data/make_example_data.py
+```

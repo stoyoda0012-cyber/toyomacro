@@ -197,10 +197,16 @@ class Stage2Refiner:
             residuals = Y_anomaly - Y_fit
             residual_norms = np.linalg.norm(residuals, axis=0)
 
-            # Check convergence (global)
-            rel_change = np.abs(prev_residual_norm - residual_norms) / (prev_residual_norm + 1e-10)
-            if np.median(rel_change) < self.config.tol and iteration > 0:
-                break
+            # Check convergence (global). Skipped on the first pass for
+            # the same reason as the scalar path in gauss_newton.py: the
+            # inf sentinel would make every ratio nan.
+            if iteration > 0:
+                rel_change = (
+                    np.abs(prev_residual_norm - residual_norms)
+                    / (prev_residual_norm + 1e-10)
+                )
+                if np.median(rel_change) < self.config.tol:
+                    break
             prev_residual_norm = residual_norms
 
             # Build Jacobian and compute updates for each spectrum

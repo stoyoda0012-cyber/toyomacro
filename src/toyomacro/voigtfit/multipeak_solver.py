@@ -39,7 +39,7 @@ try:
     import mlx.core as mx
 
     from ._mlx_support import mlx_usable as _mlx_usable
-    HAS_MLX = _mlx_usable()  # installed AND a Metal device works
+    HAS_MLX = _mlx_usable()  # installed AND the default device can execute work
 except ImportError:
     HAS_MLX = False
 
@@ -3257,7 +3257,8 @@ def process_multipeak(
 
 
 # ---------------------------------------------------------------------------
-# 2-Stage γ-calibrated multi-peak solver
+# Two-phase γ-calibrated multi-peak solver (Dict3D → Dict2D).
+# Unrelated to the Stage 1 / Stage 2 screening pipeline.
 # ---------------------------------------------------------------------------
 
 

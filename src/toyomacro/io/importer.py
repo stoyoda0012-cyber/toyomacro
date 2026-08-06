@@ -50,7 +50,7 @@ class ImportConfig:
     compress: bool = True  # apply uint16+LZ4 compression
     sweep_mode: str = "individual"  # individual|integrate
     region_name_override: str | None = None  # override region name for filename
-    # /provenance opt-ins (docs/hdf5_provenance_phase_b1_design.md §3, §7).
+    # /provenance opt-ins (provenance design note §3, §7 — see CONTRIBUTING).
     # The group itself is always written; these gate privacy-sensitive parts.
     persist_datetime: bool = False  # acquisition datetime is an indirect identifier
     persist_vendor_metadata: bool = False

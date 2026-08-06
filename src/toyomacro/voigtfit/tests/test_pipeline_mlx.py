@@ -1,6 +1,9 @@
 """
-LEGACY: Stage 2 MLX integration tests.
-Will be removed when Stage 2 (Gauss-Newton) is fully deprecated.
+MLX integration tests for the legacy compatibility fallback (Stage 2).
+
+These cover the Gauss-Newton path that `HybridPipeline` runs on
+anomalous spectra. It is retained for backward compatibility and may
+change in a future release; these tests would go with it.
 
 Verifies:
 1. MLX Stage 2 is automatically used when available

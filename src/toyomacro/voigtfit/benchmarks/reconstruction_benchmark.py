@@ -9,7 +9,6 @@ Workflow:
                         (MATLAB/DepthProfiler)   (This module)   (This module)
                                 ↓
                          Noise injection, etc.
-Date: 2026-01-22
 """
 
 import time
@@ -24,7 +23,7 @@ from ..image_utils import (
     PSNRResult,
     amplitudes_to_rgb,
     compare_images,
-    get_fuji_color_mapping,
+    get_demo_color_mapping,
     load_image,
     save_image,
 )
@@ -217,15 +216,15 @@ class ReconstructionBenchmark:
                     side = int(np.sqrt(n_spectra))
                     self.image_shape = (side, side)
 
-    def configure_fuji_8k(self) -> None:
+    def configure_demo_8k(self) -> None:
         """
-        Configure for Fuji 8K test data with standard settings.
+        Configure for the 6-component demo preset with standard settings.
         """
         element_files = ['Si1s', 'Ti1s', 'Al1s', 'C1s', 'O1s']
         self.configure_elements_from_fitpara(element_files)
 
-        # Set color mapping for Fuji data
-        self.color_mapping, self.component_order = get_fuji_color_mapping()
+        # Set color mapping for the demo preset
+        self.color_mapping, self.component_order = get_demo_color_mapping()
         self.image_shape = (4320, 7680)  # 8K
 
     def run(
@@ -307,7 +306,7 @@ class ReconstructionBenchmark:
 
         # Generate reconstructed image
         if self.color_mapping is None or self.component_order is None:
-            self.color_mapping, self.component_order = get_fuji_color_mapping()
+            self.color_mapping, self.component_order = get_demo_color_mapping()
 
         reconstructed = amplitudes_to_rgb(
             amplitudes=amplitudes,
@@ -339,36 +338,6 @@ class ReconstructionBenchmark:
             reconstructed_image=reconstructed,
             element_results={'amplitudes': amplitudes},
         )
-
-    def run_with_noise(
-        self,
-        noise_levels: list[float] = [0.0, 0.01, 0.05, 0.1],
-        verbose: bool = True,
-    ) -> dict[float, BenchmarkResult]:
-        """
-        Run benchmark with different noise levels.
-
-        Note: This requires re-generating spectra with noise,
-        which is done in MATLAB (SaveAngleProfileSpectra_Callback).
-        This method is a placeholder for future integration.
-
-        Args:
-            noise_levels: List of noise levels (fraction of signal)
-            verbose: Print progress
-
-        Returns:
-            Dict mapping noise_level to BenchmarkResult
-        """
-        # TODO: Integrate with MATLAB noise injection
-        # For now, just run the baseline
-        results = {}
-
-        if verbose:
-            print("Note: Noise injection requires MATLAB integration.")
-            print("Running baseline (noise_level=0) only.\n")
-
-        results[0.0] = self.run(verbose=verbose)
-        return results
 
     def save_result(
         self,
@@ -413,13 +382,13 @@ class ReconstructionBenchmark:
         print("\n" + "=" * 70)
 
 
-def run_fuji_benchmark(
+def run_demo_benchmark(
     project_dir: str | None = None,
     project_name: str = '250820OCAlTiSi',
     save_output: bool = True,
 ) -> BenchmarkResult:
     """
-    Convenience function to run Fuji 8K benchmark.
+    Convenience function to run the 8K reconstruction benchmark.
 
     Args:
         project_dir: Path to SpeedTest directory
@@ -435,18 +404,29 @@ def run_fuji_benchmark(
     else:
         project_dir = Path(project_dir)
 
+    from ._data_paths import find_default_image
+
+    original = find_default_image(project_dir)
+    if original is None:
+        raise SystemExit(
+            f'No source image found in {project_dir} — place the '
+            'benchmark image there or pass project_dir explicitly.'
+        )
+    # Optional MATLAB reference: any '*Color*.png' in the project dir.
+    matlab_ref = next(iter(sorted(project_dir.glob('*Color*.png'))), None)
+
     benchmark = ReconstructionBenchmark(
         project_dir=project_dir,
         project_name=project_name,
-        original_image_path=project_dir / 'churei-tower-mount-fuji-in-japan-8k-68-7680x4320.jpg',
-        matlab_image_path=project_dir / 'Fuji_8K_Color.png',
+        original_image_path=original,
+        matlab_image_path=matlab_ref,
     )
 
-    benchmark.configure_fuji_8k()
+    benchmark.configure_demo_8k()
     result = benchmark.run(verbose=True)
 
     if save_output:
-        output_path = project_dir / 'Fuji_8K_VoigtFit_benchmark.png'
+        output_path = project_dir / f'{project_name}_voigtfit_benchmark.png'
         benchmark.save_result(result, output_path)
         print(f"\nSaved: {output_path}")
 
@@ -455,4 +435,4 @@ def run_fuji_benchmark(
 
 
 if __name__ == '__main__':
-    run_fuji_benchmark()
+    run_demo_benchmark()

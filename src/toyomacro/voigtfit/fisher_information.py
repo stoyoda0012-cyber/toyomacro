@@ -56,7 +56,17 @@ class FisherResult:
         correlation: Correlation matrix r_ij = g_ij / sqrt(g_ii * g_jj)
         eigenvalues: Eigenvalues in ascending order
         eigenvectors: Corresponding eigenvectors (columns)
-        condition_number: lambda_max / lambda_min
+        condition_number: lambda_max / lambda_min **of the raw Fisher
+            matrix**. That matrix mixes units -- amplitude in area
+            units, dE and dsigma in eV -- so this number moves with the
+            amplitude parameterisation and is not an indicator of
+            identifiability: rescaling A -> cA sends g -> D g D with D
+            diagonal, which is not a similarity transform. Note that
+            `crlb.CRLBResult.condition_number` carries the same name but
+            is taken on `correlation`, which is invariant under that
+            rescaling; the two are not comparable. `amplitude_sweep()`
+            returns this quantity against an amplitude axis, so its
+            variation there is partly the unit changing.
         param_names: Parameter labels
         params: Dictionary of parameter values used
     """

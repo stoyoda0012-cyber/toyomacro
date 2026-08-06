@@ -12,7 +12,8 @@ satellite) biases the fitted center:
 where s_t = a0 * dv/dt is the center-sensitivity vector, P_a the (regularized,
 possibly constrained) hat matrix of the linear subproblem, and g''_tt the
 profiled Fisher information of the center. The law and its derivation are given
-in the companion paper [REF: IP companion, in preparation]; this example
+in a companion theoretical manuscript (in preparation; reference will be added
+when a preprint is available); this example
 validates it numerically on voigtfit's own Voigt basis, at three levels:
 
   level 1  analytic ridge inner solve, bounds inactive        -> slope ~ 1
@@ -27,10 +28,11 @@ the amplitudes while null-complement components leak to the center, and
 non-identifiable below the Voigt FWHM (an identifiability certificate, not a
 bias estimate).
 
-Level 3 caveat, stated precisely: VarProFitter's estimator class (ridge-free
-variable projection with sigma co-fit) matches the law's assumptions, which is
-why it reproduces the law at production precision; production solvers with
-different regularizers (e.g. an L1 penalty) are only directionally described.
+Level 3 caveat, stated precisely: VarProFitter's estimator class (effectively
+unregularized variable projection with sigma co-fit; numerical Tikhonov floor
+lambda=1e-8) matches the law's assumptions, which is why it reproduces the law
+at production precision; production solvers with different regularizers (e.g.
+an L1 penalty) are only directionally described.
 
 Deterministic (seed=42). Output: examples/output/04_projection_law_* and a
 tracked copy of the figure in docs/figures/.
@@ -314,8 +316,9 @@ def main():
         out['level3'] = dict(solver='toyomacro.voigtfit.VarProFitter (production)',
                              clean_center=t3_clean, eps=(EPS_SWEEP * 10).tolist(),
                              pred=pred3, num=num3, slope=sl3, r2=r23,
-                             note='different estimator (no ridge, sigma co-fit, no bg '
-                                  'columns): directionally correct, scale not calibrated')
+                             note='production estimator (effectively unregularized inner '
+                                  'solve, sigma co-fit, no bg columns): reproduces the '
+                                  'law at production precision, slope ~ 1')
         print(f"L3 (production VarPro): slope={sl3:.3f} R2={r23:.4f}")
     # sanity gates (loose, cross-platform BLAS tolerant) -- CI smoke doubles
     # as a numerical regression guard on the law itself

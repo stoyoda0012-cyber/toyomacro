@@ -10,10 +10,9 @@ Converts HDF5 files to optimal layout for VoigtFit:
 - Metadata preservation
 
 Usage:
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5 --compress lzf
-    python -m voigtfit.tools.repack_h5 input.h5 --inplace  # Dangerous!
-Date: 2026-01-23
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5 --compress lzf
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 --inplace  # Dangerous!
 """
 
 import argparse
@@ -409,19 +408,19 @@ def main():
         epilog="""
 Examples:
     # Basic repack (float64 -> float32, optimal chunks)
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5
 
     # With lzf compression (fast)
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5 --compress lzf
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5 --compress lzf
 
     # With gzip compression (smaller files)
-    python -m voigtfit.tools.repack_h5 input.h5 output.h5 --compress gzip --level 6
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 output.h5 --compress gzip --level 6
 
     # Analyze file only
-    python -m voigtfit.tools.repack_h5 input.h5 --analyze
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 --analyze
 
     # In-place repack (creates backup)
-    python -m voigtfit.tools.repack_h5 input.h5 --inplace
+    python -m toyomacro.voigtfit.tools.repack_h5 input.h5 --inplace
         """
     )
     parser.add_argument('input', help='Input HDF5 file')

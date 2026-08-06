@@ -102,6 +102,14 @@ def _environment() -> dict:
             env[dist] = md.version(dist)
         except Exception:
             env[dist] = None
+    # An installed MLX does not imply an accelerated run: the GPU path is
+    # off when the default device fails the probe, or when the user
+    # forces the NumPy backend.  Record both so a reader can tell which
+    # happened.
+    from .._mlx_support import mlx_usable
+    env['mlx_usable'] = mlx_usable()
+    env['TOYOMACRO_DISABLE_MLX'] = os.environ.get(
+        'TOYOMACRO_DISABLE_MLX') or None
     try:
         env['cpu'] = subprocess.run(
             ['sysctl', '-n', 'machdep.cpu.brand_string'],
@@ -208,6 +216,29 @@ def _mlx_active() -> bool:
     return mlx_usable()
 
 
+def _backend_label() -> str:
+    """Name the backend that actually ran: ``mlx (<device type>)`` or
+    ``numpy (CPU)``.
+
+    Records what MLX reports rather than assuming Apple Silicon, because
+    MLX has more than one GPU backend (see ``docs/CUDA_BACKEND_POC.md``)
+    and a provenance record that hardcodes the vendor is wrong the first
+    time it is generated somewhere else.
+
+    Note this does **not** identify the vendor: MLX reports only a device
+    type, so an accelerated run is labelled ``mlx (gpu)`` on Metal and on
+    CUDA alike. The surrounding ``env`` block is what distinguishes them
+    — it carries ``os``, ``machine``, ``cpu`` and the ``mlx`` version.
+    """
+    if not _mlx_active():
+        return 'numpy (CPU)'
+    try:
+        import mlx.core as mx
+        return f'mlx ({str(mx.default_device().type).split(".")[-1]})'
+    except Exception:
+        return 'mlx (GPU)'
+
+
 def bench_dict2d_parabola(energy, Y, truth, n_common: int,
                           repeats: int = 5) -> dict:
     t0 = time.perf_counter()
@@ -230,8 +261,7 @@ def bench_dict2d_parabola(energy, Y, truth, n_common: int,
     return {
         'solver': 'dict2d_parabola',
         'problem': 'amplitude + dE + dsigma (gamma fixed)',
-        'backend': ('mlx (Apple Silicon GPU)' if _mlx_active()
-                    else 'numpy (CPU)'),
+        'backend': _backend_label(),
         'n_spectra': n,
         'setup_s': round(setup_s, 4),
         'repeats': repeats,

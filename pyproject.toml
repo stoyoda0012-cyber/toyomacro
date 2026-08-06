@@ -97,6 +97,11 @@ exclude = [
 # can leak into an sdist built from a development tree. Release builds
 # must run from a clean clone; the explicit excludes below are the
 # second line of defense, and CI asserts the archive contents.
+#
+# AGENTS.md and CLAUDE.md are tracked in git but are repository
+# instructions, not package content, so they are excluded here rather
+# than by .gitignore. Dropping either line breaks the CI archive
+# assertion.
 exclude = [
     "src/toyomacro/gui",
     "src/toyomacro/api",
@@ -107,9 +112,14 @@ exclude = [
     "web",
     ".codex",
     "AGENTS.md",
+    "CLAUDE.md",
     "docs/JOSS_IMPLEMENTATION_BRIEF.md",
     "CLAUDE.local.md",
     "*.local.md",
+    # Untracked maintainer notes: handoffs, release-note drafts, API
+    # specs. .gitignore'd, so a clean-clone build never sees them — but
+    # a build from a development tree relies on nothing else.
+    "_internal",
 ]
 
 [tool.ruff]

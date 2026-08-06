@@ -13,10 +13,9 @@ Measures:
 - Memory allocation overhead
 
 Usage:
-    python -m voigtfit.scripts.bench_io_minimal data.h5
-    python -m voigtfit.scripts.bench_io_minimal --synthetic 10000000
-    python -m voigtfit.scripts.bench_io_minimal --synthetic 10000000 --dtype float64
-Date: 2026-01-23
+    python -m toyomacro.voigtfit.scripts.bench_io_minimal data.h5
+    python -m toyomacro.voigtfit.scripts.bench_io_minimal --synthetic 10000000
+    python -m toyomacro.voigtfit.scripts.bench_io_minimal --synthetic 10000000 --dtype float64
 """
 
 import argparse

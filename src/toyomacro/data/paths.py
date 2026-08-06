@@ -1,10 +1,10 @@
 """
-Data path resolution and JSON cache management.
+Data path resolution and bundled-table loading.
 
 Handles:
-- Common/data/ CSV source location
-- JSON cache generation and loading
-- Environment variable overrides
+- locating the bundled reference tables under ``_cache/``
+- the opt-in path that rebuilds one from a local CSV source
+- environment variable overrides
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from __future__ import annotations
 import csv
 import json
 import os
+import warnings
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +21,12 @@ from typing import Any
 # paths.py → data/ → toyomacro/ → src/ → toyomacro/ → SourceCode/ → Common/
 _DEFAULT_COMMON_PATH = Path(__file__).parent.parent.parent.parent.parent / "Common"
 
-# Cache directory inside the package.
-# These JSON files are regenerable (see regenerate_cache()) from the source
-# CSV/Excel tables in the sibling Common/ and SESSAAnalyser/ repos, but are
-# committed here as a pre-generated cache so the package works offline without
-# those sources. Treat them as build artifacts, not hand-edited data.
+# Bundled reference tables. The directory name is historical: these JSON
+# files are shipped, reviewed data, documented in docs/DATA_SOURCES.md and
+# pinned by tests -- not build artifacts. The CSV/Excel sources they were
+# built from are not part of this repository and have diverged since, so
+# rebuilding one (see regenerate_cache()) changes a reference dataset and
+# is gated behind REGENERATE_ENV_VAR rather than happening on demand.
 _CACHE_DIR = Path(__file__).parent / "_cache"
 
 
@@ -237,58 +240,108 @@ def _csv_to_json_cross_section(csv_path: Path) -> dict[str, Any]:
     return {"photon_energies": photon_energies, "data": data}
 
 
-def load_binding_energy_data() -> dict[str, Any]:
-    """Load binding energy data, using cache if available."""
-    cache_file = get_cache_dir() / "binding_energy.json"
+#: Env var that permits rebuilding a shipped table from a local CSV.
+#: Unset (the normal case), a missing table is an error rather than a
+#: silent rebuild — see :func:`_load_shipped_table`.
+REGENERATE_ENV_VAR = "TOYOMACRO_REGENERATE_DATA"
 
-    # Try cache first
+
+def _load_shipped_table(
+    cache_name: str,
+    csv_name: str,
+    converter: Callable[[Path], dict[str, Any]],
+) -> dict[str, Any]:
+    """Load one bundled reference table from ``_cache/``.
+
+    The files under ``_cache/`` are named "cache" for historical reasons
+    but are **shipped reference data**: reviewed, documented in
+    ``docs/DATA_SOURCES.md``, and pinned by tests. The CSV sources they
+    were built from are not part of this repository, are not shipped,
+    and have since moved on independently.
+
+    So a missing table is not rebuilt on the quiet. Doing that would let
+    a table be replaced by whatever a local CSV happens to contain, with
+    no review — the change that most needs one. It is not hypothetical:
+    on the maintainer's machine, rebuilding ``compounds.json`` from the
+    current CSV yields 166 entries rather than 109, drops ``Si3N4``
+    (split there into two phases under different names), and moves the
+    parameters of Al2O3, GaAs, SiC and SiO2.
+
+    Set :data:`REGENERATE_ENV_VAR` to opt in. The result is unreviewed
+    by construction, so it is written where it will be seen in a diff
+    rather than returned silently.
+
+    Raises:
+        FileNotFoundError: if the table is missing and regeneration was
+            not requested.
+    """
+    cache_file = get_cache_dir() / cache_name
+
     if cache_file.exists():
         with open(cache_file, encoding="utf-8") as f:
             return json.load(f)
 
-    # Generate from CSV
-    csv_path = get_common_data_path() / "BindingEnergyTable.csv"
-    data = _csv_to_json_binding_energy(csv_path)
+    if not os.environ.get(REGENERATE_ENV_VAR):
+        raise FileNotFoundError(
+            f"Bundled reference table {cache_name} is missing from "
+            f"{get_cache_dir()}. It ships with this package and is not a "
+            f"disposable cache; restore it (e.g. `git checkout` the file, or "
+            f"reinstall). To rebuild it instead from a local "
+            f"{csv_name} — which may not hold the same values, and which "
+            f"changes a reference dataset without review — set "
+            f"{REGENERATE_ENV_VAR}=1."
+        )
 
-    # Save to cache
+    warnings.warn(
+        f"Rebuilding {cache_name} from {csv_name}. The result is unreviewed "
+        f"and may differ from the reference table this package ships; "
+        f"check the diff before committing it.",
+        UserWarning,
+        stacklevel=3,
+    )
+    data = converter(get_common_data_path() / csv_name)
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
-
     return data
+
+
+def load_binding_energy_data() -> dict[str, Any]:
+    """Load the bundled elemental binding-energy table."""
+    return _load_shipped_table(
+        "binding_energy.json", "BindingEnergyTable.csv", _csv_to_json_binding_energy
+    )
 
 
 def load_compound_data() -> dict[str, Any]:
-    """Load compound data, using cache if available."""
-    cache_file = get_cache_dir() / "compounds.json"
+    """Load the bundled compound/element property table."""
+    return _load_shipped_table(
+        "compounds.json", "CompoundTable.csv", _csv_to_json_compounds
+    )
 
-    if cache_file.exists():
-        with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
 
-    csv_path = get_common_data_path() / "CompoundTable.csv"
-    data = _csv_to_json_compounds(csv_path)
+def load_compound_provenance() -> dict[str, Any]:
+    """Load the per-field provenance for the compound table.
 
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    return data
+    Hand-authored, never rebuilt from a CSV: the CSV sources carry no
+    provenance, so a rebuild would silently drop it.
+    """
+    provenance_file = get_cache_dir() / "compounds_provenance.json"
+    if not provenance_file.exists():
+        raise FileNotFoundError(
+            f"Bundled provenance table compounds_provenance.json is missing "
+            f"from {get_cache_dir()}. It ships with this package and is "
+            f"hand-authored -- there is no source to rebuild it from. Restore "
+            f"it (e.g. `git checkout` the file, or reinstall)."
+        )
+    with open(provenance_file, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def load_cross_section_data() -> dict[str, Any]:
-    """Load cross section data, using cache if available."""
-    cache_file = get_cache_dir() / "cross_section.json"
-
-    if cache_file.exists():
-        with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
-
-    csv_path = get_common_data_path() / "CrossSectionTable_Yeh=Lindau.csv"
-    data = _csv_to_json_cross_section(csv_path)
-
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    return data
+    """Load the bundled Yeh & Lindau cross-section table."""
+    return _load_shipped_table(
+        "cross_section.json", "CrossSectionTable_Yeh=Lindau.csv", _csv_to_json_cross_section
+    )
 
 
 def _get_trzh2018_xlsx_path() -> Path:
@@ -612,18 +665,109 @@ def load_trzh2019_data() -> dict[str, Any]:
     return data
 
 
-def clear_cache():
-    """Clear all cached JSON files."""
+def clear_cache() -> None:
+    """Refuse to delete the bundled tables. Kept so the name still resolves.
+
+    This used to unlink every ``*.json`` under ``_cache/``. Those files
+    are the package's shipped reference data — see
+    ``docs/DATA_SOURCES.md`` — so the operation had no correct use: it
+    destroyed reviewed data, and two of the tables it removed
+    (``scofield.json``, ``trzhaskovskaya.json``) were not rebuilt by
+    :func:`regenerate_cache` at all, leaving cross-section lookups to
+    fall back to an empty table.
+
+    Raises:
+        RuntimeError: always.
+    """
+    raise RuntimeError(
+        "clear_cache() would delete this package's bundled reference tables, "
+        "not a cache. They ship with the package, are documented in "
+        "docs/DATA_SOURCES.md, and are pinned by tests. To rebuild them from "
+        f"local CSV/XLSX sources, set {REGENERATE_ENV_VAR}=1 and call "
+        "regenerate_cache(), which writes in place and never deletes first."
+    )
+
+
+def regenerate_cache() -> dict[str, str]:
+    """Rebuild the bundled tables in place from their local sources.
+
+    Requires :data:`REGENERATE_ENV_VAR` to be set: rebuilding replaces a
+    reference dataset with an unreviewed one, which the project treats as
+    a change needing an independent audit, not a side effect.
+
+    Nothing is deleted first. A table whose source is unavailable keeps
+    the shipped copy and is reported as skipped, so a partial rebuild
+    cannot leave the package with missing data.
+
+    Returns:
+        Mapping of table filename to ``"rebuilt"`` or a reason it was
+        skipped.
+
+    Raises:
+        RuntimeError: if the opt-in is not set.
+    """
+    if not os.environ.get(REGENERATE_ENV_VAR):
+        raise RuntimeError(
+            "regenerate_cache() rebuilds shipped reference tables from local "
+            "CSV/XLSX sources that are not part of this repository, and the "
+            "result may differ from the reviewed data this package ships. Set "
+            f"{REGENERATE_ENV_VAR}=1 to confirm that is what you want."
+        )
+
     cache_dir = get_cache_dir()
-    for f in cache_dir.glob("*.json"):
-        f.unlink()
+    results: dict[str, str] = {}
 
+    def _write(cache_name: str, data: dict[str, Any]) -> None:
+        """Warn immediately before overwriting reviewed data, then write."""
+        warnings.warn(
+            f"Overwriting the bundled {cache_name} with an unreviewed rebuild "
+            f"from local sources. Review the diff before committing it: this "
+            f"is a change to a reference dataset.",
+            UserWarning,
+            stacklevel=3,
+        )
+        with open(cache_dir / cache_name, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
 
-def regenerate_cache():
-    """Force regeneration of all cache files."""
-    clear_cache()
-    load_binding_energy_data()
-    load_compound_data()
-    load_cross_section_data()
-    load_trzh2018_data()
-    load_trzh2019_data()
+    for cache_name, csv_name, converter in (
+        ("binding_energy.json", "BindingEnergyTable.csv", _csv_to_json_binding_energy),
+        ("compounds.json", "CompoundTable.csv", _csv_to_json_compounds),
+        ("cross_section.json", "CrossSectionTable_Yeh=Lindau.csv", _csv_to_json_cross_section),
+    ):
+        try:
+            csv_path = get_common_data_path() / csv_name
+        except FileNotFoundError as exc:
+            results[cache_name] = f"skipped: {exc}"
+            continue
+        if not csv_path.exists():
+            results[cache_name] = f"skipped: {csv_name} not found"
+            continue
+        _write(cache_name, converter(csv_path))
+        results[cache_name] = "rebuilt"
+
+    for cache_name, path_getter, converter in (
+        ("trzh2018_haxpes.json", _get_trzh2018_xlsx_path, _xlsx_to_json_trzh2018),
+        ("trzh2019_inner.json", _get_trzh2019_xlsx_path, _xlsx_to_json_trzh2019),
+    ):
+        # The getters resolve through get_common_data_path(), which raises
+        # when the private Common/ tree is absent -- i.e. on every public
+        # install. Skipping is the documented outcome, not an exception.
+        try:
+            xlsx_path = path_getter()
+        except FileNotFoundError as exc:
+            results[cache_name] = f"skipped: {exc}"
+            continue
+        if not xlsx_path.exists():
+            results[cache_name] = f"skipped: {xlsx_path.name} not found"
+            continue
+        _write(cache_name, converter(xlsx_path))
+        results[cache_name] = "rebuilt"
+
+    # scofield.json and trzhaskovskaya.json are rebuilt through
+    # CrossSection's own loader, from CSVs in the same Common/data tree.
+    # They were silently absent from this function's old list, which is
+    # why clear_cache() could remove them with nothing to restore them.
+    for cache_name in ("scofield.json", "trzhaskovskaya.json"):
+        results[cache_name] = "not rebuilt here: see CrossSection._load_with_cache"
+
+    return results
