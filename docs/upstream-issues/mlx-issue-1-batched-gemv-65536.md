@@ -73,3 +73,35 @@ one more kernel with an untiled grid-dimension mapping.
 Found while validating an XPS spectral-fitting engine (per-spectrum
 4-component Gram solve over 10⁵–10⁶ spectra); the workaround is
 chunking batches to ≤ 65,535.
+
+---
+
+## Fix landed and verified (2026-08-06)
+
+Merged as [ml-explore/mlx#3929](https://github.com/ml-explore/mlx/pull/3929)
+("Fix CUDA batched GEMV grid overflow", commit `4652b00`). The fix
+splits the batch dimension across `grid.y` **and** `grid.z` (both
+capped at 65,535) in `gemv.cu`, reconstructs the logical batch index
+in both `gemv_batched` and `gemv_gather`, and bounds-checks the padded
+tail slot. A related edge case (`GatherMM` with a zero-sized output)
+was bundled into the same PR.
+
+The author had no CUDA hardware to test on and left verification to
+CI (`pull/3929`: *"This machine does not have a CUDA toolkit or
+NVIDIA GPU"*) — same situation as the original report. Verified on
+this box (RTX 5070 Laptop, sm_120), build `0.32.1.dev20260806+4652b008`
+(main, includes #3929):
+
+| check | result |
+|---|---|
+| Original one-line repro, B ∈ {65535, 65536, 65537, 131072} | ✅ all pass (was: crash at 65536) |
+| Numerical correctness at/around the boundary (65534–200003) vs fp64 reference | ✅ max abs err ~1e-6 (fp32-normal), no seam artifacts |
+| `gather_mv` path (also touched by the fix) | ✅ B=65536 OK |
+| Empty-output `GatherMM` edge case | ✅ OK |
+| toyomacro AP solver (`bench_ncomp_scaling`), 200k spectra, n_comp=4 — the exact workload that motivated this report | ✅ completes without chunking (was: crash) |
+| Full 774-test voigtfit parity suite, `MLX_ENABLE_TF32=0` | ✅ 769 passed / 4 failed — failure set byte-identical to pre-fix (all speed assertions, unrelated) |
+
+**Verdict: confirmed fixed, no regressions.** The chunk-to-≤65,535
+workaround in `multipeak_solver.py` is no longer necessary once the
+project's MLX dependency is bumped past this commit (follow-up 7 in
+`docs/CUDA_BACKEND_POC.md` can be closed/reverted at that point).
