@@ -423,10 +423,10 @@ on the font's character-cell aspect ratio; the drawing assumes 2:1.)
 | Symbol | Definition | Where it comes from |
 |---|---|---|
 | `theta` | Electron emission angle from the surface normal | **Your data** — the analyzer's angle axis. Often built as `C − analyzer_axis_value` for a stated centre `C`, so pin down `C` too |
-| `alpha_xray` / `sigma_s` | Where the **source sits**, as an incidence angle from the surface normal | **Your instrument** — a value to confirm, never to inherit |
+| `alpha_xray` / `sigma_s` | Where the **source sits**, as an incidence angle from the surface normal. **Signed**: negative for a source on the opposite side of the normal from the analyzer, so `sigma_s = −56°` for the sketch above, whose label is a magnitude | **Your instrument** — a value to confirm, never to inherit |
 | `psi` | Angle from the direction *toward the source* to the emission direction | **Derived**. As magnitudes: `psi = alpha_xray + theta` on opposite sides of the normal, as drawn (56° + 27° = 83°); `psi = \|alpha_xray − theta\|` on the same side |
 | `alpha` | Angle from the beam's **propagation direction k** to the emission direction | **Derived**, and the supplement of `psi` — as drawn, 180° − 83° = **97°**. This is what `L_unpolarized` takes |
-| `kappa` | The propagation direction itself, from the outward normal | **Derived** by *reversing* `sigma_s`: `sigma_s + 180°` if `sigma_s ≤ 0`, else `sigma_s − 180°`. Then `alpha = kappa − theta`. A beam entering the sample has `\|kappa\| > 90°` |
+| `kappa` | The propagation direction itself, from the outward normal | **Derived** by *reversing* the **signed** `sigma_s`: `sigma_s + 180°` if `sigma_s ≤ 0`, else `sigma_s − 180°`. Then `alpha = kappa − theta`. As drawn, `sigma_s = −56°`, so `kappa = +124°` and `alpha = 124° − 27° = 97°` — the same answer as the `alpha` row. Feeding the sketch's unsigned `56°` instead gives `kappa = −124°` and `alpha = −151°`, which is a factor of 7.3 in `L_unpolarized` for Si 1s at 9.25 keV. A beam entering the sample has `\|kappa\| > 90°` |
 
 `psi` and `alpha` are supplements, not synonyms, and `cos alpha =
 −cos psi`. Which one a formula wants is not a matter of taste:

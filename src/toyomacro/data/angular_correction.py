@@ -10,9 +10,14 @@ Two geometry modes are supported:
     L_pol(ψ, φ) = 1 + β P₂(cos θ_ε) + (δ + γ cos²θ_ε) sin θ_ε cos φ
 
     where θ_ε = angle from polarization vector ε to electron emission,
-          φ = azimuth around ε measured from the (ε, k) plane.
+          φ = azimuth around ε measured from the (ε, k) plane, taken
+              φ = 0 in the half containing **+k**. That choice is what
+              puts the unpolarized angle on k rather than on its
+              supplement; the other half would land on ψ.
 
-    For coplanar HAXPES:  ψ = α_xray − θ_emission,  φ = 0.
+    For coplanar HAXPES:  ψ = σ_s − θ_emission,  φ = 0, with σ_s
+    *signed* — as drawn below that is −56° − 27° = −83°, not the 29°
+    the sketch's unsigned label would give.
 
 2. **Unpolarized** light (lab X-ray, e.g. Ga Kα):
 
@@ -27,9 +32,12 @@ P₂(x) = (3x² − 1) / 2  (2nd Legendre polynomial).
 Which angle is which
 --------------------
 
-Six symbols appear below and only θ is measured. Note that
-``α_xray`` and ``σ_s`` are the same quantity — where the source sits —
-and that ``α`` and ``α_xray`` differ by more than a subscript::
+Six symbols appear below and only θ is measured. ``α_xray`` and ``σ_s``
+name the same thing — where the source sits — but not the same number:
+the sketch labels magnitudes, while every rule below consumes ``σ_s``
+*signed* (negative for a source on the opposite side of the normal
+from the analyzer, so −56° as drawn). ``α`` and ``α_xray`` differ by
+more than a subscript::
 
      hν                        normal        e⁻
                                   ^
@@ -229,7 +237,10 @@ def _warn_if_geometry_unstated(xray_from_normal_deg: float) -> None:
         "the angular dependence, not merely its scale: for Si 1s at "
         "9.25 keV the spread of L_dipole across a 51°–9° emission fan is "
         "85% at 88° incidence and 216% at 55°. Pass the angle your "
-        "instrument actually uses.",
+        "instrument actually uses. On the unpolarized entry point that "
+        "angle is κ, the propagation direction, for which 88° is not a "
+        "valid value at all — a beam entering the sample has |κ| > 90°, "
+        "so the placeholder inverts the non-dipole term as well.",
         UserWarning,
         stacklevel=3,
     )

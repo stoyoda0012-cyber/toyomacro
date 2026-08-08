@@ -412,8 +412,11 @@ def test_the_polarization_average_puts_alpha_on_the_beam_direction(seed):
     eta = np.linspace(0.0, 2.0 * np.pi, 20001)[:-1]
     eps = np.stack([np.cos(eta), np.sin(eta), np.zeros_like(eta)], axis=1)
     cos_theta_eps = eps @ p
-    # φ is the azimuth about ε from the (ε, k) plane; cos φ resolves so
-    # that sin θ_ε cos φ is the component of p̂ along k̂.
+    # φ is the azimuth about ε from the (ε, k) plane, with φ = 0 taken in
+    # the half containing +k. That choice is the whole question: the other
+    # half gives -k̂·p̂ and lands the average on ψ instead of α. It is a
+    # convention of the source formula, not something this average derives,
+    # and randomising β, γ and δ does not exercise it.
     sin_cos_phi = float(p[2])
 
     p2 = (3.0 * cos_theta_eps**2 - 1.0) / 2.0
@@ -619,12 +622,32 @@ def test_the_unstated_default_warns_once_and_only_about_being_unstated():
 
 
 def test_the_beam_direction_warning_does_not_change_any_number():
-    """Warning only — the returned values are untouched."""
+    """Warning only — every returned value matches an identical unwarned call.
+
+    Named for what it must show, so it compares the two runs rather than
+    re-deriving alpha. 47° trips the check (|κ| < 90°); 137° is its
+    supplement and does not, so the pair differs only in whether the
+    warning fires.
+    """
     _params()
     theta = np.array([10.0, 30.0, 50.0])
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        warned = AngularCorrection.angular_distribution_unpolarized(
-            "Si", "1s", SI_1S_HV, theta, xray_from_normal_deg=47.0
-        )
+
+    def run(xray):
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            out = AngularCorrection.angular_distribution_unpolarized(
+                "Si", "1s", SI_1S_HV, theta, xray_from_normal_deg=xray
+            )
+        fired = [w for w in record if issubclass(w.category, UserWarning)]
+        return out, fired
+
+    warned, warned_issues = run(47.0)
+    quiet, quiet_issues = run(-47.0 + 180.0)  # same |κ| geometry, no warning
+
+    assert len(warned_issues) == 1, "47 deg should trip the beam-direction check"
+    assert quiet_issues == [], "133 deg is a beam entering the sample"
+
     assert warned["alpha"] == pytest.approx(47.0 - theta)
+    for key, value in warned.items():
+        if isinstance(value, np.ndarray):
+            assert np.all(np.isfinite(value)), key

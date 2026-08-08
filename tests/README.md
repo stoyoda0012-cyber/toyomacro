@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,799 automated tests** across **74 files**, in two
+This suite has **1,885 automated tests** across **74 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 38 | 931 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 38 | 1,017 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -99,7 +99,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 14 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
-| 16 | `test_angular_geometry.py` | θ (measured) vs ψ (derived): the magic-angle identity, the factor-of-20 cost of confusing them, the unstated-incidence-angle warning, and `L_full`'s present values pinned as a record while its convention is unresolved |
+| 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
 
 ### MCP server (13)
