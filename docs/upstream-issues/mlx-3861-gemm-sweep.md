@@ -34,7 +34,7 @@ platform      : Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 kernel        : 6.18.33.2-microsoft-standard-WSL2   (WSL2)
 MLX_ENABLE_TF32: 0
 NVIDIA_TF32_OVERRIDE: 0
-CUDA_HOME     : /home/ytoyo/toyomacro/.venv/lib/python3.12/site-packages/nvidia/cu13
+CUDA_HOME     : <venv>/lib/python3.12/site-packages/nvidia/cu13
 tf32 arm      : forced off
 mlx           : 0.32.0   default_device=Device(gpu, 0)
 cupy          : 14.1.1
@@ -61,6 +61,13 @@ cupy           t =     0.67 ms +   8.61 TFLOP/s
                at N=8192, the size-independent part is 0.5% of the time
 ```
 
+(The two `t = fixed + throughput` lines above were printed by the
+version of the harness that ran that day and are kept as part of the
+transcript. The intercepts are not trustworthy — the fit predicts
+6.02 ms at N=512 against 1.35 ms measured — and later versions of the
+script print the direct small-N bound instead. The table itself is
+unaffected.)
+
 All eight sizes completed; N=8192 did not exhaust the 8 GB of VRAM.
 
 ## Reading
@@ -70,10 +77,13 @@ independent signs:
 
 1. `gap` is not constant in absolute time — it grows from 1.18 ms at
    N=512 to 1448 ms at N=8192, i.e. with N³.
-2. The fitted size-independent term is negligible for *both* backends
-   (5.64 ms for MLX, 0.67 ms for CuPy — 0.4% and 0.5% of the N=8192
-   time respectively). If MLX were paying a large fixed launch cost,
-   this term is exactly where it would appear, and it does not.
+2. Any fixed per-kernel cost is bounded by the *whole* per-GEMM time
+   at the smallest size: 1.35 ms at N=512. The N=4096 gap is 197.65 ms
+   — 146× that bound — so a per-launch toll cannot account for it.
+   (The least-squares intercept originally quoted here, 5.64 ms, was a
+   fit artifact: unweighted over sizes spanning 4000× in FLOPs, it
+   absorbs the small-N throughput ramp and exceeds the smallest
+   measured total. The direct bound needs no model.)
 3. The ratio is flat: 11–14× at every size from N=1024 up. MLX plateaus
    at ~0.70 TFLOP/s while CuPy reaches ~8.6 TFLOP/s on the same GPU,
    same session, same `nvidia-cublas` wheel.
