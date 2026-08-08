@@ -554,3 +554,36 @@ working arrays silently inherit host memory.
 Workaround for users on affected platforms, though a fragile one:
 `mx.clear_cache()` after dropping host-sourced arrays, and prefer
 device-side construction for anything hot.
+
+## Minimal reproduction
+
+`docs/upstream-issues/repro-mlx-3861.py` — 35 lines, MLX and NumPy only,
+no ctypes and no `nvidia-smi`, three cases in separate processes because
+the buffer cache is per-process state. Suitable for pasting upstream.
+
+On this box (RTX 5070 Laptop, WSL2, `concurrentManagedAccess = 0`), with
+TF32 left at its default:
+
+```
+mlx 0.32.0, 4096x4096 float32 matmul
+
+                    device :     7.88 ms    17.44 TFLOP/s
+                      host :   775.12 ms     0.18 TFLOP/s
+   device_after_freed_host :   803.54 ms     0.17 TFLOP/s
+```
+
+**96×** between two matmuls that differ only in how their operands were
+constructed, and a third showing that freeing the host buffers is enough
+to poison later device-side allocations. On a machine with
+`concurrentManagedAccess = 1` all three should agree — that comparison is
+the check upstream can run.
+
+## Still open before posting
+
+- Whether this accounts for the original 5090 native-Windows
+  reproduction depends on how that benchmark builds its operands. Worth
+  asking rather than assuming.
+- The chained arm's 0.70 TF/s against the single arm's 0.33 is consistent
+  with the chain's intermediates being device-allocated (so one operand
+  of each matmul is hot), but that decomposition has not been measured
+  directly.
