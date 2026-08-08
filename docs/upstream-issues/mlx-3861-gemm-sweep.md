@@ -61,13 +61,13 @@ platform      : Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 kernel        : 6.18.33.2-microsoft-standard-WSL2   (WSL2)
 MLX_ENABLE_TF32: 0
 NVIDIA_TF32_OVERRIDE: 0
-CUDA_HOME     : /home/ytoyo/toyomacro/.venv/lib/python3.12/site-packages/nvidia/cu13
+CUDA_HOME     : <venv>/lib/python3.12/site-packages/nvidia/cu13
 tf32 arm      : forced off
 mlx           : 0.32.0   default_device=Device(gpu, 0)
 cupy          : 14.1.1
 gpu           : NVIDIA GeForce RTX 5070 Laptop GPU   cc=12.0
 cuda runtime  : 13020
-libcublas     : /home/ytoyo/toyomacro/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libcublasLt.so.13
+libcublas     : <venv>/lib/python3.12/site-packages/nvidia/cu13/lib/libcublasLt.so.13
 
      N  mlx_single  mlx_chained      cupy        gap   ratio  mlx TF/s  cupy TF/s
 ---------------------------------------------------------------------------------
@@ -143,15 +143,22 @@ cuBLASLt algorithm once `CUBLAS_COMPUTE_32F_FAST_TF32` is requested.
 
 1. `gap` is not constant in absolute time — it grows from 0.96 ms at
    N=512 to 1389 ms at N=8192.
-2. Any fixed per-kernel cost is bounded by 1.20 ms (the entire per-GEMM
-   time at N=512). The N=8192 gap is 1159× that bound, so a per-launch
-   toll cannot account for it.
+2. Any fixed per-kernel cost is bounded by the *whole* per-GEMM time at
+   the smallest size: 1.20 ms at N=512. The N=8192 gap is 1159× that
+   bound, so a per-launch toll cannot account for it.
 3. A submission cost scaling with the working set would track N²; the
    gap grew 1443× where N² predicts 256× and N³ predicts 4096×. It sits
    near the N³ end, and the residual is explained by both backends being
    below their asymptotic throughput at N=512.
 4. Once both reach plateau (N≥2048), MLX holds ~0.70 TF/s and CuPy
    ~12 TF/s — a flat ~17× ratio.
+
+(Evidence #2 is the direct bound, not a fitted intercept. The audit of
+the first round established that the least-squares intercept was a fit
+artifact — unweighted over sizes spanning 4000× in FLOPs, it absorbed
+the small-N throughput ramp and exceeded the smallest measured total.
+The harness used here prints the direct bound instead and no longer
+reports a fit, so that objection does not apply to these numbers.)
 
 This does not match the "super high overhead when launching the kernel"
 hypothesis as the dominant term.

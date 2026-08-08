@@ -396,8 +396,9 @@ compose yourself:
 | λ | `IMFP.tpp2m()` — for the *specific* compound, not an averaged matrix | supported |
 | `Q_elastic` | `data.elastic_scattering` — needs a caller-supplied IMFP/TRMFP pair, which `data.sessa` can read from a SESSA run | experimental |
 
-**Angles: which one you have, and which one the formulas want.** Three
-angles are involved, and only the first is something you measured.
+**Angles: which one you have, and which one the formulas want.**
+Several angles are involved, and only `theta` is something you
+measured. `alpha_xray` and `sigma_s` name the same quantity.
 
 ```
  hν                        normal        e⁻
@@ -422,19 +423,36 @@ on the font's character-cell aspect ratio; the drawing assumes 2:1.)
 | Symbol | Definition | Where it comes from |
 |---|---|---|
 | `theta` | Electron emission angle from the surface normal | **Your data** — the analyzer's angle axis. Often built as `C − analyzer_axis_value` for a stated centre `C`, so pin down `C` too |
-| `xray_from_normal` | X-ray incidence angle from the surface normal | **Your instrument** — a value to confirm, never to inherit |
-| `psi` / `alpha` | Angle from the photon direction to the emission direction | **Derived**. As magnitudes: `psi = alpha_xray + theta` when source and analyzer sit on opposite sides of the normal, as drawn (56° + 27° = 83°); `psi = \|alpha_xray − theta\|` on the same side. This is what `L_dipole` / `L_full` / `L_unpolarized` take |
+| `alpha_xray` / `sigma_s` | Where the **source sits**, as an incidence angle from the surface normal. **Signed**: negative for a source on the opposite side of the normal from the analyzer, so `sigma_s = −56°` for the sketch above, whose label is a magnitude | **Your instrument** — a value to confirm, never to inherit |
+| `psi` | Angle from the direction *toward the source* to the emission direction | **Derived**. As magnitudes: `psi = alpha_xray + theta` on opposite sides of the normal, as drawn (56° + 27° = 83°); `psi = \|alpha_xray − theta\|` on the same side |
+| `alpha` | Angle from the beam's **propagation direction k** to the emission direction | **Derived**, and the supplement of `psi` — as drawn, 180° − 83° = **97°**. This is what `L_unpolarized` takes |
+| `kappa` | The propagation direction itself, from the outward normal | **Derived** by *reversing* the **signed** `sigma_s`: `sigma_s + 180°` if `sigma_s ≤ 0`, else `sigma_s − 180°`. Then `alpha = kappa − theta`. As drawn, `sigma_s = −56°`, so `kappa = +124°` and `alpha = 124° − 27° = 97°` — the same answer as the `alpha` row. Feeding the sketch's unsigned `56°` instead gives `kappa = −124°` and `alpha = −151°`, which is a factor of 7.3 in `L_unpolarized` for Si 1s at 9.25 keV. A beam entering the sample has `\|kappa\| > 90°` |
 
-The API takes a **signed** incidence angle instead:
-`angular_distribution()` computes `psi = xray - theta`, so pass a
-negative `xray_from_normal_deg` for the geometry drawn above
-(`psi = -83°` here). `L_dipole` and `L_unpolarized` are even in `psi`,
-so the sign cannot reach them. `L_full` is not even: its non-dipole
-term flips with the sign. Over the full range it is negative for 23% of
-`psi` — on −178.8°…−137.8° and −42.2°…−1.2° for the Si 1s 9.25 keV
-parameters — where it is not a correction factor at all. The drawn
-geometry sits outside those bands, but nothing in the API checks, so
-verify the sign before using `L_full`.
+`psi` and `alpha` are supplements, not synonyms, and `cos alpha =
+−cos psi`. Which one a formula wants is not a matter of taste:
+
+- `L_dipole` cannot tell them apart — P₂ is even under `cos → −cos`, so
+  both give the same number to within rounding. Nothing you choose here
+  is observable, which is why the dipole part is no evidence that the
+  convention was applied correctly.
+- `L_unpolarized` **takes `alpha`, from k**. Its non-dipole term carries
+  a bare `cos alpha`, and is therefore odd about 90°: feeding it `psi`
+  leaves the dipole part untouched and reverses that term exactly.
+- `L_full` is unresolved (see below). Do not settle it by analogy.
+
+For the unpolarized entry point, `xray_from_normal_deg` is therefore
+`kappa`, **not** where the source sits, and
+`angular_distribution_unpolarized()` warns when the value passed has
+`|kappa| ≤ 90°` — which is what happens if the source angle is passed
+instead. Note the correction is a *reversal*, not a change of sign and not a
+supplement: both of those give a different, and wrong, `kappa`.
+
+`L_full` is not even in `psi`: its non-dipole term flips with the sign.
+Over the full range it is negative for 23% of `psi` — on
+−178.8°…−137.8° and −42.2°…−1.2° for the Si 1s 9.25 keV parameters —
+where it is not a correction factor at all. The drawn geometry sits
+outside those bands, but nothing in the API checks, so verify the sign
+before using `L_full`.
 
 Use `angular_distribution()` or `angular_distribution_unpolarized()`:
 they take `theta` and derive the rest. Calling `L_dipole` with `theta`
@@ -450,8 +468,19 @@ its mean is 85% at 88° incidence, 194% at 60° and 216% at 55°. The
 default is unchanged for compatibility; the warning exists so that no
 result is produced without the geometry having been stated once.
 
+**The two entry points read `xray_from_normal_deg` differently.**
+`angular_distribution_unpolarized()` takes `kappa`, as above.
+`angular_distribution()` forms `psi = xray_from_normal_deg − theta`,
+so it takes the source's own signed position — negative for a source
+on the opposite side of the normal from the analyzer. `L_dipole` is
+even in `psi` and cannot see the difference; `L_full` is not, and its
+convention is unresolved, so that instruction is **provisional** and
+settles nothing about `L_full`.
+
 **Sign and reference axis.** `L_dipole` is `1 − (β/2)·P₂(cos ψ)` — the
-**unpolarized** form, with the angle taken from the beam **k**. The form
+dipole part of the **unpolarized** form. `L_unpolarized` takes that
+angle from the beam **k** (see `alpha` above); `L_dipole` is even in
+it and so cannot tell `alpha` from `psi`. The form
 quoted throughout the synchrotron literature, `1 + β·P₂(cos θ_ε)`,
 differs in *both* sign and reference axis: θ_ε is measured from the
 **polarization vector ε**. Transcribing one for the other is a real
