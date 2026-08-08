@@ -48,11 +48,18 @@ wheel directory, different entry point. Earlier reports from this box
 which is true of the *wheel* but overstates the sameness of the call
 path — that wording should be corrected upstream.
 
-This matters because it makes the rest coherent. cuBLASLt requires the
-caller to pick the algorithm and workspace; classic cuBLAS dispatches on
-NVIDIA's own heuristic. If MLX selects a poor algorithm on `sm_120`,
-both the flat ~17× gap below and the TF32 result (slower with TF32 *on*)
-follow from one cause.
+The API split itself is real: cuBLASLt requires the caller to pick the
+algorithm and workspace; classic cuBLAS dispatches on NVIDIA's own
+heuristic.
+
+> **Superseded — see Round 3 below.** This section originally continued:
+> *"If MLX selects a poor algorithm on `sm_120`, both the flat ~17× gap
+> below and the TF32 result follow from one cause."* That inference was
+> tested in Round 3 by calling cuBLASLt directly with MLX's own
+> parameters, and it is **wrong**: top-1 at MLX's workspace setting runs
+> at 12.93 TF/s, and asking for eight candidates is no better. The
+> library split is a true observation; the causal story built on it was
+> not.
 
 ## ① Main sweep, TF32 forced off (chain=8, repeats=5)
 
@@ -98,9 +105,11 @@ From N=512 to N=8192 the gap grew 1442.8x, against 4096x for N^3 and 256x for N^
 All eight sizes completed; N=8192 did not exhaust the 8 GB of VRAM.
 
 **Caveat on one cell.** The `cupy` figure at N=4096 (30.32 ms) is an
-outlier — runs ② and ③ measured 9.80 ms and 11.69 ms for the same shape.
-The derived `ratio` (6.4×) and `cupy TF/s` (4.53) on that row should be
-disregarded. Every other size puts CuPy at 11–14 TF/s.
+outlier — other runs measured 9.80, 11.69 and 10.61 ms for the same
+shape. The derived `ratio` (6.4×) and `cupy TF/s` (4.53) on that row
+should be disregarded. Every other size puts CuPy at 11–14 TF/s.
+Round 3 traces the outlier to co-residency with MLX in one process, not
+to CuPy or to thermals; the clean reference at N=4096 is ~9–10 ms.
 
 ## ② Convergence check (N=4096, chain=32, repeats=3)
 
@@ -134,8 +143,17 @@ read as an upper bound or as an estimate.
 **Enabling TF32 makes MLX roughly 2× slower** (0.35 TF/s against 0.71
 with it off), while CuPy is unaffected at ~12 TF/s. The gap widens from
 ~17× to ~34×. A feature that trades precision for speed is costing
-double the time here — consistent with a heuristic picking an even worse
-cuBLASLt algorithm once `CUBLAS_COMPUTE_32F_FAST_TF32` is requested.
+double the time here.
+
+> **Superseded — see Round 3 below.** This section originally attributed
+> that to *"a heuristic picking an even worse cuBLASLt algorithm once
+> `CUBLAS_COMPUTE_32F_FAST_TF32` is requested."* Measured directly,
+> cuBLASLt with that compute type is **faster**, not slower
+> (17.7 vs 12.9 TF/s), so the slowdown cannot be a cuBLASLt selection
+> effect. The measurement stands; the explanation does not.
+
+A rerun at `--repeats 5` reproduced the effect: `mlx_chained`
+8.47 / 51.68 / 407.72 ms at N=1024/2048/4096.
 
 ## Reading
 
@@ -187,3 +205,140 @@ the WSL translation layer. Combined with the cuBLASLt-vs-cuBLAS finding
 above, the most economical hypothesis is that MLX's cuBLASLt algorithm
 selection lands badly on this driver stack, in a way NVIDIA's own
 in-cuBLAS heuristic does not.
+
+---
+
+# Round 3 (2026-08-09): the cuBLASLt causal claim is refuted
+
+Audit round 8 blocked the draft on two readings of MLX's source. Both
+were checked here by measurement rather than by re-reading. The audit
+was right to block: **the "MLX picks a bad cuBLASLt algorithm" story
+does not survive.**
+
+## Blocker 2 — CUDA graph capture: eliminated
+
+MLX wraps its `cublasLtMatmul` in a stream capture
+(`cublas_utils.cpp`, `encoder.capture_context()`); CuPy issues directly.
+`MLX_USE_CUDA_GRAPHS=0` turns the capture off without a rebuild.
+
+| N | `mlx_chained`, graphs on | graphs off |
+|---|---|---|
+| 1024 | 6.31 ms | 6.36 ms |
+| 2048 | 24.90 ms | 24.84 ms |
+| 4096 | 194.82 ms | 196.12 ms |
+
+Identical within ~1%. The flag is genuinely honoured — `device.cpp:18`
+reads it via `env::get_var("MLX_USE_CUDA_GRAPHS", true)` and it gates
+six or more sites in that file — so this is a real elimination, not a
+no-op flag.
+
+## The decisive test: call cuBLASLt directly, the way MLX calls it
+
+Reading MLX v0.32.0 rather than guessing at it:
+
+- workspace is `cc_major >= 9 ? 32 MiB : 4 MiB` (`cublas_utils.cpp:70`);
+  `sm_120` is cc 12, so **32 MiB**
+- `cublasLtMatmulAlgoGetHeuristic(..., 1, &heuristic_, &ret)` — literal
+  `requestedAlgoCount = 1` (`cublas_utils.cpp:179`)
+- operands are swapped rather than transposed ("a and b are swapped for
+  row-major layout")
+
+Driving `libcublasLt.so.13` from ctypes with the same compute type,
+workspace and algo count, N=4096 (median of 5):
+
+| workspace | top-1 (count=1) | best of 8 candidates |
+|---|---|---|
+| 0 | 18.49 ms — 7.43 TF/s | 10.48 ms — 13.11 TF/s |
+| 1 MiB | 14.35 ms — 9.58 TF/s | 10.84 ms — 12.68 TF/s |
+| **32 MiB** (MLX's setting) | **10.63 ms — 12.93 TF/s** | 11.71 ms — 11.74 TF/s |
+| 256 MiB | 11.37 ms — 12.09 TF/s | 11.33 ms — 12.13 TF/s |
+
+With `CUBLAS_COMPUTE_32F_FAST_TF32`, same N: 7.78–9.02 ms (15.2–17.7
+TF/s). CuPy reference in the same process: 11.66 ms.
+
+**MLX at N=4096 takes ~180–195 ms.** cuBLASLt asked the same way takes
+10.63 ms. That is the whole gap, and it is not in cuBLASLt.
+
+Three specific claims die here:
+
+1. *"`requestedAlgoCount = 1` gets a bad algorithm."* Best-of-8 is not
+   better than top-1 (10.5–11.7 ms either way). Asking for more
+   candidates would not help.
+2. *"No good `sm_120` kernel exists in the pool."* One does, and top-1
+   finds it: 12.93 TF/s at MLX's own workspace setting.
+3. *"TF32 is slower in MLX because a worse algorithm gets selected."*
+   Through raw cuBLASLt, TF32 is **faster** (17.7 vs 12.9 TF/s). MLX's
+   TF32 slowdown therefore cannot be a cuBLASLt selection effect. The
+   audit's question 2 was exactly right: that observation was merely
+   *not contradicting* the story, never supporting it.
+
+## Blocker 1 — the per-call heuristic query: measured, negligible
+
+`CublasGemm` is a stack local (`matmul.cpp:116`, `:338`), so the
+heuristic is re-queried per GEMM rather than cached across calls. That
+is a real structural difference from CuPy's `cublasGemmEx`, which has no
+such query. It is also far too cheap to matter:
+
+| N | heuristic query | matmul | query share |
+|---|---|---|---|
+| 1024 | 0.031 ms | 0.36 ms | 7.9% |
+| 2048 | 0.032 ms | 1.91 ms | 1.7% |
+| 4096 | 0.059 ms | 18.31 ms | 0.3% |
+| 6144 | 0.055 ms | 38.37 ms | 0.1% |
+
+Tens of microseconds against a ~170 ms gap.
+
+## Which library each backend actually calls
+
+An `LD_PRELOAD` interposer confirms the split at runtime:
+
+- CuPy calls **`cublasGemmEx`** (4 calls for 4 GEMMs) — never
+  `cublasLtMatmul`.
+- MLX calls **`cublasLtMatmulAlgoGetHeuristic`**, i.e. it does take the
+  cuBLASLt path. (The shim could not forward MLX's call — MLX resolves
+  cuBLASLt in a local scope, so `dlsym(RTLD_NEXT)` finds no next
+  definition — so only the entry point is established, not a count.)
+
+## The CuPy N=4096 outlier: an artifact of co-residency, not of CuPy
+
+Five readings existed: 30.32 / 9.80 / 11.69 / 10.61 / 30.99 ms —
+bimodal, not noise. Resolved:
+
+- **Not thermal.** 24 back-to-back iterations alone: 9.87–10.49 ms,
+  13.1–13.9 TF/s, 55→59 °C, SM clock 1635–1732 MHz throughout.
+- **Co-residency reproduces it.** In one process — CuPy first
+  (median 9.42 ms, max 9.85), then the MLX arm, then CuPy again — the
+  median stays 9.05 ms but a single iteration spikes to **27.91 ms**.
+
+So the ~30 ms readings come from measuring CuPy in a process where MLX
+has run, not from CuPy. The clean reference at N=4096 is **~9–10 ms
+(13.5 TF/s)**. Note the direction: quoting 30 ms *understated* the gap.
+
+## Where this leaves the explanation
+
+Eliminated so far, each by measurement on this box:
+
+| candidate | how ruled out |
+|---|---|
+| PTX JIT for a missing arch | native `sm_120` build unchanged (425 vs 435 ms) |
+| CUDA graph capture | `MLX_USE_CUDA_GRAPHS=0` unchanged |
+| cuBLASLt algorithm selection | direct call, same parameters, 10.63 ms |
+| too-small workspace | MLX already requests 32 MiB; 0→256 MiB spans only 18.5→11.4 ms |
+| per-call heuristic query | 0.06 ms at N=4096 |
+| fixed per-launch cost | bounded by 1.20 ms at N=512; gap is 1159× that |
+| thermal throttling | clocks and temperature logged, flat |
+
+What remains is ~170 ms per 4096³ GEMM inside MLX, scaling with N³ —
+i.e. compute-proportional, not a per-call toll and not data movement
+(which would track N²).
+
+**Caveat on the comparison.** The ctypes probe matched MLX's compute
+type, workspace size and algo count, and used plain N×N column-major
+layouts on the default stream. It did not replicate every descriptor
+attribute MLX may set (transpose flags, epilogue) nor MLX's non-default
+stream. So the honest claim is bounded: *a straightforward cuBLASLt call
+with the same compute type, workspace and algo count runs ~17× faster
+than MLX's GEMM on this machine* — which locates the cost inside MLX's
+setup or execution rather than in cuBLASLt's choices, without yet naming
+the line. Naming it needs a profiler, which is what the issue asked for
+in the first place.
