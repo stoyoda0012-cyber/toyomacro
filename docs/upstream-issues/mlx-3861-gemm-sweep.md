@@ -342,3 +342,91 @@ than MLX's GEMM on this machine* — which locates the cost inside MLX's
 setup or execution rather than in cuBLASLt's choices, without yet naming
 the line. Naming it needs a profiler, which is what the issue asked for
 in the first place.
+
+---
+
+# Round 4 (2026-08-09): operand residency — hypothesis refuted
+
+Proposed next: the harness builds operands with `mx.array(numpy_array)`,
+so perhaps they sit somewhere the GEMM reaches over PCIe on every pass,
+which would be N³-proportional and would *be* the answer rather than
+another exclusion. Tested three ways.
+
+## The construction path makes no difference
+
+N=4096, same process, `mlx_chained` per GEMM:
+
+| operands built by | single | chained | TF/s |
+|---|---|---|---|
+| `mx.array(numpy)` | 410.53 ms | 196.43 ms | 0.70 |
+| `mx.random.normal` (device-generated) | 165.86 ms | 195.81 ms | 0.70 |
+
+Ratio 0.997. Whatever the cost is, it does not depend on how the array
+was produced.
+
+## What MLX's allocator does, and what the pointer says
+
+MLX v0.32.0 allocates with **`cudaMallocManaged`**
+(`mlx/backend/cuda/allocator.cpp:58`) — managed/unified memory, not
+`cudaMalloc`.
+
+`cudaPointerGetAttributes` on an MLX buffer (address taken through
+`np.from_dlpack`, which succeeds — MLX exports these buffers as
+host-visible):
+
+```
+status=0 type=1 (host, pinned/mapped) device=0
+devicePointer=0x205000000  hostPointer=0x205000000   SAME (mapped)
+```
+
+Control, separate process, same method: a CuPy buffer reports
+`type=2 (device)`, `cudaMemGetInfo` free −0.25 GiB, `nvidia-smi` +256 MiB
+for a 256 MiB array. So the method does report "device" when the memory
+is on device.
+
+A host view of an MLX array reads back `1.0` everywhere after a GPU-side
+`+ 1.0`, with no explicit copy — one mapped allocation, as the identical
+pointers imply.
+
+**This looked like the answer and it is not.** Read on.
+
+## The decisive measurement: achieved bandwidth
+
+Pointer attributes can be argued about; a memory-bound kernel's achieved
+rate cannot. If operands were really being fetched across PCIe, a
+reduction would run at roughly 10–25 GB/s. If they are in VRAM, several
+hundred.
+
+| backend | 64 MiB | 256 MiB | 1024 MiB |
+|---|---|---|---|
+| `mx.sum` | 208.0 GB/s | 293.4 GB/s | **328.2 GB/s** |
+| `cupy sum` | 216.1 GB/s | 302.9 GB/s | **321.6 GB/s** |
+
+Identical, and both at VRAM speed. **MLX's managed allocations are
+device-backed in practice on this box; the residency hypothesis is
+refuted.** The `type=1` flag reflects how `cudaMallocManaged` memory is
+described here, not where the kernel actually reads from.
+
+Recording this explicitly because it is the same failure mode audit
+round 8 caught: an attribute flag and a plausible mechanism made a
+compelling story, and the story was wrong. The bandwidth number is what
+settles it.
+
+## Updated elimination list
+
+| candidate | how ruled out |
+|---|---|
+| PTX JIT for a missing arch | native `sm_120` build unchanged |
+| CUDA graph capture | `MLX_USE_CUDA_GRAPHS=0` unchanged |
+| cuBLASLt algorithm selection | direct call, MLX's parameters: 10.63 ms |
+| too-small workspace | MLX requests 32 MiB; 0→256 MiB spans 18.5→11.4 ms |
+| per-call heuristic query | 0.06 ms at N=4096 |
+| fixed per-launch cost | bounded by 1.20 ms at N=512 |
+| thermal throttling | clocks and temperature logged flat |
+| **operand residency / PCIe** | **328 GB/s on a streaming reduction** |
+| operand construction path | `mx.random.normal` vs `mx.array`: ratio 0.997 |
+
+Memory bandwidth is healthy, the library is fast when called the same
+way, and the cost is compute-proportional. The remaining ~170 ms per
+4096³ GEMM is specific to MLX's GEMM invocation and is not any of the
+above. Naming it needs a profiler — which is what the issue asked for.
