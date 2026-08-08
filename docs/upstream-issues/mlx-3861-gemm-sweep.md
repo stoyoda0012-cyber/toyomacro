@@ -430,3 +430,127 @@ Memory bandwidth is healthy, the library is fast when called the same
 way, and the cost is compute-proportional. The remaining ~170 ms per
 4096³ GEMM is specific to MLX's GEMM invocation and is not any of the
 above. Naming it needs a profiler — which is what the issue asked for.
+
+---
+
+# Round 5 (2026-08-09): found it — buffers are host-resident, and the cache spreads it
+
+Round 4 concluded "residency refuted". **That conclusion was wrong**, and
+the error was mine: the bandwidth test that refuted it happened to use a
+*device-resident* array, so it measured the fast case and generalised.
+Rerunning the comparison the way it was originally proposed — one
+construction per fresh process — gives the opposite answer.
+
+## The switch is how the array was built
+
+N=4096 fp32 GEMM, one variant per process, nothing else differing:
+
+| operands built by | time | rate |
+|---|---|---|
+| `mx.random.normal` (device-side) | **10.58 ms** | 12.99 TF/s |
+| `mx.array(numpy_array)` (host data) | **425.07 ms** | 0.32 TF/s |
+
+40×. Reproduced across six clean processes for the fast case
+(10.58 / 10.63 / 10.75 / 10.88 / 11.09 / 11.21 ms) and three for the slow
+one (417.75 / 425.07 / 442.32 ms). Whether a chain of dependent matmuls
+ran first makes no difference (1.0× before vs after).
+
+## Where the memory actually is
+
+1 GiB array, measured without `np.from_dlpack` (which itself migrates the
+buffer and invalidated an earlier reading):
+
+| built by | `cudaMemGetInfo` free | `nvidia-smi` used | streaming read | verdict |
+|---|---|---|---|---|
+| `mx.random.normal` | **−1.00 GiB** | **+1024 MiB** | 346.5 GB/s | device |
+| `mx.array(numpy)` | −0.00 GiB | −1 MiB | **12.6 GB/s** | host, over PCIe |
+
+Three independent signals agree in each row.
+
+## The mechanism, in MLX's own source
+
+`mlx/backend/cuda/allocator.cpp`:
+
+- `supports_managed_memory()` returns **false** when
+  `concurrent_managed_access()` is 0, with a comment citing NVIDIA's
+  "Limited unified memory support" for Windows, WSL and Tegra. This box
+  reports `cudaDevAttrConcurrentManagedAccess = 0`.
+- `unified_malloc()` therefore calls **`cudaMallocHost`** — pinned host
+  memory — rather than `cudaMallocManaged`.
+- `malloc()` routes `device == -1` to `unified_malloc()`, and device-side
+  allocations to `cudaMallocAsync` / `cudaMalloc`.
+
+So anything ingested from host data — i.e. anything loaded from NumPy,
+HDF5 or disk — lands in pinned host memory and stays there.
+
+Confirmed independently by driving cuBLASLt directly with the same call,
+same algorithm, same workspace, changing only the allocator:
+
+| operand allocator | time | rate |
+|---|---|---|
+| `cudaMalloc` | 8.48 ms | 16.21 TF/s |
+| `cudaMallocManaged` | 422.45 ms | 0.33 TF/s |
+| **`cudaMallocHost`** (what MLX uses here) | **410.66 ms** | **0.33 TF/s** |
+
+410.66 ms against MLX's measured ~410–425 ms. The workspace allocator is
+nearly irrelevant by comparison (8.48 → 8.45 ms when it too is host).
+
+## The part that makes it spread: the buffer cache ignores residency
+
+`buffer_cache_.reuse_from_cache(size)` (allocator.cpp:185) is keyed on
+**size alone**, and it runs *before* the `device == -1` branch that
+chooses host versus device allocation. A freed pinned-host buffer is
+therefore handed back to a later device-side request of the same size.
+
+Same GEMM, device-generated operands throughout; only the fate of two
+prior host-sourced buffers differs:
+
+| what happened to the earlier host buffers | GEMM | rate |
+|---|---|---|
+| kept alive (never enter the cache) | 10.75 ms | 12.78 TF/s |
+| dropped **and** `mx.clear_cache()` | 10.63 ms | 12.93 TF/s |
+| dropped, cache left populated | **446.71 ms** | **0.31 TF/s** |
+
+42× for a difference that is invisible in user code. Any program that
+loads data from NumPy and then allocates working arrays will hit this: the
+working arrays silently inherit host memory.
+
+## Why this explains everything, including the platform split
+
+- **Windows/WSL only** — `concurrentManagedAccess` is 0 exactly there.
+  On DGX Linux it is 1, `cudaMallocManaged` is used, and pages migrate to
+  the device on first touch, so nothing is slow and nothing reproduces.
+- **N³ scaling** — a GEMM re-reads each operand O(N) times; every pass
+  crosses PCIe.
+- **Immune to graph capture, arch rebuild, algorithm choice, workspace
+  size** — none of them changes where the operands live.
+- **CuPy unaffected** — it allocates with `cudaMalloc`.
+- **TF32 "slower"** — a TF32 kernel is more compute-efficient, so it is
+  starved harder by the same PCIe bottleneck.
+
+## Corrections to earlier rounds
+
+- Round 4's "operand residency refuted" is **withdrawn**. Its 328 GB/s
+  reading was taken on a `mx.random.normal` array, which is device-
+  resident; it never tested the NumPy-sourced case it claimed to refute.
+- Round 4's `cudaPointerGetAttributes` reading of `type=1 (host)` was
+  **correct** for host-sourced arrays. It was dismissed on the strength of
+  the flawed bandwidth test.
+- Round 3's elimination of cuBLASLt algorithm selection stands, and is
+  now explained: the library was never the problem.
+- The original hypothesis in this investigation — that operand residency
+  was the answer and `mx.random.normal` would drop 195 ms to ~10 ms — was
+  right. The measurement that appeared to refute it (ratio 0.997) ran both
+  arms in one process, where the cache had already been populated with
+  host buffers, so both arms used host memory.
+
+## What upstream should change
+
+1. Key the buffer cache on residency as well as size, so a pinned-host
+   buffer is never handed to a device-side allocation.
+2. Promote host-sourced arrays to device memory when they are consumed by
+   device computation, rather than leaving them pinned for their lifetime.
+
+Workaround for users on affected platforms, though a fragile one:
+`mx.clear_cache()` after dropping host-sourced arrays, and prefer
+device-side construction for anything hot.
