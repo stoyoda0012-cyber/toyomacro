@@ -587,3 +587,31 @@ the check upstream can run.
   with the chain's intermediates being device-allocated (so one operand
   of each matmul is hot), but that decomposition has not been measured
   directly.
+
+## Audit check: the 10.63 ms coincidence
+
+The cache experiment's `drop_and_clear` arm reported 10.63 ms / 12.93
+TF/s, byte-identical to the `32 MiB` row of the Round 3 workspace table.
+Flagged as a possible copy-paste, which would cost that row its
+evidence. It is not one — the two figures come from separate runs of
+different scripts (`cublaslt_probe.py` and `pool_test.py`), and only one
+number actually coincides: TF/s is derived from ms, so a match in the
+latter forces a match in the former.
+
+Settled by re-measuring rather than by inspecting the record. Three
+fresh repetitions of each arm:
+
+| run | keep | drop_and_clear | drop_no_clear |
+|---|---|---|---|
+| 1 | 10.36 ms | 10.21 ms | 410.26 ms |
+| 2 | 10.50 ms | 10.10 ms | 410.11 ms |
+| 3 | 10.27 ms | 10.07 ms | 410.17 ms |
+
+`drop_and_clear` never lands on 10.63 again, so the original reading was
+an independent measurement that happened to collide — well inside the
+10.07–11.23 ms spread these arms show.
+
+The re-run also tightens the main result: `drop_no_clear` reproduces to
+within 0.2% (410.26 / 410.11 / 410.17 ms), and matches the 410.66 ms
+measured by driving cuBLASLt directly with `cudaMallocHost` operands.
+Two independent paths to the same number.
