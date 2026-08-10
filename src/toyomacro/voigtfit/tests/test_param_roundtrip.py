@@ -355,7 +355,14 @@ class TestThreeStepThroughput:
     """Benchmark 3-step vs 2-step kernel throughput."""
 
     def test_3step_throughput(self, cache, energy, preset):
-        """3-step kernel within 2x of 2-step."""
+        """3-step kernel within 2x of 2-step.
+
+        Both kernels are warmed before the clock starts and each is timed
+        repeatedly, because a single cold pair measures neither one. The
+        first pipeline to run absorbs the MLX compile cost for the shared
+        kernels, which deflates the ratio well below 1; a single timing
+        window also lets one scheduling hiccup dominate the result.
+        """
         from toyomacro.voigtfit.pipeline import HybridPipeline
 
         peak_config = {
@@ -371,32 +378,42 @@ class TestThreeStepThroughput:
                 preset.element.sigma, preset.element.gamma, 1000.0,
             )
 
-        # 2-step
-        pipe2 = HybridPipeline(
-            cache=cache, enable_shift_correction=True,
-            enable_stage2=False, use_mlx=True,
-        )
-        t0 = time.perf_counter()
-        pipe2.process_rowmajor_extended(
-            Y, preset.element.symbol, preset.element.orbital,
-            energy, peak_config, amplitudes_only=True,
-        )
-        t_2step = time.perf_counter() - t0
+        def _pipeline():
+            return HybridPipeline(
+                cache=cache, enable_shift_correction=True,
+                enable_stage2=False, use_mlx=True,
+            )
 
-        # 3-step
-        pipe3 = HybridPipeline(
-            cache=cache, enable_shift_correction=True,
-            enable_stage2=False, use_mlx=True,
-        )
-        t0 = time.perf_counter()
-        pipe3.process_rowmajor_extended_3param(
-            Y, preset.element.symbol, preset.element.orbital,
-            energy, peak_config, amplitudes_only=True,
-        )
-        t_3step = time.perf_counter() - t0
+        def _run_2step():
+            _pipeline().process_rowmajor_extended(
+                Y, preset.element.symbol, preset.element.orbital,
+                energy, peak_config, amplitudes_only=True,
+            )
+
+        def _run_3step():
+            _pipeline().process_rowmajor_extended_3param(
+                Y, preset.element.symbol, preset.element.orbital,
+                energy, peak_config, amplitudes_only=True,
+            )
+
+        def _median_seconds(run, reps=5):
+            samples = []
+            for _ in range(reps):
+                t0 = time.perf_counter()
+                run()
+                samples.append(time.perf_counter() - t0)
+            return float(np.median(samples))
+
+        # Warm up both paths first — the discarded runs pay for kernel
+        # compilation so neither timed loop is charged for the other's.
+        _run_2step()
+        _run_3step()
+
+        t_2step = _median_seconds(_run_2step)
+        t_3step = _median_seconds(_run_3step)
 
         slowdown = t_3step / t_2step
-        print(f"\n3-step vs 2-step (n={n_spectra:,}):")
+        print(f"\n3-step vs 2-step (n={n_spectra:,}, warm, median of 5):")
         print(f"  2-step: {n_spectra/t_2step/1e6:.1f}M spec/s ({t_2step*1e3:.1f} ms)")
         print(f"  3-step: {n_spectra/t_3step/1e6:.1f}M spec/s ({t_3step*1e3:.1f} ms)")
         print(f"  Slowdown: {slowdown:.2f}x")
