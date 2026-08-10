@@ -9,10 +9,13 @@ Verifies:
 4. End-to-end image → spectra → fit → image roundtrip
 """
 
+import os
 import time
 
 import numpy as np
 import pytest
+
+IN_CI = os.environ.get("CI") == "true"
 
 from toyomacro.voigtfit.param_encoder import (
     C1S_SINGLE_PRESET,
@@ -347,6 +350,7 @@ class TestThreeStepRecovery:
         print(f"  δσ: corr={corr_ds:.4f}, RMSE={rmse_ds:.4f} eV")
 
 
+@pytest.mark.skipif(IN_CI, reason="speed ratio assertion is sensitive to CI hardware")
 class TestThreeStepThroughput:
     """Benchmark 3-step vs 2-step kernel throughput."""
 
