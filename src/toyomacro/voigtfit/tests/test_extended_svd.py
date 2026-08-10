@@ -374,7 +374,15 @@ class TestThroughput:
     """Benchmark extended vs standard pipeline throughput."""
 
     def test_extended_throughput(self, cache, energy, peak_config):
-        """Extended pipeline within 3x of standard (3 matmuls vs 1)."""
+        """Extended pipeline within 3x of standard (3 matmuls vs 1).
+
+        Both paths are warmed before the clock starts and each is timed
+        repeatedly, because a single cold pair measures neither one. The
+        first pipeline to run absorbs the MLX compile cost for the kernels
+        both paths share, which drove the ratio below 1 for work that is
+        strictly larger; a single timing window also lets one scheduling
+        hiccup dominate.
+        """
         from toyomacro.voigtfit.pipeline import HybridPipeline
 
         n_spectra = 100000
@@ -386,32 +394,42 @@ class TestThroughput:
                 peak_config["gamma"], true_amps,
             )
 
-        # Standard
-        std_pipeline = HybridPipeline(
-            cache=cache, enable_stage2=False, use_mlx=True,
-        )
-        t0 = time.perf_counter()
-        _ = std_pipeline.process_rowmajor(
-            Y, "test", "1s", energy, peak_config, amplitudes_only=True,
-        )
-        t_std = time.perf_counter() - t0
+        def _run_standard():
+            HybridPipeline(
+                cache=cache, enable_stage2=False, use_mlx=True,
+            ).process_rowmajor(
+                Y, "test", "1s", energy, peak_config, amplitudes_only=True,
+            )
 
-        # Extended
-        ext_pipeline = HybridPipeline(
-            cache=cache, enable_shift_correction=True,
-            enable_stage2=False, use_mlx=True,
-        )
-        t0 = time.perf_counter()
-        _ = ext_pipeline.process_rowmajor_extended(
-            Y, "test", "1s", energy, peak_config, amplitudes_only=True,
-        )
-        t_ext = time.perf_counter() - t0
+        def _run_extended():
+            HybridPipeline(
+                cache=cache, enable_shift_correction=True,
+                enable_stage2=False, use_mlx=True,
+            ).process_rowmajor_extended(
+                Y, "test", "1s", energy, peak_config, amplitudes_only=True,
+            )
+
+        def _median_seconds(run, reps=5):
+            samples = []
+            for _ in range(reps):
+                t0 = time.perf_counter()
+                run()
+                samples.append(time.perf_counter() - t0)
+            return float(np.median(samples))
+
+        # Warm up both paths first — the discarded runs pay for kernel
+        # compilation so neither timed loop is charged for the other's.
+        _run_standard()
+        _run_extended()
+
+        t_std = _median_seconds(_run_standard)
+        t_ext = _median_seconds(_run_extended)
 
         rate_std = n_spectra / t_std
         rate_ext = n_spectra / t_ext
         slowdown = t_ext / t_std
 
-        print("\nThroughput comparison:")
+        print("\nThroughput comparison (warm, median of 5):")
         print(f"  Standard: {rate_std/1e6:.1f}M spec/s ({t_std*1e3:.1f} ms)")
         print(f"  Extended: {rate_ext/1e6:.1f}M spec/s ({t_ext*1e3:.1f} ms)")
         print(f"  Slowdown: {slowdown:.2f}x")
