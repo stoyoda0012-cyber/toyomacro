@@ -121,6 +121,19 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`background.tougaard` no longer calls its model "3-parameter".**
+  The module docstring described the universal loss cross-section
+  `B·T/(C+T²)²` as the "universal 3-parameter Tougaard" background. It
+  is the two-parameter Universal form; the three-parameter form is a
+  different function, `B·T/[(C−T²)²+D·T²]`. The docstring now names
+  the form, says that `B` is set by matching the signal at the
+  high-loss end rather than taken from the literature and that `C` can
+  be overridden, and states the
+  validity limits by loss-cross-section FWHM (accurate ≳20 eV; near-peak
+  accuracy drops at 10–15 eV; three-parameter form better ≲5 eV), which
+  matter for narrow-plasmon materials such as Si. The computation is
+  unchanged.
+
 - **`data.angular_correction` documented two different reference axes
   for the same parameter, and the unpolarized path needed the one the
   module docstring did not teach.** `L_unpolarized` measures its angle

@@ -1,16 +1,48 @@
 """Tougaard background algorithm.
 
-Implements the universal 3-parameter Tougaard inelastic background using
-the loss cross-section:
+Implements the **two-parameter** Universal Tougaard inelastic background
+using the loss cross-section
 
     K(T) = B * T / (C + T^2)^2
 
-where T is the energy loss and B, C are constants.  The *universal*
-cross-section (C = 1643 eV^2) is used by default.
+where T is the energy loss.  The source gives it for most metals, their
+oxides and alloys, with C = 1643 eV^2 and B ~ 3000 eV^2.  Here C
+defaults to 1643 eV^2 (it can be overridden per call); B is not taken
+from the literature but determined from the spectrum, by matching the
+background to the signal level at the high-loss end (see `Tougaard`).
+The loss integral is a plain sum over channels, so that scale is not in
+eV^2 and is not comparable with the literature B.
+
+This is not the *three-parameter* Universal cross-section,
+K(T) = B*T / [(C - T^2)^2 + D*T^2], whose B, C, D are tabulated per
+class of materials (e.g. polymers, semiconductors, free-electron-like
+solids).  Validity limits of the two-parameter form, as summarised in
+Tougaard (1998) from the 1997 critical review:
+
+- quite accurate when the loss cross-section FWHM is >~ 20 eV;
+- at a FWHM of 10-15 eV, still fairly good far from the peak
+  (>~ 30 eV loss) but less accurate near it (<~ 10 eV loss);
+- at a FWHM <~ 5 eV (narrow plasmon structure), the three-parameter
+  form is always more accurate.
+
+The source does not place individual elements in these bands.  Si
+belongs to a class it lists for the three-parameter form, and has a
+narrow bulk plasmon, so a Si analysis with this background class should
+state these limits; that is an inference, not a value from the source.
 
 References:
-    S. Tougaard, Surf. Interface Anal. 11, 453 (1988)
-    S. Tougaard, J. Vac. Sci. Technol. A 14, 1415 (1996)
+    Universal cross-section, C = 1643 eV^2:
+        S. Tougaard, Solid State Commun. 61 (1987) 547,
+        doi:10.1016/0038-1098(87)90166-9
+    The background algorithm:
+        S. Tougaard, Surf. Interface Anal. 11 (1988) 453,
+        doi:10.1002/sia.740110902
+    Critical review, two- and three-parameter forms:
+        S. Tougaard, Surf. Interface Anal. 25 (1997) 137
+    Validity limits as quoted above (Eqns 8-9 and the text after them):
+        S. Tougaard, Surf. Interface Anal. 26 (1998) 249
+    Related:
+        S. Tougaard, J. Vac. Sci. Technol. A 14 (1996) 1415
 """
 
 from __future__ import annotations
