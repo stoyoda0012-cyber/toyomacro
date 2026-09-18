@@ -6,7 +6,8 @@ Two kinds of assertion, kept apart:
 
 - *Identities* that hold exactly or to rounding: the heat equation, the
   v = 0 limit, parity on a symmetric window, linearity in exposure, the
-  Hessian of the expected Poisson deviance.
+  Loewner order of effective and conditional information, the Hessian of
+  the expected Poisson deviance.
 - *Measured numbers* with a written tolerance: the agreement of the two
   derivative routes across the switch, the Olivero-Longbothum error, the
   conditioning against window width.
@@ -25,6 +26,7 @@ from toyomacro.voigtfit.identifiability import (
     Background,
     VoigtPeak,
     constant_background,
+    effective_information,
     linear_background,
     poisson_fisher,
     shirley_background,
@@ -89,6 +91,10 @@ def _corr_cond(fisher):
     d = np.sqrt(np.diag(fisher))
     ev = np.linalg.eigvalsh(fisher / np.outer(d, d))
     return ev[-1] / ev[0]
+
+
+def _is_psd(m, scale):
+    return np.linalg.eigvalsh(0.5 * (m + m.T)).min() >= -1e-10 * scale
 
 
 # ===================================================================
@@ -541,3 +547,96 @@ class TestBackground:
         assert both.basis.shape == (3, 601)
         with pytest.raises(ValueError):
             Background(np.ones((2, 5)), np.ones(1), ("a",), (True,))
+
+
+# ===================================================================
+# Effective information
+# ===================================================================
+
+
+class TestEffectiveInformation:
+    @pytest.fixture
+    def cases(self):
+        energy = np.linspace(-3.0, 3.0, 601)
+        peak = [VoigtPeak(AMP, 0.0, 0.1, GAMMA)]
+        return energy, peak, {
+            "none": None,
+            "known": constant_background(energy, 50.0, estimated=False),
+            "estimated": constant_background(energy, 50.0),
+            "estimated_shirley": constant_background(energy, 50.0)
+            + shirley_background(energy, peak, 30.0),
+        }
+
+    def test_effective_never_exceeds_conditional(self, cases):
+        energy, peak, backgrounds = cases
+        for background in backgrounds.values():
+            for name in ("var_gamma", "sigma_gamma", "fwhm_shape", "pvoigt"):
+                r = poisson_fisher(energy, peak, background, parameterization=name)
+                info = effective_information(r.fisher, r.width_index)
+                scale = np.linalg.eigvalsh(info.conditional).max()
+                assert _is_psd(info.conditional - info.effective, scale)
+                assert _is_psd(info.effective, scale)
+                assert info.nuisance_null_dim == 0
+
+    def test_inverse_is_the_width_block_of_the_full_inverse(self, cases):
+        energy, peak, backgrounds = cases
+        for background in backgrounds.values():
+            r = poisson_fisher(energy, peak, background)
+            info = effective_information(r.fisher, r.width_index)
+            block = np.linalg.inv(r.fisher)[np.ix_(r.width_index, r.width_index)]
+            assert np.allclose(np.linalg.inv(info.effective), block, rtol=1e-9)
+
+    def test_background_only_removes_information(self, cases):
+        """none >= known >= estimated, in the Loewner order."""
+        energy, peak, backgrounds = cases
+        eff = {}
+        for key, background in backgrounds.items():
+            r = poisson_fisher(energy, peak, background)
+            eff[key] = effective_information(r.fisher, r.width_index).effective
+        scale = np.linalg.eigvalsh(eff["none"]).max()
+        assert _is_psd(eff["none"] - eff["known"], scale)
+        assert _is_psd(eff["known"] - eff["estimated"], scale)
+        # and an estimated flat background costs the widths a lot more
+        # than its shot noise does: the soft direction loses over half
+        soft = {k: np.linalg.eigvalsh(v)[0] for k, v in eff.items()}
+        assert soft["known"] > 0.95 * soft["none"]
+        assert soft["estimated"] < 0.5 * soft["known"]
+
+    def test_does_not_move_with_the_amplitude_unit(self, cases):
+        """A -> cA is g -> D g D; the width block must not notice."""
+        energy, peak, backgrounds = cases
+        r = poisson_fisher(energy, peak, backgrounds["estimated"])
+        reference = effective_information(r.fisher, r.width_index).effective
+        for c in (1e-6, 1e6):
+            scale = np.ones(len(r.param_names))
+            scale[0] = c
+            rescaled = r.fisher * np.outer(scale, scale)
+            moved = effective_information(rescaled, r.width_index).effective
+            assert np.allclose(moved, reference, rtol=1e-9)
+
+    def test_redundant_nuisance_direction_is_dropped_not_inverted(self, cases):
+        energy, peak, backgrounds = cases
+        single = poisson_fisher(energy, peak, backgrounds["estimated"])
+        reference = effective_information(single.fisher, single.width_index)
+
+        duplicate = Background(
+            basis=np.ones((2, energy.size)),
+            coefficients=np.array([25.0, 25.0]),
+            names=("bg_a", "bg_b"),
+            estimated=(True, True),
+        )
+        doubled = poisson_fisher(energy, peak, duplicate)
+        info = effective_information(doubled.fisher, doubled.width_index)
+        assert info.nuisance_null_dim == 1
+        assert np.allclose(info.effective, reference.effective, rtol=1e-9)
+
+    def test_no_nuisance_means_no_loss(self):
+        m = np.array([[4.0, 1.0], [1.0, 3.0]])
+        info = effective_information(m, (0, 1))
+        assert np.array_equal(info.effective, m) and info.nuisance_null_dim == 0
+
+    def test_rejects_bad_index(self):
+        m = np.eye(3)
+        for bad in ((), (0, 0), (3,), (-1,)):
+            with pytest.raises(ValueError):
+                effective_information(m, bad)

@@ -4,12 +4,16 @@ Research/diagnostic layer answering "how much does a counting spectrum
 say about the Gaussian and Lorentzian widths, once everything else that
 has to be estimated from the same spectrum is accounted for?".
 
-Two things live here that the older Fisher modules do not have:
+Three things live here that the older Fisher modules do not have:
 
 - A Poisson Fisher matrix whose mean is *peaks plus background*, with the
   background absent, known, or estimated. ``fisher_information`` and
   ``crlb`` carry no background term at all, so a bound computed there
   conditions on a background-free spectrum.
+- The effective information for a subset of parameters with the rest
+  profiled out (a Schur complement), next to the plain sub-block that
+  treats the rest as known. ``fisher_information.analyze_sigma_gamma_axes``
+  reports the latter only.
 - Voigt derivatives in the Gaussian *variance* ``v = sigma**2`` that stay
   accurate down to and including ``v = 0``.
 
@@ -101,12 +105,14 @@ __all__ = [
     "VoigtPeak",
     "Background",
     "PoissonFisherResult",
+    "EffectiveInformation",
     "voigt_derivatives",
     "voigt_fwhm",
     "constant_background",
     "linear_background",
     "shirley_background",
     "poisson_fisher",
+    "effective_information",
 ]
 
 Parameterization = Literal[
@@ -679,4 +685,87 @@ def poisson_fisher(
             "n_energy": int(energy.size),
             "energy_range": (float(energy[0]), float(energy[-1])),
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Effective information
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EffectiveInformation:
+    """Information about a target block, with and without the rest known.
+
+    Attributes:
+        target_index: Positions of the target parameters in the full matrix
+        effective: ``I_uu - I_uq pinv(I_qq) I_qu``: what is left for the
+            targets ``u`` once the other parameters ``q`` are estimated
+            from the same data. Where it is invertible its inverse is the
+            target block of the full inverse Fisher matrix.
+        conditional: ``I_uu``: the information if ``q`` were known
+            exactly. ``conditional - effective`` is positive
+            semi-definite, so this is never the smaller of the two; it is
+            what ``fisher_information.analyze_sigma_gamma_axes`` reports.
+        nuisance_null_dim: Number of numerically null directions in the
+            nuisance block, by the ``n * eps`` rule on its correlation
+            matrix. Non-zero means some combination of nuisance
+            parameters is itself not estimable; ``effective`` is then
+            taken with those directions dropped.
+    """
+
+    target_index: tuple[int, ...]
+    effective: np.ndarray
+    conditional: np.ndarray
+    nuisance_null_dim: int
+
+
+def effective_information(
+    fisher: np.ndarray, target_index: tuple[int, ...] | list[int]
+) -> EffectiveInformation:
+    """Schur complement of the nuisance block, in a scale-free metric.
+
+    The Fisher matrix mixes units (counts, eV, eV**2), so the nuisance
+    block is inverted after rescaling the whole matrix to unit diagonal
+    and the result is scaled back. The rank decision inside the
+    pseudo-inverse therefore does not move with the units of any
+    parameter -- the same gauge ``crlb.compute_multipeak_fisher`` fixes,
+    with the same ``n * eps`` threshold.
+
+    Args:
+        fisher: Symmetric positive semi-definite matrix, (n, n)
+        target_index: Positions of the target parameters ``u``; every
+            other parameter is a nuisance parameter ``q``
+
+    Returns:
+        EffectiveInformation
+    """
+    fisher = np.asarray(fisher, dtype=np.float64)
+    n = fisher.shape[0]
+    u = np.array(sorted(target_index), dtype=int)
+    if u.size == 0 or u.size != len(set(target_index)) or u.min() < 0 or u.max() >= n:
+        raise ValueError(f"invalid target_index {tuple(target_index)} for a {n}x{n} matrix")
+    q = np.array([i for i in range(n) if i not in set(u.tolist())], dtype=int)
+
+    conditional = fisher[np.ix_(u, u)].copy()
+    if q.size == 0:
+        return EffectiveInformation(tuple(u.tolist()), conditional.copy(), conditional, 0)
+
+    d = np.sqrt(np.maximum(np.diag(fisher), 0.0))
+    d_safe = np.where(d > 0.0, d, 1.0)
+    scaled = fisher / np.outer(d_safe, d_safe)
+
+    eigenvalues, eigenvectors = np.linalg.eigh(scaled[np.ix_(q, q)])
+    threshold = max(eigenvalues[-1] * q.size * np.finfo(np.float64).eps, 1e-300)
+    null = eigenvalues <= threshold
+    inverse = np.where(null, 0.0, 1.0 / np.where(null, 1.0, eigenvalues))
+    c_uq = scaled[np.ix_(u, q)] @ eigenvectors
+    schur = scaled[np.ix_(u, u)] - (c_uq * inverse[np.newaxis, :]) @ c_uq.T
+    schur = 0.5 * (schur + schur.T)
+
+    return EffectiveInformation(
+        target_index=tuple(u.tolist()),
+        effective=schur * np.outer(d_safe[u], d_safe[u]),
+        conditional=conditional,
+        nuisance_null_dim=int(null.sum()),
     )
