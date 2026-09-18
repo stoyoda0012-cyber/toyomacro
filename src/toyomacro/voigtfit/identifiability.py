@@ -1,8 +1,17 @@
 """Identifiability diagnostics for Voigt widths (SciPy/NumPy reference).
 
-Numerical foundation of the diagnostic: Voigt derivatives in the
-Gaussian *variance* ``v = sigma**2`` that stay accurate down to and
-including ``v = 0``, where the engine's Faddeeva-based Jacobian does not.
+Research/diagnostic layer answering "how much does a counting spectrum
+say about the Gaussian and Lorentzian widths, once everything else that
+has to be estimated from the same spectrum is accounted for?".
+
+Two things live here that the older Fisher modules do not have:
+
+- A Poisson Fisher matrix whose mean is *peaks plus background*, with the
+  background absent, known, or estimated. ``fisher_information`` and
+  ``crlb`` carry no background term at all, so a bound computed there
+  conditions on a background-free spectrum.
+- Voigt derivatives in the Gaussian *variance* ``v = sigma**2`` that stay
+  accurate down to and including ``v = 0``.
 
 Why the variance. A Voigt profile is a Lorentzian convolved with a
 Gaussian, so it obeys the heat equation in ``v``::
@@ -55,12 +64,22 @@ Conventions inherited from the existing engine:
 
 - Peaks are unit-area Voigt profiles; ``sigma`` is the Gaussian standard
   deviation and ``gamma`` the Lorentzian half width at half maximum.
+- ``amplitude * V(E)`` is the expected count *per channel* at unit
+  exposure. As in ``crlb``, nothing can check that the caller's
+  amplitudes are on that scale; normalised or arbitrary-unit amplitudes
+  rescale every bound silently.
+
+A Fisher matrix is computed from a model; it is not a measurement. What
+``crlb``'s module docstring says about unbiasedness, correct
+specification and non-singularity applies here unchanged.
 
 Not exported from ``toyomacro.voigtfit.__init__``; not wired to any CLI.
 
 References:
     J. J. Olivero and R. L. Longbothum, J. Quant. Spectrosc. Radiat.
         Transfer 17, 233-236 (1977), doi:10.1016/0022-4073(77)90161-3
+    P. Thompson, D. E. Cox and J. B. Hastings, J. Appl. Cryst. 20, 79-83
+        (1987), doi:10.1107/S0021889887087090
     S. G. Self and K.-Y. Liang, J. Am. Stat. Assoc. 82, 605-610 (1987),
         doi:10.1080/01621459.1987.10478472
 """
@@ -68,16 +87,34 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Literal, NamedTuple
+from dataclasses import dataclass, field
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from scipy import special as sps
 
+from ..lineshape.pseudovoigt import PseudoVoigt
+
 __all__ = [
+    "PARAMETERIZATIONS",
     "VoigtDerivatives",
+    "VoigtPeak",
+    "Background",
+    "PoissonFisherResult",
     "voigt_derivatives",
     "voigt_fwhm",
+    "constant_background",
+    "linear_background",
+    "shirley_background",
+    "poisson_fisher",
 ]
+
+Parameterization = Literal[
+    "sigma_gamma", "var_gamma", "fwhm_shape", "pvoigt", "fixed_instrument"
+]
+PARAMETERIZATIONS: tuple[str, ...] = (
+    "sigma_gamma", "var_gamma", "fwhm_shape", "pvoigt", "fixed_instrument"
+)
 
 _SQRT_PI = math.sqrt(math.pi)
 _SQRT_2PI = math.sqrt(2.0 * math.pi)
@@ -232,8 +269,414 @@ def voigt_fwhm(variance: float, gamma: float) -> float:
     half-maximum width of the profile its error is at most 2.4e-4
     (measured over f_L/f_G from 1e-4 to 1e4, pinned by the tests), exact
     for a Gaussian and 3e-6 for a Lorentzian. It is used here as the
-    *definition* of a total-width coordinate, so that a map through it
-    is exactly invertible whatever the approximation error.
+    *definition* of the width coordinate in 'fwhm_shape', so that map is
+    exactly invertible whatever the approximation error.
     """
     f_l = 2.0 * gamma
     return _OL_A * f_l + math.sqrt(_OL_B * f_l * f_l + _EIGHT_LN2 * variance)
+
+
+# ---------------------------------------------------------------------------
+# Model specification
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VoigtPeak:
+    """One Voigt component.
+
+    Attributes:
+        amplitude: Peak area; ``amplitude * V(E)`` is the expected count
+            per channel at unit exposure. Must be positive.
+        center: Peak center (eV)
+        sigma: Gaussian standard deviation (eV), ``>= 0``. Zero is
+            allowed and means a pure Lorentzian.
+        gamma: Lorentzian half width at half maximum (eV), ``>= 0``
+    """
+
+    amplitude: float
+    center: float
+    sigma: float
+    gamma: float
+
+    def __post_init__(self) -> None:
+        if not self.amplitude > 0.0:
+            raise ValueError(f"amplitude must be positive, got {self.amplitude}")
+        if self.sigma < 0.0 or self.gamma < 0.0 or (self.sigma == 0.0 and self.gamma == 0.0):
+            raise ValueError(
+                "need sigma >= 0 and gamma >= 0, not both zero; "
+                f"got sigma={self.sigma}, gamma={self.gamma}"
+            )
+
+    @property
+    def variance(self) -> float:
+        return self.sigma * self.sigma
+
+
+@dataclass(frozen=True)
+class Background:
+    """Background that is linear in its coefficients.
+
+    ``counts = coefficients @ basis`` per channel at unit exposure. Terms
+    flagged in ``estimated`` become parameters of the Fisher matrix; the
+    others enter the Poisson mean only, i.e. they are treated as known.
+    Backgrounds add: ``constant_background(...) + shirley_background(...)``.
+
+    Attributes:
+        basis: Shape functions, shape (n_terms, n_energy)
+        coefficients: Shape (n_terms,)
+        names: Parameter name per term
+        estimated: Boolean per term
+    """
+
+    basis: np.ndarray
+    coefficients: np.ndarray
+    names: tuple[str, ...]
+    estimated: tuple[bool, ...]
+
+    def __post_init__(self) -> None:
+        n = len(self.names)
+        if self.basis.shape[0] != n or self.coefficients.shape != (n,) or len(self.estimated) != n:
+            raise ValueError("basis, coefficients, names and estimated disagree on n_terms")
+
+    def counts(self) -> np.ndarray:
+        return self.coefficients @ self.basis
+
+    def __add__(self, other: Background) -> Background:
+        if self.basis.shape[1] != other.basis.shape[1]:
+            raise ValueError("backgrounds are on different energy axes")
+        return Background(
+            basis=np.vstack([self.basis, other.basis]),
+            coefficients=np.concatenate([self.coefficients, other.coefficients]),
+            names=self.names + other.names,
+            estimated=self.estimated + other.estimated,
+        )
+
+
+def constant_background(
+    energy: np.ndarray, level: float, *, estimated: bool = True
+) -> Background:
+    """Flat background of ``level`` counts per channel at unit exposure."""
+    energy = np.asarray(energy, dtype=np.float64)
+    return Background(
+        basis=np.ones((1, energy.size)),
+        coefficients=np.array([float(level)]),
+        names=("bg_level",),
+        estimated=(estimated,),
+    )
+
+
+def linear_background(
+    energy: np.ndarray, level: float, slope: float, *, estimated: bool = True
+) -> Background:
+    """``level + slope * (E - E_mid)`` with E_mid the window midpoint.
+
+    Referring the slope to the midpoint only changes the coordinates of
+    the background block; the information left for the peak parameters
+    depends on the span of the basis, not on this choice.
+    """
+    energy = np.asarray(energy, dtype=np.float64)
+    e_mid = 0.5 * (energy[0] + energy[-1])
+    return Background(
+        basis=np.vstack([np.ones(energy.size), energy - e_mid]),
+        coefficients=np.array([float(level), float(slope)]),
+        names=("bg_level", "bg_slope"),
+        estimated=(estimated, estimated),
+    )
+
+
+def shirley_background(
+    energy: np.ndarray,
+    peaks: list[VoigtPeak],
+    step: float,
+    *,
+    estimated: bool = True,
+    rises_toward: Literal["high", "low"] = "high",
+) -> Background:
+    """Shirley-type step of fixed shape; only its height is a parameter.
+
+    The shape is the running integral of the peak sum across the window,
+    normalised to go from 0 to 1, so ``step`` is the background rise
+    across the window in counts per channel (Shirley 1972; the endpoint
+    convention of ``toyomacro.background.Shirley``). It is evaluated once
+    at the stated peak parameters and then held fixed: the dependence of
+    a real Shirley background on the peak parameters is *not*
+    differentiated, so this understates the coupling between an
+    iteratively determined Shirley background and the widths.
+
+    Args:
+        energy: Energy axis (eV), ascending
+        peaks: Peaks whose integral shapes the step
+        step: Rise across the window, counts per channel at unit exposure
+        estimated: Whether ``step`` is a parameter or known
+        rises_toward: 'high' puts the step-up at the high-energy end of
+            the axis (a binding-energy axis), 'low' at the low end (a
+            kinetic-energy axis)
+    """
+    energy = np.asarray(energy, dtype=np.float64)
+    if np.any(np.diff(energy) <= 0.0):
+        raise ValueError("energy must be strictly ascending")
+    total = np.zeros_like(energy)
+    for p in peaks:
+        total += p.amplitude * voigt_derivatives(energy, p.center, p.variance, p.gamma).value
+    running = np.concatenate(
+        [[0.0], np.cumsum(0.5 * (total[1:] + total[:-1]) * np.diff(energy))]
+    )
+    shape = running / running[-1]
+    if rises_toward == "low":
+        shape = 1.0 - shape
+    elif rises_toward != "high":
+        raise ValueError(f"rises_toward must be 'high' or 'low', got '{rises_toward}'")
+    return Background(
+        basis=shape[np.newaxis, :],
+        coefficients=np.array([float(step)]),
+        names=("bg_shirley_step",),
+        estimated=(estimated,),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Width coordinates
+# ---------------------------------------------------------------------------
+
+_WIDTH_NAMES = {
+    "sigma_gamma": ("sigma", "gamma"),
+    "var_gamma": ("var", "gamma"),
+    "fwhm_shape": ("fwhm", "shape"),
+    "pvoigt": ("w", "eta"),
+    "fixed_instrument": ("gamma",),
+}
+
+
+def _shape_slope(r: float) -> float:
+    """g'(r) for g(r) = (1 - a r)**2 - b r**2, where f_G**2 = F**2 g(r)."""
+    return -2.0 * _OL_A * (1.0 - _OL_A * r) - 2.0 * _OL_B * r
+
+
+def _width_coordinates(name: str, variance: float, gamma: float) -> np.ndarray:
+    """Width coordinates of the point (variance, gamma)."""
+    if name == "sigma_gamma":
+        return np.array([math.sqrt(variance), gamma])
+    if name == "var_gamma":
+        return np.array([variance, gamma])
+    if name == "fwhm_shape":
+        fwhm = voigt_fwhm(variance, gamma)
+        return np.array([fwhm, 2.0 * gamma / fwhm])
+    if name == "fixed_instrument":
+        return np.array([gamma])
+    raise ValueError(f"no (variance, gamma) coordinates for '{name}'")
+
+
+def _width_transform(name: str, variance: float, gamma: float) -> np.ndarray:
+    """T = d(variance, gamma) / d(width coordinates), shape (2, n_width)."""
+    if name == "sigma_gamma":
+        return np.array([[2.0 * math.sqrt(variance), 0.0], [0.0, 1.0]])
+    if name == "var_gamma":
+        return np.eye(2)
+    if name == "fwhm_shape":
+        fwhm = voigt_fwhm(variance, gamma)
+        r = 2.0 * gamma / fwhm
+        # variance = F**2 g(r) / (8 ln2); its F-derivative is written as
+        # 2 variance / F because g(r) itself cancels to nothing as r -> 1.
+        return np.array([
+            [2.0 * variance / fwhm, fwhm * fwhm * _shape_slope(r) / _EIGHT_LN2],
+            [0.5 * r, 0.5 * fwhm],
+        ])
+    if name == "fixed_instrument":
+        return np.array([[0.0], [1.0]])
+    raise ValueError(f"no (variance, gamma) coordinates for '{name}'")
+
+
+def _pvoigt_derivatives(x: np.ndarray, w: float, eta: float):
+    """Pseudo-Voigt eta*L + (1-eta)*G at common FWHM w, and derivatives."""
+    h = 0.5 * w
+    den = x * x + h * h
+    lor = h / (math.pi * den)
+    lor_x = -2.0 * x * h / (math.pi * den * den)
+    lor_w = 0.5 * (x * x - h * h) / (math.pi * den * den)
+
+    s = w / math.sqrt(_EIGHT_LN2)
+    gau = np.exp(-0.5 * (x / s) ** 2) / (s * _SQRT_2PI)
+    gau_x = -x / (s * s) * gau
+    gau_w = gau * (x * x / s**3 - 1.0 / s) / math.sqrt(_EIGHT_LN2)
+
+    value = eta * lor + (1.0 - eta) * gau
+    d_center = -(eta * lor_x + (1.0 - eta) * gau_x)
+    d_w = eta * lor_w + (1.0 - eta) * gau_w
+    d_eta = lor - gau
+    return value, d_center, d_w, d_eta
+
+
+# ---------------------------------------------------------------------------
+# Poisson Fisher matrix with background
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PoissonFisherResult:
+    """Poisson Fisher matrix of a peaks-plus-background model.
+
+    Attributes:
+        fisher: Fisher matrix in the chosen coordinates, (n_params, n_params)
+        param_names: e.g. ('amp_0', 'center_0', 'var_0', 'gamma_0', 'bg_level')
+        param_roles: 'amplitude', 'center', 'width' or 'background' per
+            parameter
+        param_values: Parameter values in the chosen coordinates
+        width_index: Positions of the width parameters
+        jacobian: d(expected counts)/d(parameters) at the stated exposure,
+            shape (n_energy, n_params)
+        expected_counts: Poisson mean per channel at the stated exposure,
+            peaks plus every background term, known or estimated
+        parameterization: Width coordinates used
+        exposure: Multiplier on the whole mean; ``fisher`` is linear in it
+        config: Model echo
+    """
+
+    fisher: np.ndarray
+    param_names: tuple[str, ...]
+    param_roles: tuple[str, ...]
+    param_values: np.ndarray
+    width_index: tuple[int, ...]
+    jacobian: np.ndarray
+    expected_counts: np.ndarray
+    parameterization: str
+    exposure: float
+    config: dict[str, Any] = field(default_factory=dict)
+
+
+def poisson_fisher(
+    energy: np.ndarray,
+    peaks: list[VoigtPeak],
+    background: Background | None = None,
+    *,
+    parameterization: Parameterization = "var_gamma",
+    exposure: float = 1.0,
+) -> PoissonFisherResult:
+    """Fisher matrix ``J^T diag(1/mu) J`` for Poisson counts.
+
+    ``mu(E) = exposure * (sum_k A_k V_k(E) + background(E))``. Each peak
+    contributes amplitude, center and its width coordinates; each
+    background term flagged ``estimated`` contributes its coefficient. A
+    known background raises ``mu`` -- and with it the counting noise
+    under the peak -- without adding parameters; an estimated one
+    additionally competes with the peak parameters for the same counts.
+
+    Width coordinates:
+
+    - 'sigma_gamma': (sigma, gamma). Singular at sigma = 0 by
+      construction of the coordinate, see the module docstring.
+    - 'var_gamma': (sigma**2, gamma). Regular at sigma = 0.
+    - 'fwhm_shape': (F, r) with F the Olivero-Longbothum total FWHM and
+      r = f_L / F the Lorentzian share of it, 0 for a Gaussian and
+      0.999997 (not 1: the published coefficients are rounded) for a
+      Lorentzian.
+    - 'fixed_instrument': (gamma,) only; each peak's ``sigma`` is taken as
+      a calibrated instrument width and not estimated. No sample-side
+      Gaussian broadening is allowed for.
+    - 'pvoigt': (w, eta) of the pseudo-Voigt ``eta L + (1 - eta) G`` at
+      common FWHM ``w``. This is a **different lineshape model**, not a
+      re-parameterisation of the Voigt: each peak's (sigma, gamma) is
+      mapped to (w, eta) by Thompson, Cox & Hastings (1987) and mean and
+      derivatives are those of the pseudo-Voigt at that point.
+
+    The first four are related by ``I_phi = T^T I_theta T`` and describe
+    the same statistical model; only 'sigma_gamma' has a singular ``T``.
+
+    Args:
+        energy: Energy axis (eV), shape (n_energy,)
+        peaks: One or more peaks
+        background: None for no background, else a ``Background``
+        parameterization: Width coordinates, see above
+        exposure: Multiplier on the whole mean (acquisition time, flux).
+            Parameters are defined at unit exposure, so the matrix is
+            exactly linear in it.
+
+    Returns:
+        PoissonFisherResult. The matrix is returned as computed and can
+        be singular; nothing here inverts it.
+
+    Raises:
+        ValueError: if the expected count is not positive in every
+            channel. Without a background that happens where a profile
+            underflows (a pure Gaussian far from its center); the
+            information is then undefined, not large.
+    """
+    if parameterization not in PARAMETERIZATIONS:
+        raise ValueError(
+            f"parameterization must be one of {PARAMETERIZATIONS}, got '{parameterization}'"
+        )
+    if not peaks:
+        raise ValueError("need at least one peak")
+    if not exposure > 0.0:
+        raise ValueError(f"exposure must be positive, got {exposure}")
+    energy = np.asarray(energy, dtype=np.float64)
+
+    mean = np.zeros_like(energy)
+    columns: list[np.ndarray] = []
+    names: list[str] = []
+    roles: list[str] = []
+    values: list[float] = []
+
+    for k, p in enumerate(peaks):
+        if parameterization == "pvoigt":
+            w, eta = PseudoVoigt.eta_from_voigt_params(
+                math.sqrt(_EIGHT_LN2) * p.sigma, 2.0 * p.gamma
+            )
+            value, d_center, d_w, d_eta = _pvoigt_derivatives(energy - p.center, w, float(eta))
+            width_columns = p.amplitude * np.stack([d_w, d_eta], axis=1)
+            width_values = np.array([w, float(eta)])
+        else:
+            d = voigt_derivatives(energy, p.center, p.variance, p.gamma)
+            value, d_center = d.value, d.d_center
+            canonical = p.amplitude * np.stack([d.d_variance, d.d_gamma], axis=1)
+            width_columns = canonical @ _width_transform(parameterization, p.variance, p.gamma)
+            width_values = _width_coordinates(parameterization, p.variance, p.gamma)
+
+        mean += p.amplitude * value
+        columns += [value, p.amplitude * d_center, *width_columns.T]
+        width_names = _WIDTH_NAMES[parameterization]
+        names += [f"amp_{k}", f"center_{k}", *(f"{n}_{k}" for n in width_names)]
+        roles += ["amplitude", "center", *(["width"] * len(width_names))]
+        values += [p.amplitude, p.center, *width_values]
+
+    if background is not None:
+        if background.basis.shape[1] != energy.size:
+            raise ValueError("background is on a different energy axis")
+        mean += background.counts()
+        for j, is_estimated in enumerate(background.estimated):
+            if is_estimated:
+                columns.append(background.basis[j])
+                names.append(background.names[j])
+                roles.append("background")
+                values.append(float(background.coefficients[j]))
+    if len(set(names)) != len(names):
+        raise ValueError(f"duplicate parameter names: {names}")
+
+    if not np.all(mean > 0.0):
+        raise ValueError(
+            "expected counts must be positive in every channel; "
+            f"minimum is {mean.min():.3e}. Add a background or narrow the window."
+        )
+
+    jac_unit = np.stack(columns, axis=1)  # (n_energy, n_params), unit exposure
+    weighted = jac_unit / np.sqrt(mean)[:, np.newaxis]
+    fisher = exposure * (weighted.T @ weighted)
+
+    return PoissonFisherResult(
+        fisher=fisher,
+        param_names=tuple(names),
+        param_roles=tuple(roles),
+        param_values=np.array(values, dtype=np.float64),
+        width_index=tuple(i for i, r in enumerate(roles) if r == "width"),
+        jacobian=exposure * jac_unit,
+        expected_counts=exposure * mean,
+        parameterization=parameterization,
+        exposure=float(exposure),
+        config={
+            "peaks": [(p.amplitude, p.center, p.sigma, p.gamma) for p in peaks],
+            "background_terms": () if background is None else background.names,
+            "background_estimated": () if background is None else background.estimated,
+            "n_energy": int(energy.size),
+            "energy_range": (float(energy[0]), float(energy[-1])),
+        },
+    )

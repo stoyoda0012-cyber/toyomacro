@@ -4,10 +4,12 @@ Tests for the Voigt width identifiability diagnostics
 
 Two kinds of assertion, kept apart:
 
-- *Identities* that hold exactly or to rounding: the heat equation and
-  the v = 0 limit.
+- *Identities* that hold exactly or to rounding: the heat equation, the
+  v = 0 limit, parity on a symmetric window, linearity in exposure, the
+  Hessian of the expected Poisson deviance.
 - *Measured numbers* with a written tolerance: the agreement of the two
-  derivative routes across the switch and the Olivero-Longbothum error.
+  derivative routes across the switch, the Olivero-Longbothum error, the
+  conditioning against window width.
 """
 
 import math
@@ -17,7 +19,18 @@ import pytest
 from scipy.optimize import brentq
 
 from toyomacro.lineshape import Voigt
-from toyomacro.voigtfit.identifiability import voigt_derivatives, voigt_fwhm
+from toyomacro.voigtfit import identifiability as idf
+from toyomacro.voigtfit.identifiability import (
+    PARAMETERIZATIONS,
+    Background,
+    VoigtPeak,
+    constant_background,
+    linear_background,
+    poisson_fisher,
+    shirley_background,
+    voigt_derivatives,
+    voigt_fwhm,
+)
 from toyomacro.voigtfit.voigt_jacobian import voigt_with_hessian
 
 GAMMA = 0.3
@@ -51,6 +64,31 @@ def _quadrature_reference(x, variance, gamma):
     q = (1 / u**2) @ phi
     d_variance = ((1 / u**3).imag @ phi) / math.pi
     return value, q.imag / math.pi, d_variance, q.real / math.pi
+
+
+def _canonical_from_widths(name, widths, variance):
+    """Inverse of ``idf._width_coordinates``, written independently of it.
+
+    ``variance`` is only used by 'fixed_instrument', where it is not a
+    coordinate.
+    """
+    if name == "sigma_gamma":
+        return float(widths[0]) ** 2, float(widths[1])
+    if name == "var_gamma":
+        return float(widths[0]), float(widths[1])
+    if name == "fwhm_shape":
+        fwhm, r = float(widths[0]), float(widths[1])
+        f_g_squared = (fwhm - 0.5346 * r * fwhm) ** 2 - 0.2166 * (r * fwhm) ** 2
+        return f_g_squared / (8 * math.log(2)), 0.5 * r * fwhm
+    if name == "fixed_instrument":
+        return variance, float(widths[0])
+    raise ValueError(name)
+
+
+def _corr_cond(fisher):
+    d = np.sqrt(np.diag(fisher))
+    ev = np.linalg.eigvalsh(fisher / np.outer(d, d))
+    return ev[-1] / ev[0]
 
 
 # ===================================================================
@@ -157,3 +195,349 @@ class TestVoigtFwhm:
             variance, gamma = 1.0 / (8 * math.log(2)), ratio / 2
             worst = max(worst, abs(voigt_fwhm(variance, gamma) / exact(variance, gamma) - 1))
         assert 1e-4 < worst < 2.5e-4
+
+
+# ===================================================================
+# Width coordinates
+# ===================================================================
+
+
+WIDTH_MAPS = ["sigma_gamma", "var_gamma", "fwhm_shape", "fixed_instrument"]
+
+
+class TestWidthCoordinates:
+    @pytest.mark.parametrize("name", WIDTH_MAPS)
+    @pytest.mark.parametrize("variance", [0.0, 1e-6, 0.04, 1.0])
+    def test_round_trip(self, name, variance):
+        widths = idf._width_coordinates(name, variance, GAMMA)
+        v, g = _canonical_from_widths(name, widths, variance)
+        # In (F, r) the Gaussian variance is a difference of two numbers
+        # of order F**2 that cancels as r -> 1, so it comes back only to
+        # about eps * F**2 in absolute terms: the coordinate is poorly
+        # conditioned at the Lorentzian end. The others are exact.
+        absolute = 1e-15 * voigt_fwhm(variance, GAMMA) ** 2 if name == "fwhm_shape" else 1e-18
+        assert v == pytest.approx(variance, rel=1e-12, abs=absolute)
+        assert g == pytest.approx(GAMMA, rel=1e-12)
+
+    @pytest.mark.parametrize("name", WIDTH_MAPS)
+    def test_transform_is_the_jacobian_of_the_map(self, name):
+        variance = 0.04
+        w0 = idf._width_coordinates(name, variance, GAMMA)
+        numeric = np.zeros((2, w0.size))
+        for j in range(w0.size):
+            h = 1e-6 * max(abs(w0[j]), 1.0)
+            up, dn = w0.copy(), w0.copy()
+            up[j] += h
+            dn[j] -= h
+            numeric[:, j] = (
+                np.array(_canonical_from_widths(name, up, variance))
+                - np.array(_canonical_from_widths(name, dn, variance))
+            ) / (2 * h)
+        assert np.allclose(idf._width_transform(name, variance, GAMMA), numeric, rtol=1e-7, atol=1e-9)
+
+
+# ===================================================================
+# Fisher matrix
+# ===================================================================
+
+
+def _mean_from_params(result, energy, phi, background):
+    """Poisson mean at parameter vector ``phi`` in ``result``'s coordinates."""
+    name = result.parameterization
+    n_width = len(idf._WIDTH_NAMES[name])
+    n_peaks = len(result.config["peaks"])
+    mean = np.zeros_like(energy)
+    pos = 0
+    for k in range(n_peaks):
+        amp, center = phi[pos], phi[pos + 1]
+        widths = phi[pos + 2: pos + 2 + n_width]
+        pos += 2 + n_width
+        if name == "pvoigt":
+            mean += amp * idf._pvoigt_derivatives(energy - center, widths[0], widths[1])[0]
+        else:
+            fixed_variance = result.config["peaks"][k][2] ** 2
+            v, g = _canonical_from_widths(name, widths, fixed_variance)
+            mean += amp * voigt_derivatives(energy, center, v, g).value
+    if background is not None:
+        coefficients = background.coefficients.copy()
+        for j, is_estimated in enumerate(background.estimated):
+            if is_estimated:
+                coefficients[j] = phi[pos]
+                pos += 1
+        mean += coefficients @ background.basis
+    assert pos == phi.size
+    return result.exposure * mean
+
+
+class TestPoissonFisher:
+    def test_fisher_matrix_is_the_same_from_either_route(self, monkeypatch):
+        """The brief's criterion: agreement of the matrix, not of the profile."""
+        energy = np.linspace(-3.0, 3.0, 1201)
+        peak = [VoigtPeak(AMP, 0.0, 0.03 * GAMMA, GAMMA)]  # min |z| = 23.6: all series
+        auto = poisson_fisher(energy, peak).fisher
+
+        def forced(energy, center, variance, gamma, *, route="auto"):
+            return original(energy, center, variance, gamma, route="faddeeva")
+
+        original = idf.voigt_derivatives
+        monkeypatch.setattr(idf, "voigt_derivatives", forced)
+        legacy = poisson_fisher(energy, peak).fisher
+        d = np.sqrt(np.diag(auto))
+        assert np.allclose(legacy / np.outer(d, d), auto / np.outer(d, d), rtol=0, atol=1e-7)
+
+    def test_sigma_information_slope_is_two(self):
+        """I_sigma_sigma ~ sigma**2 when the Lorentzian dominates.
+
+        Asserted over 3e-3 <= sigma/gamma <= 3e-2, the window in which
+        the legacy Jacobian also shows it; the slope departs from 2 by
+        O((sigma/gamma)**2) at the top, hence 0.01.
+        """
+        energy = np.linspace(-10.0, 10.0, 2001)
+        ratios = np.logspace(math.log10(3e-3), math.log10(3e-2), 9)
+        info = np.array([
+            poisson_fisher(
+                energy, [VoigtPeak(AMP, 0.0, r * GAMMA, GAMMA)], parameterization="sigma_gamma"
+            ).fisher[2, 2]
+            for r in ratios
+        ])
+        slopes = np.diff(np.log(info)) / np.diff(np.log(ratios))
+        assert np.all(np.abs(slopes - 2.0) < 0.01)
+
+    def test_slope_holds_where_the_legacy_jacobian_has_broken_down(self):
+        """Down to sigma/gamma = 1e-7; voigt_with_jacobian fails below 1e-3."""
+        energy = np.linspace(-10.0, 10.0, 2001)
+        ratios = np.logspace(-7, -4, 7)
+        info = np.array([
+            poisson_fisher(
+                energy, [VoigtPeak(AMP, 0.0, r * GAMMA, GAMMA)], parameterization="sigma_gamma"
+            ).fisher[2, 2]
+            for r in ratios
+        ])
+        slopes = np.diff(np.log(info)) / np.diff(np.log(ratios))
+        assert np.all(np.abs(slopes - 2.0) < 1e-6)
+
+    def test_variance_information_is_finite_and_nonzero_at_zero(self):
+        energy = np.linspace(-10.0, 10.0, 2001)
+        at_zero = poisson_fisher(energy, [VoigtPeak(AMP, 0.0, 0.0, GAMMA)])
+        assert at_zero.param_names[2] == "var_0"
+        i_vv = at_zero.fisher[2, 2]
+        assert np.isfinite(i_vv) and i_vv > 0
+        assert np.linalg.eigvalsh(at_zero.fisher).min() > 0
+
+        sigma = 1e-4 * GAMMA
+        nearby = poisson_fisher(
+            energy, [VoigtPeak(AMP, 0.0, sigma, GAMMA)], parameterization="sigma_gamma"
+        )
+        assert nearby.fisher[2, 2] / (4 * sigma**2) == pytest.approx(i_vv, rel=1e-6)
+
+    def test_sigma_coordinate_is_singular_at_zero(self):
+        energy = np.linspace(-10.0, 10.0, 2001)
+        r = poisson_fisher(
+            energy, [VoigtPeak(AMP, 0.0, 0.0, GAMMA)], parameterization="sigma_gamma"
+        )
+        assert np.all(r.fisher[2, :] == 0.0) and np.all(r.fisher[:, 2] == 0.0)
+
+    @staticmethod
+    def _correlation(energy, peak, background):
+        r = poisson_fisher(energy, peak, background)
+        d = np.sqrt(np.diag(r.fisher))
+        return r.param_names, r.fisher / np.outer(d, d)
+
+    def test_center_decouples_when_the_mean_is_even(self):
+        """Symmetric window *and* an even mean: odd and even parameters split.
+
+        The center is odd, amplitude, widths and a flat level are even. A
+        background slope is odd too, so it couples to the center and to
+        nothing else -- provided its true value is zero, because the
+        weights 1/mu must be even as well.
+        """
+        energy = np.linspace(-5.0, 5.0, 1001)
+        peak = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+
+        for background in (None, constant_background(energy, 40.0)):
+            names, c = self._correlation(energy, peak, background)
+            row = np.delete(c[names.index("center_0")], names.index("center_0"))
+            assert np.max(np.abs(row)) < 1e-12
+
+        names, c = self._correlation(energy, peak, linear_background(energy, 40.0, 0.0))
+        center, slope = names.index("center_0"), names.index("bg_slope")
+        assert abs(c[center, slope]) > 1e-3
+        even = [i for i, n in enumerate(names) if n not in ("center_0", "bg_slope")]
+        assert np.max(np.abs(c[np.ix_([center, slope], even)])) < 1e-12
+
+    def test_a_sloping_background_recouples_the_center(self):
+        """A non-zero slope makes 1/mu uneven; the symmetric window no
+        longer protects the position. Measured at 4e-4 (center) to 1e-2
+        (slope) against the even parameters for this configuration."""
+        energy = np.linspace(-5.0, 5.0, 1001)
+        peak = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+        names, c = self._correlation(energy, peak, linear_background(energy, 40.0, 1.5))
+        center = names.index("center_0")
+        even = [i for i, n in enumerate(names) if n not in ("center_0", "bg_slope")]
+        assert np.max(np.abs(c[center, even])) > 1e-4
+
+    def test_center_couples_on_an_asymmetric_window(self):
+        energy = np.linspace(-6.0, 10.0, 1601)
+        r = poisson_fisher(energy, [VoigtPeak(AMP, 0.0, 0.3, GAMMA)])
+        d = np.sqrt(np.diag(r.fisher))
+        row = (r.fisher / np.outer(d, d))[1]
+        assert np.max(np.abs(np.delete(row, 1))) > 1e-4
+
+    def test_linear_in_exposure(self):
+        energy = np.linspace(-3.0, 3.0, 601)
+        peak = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+        background = linear_background(energy, 40.0, 1.5)
+        one = poisson_fisher(energy, peak, background)
+        many = poisson_fisher(energy, peak, background, exposure=37.0)
+        assert np.allclose(many.fisher, 37.0 * one.fisher, rtol=1e-13, atol=0)
+        assert np.allclose(many.expected_counts, 37.0 * one.expected_counts, rtol=1e-15)
+        assert np.allclose(many.jacobian, 37.0 * one.jacobian, rtol=1e-15)
+        assert np.array_equal(many.param_values, one.param_values)
+
+    @pytest.mark.parametrize("name", PARAMETERIZATIONS)
+    def test_is_the_hessian_of_the_expected_deviance(self, name):
+        """E[-log L] has Hessian exactly I at the truth; checked by differences.
+
+        Independent of every derivative in the module: only model values
+        enter. Done in each coordinate system, so it checks the transform
+        T as well, and with two peaks and an estimated linear background.
+        """
+        energy = np.linspace(-3.0, 4.0, 701)
+        peaks = [VoigtPeak(AMP, 0.0, 0.15, GAMMA), VoigtPeak(0.4 * AMP, 1.1, 0.25, 0.2)]
+        background = linear_background(energy, 60.0, 3.0)
+        r = poisson_fisher(energy, peaks, background, parameterization=name, exposure=2.0)
+        mu0, phi0 = r.expected_counts, r.param_values
+
+        def half_deviance(phi):
+            delta = (_mean_from_params(r, energy, phi, background) - mu0) / mu0
+            return np.sum(mu0 * (delta - np.log1p(delta)))
+
+        n = phi0.size
+        steps = 1e-2 / np.sqrt(np.diag(r.fisher))
+        hessian = np.zeros((n, n))
+        for i in range(n):
+            for j in range(i, n):
+                total = 0.0
+                for si, sj in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                    phi = phi0.copy()
+                    phi[i] += si * steps[i]
+                    phi[j] += sj * steps[j]
+                    total += si * sj * half_deviance(phi)
+                hessian[i, j] = hessian[j, i] = total / (4 * steps[i] * steps[j])
+
+        d = np.sqrt(np.diag(r.fisher))
+        assert np.allclose(hessian / np.outer(d, d), r.fisher / np.outer(d, d), rtol=0, atol=2e-4)
+
+    def test_amplitude_bound_does_not_depend_on_width_coordinates(self):
+        """Re-parameterising nuisance directions cannot move another bound."""
+        energy = np.linspace(-3.0, 3.0, 601)
+        peak = [VoigtPeak(AMP, 0.0, 0.15, GAMMA)]
+        background = constant_background(energy, 60.0)
+        bounds = []
+        for name in ("sigma_gamma", "var_gamma", "fwhm_shape"):
+            r = poisson_fisher(energy, peak, background, parameterization=name)
+            bounds.append(np.diag(np.linalg.inv(r.fisher))[:2])
+        assert np.allclose(bounds[0], bounds[1], rtol=1e-9)
+        assert np.allclose(bounds[2], bounds[1], rtol=1e-9)
+
+    def test_conditioning_against_window_width(self):
+        """No background, sigma/gamma = 1/30, condition number of the
+        unit-diagonal matrix.
+
+        +-33.3 gamma reproduces the 6.18 of the inventory. The narrow
+        windows are given as ranges because the number there depends on
+        the sampling at the several-percent level (measured: 936 on 2001
+        points against 912 on a 0.003 eV step at +-gamma, 5.5e6 against
+        4.9e6 at +-0.3 gamma); an independent recomputation got 917 and
+        5.2e6.
+        """
+        conds = []
+        for half in (100.0 / 3.0, 1.0, 0.3):
+            energy = np.linspace(-half * GAMMA, half * GAMMA, 2001)
+            r = poisson_fisher(energy, [VoigtPeak(AMP, 0.0, GAMMA / 30, GAMMA)])
+            conds.append(_corr_cond(r.fisher))
+        assert conds[0] == pytest.approx(6.18, abs=0.02)
+        assert 8.0e2 < conds[1] < 1.1e3
+        assert 4.0e6 < conds[2] < 7.0e6
+
+    def test_pvoigt_is_regular_at_a_pure_lorentzian(self):
+        energy = np.linspace(-10.0, 10.0, 2001)
+        r = poisson_fisher(energy, [VoigtPeak(AMP, 0.0, 0.0, GAMMA)], parameterization="pvoigt")
+        assert r.param_names == ("amp_0", "center_0", "w_0", "eta_0")
+        assert r.param_values[3] == pytest.approx(1.0, abs=1e-5)
+        assert r.param_values[2] == pytest.approx(2 * GAMMA, rel=1e-12)
+        assert np.linalg.eigvalsh(r.fisher).min() > 0
+
+    def test_layout_for_two_peaks_with_background(self):
+        energy = np.linspace(-3.0, 4.0, 701)
+        peaks = [VoigtPeak(AMP, 0.0, 0.15, GAMMA), VoigtPeak(AMP, 1.1, 0.25, 0.2)]
+        background = constant_background(energy, 60.0) + shirley_background(energy, peaks, 30.0)
+        r = poisson_fisher(energy, peaks, background)
+        assert r.param_names == (
+            "amp_0", "center_0", "var_0", "gamma_0",
+            "amp_1", "center_1", "var_1", "gamma_1",
+            "bg_level", "bg_shirley_step",
+        )
+        assert r.width_index == (2, 3, 6, 7)
+        assert r.fisher.shape == (10, 10) and r.jacobian.shape == (701, 10)
+        assert np.allclose(r.fisher, r.fisher.T, rtol=1e-14)
+
+        fixed = poisson_fisher(energy, peaks, background, parameterization="fixed_instrument")
+        assert fixed.width_index == (2, 5)
+        keep = [0, 1, 3, 4, 5, 7, 8, 9]
+        assert np.allclose(fixed.fisher, r.fisher[np.ix_(keep, keep)], rtol=1e-13)
+
+    def test_rejects_a_channel_with_no_expected_counts(self):
+        energy = np.linspace(-20.0, 20.0, 401)
+        gaussian = [VoigtPeak(AMP, 0.0, 0.2, 0.0)]
+        with pytest.raises(ValueError, match="positive in every channel"):
+            poisson_fisher(energy, gaussian)
+        poisson_fisher(energy, gaussian, constant_background(energy, 5.0, estimated=False))
+
+    def test_rejects_bad_arguments(self):
+        energy = np.linspace(-1.0, 1.0, 11)
+        peak = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+        with pytest.raises(ValueError):
+            poisson_fisher(energy, peak, parameterization="eta_fwhm")
+        with pytest.raises(ValueError):
+            poisson_fisher(energy, [])
+        with pytest.raises(ValueError):
+            poisson_fisher(energy, peak, exposure=0.0)
+        with pytest.raises(ValueError):
+            poisson_fisher(energy, peak, constant_background(energy[:-1], 5.0))
+        with pytest.raises(ValueError):
+            VoigtPeak(0.0, 0.0, 0.2, GAMMA)
+        with pytest.raises(ValueError):
+            VoigtPeak(AMP, 0.0, 0.0, 0.0)
+
+
+class TestBackground:
+    def test_shirley_shape_runs_from_zero_to_one(self):
+        energy = np.linspace(-4.0, 4.0, 801)
+        peaks = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+        high = shirley_background(energy, peaks, 30.0)
+        low = shirley_background(energy, peaks, 30.0, rises_toward="low")
+        assert high.basis[0, 0] == 0.0 and high.basis[0, -1] == pytest.approx(1.0)
+        assert np.all(np.diff(high.basis[0]) > 0)
+        assert np.allclose(low.basis[0], 1.0 - high.basis[0])
+        assert high.counts().max() == pytest.approx(30.0)
+        with pytest.raises(ValueError):
+            shirley_background(energy[::-1], peaks, 30.0)
+
+    def test_known_terms_enter_the_mean_but_not_the_parameters(self):
+        energy = np.linspace(-3.0, 3.0, 601)
+        peak = [VoigtPeak(AMP, 0.0, 0.2, GAMMA)]
+        known = poisson_fisher(energy, peak, constant_background(energy, 50.0, estimated=False))
+        bare = poisson_fisher(energy, peak)
+        assert known.param_names == bare.param_names
+        assert np.allclose(known.expected_counts - bare.expected_counts, 50.0)
+
+    def test_sum_concatenates_terms(self):
+        energy = np.linspace(-3.0, 3.0, 601)
+        both = constant_background(energy, 50.0, estimated=False) + linear_background(
+            energy, 0.0, 2.0
+        )
+        assert both.estimated == (False, True, True)
+        assert both.basis.shape == (3, 601)
+        with pytest.raises(ValueError):
+            Background(np.ones((2, 5)), np.ones(1), ("a",), (True,))
