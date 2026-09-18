@@ -59,10 +59,29 @@ The worst case sits just below the switch, on the Faddeeva side. The
 expansion is at rounding level (3e-14) from ``|z| = 7`` up, while the
 Faddeeva route keeps degrading with ``|z|`` (d_variance: 9e-11 on
 7 <= |z| < 8, 4e-9 on 20 <= |z| < 50, 2e-7 beyond), so the switch is put
-at the lowest ``|z|`` the expansion can take. It cannot go lower: the
-expansion is asymptotic, not convergent, and below the switch it fails
-fast -- 5e-11 on 6 <= |z| < 7, 2e-2 on 4 <= |z| < 6. Those are numbers
-for this window and these shapes, not a bound.
+at the lowest ``|z|`` the expansion can take; below it the 24-term sum
+fails fast -- 5e-11 on 6 <= |z| < 7, 2e-2 on 4 <= |z| < 6. Those are
+numbers for this window and these shapes, not a bound.
+
+The expansion is asymptotic, not convergent. Successive terms are in the
+ratio ``(2n + 1) / (2 |z|**2)``, so they shrink only while ``n < |z|**2``
+and grow without limit after it; the smallest term, and with it the best
+accuracy available at that ``|z|``, is of order ``exp(-|z|**2)``. Two
+constraints on the constants follow:
+
+- The number of terms N must stay below ``|z_c|**2`` at the switch
+  ``|z_c|`` -- 24 < 49 here -- so that every term summed is on the
+  shrinking side at every point that uses the expansion.
+- The switch cannot be lowered to buy back the Faddeeva error. Measured
+  on d_variance at sigma/gamma = 1, the best any N can do is 4e-8 at
+  ``|z| = 5`` and 3e-5 at ``|z| = 4``; N = 24 gives 2.5e-3 at ``|z| = 4``
+  and N = 40 gives 3e2. More terms make it worse, not better.
+
+At ``|z| = 7`` the same measurement is at rounding level for every N from
+24 to 60, 6e-8 at N = 100 and 0.5 at N = 120. So exceeding ``|z_c|**2``
+mildly has no numerical effect at this switch and the accuracy tests
+would not notice it; ``N < |z_c|**2`` is therefore asserted on the
+constants directly.
 
 Conventions inherited from the existing engine:
 
@@ -135,11 +154,17 @@ _OL_B = 0.2166
 # Faddeeva route only gets worse with |z|, so nothing is gained by
 # waiting. Measurements in the module docstring, pinned by the tests.
 _SERIES_SWITCH_Z = 7.0
+# The series is asymptotic: terms grow again once n exceeds |z|**2, so
+# this must stay below _SERIES_SWITCH_Z**2 (the tests assert it).
 _SERIES_TERMS = 24
 
 
 def _series_coefficients(n_terms: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Coefficients (2n-1)!!, (2n+1)!! and (n+1)(2n+1)!! for n = 0..n_terms."""
+    """Coefficients (2n-1)!!, (2n+1)!! and (n+1)(2n+1)!! for n = 0..n_terms.
+
+    Those of the value, of d/dx and d/dgamma, and of d/dvariance, as
+    power series in t = variance / (x - i gamma)**2.
+    """
     a = np.ones(n_terms + 1)
     b = np.ones(n_terms + 1)
     for n in range(1, n_terms + 1):
@@ -180,18 +205,27 @@ def _horner(coefficients: np.ndarray, t: np.ndarray) -> np.ndarray:
     return acc
 
 
-def _derivatives_series(x: np.ndarray, variance: float, gamma: float):
-    """Large-|z| expansion; exact at variance = 0."""
+def _derivatives_series(
+    x: np.ndarray, variance: float, gamma: float, n_terms: int | None = None
+):
+    """Large-|z| expansion; exact at variance = 0.
+
+    ``n_terms`` overrides the shipped number of terms. It exists so the
+    tests can show the series diverging; nothing else should pass it.
+    """
+    coeff_a, coeff_b, coeff_c = (
+        (_SERIES_A, _SERIES_B, _SERIES_C) if n_terms is None else _series_coefficients(n_terms)
+    )
     # L(x) = Im[1/u]/pi with u = x - i gamma, and every x-derivative of L
     # is a power of 1/u, so the heat-equation series in the variance
     # becomes a power series in t = variance / u**2.
     u = x - 1j * gamma
     t = variance / (u * u)
-    value = (_horner(_SERIES_A, t) / u).imag / math.pi
-    q = _horner(_SERIES_B, t) / (u * u)
+    value = (_horner(coeff_a, t) / u).imag / math.pi
+    q = _horner(coeff_b, t) / (u * u)
     d_x = -q.imag / math.pi
     d_gamma = q.real / math.pi
-    d_variance = (_horner(_SERIES_C, t) / u**3).imag / math.pi
+    d_variance = (_horner(coeff_c, t) / u**3).imag / math.pi
     return value, -d_x, d_variance, d_gamma
 
 

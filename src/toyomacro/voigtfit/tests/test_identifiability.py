@@ -165,6 +165,47 @@ class TestVoigtDerivatives:
             assert _close(s, f, 1e-9)
             assert _close(a, f, 1e-9)
 
+    def test_term_count_stays_below_the_turning_point_of_the_series(self):
+        """N < |z_c|**2: every term summed is on the shrinking side.
+
+        Asserted on the constants because the accuracy tests cannot see a
+        mild violation: at the shipped switch the terms near n = |z|**2
+        are of order exp(-49), and the measured error is at rounding
+        level for every N from 24 to 60. What the accuracy tests do catch
+        is the other way of breaking it, a switch lowered to |z| = 4
+        (16 < 24), and a gross excess of terms (N >= 100).
+        """
+        assert idf._SERIES_TERMS < idf._SERIES_SWITCH_Z**2
+
+    def test_expansion_is_asymptotic_more_terms_eventually_hurt(self):
+        """At |z| = 4 terms grow once n > 16; the error has a floor, then diverges.
+
+        d_variance at sigma/gamma = 1 against the quadrature reference.
+        Measured: 1.9e-3 (N=4), 2.9e-5 (N=12, the best), 2.5e-3 (N=24),
+        3e2 (N=40). The floor is why the switch cannot be lowered, and the
+        divergence is why the term count is bounded by |z_c|**2.
+        """
+        sigma = GAMMA
+        z_abs = np.linspace(4.0, 4.08, 9)
+        x = np.sqrt((z_abs * sigma * math.sqrt(2)) ** 2 - GAMMA**2)
+        reference = _quadrature_reference(x, sigma**2, GAMMA)[2]
+
+        def error(n_terms):
+            got = idf._derivatives_series(x, sigma**2, GAMMA, n_terms=n_terms)[2]
+            return np.max(np.abs(got - reference)) / np.max(np.abs(reference))
+
+        assert error(12) < error(4) < 1e-2
+        assert 1e-6 < error(12) < 1e-4  # a floor of order exp(-16), not rounding
+        assert error(24) > 10 * error(12)
+        assert error(40) > 1.0
+
+    def test_overridden_term_count_matches_the_shipped_one(self):
+        x = np.linspace(3.0, 10.0, 50)
+        shipped = idf._derivatives_series(x, 0.01, GAMMA)
+        explicit = idf._derivatives_series(x, 0.01, GAMMA, n_terms=idf._SERIES_TERMS)
+        for a, b in zip(shipped, explicit):
+            assert np.array_equal(a, b)
+
     def test_rejects_points_outside_the_domain(self):
         x = np.linspace(-1, 1, 5)
         with pytest.raises(ValueError):
