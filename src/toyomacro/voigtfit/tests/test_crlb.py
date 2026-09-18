@@ -352,7 +352,7 @@ class TestHelpers:
     """Test helper functions."""
 
     def test_voigt_fwhm(self):
-        """Thompson approximation gives reasonable FWHM."""
+        """Olivero-Longbothum approximation gives reasonable FWHM."""
         fwhm = _voigt_fwhm(SIGMA, GAMMA)
         f_G = SIGMA / FWHM_TO_SIGMA
         f_L = 2 * GAMMA

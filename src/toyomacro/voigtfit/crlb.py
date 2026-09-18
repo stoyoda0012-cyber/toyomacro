@@ -635,7 +635,11 @@ def compute_multipeak_fisher(
 
 
 def _voigt_fwhm(sigma: float, gamma: float) -> float:
-    """Thompson (1987) approximation for Voigt FWHM."""
+    """Olivero & Longbothum (1977) approximation for Voigt FWHM.
+
+    J. Quant. Spectrosc. Radiat. Transfer 17, 233-236,
+    doi:10.1016/0022-4073(77)90161-3.
+    """
     f_G = sigma / FWHM_TO_SIGMA
     f_L = 2 * gamma
     return 0.5346 * f_L + np.sqrt(0.2166 * f_L**2 + f_G**2)
