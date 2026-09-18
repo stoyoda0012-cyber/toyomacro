@@ -485,6 +485,8 @@ _WIDTH_NAMES = {
     "fwhm_shape": ("fwhm", "shape"),
     "pvoigt": ("w", "eta"),
     "fixed_instrument": ("gamma",),
+    # 'fixed_instrument' with a variance floor: the excess over the floor
+    "instrument_floor": ("var_extra", "gamma"),
 }
 
 
@@ -493,7 +495,9 @@ def _shape_slope(r: float) -> float:
     return -2.0 * _OL_A * (1.0 - _OL_A * r) - 2.0 * _OL_B * r
 
 
-def _width_coordinates(name: str, variance: float, gamma: float) -> np.ndarray:
+def _width_coordinates(
+    name: str, variance: float, gamma: float, variance_floor: float = 0.0
+) -> np.ndarray:
     """Width coordinates of the point (variance, gamma)."""
     if name == "sigma_gamma":
         return np.array([math.sqrt(variance), gamma])
@@ -504,6 +508,8 @@ def _width_coordinates(name: str, variance: float, gamma: float) -> np.ndarray:
         return np.array([fwhm, 2.0 * gamma / fwhm])
     if name == "fixed_instrument":
         return np.array([gamma])
+    if name == "instrument_floor":
+        return np.array([variance - variance_floor, gamma])
     raise ValueError(f"no (variance, gamma) coordinates for '{name}'")
 
 
@@ -511,7 +517,7 @@ def _width_transform(name: str, variance: float, gamma: float) -> np.ndarray:
     """T = d(variance, gamma) / d(width coordinates), shape (2, n_width)."""
     if name == "sigma_gamma":
         return np.array([[2.0 * math.sqrt(variance), 0.0], [0.0, 1.0]])
-    if name == "var_gamma":
+    if name in ("var_gamma", "instrument_floor"):
         return np.eye(2)
     if name == "fwhm_shape":
         fwhm = voigt_fwhm(variance, gamma)
@@ -591,6 +597,7 @@ def poisson_fisher(
     *,
     parameterization: Parameterization = "var_gamma",
     exposure: float = 1.0,
+    variance_floor: float | None = None,
 ) -> PoissonFisherResult:
     """Fisher matrix ``J^T diag(1/mu) J`` for Poisson counts.
 
@@ -610,9 +617,17 @@ def poisson_fisher(
       r = f_L / F the Lorentzian share of it, 0 for a Gaussian and
       0.999997 (not 1: the published coefficients are rounded) for a
       Lorentzian.
-    - 'fixed_instrument': (gamma,) only; each peak's ``sigma`` is taken as
-      a calibrated instrument width and not estimated. No sample-side
-      Gaussian broadening is allowed for.
+    - 'fixed_instrument': the instrument's Gaussian width is calibrated
+      and not estimated. Without ``variance_floor`` that is all of the
+      Gaussian width: (gamma,) only, each peak's ``sigma`` taken as the
+      calibrated value, no sample-side Gaussian broadening allowed for.
+      With ``variance_floor = sigma_inst**2`` the sample may add to it:
+      (var_extra, gamma) with ``var_extra = sigma**2 - variance_floor >=
+      0``, the usual XPS question of whether there is broadening beyond
+      the known resolution. That matrix equals the 'var_gamma' one --
+      shifting the origin of a coordinate changes no derivative -- and
+      what moves is the boundary, from ``sigma**2 = 0`` to ``var_extra =
+      0``.
     - 'pvoigt': (w, eta) of the pseudo-Voigt ``eta L + (1 - eta) G`` at
       common FWHM ``w``. This is a **different lineshape model**, not a
       re-parameterisation of the Voigt: each peak's (sigma, gamma) is
@@ -630,6 +645,9 @@ def poisson_fisher(
         exposure: Multiplier on the whole mean (acquisition time, flux).
             Parameters are defined at unit exposure, so the matrix is
             exactly linear in it.
+        variance_floor: Calibrated instrument variance (eV**2), for
+            'fixed_instrument' only; see above. Every peak must have
+            ``sigma**2 >= variance_floor``.
 
     Returns:
         PoissonFisherResult. The matrix is returned as computed and can
@@ -639,7 +657,9 @@ def poisson_fisher(
         ValueError: if the expected count is not positive in every
             channel. Without a background that happens where a profile
             underflows (a pure Gaussian far from its center); the
-            information is then undefined, not large.
+            information is then undefined, not large. Also if
+            ``variance_floor`` is given with another parameterization
+            (it would be silently ignored) or exceeds a peak's variance.
     """
     if parameterization not in PARAMETERIZATIONS:
         raise ValueError(
@@ -649,6 +669,15 @@ def poisson_fisher(
         raise ValueError("need at least one peak")
     if not exposure > 0.0:
         raise ValueError(f"exposure must be positive, got {exposure}")
+    coordinates: str = parameterization
+    if variance_floor is not None:
+        if parameterization != "fixed_instrument":
+            raise ValueError("variance_floor only applies to parameterization='fixed_instrument'")
+        if variance_floor < 0.0 or any(p.variance < variance_floor for p in peaks):
+            raise ValueError(
+                f"need 0 <= variance_floor <= sigma**2 for every peak, got {variance_floor}"
+            )
+        coordinates = "instrument_floor"
     energy = np.asarray(energy, dtype=np.float64)
 
     mean = np.zeros_like(energy)
@@ -669,12 +698,14 @@ def poisson_fisher(
             d = voigt_derivatives(energy, p.center, p.variance, p.gamma)
             value, d_center = d.value, d.d_center
             canonical = p.amplitude * np.stack([d.d_variance, d.d_gamma], axis=1)
-            width_columns = canonical @ _width_transform(parameterization, p.variance, p.gamma)
-            width_values = _width_coordinates(parameterization, p.variance, p.gamma)
+            width_columns = canonical @ _width_transform(coordinates, p.variance, p.gamma)
+            width_values = _width_coordinates(
+                coordinates, p.variance, p.gamma, variance_floor or 0.0
+            )
 
         mean += p.amplitude * value
         columns += [value, p.amplitude * d_center, *width_columns.T]
-        width_names = _WIDTH_NAMES[parameterization]
+        width_names = _WIDTH_NAMES[coordinates]
         names += [f"amp_{k}", f"center_{k}", *(f"{n}_{k}" for n in width_names)]
         roles += ["amplitude", "center", *(["width"] * len(width_names))]
         values += [p.amplitude, p.center, *width_values]
@@ -716,6 +747,7 @@ def poisson_fisher(
             "peaks": [(p.amplitude, p.center, p.sigma, p.gamma) for p in peaks],
             "background_terms": () if background is None else background.names,
             "background_estimated": () if background is None else background.estimated,
+            "variance_floor": variance_floor,
             "n_energy": int(energy.size),
             "energy_range": (float(energy[0]), float(energy[-1])),
         },

@@ -71,8 +71,8 @@ def _quadrature_reference(x, variance, gamma):
 def _canonical_from_widths(name, widths, variance):
     """Inverse of ``idf._width_coordinates``, written independently of it.
 
-    ``variance`` is only used by 'fixed_instrument', where it is not a
-    coordinate.
+    ``variance`` is only used by 'fixed_instrument': the fixed Gaussian
+    variance, or the floor when the excess over it is a coordinate.
     """
     if name == "sigma_gamma":
         return float(widths[0]) ** 2, float(widths[1])
@@ -83,6 +83,8 @@ def _canonical_from_widths(name, widths, variance):
         f_g_squared = (fwhm - 0.5346 * r * fwhm) ** 2 - 0.2166 * (r * fwhm) ** 2
         return f_g_squared / (8 * math.log(2)), 0.5 * r * fwhm
     if name == "fixed_instrument":
+        if len(widths) == 2:  # with a variance floor: (var_extra, gamma)
+            return variance + float(widths[0]), float(widths[1])
         return variance, float(widths[0])
     raise ValueError(name)
 
@@ -299,7 +301,8 @@ class TestWidthCoordinates:
 def _mean_from_params(result, energy, phi, background):
     """Poisson mean at parameter vector ``phi`` in ``result``'s coordinates."""
     name = result.parameterization
-    n_width = len(idf._WIDTH_NAMES[name])
+    floor = result.config["variance_floor"]
+    n_width = len(idf._WIDTH_NAMES[name if floor is None else "instrument_floor"])
     n_peaks = len(result.config["peaks"])
     mean = np.zeros_like(energy)
     pos = 0
@@ -310,7 +313,7 @@ def _mean_from_params(result, energy, phi, background):
         if name == "pvoigt":
             mean += amp * idf._pvoigt_derivatives(energy - center, widths[0], widths[1])[0]
         else:
-            fixed_variance = result.config["peaks"][k][2] ** 2
+            fixed_variance = result.config["peaks"][k][2] ** 2 if floor is None else floor
             v, g = _canonical_from_widths(name, widths, fixed_variance)
             mean += amp * voigt_derivatives(energy, center, v, g).value
     if background is not None:
@@ -449,7 +452,7 @@ class TestPoissonFisher:
         assert np.allclose(many.jacobian, 37.0 * one.jacobian, rtol=1e-15)
         assert np.array_equal(many.param_values, one.param_values)
 
-    @pytest.mark.parametrize("name", PARAMETERIZATIONS)
+    @pytest.mark.parametrize("name", [*PARAMETERIZATIONS, "fixed_instrument+floor"])
     def test_is_the_hessian_of_the_expected_deviance(self, name):
         """E[-log L] has Hessian exactly I at the truth; checked by differences.
 
@@ -460,7 +463,12 @@ class TestPoissonFisher:
         energy = np.linspace(-3.0, 4.0, 701)
         peaks = [VoigtPeak(AMP, 0.0, 0.15, GAMMA), VoigtPeak(0.4 * AMP, 1.1, 0.25, 0.2)]
         background = linear_background(energy, 60.0, 3.0)
-        r = poisson_fisher(energy, peaks, background, parameterization=name, exposure=2.0)
+        floor = None
+        if name.endswith("+floor"):
+            name, floor = "fixed_instrument", 0.1**2
+        r = poisson_fisher(
+            energy, peaks, background, parameterization=name, exposure=2.0, variance_floor=floor
+        )
         mu0, phi0 = r.expected_counts, r.param_values
 
         def half_deviance(phi):
@@ -541,6 +549,35 @@ class TestPoissonFisher:
         assert fixed.width_index == (2, 5)
         keep = [0, 1, 3, 4, 5, 7, 8, 9]
         assert np.allclose(fixed.fisher, r.fisher[np.ix_(keep, keep)], rtol=1e-13)
+
+    def test_variance_floor_moves_the_origin_and_nothing_else(self):
+        """Excess variance over a calibrated instrument width.
+
+        Same matrix as 'var_gamma'; the coordinate value is the excess,
+        and it may be exactly zero -- that is the boundary of interest.
+        """
+        energy = np.linspace(-3.0, 3.0, 601)
+        peaks = [VoigtPeak(AMP, 0.0, 0.15, GAMMA), VoigtPeak(AMP, 1.2, 0.25, 0.2)]
+        reference = poisson_fisher(energy, peaks)
+        floor = 0.15**2
+        r = poisson_fisher(
+            energy, peaks, parameterization="fixed_instrument", variance_floor=floor
+        )
+        assert r.param_names == (
+            "amp_0", "center_0", "var_extra_0", "gamma_0",
+            "amp_1", "center_1", "var_extra_1", "gamma_1",
+        )
+        assert np.array_equal(r.fisher, reference.fisher)
+        assert r.param_values[2] == 0.0
+        assert r.param_values[6] == pytest.approx(0.25**2 - floor, rel=1e-12)
+        assert r.config["variance_floor"] == floor
+
+        with pytest.raises(ValueError, match="variance_floor"):
+            poisson_fisher(
+                energy, peaks, parameterization="fixed_instrument", variance_floor=0.2**2
+            )
+        with pytest.raises(ValueError, match="only applies"):
+            poisson_fisher(energy, peaks, variance_floor=floor)
 
     def test_rejects_a_channel_with_no_expected_counts(self):
         energy = np.linspace(-20.0, 20.0, 401)
