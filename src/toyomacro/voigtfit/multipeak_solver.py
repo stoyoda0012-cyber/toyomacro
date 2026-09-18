@@ -2584,6 +2584,7 @@ def solve_alternating_projection(
     gamma_chi2_gate: bool = True,
     gamma_chi2_margin: float = 0.01,
     newton_jacobian_mode: str = "raw",
+    use_mlx: bool = True,
 ) -> MultiPeakResult:
     """Multi-peak solver using Alternating Projection.
 
@@ -2676,6 +2677,10 @@ def solve_alternating_projection(
             ``quality_flags`` diagnostics and ``bg_degree>=0`` (ValueError).
             See gp_reference.py and benchmarks/gp_newton_comparison.py for
             the verification study behind this flag.
+        use_mlx: If False, take the pure-numpy path even when MLX is usable
+            (default True: MLX whenever it is usable). The MLX-only options
+            (``fit_gamma``, ``newton_exact``) then raise NotImplementedError,
+            as they do on hosts without MLX.
 
     Returns:
         MultiPeakResult with amplitudes, delta_E, delta_sigma, chi2 (and, when
@@ -2709,7 +2714,7 @@ def solve_alternating_projection(
                 "the joint projection); 'kaufman'/'golub_pereyra' do not "
                 "support it."
             )
-    if not HAS_MLX:
+    if not (HAS_MLX and use_mlx):
         if fit_gamma:
             raise NotImplementedError(
                 "fit_gamma=True requires MLX; the numpy fallback does not "
@@ -3050,6 +3055,7 @@ def solve_multipeak_chunked(
     fit_gamma: bool = False,
     gamma_chi2_gate: bool = True,
     gamma_chi2_margin: float = 0.01,
+    use_mlx: bool = True,
 ) -> MultiPeakResult:
     """Chunked multi-peak solver for large datasets.
 
@@ -3077,6 +3083,8 @@ def solve_multipeak_chunked(
             :func:`solve_alternating_projection`.
         gamma_chi2_margin: Relative χ² improvement the gate requires to accept
             δγ (default 0.01). See :func:`solve_alternating_projection`.
+        use_mlx: If False, force the numpy path. See
+            :func:`solve_alternating_projection`.
 
     Returns:
         MultiPeakResult concatenated from all chunks.
@@ -3102,6 +3110,7 @@ def solve_multipeak_chunked(
             apply_newton=apply_newton, newton_iter=newton_iter,
             newton_exact=newton_exact, bg_degree=bg_degree, fit_gamma=fit_gamma,
             gamma_chi2_gate=gamma_chi2_gate, gamma_chi2_margin=gamma_chi2_margin,
+            use_mlx=use_mlx,
         )
 
     n_comp = len(dicts)
@@ -3121,6 +3130,7 @@ def solve_multipeak_chunked(
             apply_newton=apply_newton, newton_iter=newton_iter,
             newton_exact=newton_exact, bg_degree=bg_degree, fit_gamma=fit_gamma,
             gamma_chi2_gate=gamma_chi2_gate, gamma_chi2_margin=gamma_chi2_margin,
+            use_mlx=use_mlx,
         )
         all_amp.append(result.amplitudes)
         all_dE.append(result.delta_E)
@@ -3176,6 +3186,7 @@ def process_multipeak(
     fit_gamma: bool = False,
     gamma_chi2_gate: bool = True,
     gamma_chi2_margin: float = 0.01,
+    use_mlx: bool = True,
 ) -> MultiPeakResult:
     """Multi-peak pipeline entry point.
 
@@ -3219,6 +3230,8 @@ def process_multipeak(
             :func:`solve_alternating_projection`.
         gamma_chi2_margin: Relative χ² improvement the gate requires to accept
             δγ (default 0.01). See :func:`solve_alternating_projection`.
+        use_mlx: If False, force the numpy path. See
+            :func:`solve_alternating_projection`.
 
     Returns:
         MultiPeakResult.
@@ -3237,6 +3250,7 @@ def process_multipeak(
         bg_degree=bg_degree, apply_newton=apply_newton, newton_iter=newton_iter,
         newton_exact=newton_exact, fit_gamma=fit_gamma,
         gamma_chi2_gate=gamma_chi2_gate, gamma_chi2_margin=gamma_chi2_margin,
+        use_mlx=use_mlx,
     )
 
     if result.timing:

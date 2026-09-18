@@ -241,3 +241,52 @@ class TestTemplateGetReferenceBe:
             reference_be=None,
         )
         assert t.get_reference_be() is None
+
+
+# ------------------------------------------------------------------
+# use_mlx on the multi-component path
+# ------------------------------------------------------------------
+
+
+def _spy_numpy_ap(monkeypatch):
+    """Count calls to the multipeak solver's numpy path."""
+    from toyomacro.voigtfit import multipeak_solver as ms
+
+    calls = []
+    original = ms._solve_alternating_projection_numpy
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(ms, "_solve_alternating_projection_numpy", spy)
+    return calls
+
+
+@needs_voigtfit
+class TestUseMlxMultipeak:
+    """FastFitConfig.use_mlx must reach the multipeak solver (n_comp >= 2)."""
+
+    def test_use_mlx_false_takes_numpy_path(self, monkeypatch):
+        from toyomacro.fitting import FastVoigtFitter
+
+        calls = _spy_numpy_ap(monkeypatch)
+        spectra, energy, centers, sigmas, gamma = _make_synthetic_batch(n_comp=2)
+        fitter = FastVoigtFitter(FastFitConfig(mode="fast", use_mlx=False))
+        result = fitter.fit_batch_rowmajor(spectra, energy, centers, sigmas, gamma)
+
+        assert calls, "use_mlx=False did not reach the numpy multipeak path"
+        assert result.amplitudes.shape == (2, 100)
+
+    def test_use_mlx_true_takes_mlx_path_when_usable(self, monkeypatch):
+        from toyomacro.fitting import FastVoigtFitter
+        from toyomacro.voigtfit import multipeak_solver as ms
+
+        if not ms.HAS_MLX:
+            pytest.skip("MLX not usable on this host")
+        calls = _spy_numpy_ap(monkeypatch)
+        spectra, energy, centers, sigmas, gamma = _make_synthetic_batch(n_comp=2)
+        fitter = FastVoigtFitter(FastFitConfig(mode="fast", use_mlx=True))
+        fitter.fit_batch_rowmajor(spectra, energy, centers, sigmas, gamma)
+
+        assert not calls

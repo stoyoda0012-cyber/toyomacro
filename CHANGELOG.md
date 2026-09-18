@@ -121,6 +121,20 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`FastFitConfig(use_mlx=False)` now applies to multi-component fits.**
+  With two or more components, `FastVoigtFitter` routes to the multipeak
+  solver, which chose its backend from whether MLX was usable and
+  ignored the flag, so `use_mlx=False` still ran on the GPU. The flag
+  now reaches it: `HybridPipeline.process_multipeak` passes its own
+  `use_mlx`, and `process_multipeak`, `solve_multipeak_chunked` and
+  `solve_alternating_projection` take a `use_mlx` keyword (default
+  `True`, so callers that do not pass it are unchanged). With MLX
+  installed, a 2-state fit of 262,144 spectra now takes ~1 s with
+  `use_mlx=False` (NumPy) against ~70 ms with MLX, where both used to
+  take the MLX time. With `use_mlx=False`, the MLX-only options
+  `fit_gamma` and `newton_exact` raise `NotImplementedError`, as on
+  hosts without MLX.
+
 - **`background.tougaard` no longer calls its model "3-parameter".**
   The module docstring described the universal loss cross-section
   `B·T/(C+T²)²` as the "universal 3-parameter Tougaard" background. It

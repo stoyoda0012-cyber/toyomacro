@@ -1989,7 +1989,7 @@ class HybridPipeline:
 
         return process_multipeak(
             Y, config, grid_type, n_iterations, chunk_size,
-            parabola_dE, parabola_ds, dicts=dicts,
+            parabola_dE, parabola_ds, dicts=dicts, use_mlx=self.use_mlx,
         )
 
     def process_multipeak_2stage(
