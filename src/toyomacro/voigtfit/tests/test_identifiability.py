@@ -186,7 +186,12 @@ class TestVoigtFwhm:
             )
 
     def test_fwhm_error_against_the_exact_half_maximum(self):
-        """Implementation fidelity: the approximation is good to 2.4e-4."""
+        """The number the docstrings quote: 2.37e-4 at f_L/f_G = 0.29.
+
+        Slightly above the nominal 0.02 % attached to this expression, so
+        "within 0.02 %" is not a bound. lineshape/voigt.py and
+        rank_diagnostics.py state the same figure and rely on this test.
+        """
 
         def exact(variance, gamma):
             peak = voigt_derivatives(np.array([0.0]), 0.0, variance, gamma).value[0]
@@ -196,11 +201,14 @@ class TestVoigtFwhm:
 
             return 2 * brentq(f, 0.0, 10 * (math.sqrt(variance) + gamma), xtol=1e-15, rtol=1e-14)
 
-        worst = 0.0
-        for ratio in np.logspace(-4, 4, 81):  # f_L / f_G
+        ratios = np.concatenate([np.logspace(-4, 4, 81), np.linspace(0.25, 0.33, 9)])
+        errors = []
+        for ratio in ratios:  # f_L / f_G
             variance, gamma = 1.0 / (8 * math.log(2)), ratio / 2
-            worst = max(worst, abs(voigt_fwhm(variance, gamma) / exact(variance, gamma) - 1))
-        assert 1e-4 < worst < 2.5e-4
+            errors.append(abs(voigt_fwhm(variance, gamma) / exact(variance, gamma) - 1))
+        worst = int(np.argmax(errors))
+        assert errors[worst] == pytest.approx(2.37e-4, rel=5e-3)
+        assert ratios[worst] == pytest.approx(0.29, abs=0.011)
 
 
 # ===================================================================
