@@ -89,6 +89,13 @@ archived on Zenodo for a citable DOI.
 
 ### Changed
 
+- **Example 02 no longer implies MLX makes it faster.** `examples/README.md`
+  said installing the `mlx` extra "accelerates example 02". At the
+  example's 4,096 spectra a single fit call is dominated by one-off
+  setup, and the printed time barely moves between backends; the GPU
+  speedup (about an order of magnitude) appears from tens of thousands
+  of spectra up. The README and the example's docstring now say so.
+
 - **The TRMFP bundling question is settled: caller-supplied, by
   policy.** `docs/DATA_SOURCES.md` previously recorded that no
   redistribution permission for the Jablonski & Powell 2020

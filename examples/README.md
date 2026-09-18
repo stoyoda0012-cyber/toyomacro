@@ -21,8 +21,11 @@ python examples/04_projection_law_validation.py   # ~1-2 min
 | `04_projection_law_validation.py` | Systematic-error sensitivity: validates the first-order projection law for the fitted-center bias under lineshape misspecification, incl. the production solver — details in [`docs/projection_law_validation.md`](../docs/projection_law_validation.md) | `VarProFitter`, `voigt_profile` |
 
 All examples run on the pure-numpy backend. Installing the `mlx` extra
-(`pip install toyomacro[mlx]`) accelerates example 02 on Apple Silicon,
-same code.
+(`pip install toyomacro[mlx]`) moves the batch fit in example 02 onto the
+Apple Silicon GPU, same code — but at 4,096 spectra a single call is
+dominated by one-off setup, so the time it prints barely changes. The
+GPU pays off on larger maps: from tens of thousands of spectra up, the
+same call runs about an order of magnitude faster than on NumPy.
 
 ## Data
 

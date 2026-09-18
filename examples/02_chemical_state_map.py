@@ -8,7 +8,8 @@ vs. recovered chemical-state maps.
 The high-level batch API fits each chemical state as a single Voigt
 component; spin-orbit doublet models are available through the
 low-level ``toyomacro.voigtfit`` multipeak API. Runs on the pure-numpy
-backend; installing the ``mlx`` extra accelerates it on Apple Silicon.
+backend; the ``mlx`` extra moves the fit onto the Apple Silicon GPU,
+which matters for larger maps rather than for this 4,096-spectrum one.
 
 Run from the repository root::
 
