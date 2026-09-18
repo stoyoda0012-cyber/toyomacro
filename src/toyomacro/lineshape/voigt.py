@@ -72,7 +72,7 @@ class Voigt(BaseLineshape):
         Uses the Olivero-Longbothum approximation (1977):
         FWHM_V ≈ 0.5346 * fwhm_l + √(0.2166 * fwhm_l² + fwhm_g²)
 
-        Nominal accuracy about 0.02% (Olivero & Longbothum 1977). The
+        The accuracy usually quoted for this expression is 0.02%. The
         largest error measured against the exact half-maximum width of
         the profile is 2.37e-4, at fwhm_l/fwhm_g = 0.29, over ratios from
         1e-4 to 1e4; it is exact for a Gaussian and 3e-6 for a

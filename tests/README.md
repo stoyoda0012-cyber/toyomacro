@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **1,920 automated tests** across **77 files**, in two
+This suite has **2,031 automated tests** across **79 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 41 | 1,052 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 42 | 1,058 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 973 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only`.
@@ -16,11 +16,11 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,488 tests, 77%) — guarantee the library
+- **Contract / regression** (1,599 tests, 79%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 23%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 21%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -39,9 +39,9 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,052)
+## Library body — `tests/` (1,058)
 
-### Claim guards — noise model, versions, backends, comparisons (48)
+### Claim guards — noise model, versions, backends, comparisons (54)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
@@ -50,6 +50,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 4 | `test_cli_surface.py` | CLI entry points stay importable and keep their documented flags |
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
+| 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
 
 ### Lineshape & background — physics core (77)
 | Tests | File | Guards |
@@ -110,7 +111,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (868)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (973)
 
 ### Solvers & fitting core (297)
 | Tests | File | Guards |
@@ -141,9 +142,10 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (258)
+### Statistics & information theory (363)
 | Tests | File | Guards |
 |--:|---|---|
+| 105 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan |
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
 | 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |

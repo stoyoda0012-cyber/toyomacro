@@ -15,10 +15,14 @@ usually blamed on each other. This example pulls them apart:
   the variance relative to itself: a small Gaussian component cannot be
   detected however the width is parameterised.
 - panels (a), (b), (d): narrowing the window removes the tails that carry
-  the Lorentzian width, with or without a background; a background that
-  has to be estimated from the same spectrum takes far more than its shot
-  noise does. The dashed line is what a diagnostic that treats
-  amplitude, position and background as known would report.
+  the Lorentzian width, with or without a background. In a narrow window
+  a background that has to be estimated from the same spectrum costs far
+  more than its shot noise: at +-0.6 FWHM the shot noise raises the
+  bound on gamma by 9 % and estimating the level by another factor 19.
+  The two cross near +-3 FWHM, and at +-15 FWHM it is the other way
+  round: the shot noise doubles the bound and estimating the level adds
+  a tenth. The dashed line is what a diagnostic that treats amplitude,
+  position and background as known would report.
 
 Everything here is computed from a model (Poisson Fisher information at
 stated parameters). It is not a measurement and not a statement about any

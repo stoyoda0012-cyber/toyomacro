@@ -26,16 +26,21 @@ to show them separately.
    a constrained estimator (Self & Liang 1987).
 4. **A finite window.** The Lorentzian width lives in the tails. With no
    background at all, the condition number of the unit-diagonal Fisher
-   matrix at σ/γ = 1/30 is 6.18 on ±33.3γ, about 9×10² on ±γ and about
-   5×10⁶ on ±0.3γ (the last two move by several percent with the
-   sampling).
+   matrix at σ/γ = 1/30 is 6.18 on ±33.3γ, 9.4×10² on ±γ and 5.5×10⁶ on
+   ±0.3γ. The last two are limits of fine sampling; 21 points across the
+   window give 7.2×10² and 4.0×10⁶, lower by 23 % and 27 %.
 5. **A background.** Its shot noise raises the mean under the peak; if
    it also has to be estimated from the same spectrum it competes with
    the widths for the same counts, and that second effect does not need
    a large background. At ±10γ, σ/γ = 1/3, a flat background of 0.05 %
    of the peak height leaves the least determined width direction 99 %
-   of its information when known and 43 % when estimated; at 10 % of
-   the peak height the figures are 44 % and 20 %.
+   of its information when known and 61 % when estimated; at 10 % of
+   the peak height the figures are 57 % and 36 %. The direction is
+   taken in the scaled coordinates of §5. The smallest eigenvalue of
+   the raw (eV², eV) block is not a physical quantity — for the first
+   case it gives 43 %, 63 % or 41 % according to whether the same
+   spectrum is described in eV, meV or keV — and the test suite pins
+   the share as unit-free.
 
 Items 4 and 5 are treated as *practical weak identification*: more
 counts or a wider window change them. They are not structural
@@ -45,9 +50,11 @@ non-identifiability and the labels below never claim so.
 
 The engine's Faddeeva-based Jacobian cannot be used here. In w″(z) a
 term of order 4z cancels down to 2/z³, so the relative error of the
-variance derivative grows like |z|⁴ with |z| = |x + iγ|/(σ√2); on a
-±33γ window `voigt_with_jacobian` and `voigt_with_hessian` have lost
-every digit by σ/γ ≈ 10⁻³.
+variance derivative grows like |z|⁴ with |z| = |x + iγ|/(σ√2). The wings
+go first and the Fisher matrix follows: on a ±33γ window the variance
+element built from `voigt_with_hessian` (or from `voigt_with_jacobian`
+by the chain rule) is off by 1.5×10⁻³ at σ/γ = 10⁻³, by a factor 5.8 at
+3×10⁻⁴ and by four orders of magnitude at 10⁻⁴.
 
 `voigt_derivatives` therefore switches *per energy point*: for |z| ≥ 7 it
 sums the large-|z| expansion
@@ -70,9 +77,10 @@ available at that |z|. Two separate constraints follow:
 
 - N < |z_c|² at the switch |z_c| (24 < 49), so every term summed is on
   the shrinking side wherever the expansion is used;
-- the switch cannot be lowered to buy back the Faddeeva error: on ∂V/∂v
-  the best any N achieves is 4×10⁻⁸ at |z| = 5 and 3×10⁻⁵ at |z| = 4,
-  and more terms make it worse (N = 40 at |z| = 4: 3×10²).
+- the switch cannot be lowered to buy back the Faddeeva error: on ∂V/∂v,
+  scanning every N from 2 to 70 at σ/γ = 1, the best reached is 1×10⁻⁸
+  at |z| = 5 (N = 25) and 3×10⁻⁵ at |z| = 4 (N = 12), and past the
+  turning point more terms make it worse (N = 40 at |z| = 4: 3×10²).
 
 Which test catches which violation (by mutation):
 
@@ -92,10 +100,11 @@ integral (an independent route: no Faddeeva function, no expansion), as
 the largest error in a band of |z| over the largest magnitude in that
 band, worst over 31 shapes σ/γ = 0.01…10 on ±33.3γ: value 6×10⁻¹⁴,
 ∂/∂v 3×10⁻¹¹, ∂/∂γ 5×10⁻¹², ∂/∂c 7×10⁻¹³. The worst case sits just below
-the switch on the Faddeeva side. An earlier draft quoted 10⁻¹¹ from one
-point per |z|; the population measurement replaced that number and moved
-the switch from 8 to 7, the lowest |z| at which the expansion is at
-rounding level.
+the switch on the Faddeeva side, which is why the switch is the lowest
+|z| at which the expansion is at rounding level. These are band maxima
+over a population; one point per |z| understates the worst case by
+about a factor three. The test suite asserts the population figure at
+10⁻¹⁰.
 
 NumPy float64 is the reference implementation and the only one. The MLX
 Jacobian in the engine covers σ/γ ≥ 0.71 only and is not used here.
@@ -116,8 +125,10 @@ coupling of an iteratively determined Shirley background to the widths.
 
 Width coordinates `sigma_gamma`, `var_gamma`, `fwhm_shape` (the
 Olivero–Longbothum total width and the Lorentzian share of it) and
-`fixed_instrument` describe one statistical model and are related by
-I_φ = Tᵀ I_θ T; only `sigma_gamma` has a singular T. `pvoigt` is a
+`fixed_instrument` with a floor are coordinates on one statistical model,
+related by I_φ = Tᵀ I_θ T; T is singular only for `sigma_gamma`, and only
+at σ = 0. `fixed_instrument` without a floor is a sub-model of it, one
+parameter per peak fewer. `pvoigt` is a
 different lineshape model evaluated at the Thompson–Cox–Hastings point,
 not a re-parameterisation. `fwhm_shape` is itself poorly conditioned at
 the Lorentzian end: v is encoded in the last digits of the share.
@@ -132,7 +143,9 @@ symmetric window is not enough: the weights 1/μ must be even too. The
 center is odd; amplitude, widths and a flat level are even; a background
 *slope* is odd like the center. With a true slope of zero the center
 couples to the slope and to nothing else. With a non-zero true slope the
-center recouples to the widths (correlation 4×10⁻⁴ in the pinned case).
+center recouples to every even parameter: in the pinned case its
+correlation is 4×10⁻⁴ with the background level, 2×10⁻⁴ with γ, 1×10⁻⁴
+with the amplitude and 5×10⁻⁵ with v.
 
 ## 4. Effective versus conditional information
 
@@ -145,9 +158,12 @@ spectrum; its inverse is the width block of the full inverse. The plain
 sub-block I_uu is the information *if q were known* — what
 `fisher_information.analyze_sigma_gamma_axes` reports. I_uu − I_eff is
 positive semi-definite, so the sub-block is always the optimistic one,
-and the gap is large exactly where it matters: at ±γ with an estimated
-flat background the bound on γ is 0.24 of the FWHM from I_eff and 7×10⁻⁴
-from I_uu. Both are reported side by side.
+and the gap is large exactly where it matters: at ±γ, σ/γ = 1/3, with
+an estimated flat background at a tenth of the peak height, the bound on
+γ from I_eff is 318 times the one from I_uu. That ratio does not depend
+on the counts; the bounds themselves do (0.24 and 7×10⁻⁴ of the FWHM for
+5.5×10⁶ counts in the window, 0.75 and 2×10⁻³ for a tenth of that). Both
+are reported side by side.
 
 The nuisance block is inverted on the unit-diagonal matrix with the n·ε
 rank rule, the gauge `crlb.compute_multipeak_fisher` already fixes: the
@@ -160,8 +176,10 @@ Judged in `var_gamma`, from the full inverse, so item 1 of §1 cannot
 raise a flag.
 
 - `rank_deficient` — the unit-diagonal matrix is numerically singular
-  and this parameter's axis projects onto its null space. Rank rule and
-  both tolerances are imported from `crlb`, not copied.
+  and this parameter's axis projects onto its null space. The same
+  decision as `crlb.compute_multipeak_fisher`: its n·ε rank rule,
+  re-implemented here in one place, and its projection tolerance,
+  imported.
 - `weakly_identified` — the bound exceeds a fraction of a reference
   scale.
 - `identified` — neither.
@@ -173,8 +191,11 @@ and for γ; FWHM²/(8 ln 2) for v. Not the parameter's own value, which is
 undefined at v = 0 and, for a position, not invariant under a shift of
 the energy origin. The variance is reported against itself as well
 (`variance_relative_sd`), because the FWHM scale stays finite as the
-Gaussian component vanishes: at σ/γ = 0.03 the width block is
-`identified` at 2×10⁻³ while sd(v)/v = 1.6. The test suite checks that
+Gaussian component vanishes: at σ/γ = 0.03 (±10γ, 1.5×10⁷ counts in
+the window) the width block is `identified` at 2×10⁻³ while
+sd(v)/v = 1.6. With more counts sd(v)/v falls like any other bound; the
+point is that the FWHM-scaled number says nothing about it. The test
+suite checks that
 the same spectrum described in meV instead of eV gives the same labels.
 Background coefficients have no natural scale and are `not_assessed`
 unless rank deficient.
@@ -188,10 +209,16 @@ unless rank deficient.
   estimator the chance of falling below the limit would be 0.13 % at 3
   and 2.3 % at 2. But that normal approximation is exactly what fails
   near a boundary, so 3 is a margin of caution, not a probability. The
-  simulation in §6 is the evidence that 3 is a sensible margin.
+  simulation in §6 does not contradict it — the Fisher number is not the
+  estimator's spread at 0 and 1 bounds from the floor and is at 2 and 4
+  — but it has no row at 3 and is one configuration.
 
 **What the labels are not.** `identified` on the FWHM scale is not
-detection of a small Gaussian component. `weakly_identified` is not
+detection of a small Gaussian component, and the same holds at the other
+end: γ = 0 is a boundary too, γ is judged against the FWHM, and a nearly
+Gaussian peak can have γ `identified` with sd(γ)/γ of order one (0.58 at
+σ/γ = 100 for the default scan peak on ±5 FWHM). No flag is raised for
+that boundary. `weakly_identified` is not
 structural non-identifiability — the tests show more exposure lifting
 it. Near the boundary the reported bounds are still the Fisher numbers;
 they are not corrected. Nothing here is a statement about a fit.
@@ -206,10 +233,16 @@ set. It is cross-checked against L-BFGS-B on the same deviance. A
 weighted least-squares fit would have a different fixed point; swapping
 in Neyman weights fails every test.
 
+All of it is one configuration: a single peak, γ = 0.3 eV on ±3 eV at a
+0.02 eV step, 2×10⁴ counts·eV of area on a flat background of 300 counts
+per channel. It checks the module against an estimator there; it is not
+a statement about other windows, intensities or several peaks.
+
 Interior, pass/fail: σ/γ = 1, estimated flat background, 10⁴ replicas, a
 regime the module itself labels identified and away from the boundary.
-Replica sd over Fisher sd 1.002…1.010, correlations within 0.006, bias
-under 0.01 sd; tolerance 5 %.
+Replica sd over Fisher sd 1.002…1.010 (0.994…1.008 with two other
+seeds), correlations within 0.006, bias under 0.01 sd. Tolerance 4 %: a
+Fisher matrix wrong by 10 % in either direction moves the ratio by 5 %.
 
 Near the boundary, *recorded, not judged* (4000 replicas per row):
 
@@ -222,8 +255,8 @@ Near the boundary, *recorded, not judged* (4000 replicas per row):
 
 For orientation, not as a criterion: with one parameter on the boundary
 and the rest interior the asymptotic law is half a point mass at the
-floor and half a half-normal, giving ½ and √(½ − 1/(2π)) = 0.584 in the
-first row. With the floor at a calibrated instrument variance and no
+floor and half a half-normal (Self & Liang 1987), giving ½ and
+√(½ − 1/(2π)) = 0.584 in the first row. With the floor at a calibrated instrument variance and no
 sample broadening the share at the floor is 0.4988.
 
 ## 7. The scan
@@ -239,8 +272,9 @@ has a minimum near ±7 FWHM for the example configuration and rises again
 beyond it, because a wider window spends its counts on background.
 
 Every cell is evaluated in `var_gamma` and again in `sigma_gamma`.
-Towards σ = 0 the variance bound does not move (0.009 of its scale from
-σ/γ = 10⁻² down to 0) while the σ bound grows as 1/σ and the information
+Towards σ = 0 the variance bound does not move (it changes by under
+0.1 % from σ/γ = 10⁻² down to 0, at 0.009 of its scale for the example's
+counts) while the σ bound grows as 1/σ and the information
 on σ falls as σ²; towards a narrow window both grow. That is how item 1
 of §1 is told from items 4 and 5. `examples/05_width_identifiability_map.py`
 draws the maps; its output is not tracked.
@@ -262,6 +296,9 @@ Open questions:
   belongs in this module is undecided.
 - The Shirley step ignores its own dependence on the peak parameters
   (§3). How much that understates the loss has not been measured.
+- γ = 0 is a boundary as well and gets no flag and no relative-precision
+  field of its own (§5). Symmetric treatment would be cheap; whether it
+  is wanted is undecided.
 - The Doniach–Šunjić asymmetry is not covered. It adds a parameter that
   competes with γ for the same tail.
 - The Olivero–Longbothum width is used as the reference scale. Its

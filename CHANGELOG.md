@@ -58,12 +58,15 @@ archived on Zenodo for a citable DOI.
   `effective_information` gives the information left for the widths once
   amplitude, position and background are estimated from the same
   spectrum, next to the sub-block that assumes them known — at a window
-  of ±γ with an estimated flat background the two bounds on γ are 0.24
-  and 7×10⁻⁴ of the FWHM. (3) `voigt_derivatives` works in the Gaussian
-  *variance*, in which the Fisher matrix is regular at σ = 0, and stays
-  accurate there: the engine's Faddeeva-based Jacobian loses every digit
-  by σ/γ ≈ 10⁻³, so points with |z| ≥ 7 use a 24-term large-|z| expansion
-  instead (worst measured error 3×10⁻¹¹ over σ/γ = 0.01…10). Width
+  of ±γ with an estimated flat background at a tenth of the peak height
+  the first bound on γ is 318 times the second, whatever the counts.
+  (3) `voigt_derivatives` works in the Gaussian *variance*, in which the
+  Fisher matrix is regular at σ = 0, and stays accurate there: built from
+  the engine's Faddeeva-based Jacobian the variance element of the Fisher
+  matrix is off by a factor 5.8 at σ/γ = 3×10⁻⁴ and by four orders at
+  10⁻⁴ (window ±33γ), so points with |z| ≥ 7 use a 24-term large-|z|
+  expansion instead (worst measured error 3×10⁻¹¹ over σ/γ = 0.01…10).
+  Width
   coordinates are selectable (`sigma_gamma`, `var_gamma`, `fwhm_shape`,
   `pvoigt`, `fixed_instrument`, the last optionally with a calibrated
   instrument variance as the floor). `assess_identifiability` labels each
@@ -76,10 +79,11 @@ archived on Zenodo for a citable DOI.
   `weakly_identified` is not structural non-identifiability, and near the
   boundary the inverse Fisher matrix is not the variance of a constrained
   estimator. The defaults (a tenth of the FWHM; three bounds from the
-  boundary) are conventions. Checked against exact constrained Poisson
-  maximum likelihood on 10⁴ simulated spectra: replica standard
-  deviations within 1 % of the bound in the interior; near the boundary
-  the disagreement is recorded, not asserted. NumPy float64 only, no MLX
+  boundary) are conventions. Checked, in one single-peak configuration,
+  against exact constrained Poisson maximum likelihood on 10⁴ simulated
+  spectra: replica standard deviations within 1 % of the bound in the
+  interior; near the boundary the disagreement is recorded, not
+  asserted. NumPy float64 only, no MLX
   path. Design record:
   [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md);
   runnable map: `examples/05_width_identifiability_map.py`.
@@ -193,6 +197,20 @@ archived on Zenodo for a citable DOI.
   adopted from it.
 
 ### Fixed
+
+- **The Voigt FWHM approximation is credited to the right paper and its
+  accuracy claim is corrected.** `0.5346 f_L + sqrt(0.2166 f_L² + f_G²)`
+  is the empirical fit of Olivero & Longbothum (1977,
+  doi:10.1016/0022-4073(77)90161-3); `fisher_information`, `crlb` and
+  `fisher_transform` credited it to Thompson et al. (1987), whose
+  pseudo-Voigt polynomial is a different expression that the package
+  also has and labels correctly. `lineshape.Voigt.fwhm` said "accurate to
+  within 0.02% for all ratios" and `rank_diagnostics` "relative error
+  < 0.02 %". Measured against the exact half-maximum width, the largest
+  error is 2.37×10⁻⁴, at f_L/f_G = 0.29 (exact for a Gaussian, 3×10⁻⁶ for
+  a Lorentzian): 0.02 % is the right size and the figure usually quoted,
+  but it is not a bound, and the docstrings now give both and a test
+  pins the maximum. Docstrings only; no returned number changes.
 
 - **`FastFitConfig(use_mlx=False)` now applies to multi-component fits.**
   With two or more components, `FastVoigtFitter` routes to the multipeak
