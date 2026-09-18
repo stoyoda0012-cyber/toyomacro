@@ -47,6 +47,42 @@ archived on Zenodo for a citable DOI.
   area 92.5% because the spin-orbit doublet is fitted as one Voigt,
   which the example states). Runs in CI.
 
+- **Experimental** `voigtfit.identifiability`: diagnostics for how well
+  a counting spectrum determines the Gaussian and the Lorentzian width
+  of a Voigt peak. The two are hard to separate for reasons of different
+  kinds, and the module reports them apart. (1) `poisson_fisher` is a
+  Poisson Fisher matrix whose mean includes a background that is absent,
+  known, or estimated (constant, linear, or a Shirley-type step of fixed
+  shape); `fisher_information` and `crlb` have no background term, so
+  their bounds condition on a background-free spectrum. (2)
+  `effective_information` gives the information left for the widths once
+  amplitude, position and background are estimated from the same
+  spectrum, next to the sub-block that assumes them known — at a window
+  of ±γ with an estimated flat background the two bounds on γ are 0.24
+  and 7×10⁻⁴ of the FWHM. (3) `voigt_derivatives` works in the Gaussian
+  *variance*, in which the Fisher matrix is regular at σ = 0, and stays
+  accurate there: the engine's Faddeeva-based Jacobian loses every digit
+  by σ/γ ≈ 10⁻³, so points with |z| ≥ 7 use a 24-term large-|z| expansion
+  instead (worst measured error 3×10⁻¹¹ over σ/γ = 0.01…10). Width
+  coordinates are selectable (`sigma_gamma`, `var_gamma`, `fwhm_shape`,
+  `pvoigt`, `fixed_instrument`, the last optionally with a calibrated
+  instrument variance as the floor). `assess_identifiability` labels each
+  parameter `rank_deficient`, `weakly_identified` or `identified` against
+  a stated reference scale, and flags a variance `near_boundary`;
+  `scan_identifiability` maps this over window, intensity, shape,
+  background and peak spacing. These are **bounds computed from a model,
+  not confidence intervals and not statements about a fit**: `identified`
+  on the FWHM scale is not detection of a small Gaussian component,
+  `weakly_identified` is not structural non-identifiability, and near the
+  boundary the inverse Fisher matrix is not the variance of a constrained
+  estimator. The defaults (a tenth of the FWHM; three bounds from the
+  boundary) are conventions. Checked against exact constrained Poisson
+  maximum likelihood on 10⁴ simulated spectra: replica standard
+  deviations within 1 % of the bound in the interior; near the boundary
+  the disagreement is recorded, not asserted. NumPy float64 only, no MLX
+  path. Design record:
+  [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md);
+  runnable map: `examples/05_width_identifiability_map.py`.
 - **Experimental** `data.sessa`: a reader for the `sam_par.txt` that
   SESSA (NIST SRD 100) writes on `PROJECT SAVE OUTPUT`, which is the
   practical way to obtain the IMFP/TRMFP pair `data.elastic_scattering`
