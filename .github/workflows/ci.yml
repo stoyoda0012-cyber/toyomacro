@@ -47,6 +47,7 @@ jobs:
           uv run python examples/04_projection_law_validation.py
           uv run python examples/05_fit_map_from_file.py
           uv run python examples/06_fermi_edge_calibration.py
+          uv run python examples/05_width_identifiability_map.py
 
   lint:
     name: ruff
