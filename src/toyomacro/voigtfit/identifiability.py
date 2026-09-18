@@ -40,11 +40,13 @@ asymptotics of constrained estimators do not apply (Self & Liang 1987).
 
 Numerical validity. The Faddeeva-based derivative formulas cancel
 catastrophically at large ``|z| = |x + i gamma| / (sigma sqrt 2)``: in
-``w''(z)`` a term of order ``4z`` cancels down to ``2/z**3``. On a window
-of +-33 gamma that is why ``voigt_jacobian.voigt_with_jacobian`` and
-``voigt_with_hessian`` break down for ``sigma/gamma`` below about 1e-3.
-Here every energy point with ``|z| >= 7`` is evaluated from the
-large-``|z|`` expansion instead,
+``w''(z)`` a term of order ``4z`` cancels down to ``2/z**3``. The wings go
+first, and the Fisher matrix follows: on a window of +-33 gamma the
+variance element built from ``voigt_jacobian.voigt_with_hessian`` (or
+from ``voigt_with_jacobian`` by the chain rule) is off by 1.5e-3 at
+``sigma/gamma`` = 1e-3, by a factor 5.8 at 3e-4 and by four orders of
+magnitude at 1e-4. Here every energy point with ``|z| >= 7`` is
+evaluated from the large-``|z|`` expansion instead,
 
     V = L + (v/2) L'' + (v**2/8) L'''' + ...
 
@@ -79,9 +81,10 @@ constraints on the constants follow:
   ``|z_c|`` -- 24 < 49 here -- so that every term summed is on the
   shrinking side at every point that uses the expansion.
 - The switch cannot be lowered to buy back the Faddeeva error. Measured
-  on d_variance at sigma/gamma = 1, the best any N can do is 4e-8 at
-  ``|z| = 5`` and 3e-5 at ``|z| = 4``; N = 24 gives 2.5e-3 at ``|z| = 4``
-  and N = 40 gives 3e2. More terms make it worse, not better.
+  on d_variance at sigma/gamma = 1 for every N from 2 to 70, the best
+  that any of them reaches is 1e-8 at ``|z| = 5`` (N = 25) and 3e-5 at
+  ``|z| = 4`` (N = 12); N = 24 gives 2.5e-3 at ``|z| = 4`` and N = 40
+  gives 3e2. Past the turning point more terms make it worse.
 
 At ``|z| = 7`` the same measurement is at rounding level for every N from
 24 to 60, 6e-8 at N = 100 and 0.5 at N = 120. So exceeding ``|z_c|**2``
@@ -360,6 +363,9 @@ class VoigtPeak:
     gamma: float
 
     def __post_init__(self) -> None:
+        values = (self.amplitude, self.center, self.sigma, self.gamma)
+        if not all(math.isfinite(v) for v in values):
+            raise ValueError(f"peak parameters must be finite, got {values}")
         if not self.amplitude > 0.0:
             raise ValueError(f"amplitude must be positive, got {self.amplitude}")
         if self.sigma < 0.0 or self.gamma < 0.0 or (self.sigma == 0.0 and self.gamma == 0.0):
@@ -510,6 +516,16 @@ _WIDTH_NAMES = {
 }
 
 
+def _null_directions(eigenvalues: np.ndarray) -> np.ndarray:
+    """Mask of numerically null eigenvalues of a unit-diagonal matrix.
+
+    The ``n * eps`` rule of ``np.linalg.matrix_rank``, as used by
+    ``crlb.compute_multipeak_fisher``; re-implemented here, not imported.
+    """
+    n = eigenvalues.size
+    return eigenvalues <= max(eigenvalues[-1] * n * np.finfo(np.float64).eps, 1e-300)
+
+
 def _shape_slope(r: float) -> float:
     """g'(r) for g(r) = (1 - a r)**2 - b r**2, where f_G**2 = F**2 g(r)."""
     return -2.0 * _OL_A * (1.0 - _OL_A * r) - 2.0 * _OL_B * r
@@ -652,10 +668,15 @@ def poisson_fisher(
       common FWHM ``w``. This is a **different lineshape model**, not a
       re-parameterisation of the Voigt: each peak's (sigma, gamma) is
       mapped to (w, eta) by Thompson, Cox & Hastings (1987) and mean and
-      derivatives are those of the pseudo-Voigt at that point.
+      derivatives are those of the pseudo-Voigt at that point. Needs a
+      total FWHM above 1e-10 in whatever unit the axis is in: the mapping
+      in ``lineshape.PseudoVoigt`` has an absolute threshold there.
 
-    The first four are related by ``I_phi = T^T I_theta T`` and describe
-    the same statistical model; only 'sigma_gamma' has a singular ``T``.
+    'sigma_gamma', 'var_gamma', 'fwhm_shape' and 'fixed_instrument' with
+    a floor are coordinates on one statistical model, related by ``I_phi
+    = T^T I_theta T``; ``T`` is singular only for 'sigma_gamma', and only
+    at sigma = 0. 'fixed_instrument' without a floor is a sub-model of it,
+    one parameter per peak fewer.
 
     Args:
         energy: Energy axis (eV), shape (n_energy,)
@@ -711,6 +732,11 @@ def poisson_fisher(
             w, eta = PseudoVoigt.eta_from_voigt_params(
                 math.sqrt(_EIGHT_LN2) * p.sigma, 2.0 * p.gamma
             )
+            if not w > 0.0:
+                raise ValueError(
+                    "pvoigt needs a total FWHM above 1e-10 (absolute threshold in "
+                    "PseudoVoigt.eta_from_voigt_params)"
+                )
             value, d_center, d_w, d_eta = _pvoigt_derivatives(energy - p.center, w, float(eta))
             width_columns = p.amplitude * np.stack([d_w, d_eta], axis=1)
             width_values = np.array([w, float(eta)])
@@ -815,8 +841,8 @@ def effective_information(
     block is inverted after rescaling the whole matrix to unit diagonal
     and the result is scaled back. The rank decision inside the
     pseudo-inverse therefore does not move with the units of any
-    parameter -- the same gauge ``crlb.compute_multipeak_fisher`` fixes,
-    with the same ``n * eps`` threshold.
+    parameter -- the gauge ``crlb.compute_multipeak_fisher`` fixes, with
+    the same ``n * eps`` rule (re-implemented here).
 
     Args:
         fisher: Symmetric positive semi-definite matrix, (n, n)
@@ -842,8 +868,7 @@ def effective_information(
     scaled = fisher / np.outer(d_safe, d_safe)
 
     eigenvalues, eigenvectors = np.linalg.eigh(scaled[np.ix_(q, q)])
-    threshold = max(eigenvalues[-1] * q.size * np.finfo(np.float64).eps, 1e-300)
-    null = eigenvalues <= threshold
+    null = _null_directions(eigenvalues)
     inverse = np.where(null, 0.0, 1.0 / np.where(null, 1.0, eigenvalues))
     c_uq = scaled[np.ix_(u, q)] @ eigenvectors
     schur = scaled[np.ix_(u, u)] - (c_uq * inverse[np.newaxis, :]) @ c_uq.T
@@ -988,7 +1013,12 @@ class IdentifiabilityReport:
     fisher: PoissonFisherResult = field(repr=False)
 
     def to_dict(self) -> dict[str, Any]:
-        """Plain-Python summary (no arrays), for JSON or a table row."""
+        """Plain-Python summary (no arrays), for a table row or ``json.dumps``.
+
+        Bounds are ``inf`` at a boundary or when rank deficient, and
+        ``json.dumps`` writes those as ``Infinity``, which strict JSON
+        parsers reject.
+        """
         return {
             "null_space_dim": self.null_space_dim,
             "condition_number": self.condition_number,
@@ -1009,12 +1039,10 @@ def _covariance_bound(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray, int, 
     condition number of the unit-diagonal matrix. Entries of the
     pseudo-inverse on masked axes are not bounds and must not be read.
     """
-    n = matrix.shape[0]
     d = np.sqrt(np.maximum(np.diag(matrix), 0.0))
     d_safe = np.where(d > 0.0, d, 1.0)
     eigenvalues, eigenvectors = np.linalg.eigh(matrix / np.outer(d_safe, d_safe))
-    threshold = max(eigenvalues[-1] * n * np.finfo(np.float64).eps, 1e-300)
-    null = eigenvalues <= threshold
+    null = _null_directions(eigenvalues)
     inverse = np.where(null, 0.0, 1.0 / np.where(null, 1.0, eigenvalues))
     covariance = (eigenvectors * inverse[np.newaxis, :]) @ eigenvectors.T
     covariance /= np.outer(d_safe, d_safe)
@@ -1044,8 +1072,9 @@ def assess_identifiability(
 
     - 'rank_deficient': the unit-diagonal Fisher matrix is numerically
       singular and this parameter's axis projects onto its null space.
-      The rank rule and both tolerances are those of
-      ``crlb.compute_multipeak_fisher``. The bound is infinite.
+      Same decision as ``crlb.compute_multipeak_fisher``: its ``n * eps``
+      rank rule, re-implemented here, and its projection tolerance,
+      imported. The bound is infinite.
     - 'weakly_identified': the bound on the standard deviation exceeds
       ``thresholds.weak_relative_sd`` times the reference scale.
     - 'identified': neither.
@@ -1063,6 +1092,12 @@ def assess_identifiability(
       vanishes, so a peak with ``sigma/gamma = 0.03`` can be
       'identified' while ``variance_relative_sd`` is above 1. Read that
       field, and ``near_boundary``, for the component itself.
+    - The same holds at the other end. ``gamma = 0`` is a boundary too,
+      and gamma is judged against the FWHM: a nearly Gaussian peak can
+      have gamma 'identified' while sd(gamma)/gamma is of order one (0.58
+      at sigma/gamma = 100 for the default ``ScanGrid`` peak on +-5 FWHM
+      with an estimated flat background, where sd(gamma)/FWHM is 2e-3).
+      No flag is raised for that boundary; compare ``sd`` with ``value``.
     - 'weakly_identified' is **not** structural non-identifiability. It
       says the information in *this* window, at *this* exposure and with
       *this* background is small against a chosen scale; more counts or
@@ -1207,9 +1242,12 @@ class ScanGrid:
         background_fraction: Background level as a fraction of the height
             of a single peak
         step: Energy step
-        fwhm: Total FWHM in eV; only sets the unit of the energy axis
-        area: Peak area at unit exposure, in counts x eV per step, i.e.
-            ``area * V(E)`` counts per channel
+        fwhm: Total FWHM in eV. Only sets the unit of the energy axis:
+            step and window are in units of it and the peak area scales
+            with it, so no result depends on it.
+        area: Peak area at unit exposure in counts x FWHM: the peak is
+            given ``amplitude = area * fwhm``, i.e. ``area * fwhm * V(E)``
+            counts per channel, which does not change with ``fwhm``
         variance_floor: As in ``assess_identifiability``, in units of
             ``fwhm**2``
         thresholds: As in ``assess_identifiability``
@@ -1316,7 +1354,7 @@ def scan_identifiability(grid: ScanGrid) -> dict[str, np.ndarray]:
         sigma, gamma = _widths_at_fwhm(grid.ratios[r], fwhm)
         separation = grid.separations[s_]
         centers = [0.0] if separation is None else [-0.5 * separation * fwhm, 0.5 * separation * fwhm]
-        peaks = [VoigtPeak(grid.area, c, sigma, gamma) for c in centers]
+        peaks = [VoigtPeak(grid.area * fwhm, c, sigma, gamma) for c in centers]
         lo = centers[0] - grid.half_widths[h] * fwhm
         hi = centers[-1] + grid.half_widths[h] * fwhm
         energy = np.linspace(lo, hi, int(round((hi - lo) / (grid.step * fwhm))) + 1)

@@ -92,12 +92,17 @@ class TestFitter:
 
 class TestInterior:
     def test_replica_covariance_is_the_inverse_fisher_matrix(self):
-        """sigma/gamma = 1, 10^4 replicas, tolerance 5 %.
+        """sigma/gamma = 1, 10^4 replicas, tolerance 4 %.
 
+        One configuration: a single peak, this window, this intensity.
         The sampling error of a standard deviation from 10^4 replicas is
-        1/sqrt(2e4) = 0.7 %, so 5 % is seven of those; a first-order bias
-        of the estimate would show as a shift, bounded here at 0.05 sd
-        (its own sampling error is 0.01 sd).
+        1/sqrt(2e4) = 0.7 %; the ratios measured are 1.002..1.010 with
+        this seed (0.994..1.008 with two others). 4 % rather than 5 %
+        because a Fisher matrix wrong by 10 % moves the ratio by 5 % in
+        either direction, and at 5 % only the too-large case was caught
+        (the too-small one gave 0.950..0.958). A first-order bias of the
+        estimate would show as a shift, bounded here at 0.05 sd (its own
+        sampling error is 0.01 sd).
         """
         fisher, _, fit, report = _simulate(GAMMA, 10_000, seed=1)
         assert fit.converged.all() and not fit.at_floor.any()
@@ -108,7 +113,7 @@ class TestInterior:
         sd = np.sqrt(np.diag(bound))
         empirical = np.cov(fit.params.T)
         empirical_sd = np.sqrt(np.diag(empirical))
-        assert np.all(np.abs(empirical_sd / sd - 1.0) < 0.05)
+        assert np.all(np.abs(empirical_sd / sd - 1.0) < 0.04)
         assert np.max(np.abs(
             empirical / np.outer(empirical_sd, empirical_sd) - bound / np.outer(sd, sd)
         )) < 0.05
@@ -123,7 +128,7 @@ class TestBoundary:
         For orientation, not as a criterion: with one parameter on the
         boundary and the rest interior, the asymptotic law of the
         estimate is half a point mass at the floor and half a half-normal
-        (Self & Liang 1987, case 5), whose standard deviation is
+        (Self & Liang 1987), whose standard deviation is
         sqrt(1/2 - 1/(2 pi)) = 0.584 of the Fisher one.
         """
         sd_at_zero = assess_identifiability(

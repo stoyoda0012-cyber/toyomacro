@@ -102,8 +102,20 @@ def _corr_cond(fisher):
     return ev[-1] / ev[0]
 
 
-def _is_psd(m, scale):
-    return np.linalg.eigvalsh(0.5 * (m + m.T)).min() >= -1e-10 * scale
+def _unit_free(m, reference):
+    """``m`` in the coordinates that give ``reference`` a unit diagonal.
+
+    A width block mixes eV**2 and eV, so its eigenvalues are statements
+    about the energy unit. After this congruence they are not.
+    """
+    d = np.sqrt(np.diag(reference))
+    return m / np.outer(d, d)
+
+
+def _is_psd(m, reference):
+    """Positive semi-definite to rounding, judged unit-free."""
+    scaled = _unit_free(0.5 * (m + m.T), reference)
+    return np.linalg.eigvalsh(scaled).min() >= -1e-10
 
 
 # ===================================================================
@@ -155,6 +167,30 @@ class TestVoigtDerivatives:
         assert _close(d.d_center, d_x, 1e-9)
         assert _close(d.d_variance, d_variance, 1e-9)
         assert _close(d.d_gamma, d_gamma, 1e-9)
+
+    def test_accuracy_over_a_population_of_shapes(self):
+        """The table in the module docstring, as a bound: 31 shapes from
+        sigma/gamma = 0.01 to 10 on +-33.3 gamma, every output, error in a
+        band of |z| over the largest magnitude in that band.
+
+        Measured worst case 3.1e-11 (d_variance on 6 <= |z| < 7, the
+        Faddeeva side of the switch); asserted at 1e-10.
+        """
+        bands = [0.0, 2.0, 4.0, 6.0, 7.0, 8.0, 12.0, 50.0, np.inf]
+        x = np.linspace(-33.3 * GAMMA, 33.3 * GAMMA, 1601) + 1.234e-4
+        worst = 0.0
+        for ratio in np.logspace(-2, 1, 31):
+            sigma = ratio * GAMMA
+            z_abs = np.hypot(x, GAMMA) / (sigma * math.sqrt(2))
+            got = voigt_derivatives(x, 0.0, sigma**2, GAMMA)
+            reference = _quadrature_reference(x, sigma**2, GAMMA)
+            for lo, hi in zip(bands[:-1], bands[1:]):
+                band = (z_abs >= lo) & (z_abs < hi)
+                if band.sum() < 5:
+                    continue
+                for a, b in zip(got, reference):
+                    worst = max(worst, np.max(np.abs(a[band] - b[band])) / np.max(np.abs(b[band])))
+        assert worst < 1e-10
 
     @pytest.mark.parametrize("ratio", [0.11, 0.3, 1.0, 3.0])
     def test_routes_agree_on_both_sides_of_the_switch(self, ratio):
@@ -352,7 +388,7 @@ def _mean_from_params(result, energy, phi, background):
 
 class TestPoissonFisher:
     def test_fisher_matrix_is_the_same_from_either_route(self, monkeypatch):
-        """The brief's criterion: agreement of the matrix, not of the profile."""
+        """Agreement of the matrix, not only of the profile."""
         energy = np.linspace(-3.0, 3.0, 1201)
         peak = [VoigtPeak(AMP, 0.0, 0.03 * GAMMA, GAMMA)]  # min |z| = 23.6: all series
         auto = poisson_fisher(energy, peak).fisher
@@ -385,7 +421,8 @@ class TestPoissonFisher:
         assert np.all(np.abs(slopes - 2.0) < 0.01)
 
     def test_slope_holds_where_the_legacy_jacobian_has_broken_down(self):
-        """Down to sigma/gamma = 1e-7; voigt_with_jacobian fails below 1e-3."""
+        """Down to sigma/gamma = 1e-7. The engine's Jacobian gives this
+        element wrong by a factor 5.8 at 3e-4 and by four orders at 1e-4."""
         energy = np.linspace(-10.0, 10.0, 2001)
         ratios = np.logspace(-7, -4, 7)
         info = np.array([
@@ -511,8 +548,11 @@ class TestPoissonFisher:
                     total += si * sj * half_deviance(phi)
                 hessian[i, j] = hessian[j, i] = total / (4 * steps[i] * steps[j])
 
+        # Achieved: 1.5e-10 .. 6e-10 in every coordinate system, for steps
+        # of 1e-3 to 1e-2 sd alike. 2e-8 leaves a factor 30 and still fails
+        # a column that is wrong by one part in 10**7.
         d = np.sqrt(np.diag(r.fisher))
-        assert np.allclose(hessian / np.outer(d, d), r.fisher / np.outer(d, d), rtol=0, atol=2e-4)
+        assert np.allclose(hessian / np.outer(d, d), r.fisher / np.outer(d, d), rtol=0, atol=2e-8)
 
     def test_amplitude_bound_does_not_depend_on_width_coordinates(self):
         """Re-parameterising nuisance directions cannot move another bound."""
@@ -530,12 +570,12 @@ class TestPoissonFisher:
         """No background, sigma/gamma = 1/30, condition number of the
         unit-diagonal matrix.
 
-        +-33.3 gamma reproduces the 6.18 of the inventory. The narrow
-        windows are given as ranges because the number there depends on
-        the sampling at the several-percent level (measured: 936 on 2001
-        points against 912 on a 0.003 eV step at +-gamma, 5.5e6 against
-        4.9e6 at +-0.3 gamma); an independent recomputation got 917 and
-        5.2e6.
+        6.18 at +-33.3 gamma. The narrow windows are given as ranges
+        because the number there depends on how finely the window is
+        sampled: at +-gamma 719, 854, 912, 936, 939 on 21, 61, 201, 2001
+        and 20001 points, at +-0.3 gamma 4.0e6, 4.9e6, 5.3e6, 5.5e6, 5.5e6.
+        Coarse sampling understates it, by 23 % and 27 % on 21 points;
+        2001 points are within 0.4 % of the limit.
         """
         conds = []
         for half in (100.0 / 3.0, 1.0, 0.3):
@@ -624,6 +664,12 @@ class TestPoissonFisher:
             VoigtPeak(0.0, 0.0, 0.2, GAMMA)
         with pytest.raises(ValueError):
             VoigtPeak(AMP, 0.0, 0.0, 0.0)
+        for bad in ((np.inf, 0.0, 0.2, GAMMA), (AMP, np.nan, 0.2, GAMMA), (AMP, 0.0, np.nan, GAMMA),
+                    (AMP, 0.0, 0.2, np.inf)):
+            with pytest.raises(ValueError, match="finite"):
+                VoigtPeak(*bad)
+        with pytest.raises(ValueError, match="pvoigt"):
+            poisson_fisher(energy, [VoigtPeak(AMP, 0.0, 1e-12, 1e-12)], parameterization="pvoigt")
 
 
 class TestBackground:
@@ -638,6 +684,20 @@ class TestBackground:
         assert high.counts().max() == pytest.approx(30.0)
         with pytest.raises(ValueError):
             shirley_background(energy[::-1], peaks, 30.0)
+
+    def test_shirley_shape_of_two_lorentzians_is_the_arctangent_sum(self):
+        """Closed form: the running integral of A/pi * g/(x^2+g^2) is
+        A/pi * arctan(x/g). Two peaks of unequal area, so the weights
+        matter; trapezoid rule on a 0.002 eV step, so 1e-6 -- a rectangle
+        rule would be out by 1e-3."""
+        energy = np.linspace(-4.0, 5.0, 4501)
+        peaks = [VoigtPeak(AMP, 0.0, 0.0, 0.3), VoigtPeak(0.25 * AMP, 1.5, 0.0, 0.2)]
+        running = sum(
+            p.amplitude / math.pi * np.arctan((energy - p.center) / p.gamma) for p in peaks
+        )
+        expected = (running - running[0]) / (running[-1] - running[0])
+        shape = shirley_background(energy, peaks, 30.0).basis[0]
+        assert np.max(np.abs(shape - expected)) < 1e-6
 
     def test_known_terms_enter_the_mean_but_not_the_parameters(self):
         energy = np.linspace(-3.0, 3.0, 601)
@@ -682,9 +742,8 @@ class TestEffectiveInformation:
             for name in ("var_gamma", "sigma_gamma", "fwhm_shape", "pvoigt"):
                 r = poisson_fisher(energy, peak, background, parameterization=name)
                 info = effective_information(r.fisher, r.width_index)
-                scale = np.linalg.eigvalsh(info.conditional).max()
-                assert _is_psd(info.conditional - info.effective, scale)
-                assert _is_psd(info.effective, scale)
+                assert _is_psd(info.conditional - info.effective, info.conditional)
+                assert _is_psd(info.effective, info.conditional)
                 assert info.nuisance_null_dim == 0
 
     def test_inverse_is_the_width_block_of_the_full_inverse(self, cases):
@@ -702,14 +761,45 @@ class TestEffectiveInformation:
         for key, background in backgrounds.items():
             r = poisson_fisher(energy, peak, background)
             eff[key] = effective_information(r.fisher, r.width_index).effective
-        scale = np.linalg.eigvalsh(eff["none"]).max()
-        assert _is_psd(eff["none"] - eff["known"], scale)
-        assert _is_psd(eff["known"] - eff["estimated"], scale)
-        # and an estimated flat background costs the widths a lot more
-        # than its shot noise does: the soft direction loses over half
-        soft = {k: np.linalg.eigvalsh(v)[0] for k, v in eff.items()}
-        assert soft["known"] > 0.95 * soft["none"]
-        assert soft["estimated"] < 0.5 * soft["known"]
+        assert _is_psd(eff["none"] - eff["known"], eff["none"])
+        assert _is_psd(eff["known"] - eff["estimated"], eff["none"])
+
+    def test_a_small_estimated_background_costs_more_than_its_shot_noise(self, cases):
+        """Flat background at 0.05 % of the peak height, +-10 gamma.
+
+        Information left in the least determined direction of the width
+        block: 99 % with the background known, 61 % with it estimated. The
+        direction is taken in the scaled coordinates of the assessment
+        (variance over FWHM**2/(8 ln2), gamma over FWHM); the smallest
+        eigenvalue of the raw (eV**2, eV) block is not a physical quantity,
+        and gives 43 %, 63 % or 41 % for the same spectrum described in eV,
+        meV or keV.
+        """
+        energy, peak, backgrounds = cases
+        fwhm = voigt_fwhm(peak[0].variance, peak[0].gamma)
+        scales = np.array([fwhm**2 / (8 * math.log(2)), fwhm])
+        soft = {}
+        for key in ("none", "known", "estimated"):
+            r = poisson_fisher(energy, peak, backgrounds[key])
+            effective = effective_information(r.fisher, r.width_index).effective
+            soft[key] = np.linalg.eigvalsh(effective * np.outer(scales, scales))[0]
+        assert soft["known"] / soft["none"] == pytest.approx(0.993, abs=0.002)
+        assert soft["estimated"] / soft["none"] == pytest.approx(0.605, abs=0.005)
+
+    def test_that_share_does_not_depend_on_the_energy_unit(self):
+        shares = []
+        for c in (1.0, 1.0e3, 1.0e-3):  # eV, meV, keV
+            energy = c * np.linspace(-3.0, 3.0, 601)
+            peak = [VoigtPeak(c * AMP, 0.0, c * 0.1, c * GAMMA)]
+            fwhm = voigt_fwhm(peak[0].variance, peak[0].gamma)
+            scales = np.array([fwhm**2 / (8 * math.log(2)), fwhm])
+            soft = []
+            for background in (None, constant_background(energy, 50.0)):
+                r = poisson_fisher(energy, peak, background)
+                effective = effective_information(r.fisher, r.width_index).effective
+                soft.append(np.linalg.eigvalsh(effective * np.outer(scales, scales))[0])
+            shares.append(soft[1] / soft[0])
+        assert np.allclose(shares, shares[0], rtol=1e-8)
 
     def test_does_not_move_with_the_amplitude_unit(self, cases):
         """A -> cA is g -> D g D; the width block must not notice."""
@@ -856,6 +946,26 @@ class TestAssessment:
                 assert a.sd_conditional < a.sd
             else:
                 assert a.sd_conditional is None
+
+    def test_conditional_sd_is_the_inverse_of_the_width_block(self):
+        """Both widths of both peaks jointly, the rest known -- not
+        1/sqrt(I_ii), which would also take the other width as known."""
+        energy = np.arange(-1.0, 1.5 + 1e-9, 0.01)
+        peaks = [VoigtPeak(AMP, 0.0, 0.12, GAMMA), VoigtPeak(0.5 * AMP, 0.6, 0.2, 0.15)]
+        report = assess_identifiability(energy, peaks, linear_background(energy, 4000.0, 0.0))
+        index = list(report.fisher.width_index)
+        block = report.fisher.fisher[np.ix_(index, index)]
+        expected = np.sqrt(np.diag(np.linalg.inv(block)))
+        got = [report.parameters[i].sd_conditional for i in index]
+        assert np.allclose(got, expected, rtol=1e-9)
+        single = 1.0 / np.sqrt(np.diag(block))
+        assert np.all(expected > 1.2 * single)  # the two are not the same number
+
+    def test_default_thresholds_are_the_documented_ones(self):
+        """A tenth of the scale; three bounds from the boundary. Stated in
+        the design record and the changelog, so a change must be loud."""
+        defaults = IdentifiabilityThresholds()
+        assert (defaults.weak_relative_sd, defaults.boundary_sd) == (0.1, 3.0)
 
     def test_worst_direction_is_no_better_than_either_width(self):
         for half_width in (1.0, 3.0, 10.0):
@@ -1032,21 +1142,68 @@ class TestScan:
         """Compared at +-5 FWHM only. The window is measured outward from
         the outermost center, so a pair gets a window wider by its
         separation; at +-0.3 FWHM that extra half FWHM of data outweighs
-        the overlap and the pair comes out *better* (1.9 against 2.5 for
-        sd_gamma). Cells are not comparable across separations there."""
+        the overlap and the pair comes out *better* (sd_gamma 15.7 against
+        39.7 at sigma/gamma = 1). Cells are not comparable across
+        separations there."""
         est = self._b(scan, "estimated")
         assert np.all(scan["sd_gamma"][est, 1, :, 2] > 1.5 * scan["sd_gamma"][est, 0, :, 2])
         assert scan["sd_gamma"][est, 1, 3, 0, 0] < scan["sd_gamma"][est, 0, 3, 0, 0]
 
     def test_total_counts_normalisation(self):
-        """Same counts in every window: what is left is the window's shape."""
+        """Same counts in every window: what is left is the window's shape.
+
+        The total is checked against a mean rebuilt here, background
+        included, not against the number the scan was given.
+        """
         grid = ScanGrid(
             half_widths=(1.0, 5.0), levels=(1.0e6,), backgrounds=("none", "estimated"),
             normalization="total_counts",
         )
         scan = scan_identifiability(grid)
-        assert np.allclose(scan["total_counts"], 1.0e6, rtol=1e-12)
         assert np.all(scan["sd_gamma"][:, 0, 0, 0, 0] > scan["sd_gamma"][:, 0, 0, 1, 0])
+
+        sigma, gamma = idf._widths_at_fwhm(1.0, 1.0)
+        peak = VoigtPeak(grid.area, 0.0, sigma, gamma)
+        for h, half in enumerate(grid.half_widths):
+            energy = np.linspace(-half, half, int(round(2 * half / grid.step)) + 1)
+            background = _flat(energy, peak)
+            unit = poisson_fisher(energy, [peak], background).expected_counts.sum()
+            report = assess_identifiability(energy, [peak], background, exposure=1.0e6 / unit)
+            assert report.fisher.expected_counts.sum() == pytest.approx(1.0e6, rel=1e-12)
+            cell = (1, 0, 0, h, 0)
+            assert scan["sd_gamma"][cell] == pytest.approx(
+                report.parameters[3].relative_sd, rel=1e-10
+            )
+            assert scan["total_counts"][cell] == pytest.approx(1.0e6, rel=1e-12)
+
+    def test_fwhm_only_sets_the_unit(self):
+        """Step, window and area all scale with it, so nothing else moves."""
+        kwargs = dict(half_widths=(0.5, 3.0), ratios=(0.0, 1.0), separations=(None, 0.5))
+        reference = scan_identifiability(ScanGrid(**kwargs))
+        for fwhm in (0.5, 2.0):
+            other = scan_identifiability(ScanGrid(fwhm=fwhm, **kwargs))
+            for key in ("sd_gamma", "sd_variance", "sd_sigma", "worst_relative_sd",
+                        "variance_relative_sd", "total_counts", "info_sigma"):
+                assert np.allclose(other[key], reference[key], rtol=1e-8), key
+            assert np.array_equal(other["status"], reference["status"])
+
+    def test_variance_floor_reaches_the_cells(self):
+        """In units of fwhm**2; at the floor the peak is on the boundary."""
+        sigma, _ = idf._widths_at_fwhm(1.0, 1.0)
+        free = scan_identifiability(ScanGrid(half_widths=(5.0,), backgrounds=("estimated",)))
+        held = scan_identifiability(
+            ScanGrid(half_widths=(5.0,), backgrounds=("estimated",), variance_floor=sigma**2)
+        )
+        assert not free["near_boundary"].any() and held["near_boundary"].all()
+        assert np.isfinite(free["variance_relative_sd"]).all()
+        assert np.isinf(held["variance_relative_sd"]).all()
+        assert np.array_equal(held["sd_variance"], free["sd_variance"])
+
+    def test_information_is_the_inverse_square_of_the_scaled_bound(self, scan):
+        finite = np.isfinite(scan["sd_sigma"])
+        assert np.all(scan["info_sigma"][~finite] == 0.0)
+        assert np.allclose(scan["info_sigma"][finite] * scan["sd_sigma"][finite] ** 2, 1.0, rtol=1e-10)
+        assert np.allclose(scan["info_variance"] * scan["sd_variance"] ** 2, 1.0, rtol=1e-10)
 
     @pytest.mark.parametrize("kind", ["linear", "shirley"])
     def test_other_background_shapes(self, kind):
