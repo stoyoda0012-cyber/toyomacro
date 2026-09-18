@@ -44,8 +44,8 @@ catastrophically at large ``|z| = |x + i gamma| / (sigma sqrt 2)``: in
 first, and the Fisher matrix follows: on a window of +-33 gamma the
 variance element built from ``voigt_jacobian.voigt_with_hessian`` (or
 from ``voigt_with_jacobian`` by the chain rule) is off by 1.5e-3 at
-``sigma/gamma`` = 1e-3, by a factor 5.8 at 3e-4 and by four orders of
-magnitude at 1e-4. Here every energy point with ``|z| >= 7`` is
+``sigma/gamma`` = 1e-3, by a factor of about 6 at 3e-4 (5.2 to 6.5
+depending on the grid) and by four orders of magnitude at 1e-4. Here every energy point with ``|z| >= 7`` is
 evaluated from the large-``|z|`` expansion instead,
 
     V = L + (v/2) L'' + (v**2/8) L'''' + ...

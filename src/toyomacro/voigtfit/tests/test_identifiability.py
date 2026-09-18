@@ -173,8 +173,9 @@ class TestVoigtDerivatives:
         sigma/gamma = 0.01 to 10 on +-33.3 gamma, every output, error in a
         band of |z| over the largest magnitude in that band.
 
-        Measured worst case 3.1e-11 (d_variance on 6 <= |z| < 7, the
-        Faddeeva side of the switch); asserted at 1e-10.
+        Measured worst case 3e-11 (d_variance on 6 <= |z| < 7, the
+        Faddeeva side of the switch; 2e-11 to 4e-11 as the grid is
+        shifted, 5e-11 on ten times as many shapes); asserted at 1e-10.
         """
         bands = [0.0, 2.0, 4.0, 6.0, 7.0, 8.0, 12.0, 50.0, np.inf]
         x = np.linspace(-33.3 * GAMMA, 33.3 * GAMMA, 1601) + 1.234e-4
@@ -422,7 +423,8 @@ class TestPoissonFisher:
 
     def test_slope_holds_where_the_legacy_jacobian_has_broken_down(self):
         """Down to sigma/gamma = 1e-7. The engine's Jacobian gives this
-        element wrong by a factor 5.8 at 3e-4 and by four orders at 1e-4."""
+        element wrong by a factor of about 6 at 3e-4 and by four orders at
+        1e-4."""
         energy = np.linspace(-10.0, 10.0, 2001)
         ratios = np.logspace(-7, -4, 7)
         info = np.array([
@@ -829,6 +831,13 @@ class TestEffectiveInformation:
         assert info.nuisance_null_dim == 1
         assert np.allclose(info.effective, reference.effective, rtol=1e-9)
 
+    def test_rank_rule_is_n_times_eps(self):
+        """As np.linalg.matrix_rank and crlb: an eigenvalue of 1e-15 next
+        to 1 is null among ten, not among two."""
+        ten = np.array([1e-15] + [0.5] * 8 + [1.0])
+        assert idf._null_directions(ten).tolist() == [True] + [False] * 9
+        assert idf._null_directions(np.array([1e-15, 1.0])).tolist() == [False, False]
+
     def test_no_nuisance_means_no_loss(self):
         m = np.array([[4.0, 1.0], [1.0, 3.0]])
         info = effective_information(m, (0, 1))
@@ -960,6 +969,29 @@ class TestAssessment:
         assert np.allclose(got, expected, rtol=1e-9)
         single = 1.0 / np.sqrt(np.diag(block))
         assert np.all(expected > 1.2 * single)  # the two are not the same number
+
+    def test_thresholds_are_applied_as_stated(self):
+        """Not only what the defaults are, but where the code puts them:
+        the boundary flag flips between 2.9 and 3.1 bounds from the floor,
+        the label between 0.99 and 1.01 of the reported worst direction."""
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        peak = VoigtPeak(AMP, 0.0, 0.15, GAMMA)
+        background = _flat(energy, peak)
+        free = assess_identifiability(energy, [peak], background).widths[0]
+        for distance, expected in ((2.9, True), (3.1, False)):
+            floor = peak.variance - distance * free.sd_variance
+            width = assess_identifiability(
+                energy, [peak], background, variance_floor=floor
+            ).widths[0]
+            assert width.near_boundary is expected
+        for factor, expected in ((0.99, "weakly_identified"), (1.01, "identified")):
+            thresholds = IdentifiabilityThresholds(
+                weak_relative_sd=factor * free.worst_relative_sd
+            )
+            width = assess_identifiability(
+                energy, [peak], background, thresholds=thresholds
+            ).widths[0]
+            assert width.status == expected
 
     def test_default_thresholds_are_the_documented_ones(self):
         """A tenth of the scale; three bounds from the boundary. Stated in
@@ -1176,16 +1208,27 @@ class TestScan:
             )
             assert scan["total_counts"][cell] == pytest.approx(1.0e6, rel=1e-12)
 
-    def test_fwhm_only_sets_the_unit(self):
-        """Step, window and area all scale with it, so nothing else moves."""
-        kwargs = dict(half_widths=(0.5, 3.0), ratios=(0.0, 1.0), separations=(None, 0.5))
+    @pytest.mark.parametrize("normalization, level", [("exposure", 1.0), ("total_counts", 1e6)])
+    def test_fwhm_only_sets_the_unit(self, normalization, level):
+        """Step, window, area and floor all scale with it, so no result
+        moves: every array the scan returns, both normalisations, with a
+        floor in force. rtol 1e-6 because the matrices here reach a
+        condition number of 1e9, i.e. 3e-7 of rounding."""
+        sigma, _ = idf._widths_at_fwhm(1.0, 1.0)
+        kwargs = dict(
+            half_widths=(0.5, 3.0), ratios=(1.0, 3.0), separations=(None, 0.5),
+            levels=(level,), normalization=normalization, variance_floor=0.5 * sigma**2,
+        )
         reference = scan_identifiability(ScanGrid(**kwargs))
-        for fwhm in (0.5, 2.0):
+        axes = {"backgrounds", "separations", "ratios", "half_widths", "levels",
+                "normalization", "background_kind", "fwhm"}
+        for fwhm in (0.5, 0.7, 3.0):
             other = scan_identifiability(ScanGrid(fwhm=fwhm, **kwargs))
-            for key in ("sd_gamma", "sd_variance", "sd_sigma", "worst_relative_sd",
-                        "variance_relative_sd", "total_counts", "info_sigma"):
-                assert np.allclose(other[key], reference[key], rtol=1e-8), key
-            assert np.array_equal(other["status"], reference["status"])
+            for key in set(reference) - axes:
+                if reference[key].dtype.kind == "f":
+                    assert np.allclose(other[key], reference[key], rtol=1e-6), key
+                else:
+                    assert np.array_equal(other[key], reference[key]), key
 
     def test_variance_floor_reaches_the_cells(self):
         """In units of fwhm**2; at the floor the peak is on the boundary."""

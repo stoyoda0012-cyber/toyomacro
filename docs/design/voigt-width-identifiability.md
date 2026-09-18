@@ -53,8 +53,9 @@ term of order 4z cancels down to 2/z³, so the relative error of the
 variance derivative grows like |z|⁴ with |z| = |x + iγ|/(σ√2). The wings
 go first and the Fisher matrix follows: on a ±33γ window the variance
 element built from `voigt_with_hessian` (or from `voigt_with_jacobian`
-by the chain rule) is off by 1.5×10⁻³ at σ/γ = 10⁻³, by a factor 5.8 at
-3×10⁻⁴ and by four orders of magnitude at 10⁻⁴.
+by the chain rule) is off by 1.5×10⁻³ at σ/γ = 10⁻³, by a factor of about
+6 at 3×10⁻⁴ (5.2 to 6.5 depending on the grid) and by four orders of
+magnitude at 10⁻⁴.
 
 `voigt_derivatives` therefore switches *per energy point*: for |z| ≥ 7 it
 sums the large-|z| expansion
@@ -102,9 +103,9 @@ band, worst over 31 shapes σ/γ = 0.01…10 on ±33.3γ: value 6×10⁻¹⁴,
 ∂/∂v 3×10⁻¹¹, ∂/∂γ 5×10⁻¹², ∂/∂c 7×10⁻¹³. The worst case sits just below
 the switch on the Faddeeva side, which is why the switch is the lowest
 |z| at which the expansion is at rounding level. These are band maxima
-over a population; one point per |z| understates the worst case by
-about a factor three. The test suite asserts the population figure at
-10⁻¹⁰.
+over a population. A single point per |z| is not a substitute: random
+points in 6 ≤ |z| < 7 have a median error 25 times below the band
+maximum. The test suite asserts the population figure at 10⁻¹⁰.
 
 NumPy float64 is the reference implementation and the only one. The MLX
 Jacobian in the engine covers σ/γ ≥ 0.71 only and is not used here.
@@ -160,10 +161,12 @@ sub-block I_uu is the information *if q were known* — what
 positive semi-definite, so the sub-block is always the optimistic one,
 and the gap is large exactly where it matters: at ±γ, σ/γ = 1/3, with
 an estimated flat background at a tenth of the peak height, the bound on
-γ from I_eff is 318 times the one from I_uu. That ratio does not depend
-on the counts; the bounds themselves do (0.24 and 7×10⁻⁴ of the FWHM for
-5.5×10⁶ counts in the window, 0.75 and 2×10⁻³ for a tenth of that). Both
-are reported side by side.
+γ from I_eff is about 3×10² times the one from I_uu: 318 on 61 points,
+338 with fine sampling. The ratio does not depend on the exposure; it
+does depend on the shape (94 at σ/γ = 0.1, 6×10³ at σ/γ = 1, same
+window). The bounds themselves scale with the counts: 0.24 and 7×10⁻⁴ of
+the FWHM for 5.5×10⁶ counts in the window, 0.75 and 2×10⁻³ for a tenth
+of that. Both are reported side by side.
 
 The nuisance block is inverted on the unit-diagonal matrix with the n·ε
 rank rule, the gauge `crlb.compute_multipeak_fisher` already fixes: the
@@ -191,7 +194,7 @@ and for γ; FWHM²/(8 ln 2) for v. Not the parameter's own value, which is
 undefined at v = 0 and, for a position, not invariant under a shift of
 the energy origin. The variance is reported against itself as well
 (`variance_relative_sd`), because the FWHM scale stays finite as the
-Gaussian component vanishes: at σ/γ = 0.03 (±10γ, 1.5×10⁷ counts in
+Gaussian component vanishes: at σ/γ = 0.03 (±10γ, 1.6×10⁷ counts in
 the window) the width block is `identified` at 2×10⁻³ while
 sd(v)/v = 1.6. With more counts sd(v)/v falls like any other bound; the
 point is that the FWHM-scaled number says nothing about it. The test
@@ -240,8 +243,9 @@ a statement about other windows, intensities or several peaks.
 
 Interior, pass/fail: σ/γ = 1, estimated flat background, 10⁴ replicas, a
 regime the module itself labels identified and away from the boundary.
-Replica sd over Fisher sd 1.002…1.010 (0.994…1.008 with two other
-seeds), correlations within 0.006, bias under 0.01 sd. Tolerance 4 %: a
+Replica sd over Fisher sd 1.002…1.010 with the recorded seed; other
+seeds deviate by up to 1.7 %, the sampling error being 0.7 %.
+Correlations within 0.006, bias under 0.01 sd. Tolerance 4 %: a
 Fisher matrix wrong by 10 % in either direction moves the ratio by 5 %.
 
 Near the boundary, *recorded, not judged* (4000 replicas per row):

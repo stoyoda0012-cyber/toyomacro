@@ -57,17 +57,17 @@ archived on Zenodo for a citable DOI.
   their bounds condition on a background-free spectrum. (2)
   `effective_information` gives the information left for the widths once
   amplitude, position and background are estimated from the same
-  spectrum, next to the sub-block that assumes them known — at a window
-  of ±γ with an estimated flat background at a tenth of the peak height
-  the first bound on γ is 318 times the second, whatever the counts.
+  spectrum, next to the sub-block that assumes them known — at σ/γ = 1/3
+  on a window of ±γ, with an estimated flat background at a tenth of the
+  peak height, the first bound on γ is about 3×10² times the second
+  (318 on 61 points, 338 with fine sampling), whatever the exposure.
   (3) `voigt_derivatives` works in the Gaussian *variance*, in which the
   Fisher matrix is regular at σ = 0, and stays accurate there: built from
   the engine's Faddeeva-based Jacobian the variance element of the Fisher
-  matrix is off by a factor 5.8 at σ/γ = 3×10⁻⁴ and by four orders at
-  10⁻⁴ (window ±33γ), so points with |z| ≥ 7 use a 24-term large-|z|
+  matrix is off by a factor of about 6 at σ/γ = 3×10⁻⁴ and by four orders
+  at 10⁻⁴ (window ±33γ), so points with |z| ≥ 7 use a 24-term large-|z|
   expansion instead (worst measured error 3×10⁻¹¹ over σ/γ = 0.01…10).
-  Width
-  coordinates are selectable (`sigma_gamma`, `var_gamma`, `fwhm_shape`,
+  Width coordinates are selectable (`sigma_gamma`, `var_gamma`, `fwhm_shape`,
   `pvoigt`, `fixed_instrument`, the last optionally with a calibrated
   instrument variance as the floor). `assess_identifiability` labels each
   parameter `rank_deficient`, `weakly_identified` or `identified` against
@@ -81,8 +81,8 @@ archived on Zenodo for a citable DOI.
   estimator. The defaults (a tenth of the FWHM; three bounds from the
   boundary) are conventions. Checked, in one single-peak configuration,
   against exact constrained Poisson maximum likelihood on 10⁴ simulated
-  spectra: replica standard deviations within 1 % of the bound in the
-  interior; near the boundary the disagreement is recorded, not
+  spectra: replica standard deviations within 2 % of the bound in the
+  interior (sampling error 0.7 %); near the boundary the disagreement is recorded, not
   asserted. NumPy float64 only, no MLX
   path. Design record:
   [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md);
