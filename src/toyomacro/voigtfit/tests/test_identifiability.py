@@ -215,6 +215,22 @@ class TestVoigtDerivatives:
         for a, b in zip(shipped, explicit):
             assert np.array_equal(a, b)
 
+    def test_broadcasts_over_profiles(self):
+        """(n, 1) parameters against an (n_energy,) axis: n profiles at
+        once, each point on its own route, identical to the scalar calls."""
+        energy = np.linspace(-6.0, 6.0, 241)
+        center = np.array([0.0, 0.3, -1.0, 0.0])
+        variance = np.array([0.0, 1e-6, 0.04, 1.0])
+        gamma = np.array([GAMMA, GAMMA, 0.1, 0.0])
+        batch = voigt_derivatives(energy, center[:, None], variance[:, None], gamma[:, None])
+        for k in range(4):
+            single = voigt_derivatives(energy, center[k], variance[k], gamma[k])
+            for a, b in zip(batch, single):
+                assert a.shape == (4, 241)
+                assert np.array_equal(a[k], b)
+        with pytest.raises(ValueError):
+            voigt_derivatives(energy, 0.0, np.array([[0.1], [-0.1]]), GAMMA)
+
     def test_rejects_points_outside_the_domain(self):
         x = np.linspace(-1, 1, 5)
         with pytest.raises(ValueError):

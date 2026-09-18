@@ -219,9 +219,7 @@ def _horner(coefficients: np.ndarray, t: np.ndarray) -> np.ndarray:
     return acc
 
 
-def _derivatives_series(
-    x: np.ndarray, variance: float, gamma: float, n_terms: int | None = None
-):
+def _derivatives_series(x: np.ndarray, variance, gamma, n_terms: int | None = None):
     """Large-|z| expansion; exact at variance = 0.
 
     ``n_terms`` overrides the shipped number of terms. It exists so the
@@ -243,9 +241,9 @@ def _derivatives_series(
     return value, -d_x, d_variance, d_gamma
 
 
-def _derivatives_faddeeva(x: np.ndarray, variance: float, gamma: float):
+def _derivatives_faddeeva(x: np.ndarray, variance, gamma):
     """Closed form from w(z), w'(z), w''(z); needs variance > 0."""
-    sigma = math.sqrt(variance)
+    sigma = np.sqrt(variance)
     z = (x + 1j * gamma) / (sigma * math.sqrt(2.0))
     w = sps.wofz(z)
     w1 = -2.0 * z * w + 2j / _SQRT_PI
@@ -259,9 +257,9 @@ def _derivatives_faddeeva(x: np.ndarray, variance: float, gamma: float):
 
 def voigt_derivatives(
     energy: np.ndarray,
-    center: float,
-    variance: float,
-    gamma: float,
+    center: float | np.ndarray,
+    variance: float | np.ndarray,
+    gamma: float | np.ndarray,
     *,
     route: Literal["auto", "faddeeva", "series"] = "auto",
 ) -> VoigtDerivatives:
@@ -270,6 +268,11 @@ def voigt_derivatives(
     Valid for ``variance >= 0`` and ``gamma >= 0``, not both zero,
     including ``variance = 0`` exactly, where the profile is the
     Lorentzian ``L`` and ``d_variance`` is ``L''/2``.
+
+    ``center``, ``variance`` and ``gamma`` may be arrays that broadcast
+    against ``energy`` -- shape (n, 1) against an axis of shape
+    (n_energy,) evaluates n profiles at once, each point taking its own
+    route -- and the outputs then have the broadcast shape.
 
     Args:
         energy: Energy axis (eV), shape (n_energy,)
@@ -285,17 +288,20 @@ def voigt_derivatives(
     Returns:
         VoigtDerivatives
     """
-    if variance < 0.0 or gamma < 0.0 or (variance == 0.0 and gamma == 0.0):
+    variance = np.asarray(variance, dtype=np.float64)
+    gamma = np.asarray(gamma, dtype=np.float64)
+    if np.any(variance < 0.0) or np.any(gamma < 0.0) or np.any((variance == 0.0) & (gamma == 0.0)):
         raise ValueError(
             "need variance >= 0 and gamma >= 0, not both zero; "
             f"got variance={variance}, gamma={gamma}"
         )
-    x = np.asarray(energy, dtype=np.float64) - float(center)
+    x = np.asarray(energy, dtype=np.float64) - np.asarray(center, dtype=np.float64)
+    x, variance, gamma = np.broadcast_arrays(x, variance, gamma)
 
     if route == "series":
         return VoigtDerivatives(*_derivatives_series(x, variance, gamma))
     if route == "faddeeva":
-        if variance == 0.0:
+        if np.any(variance == 0.0):
             raise ValueError("route='faddeeva' needs variance > 0")
         return VoigtDerivatives(*_derivatives_faddeeva(x, variance, gamma))
     if route != "auto":
@@ -303,13 +309,13 @@ def voigt_derivatives(
 
     # |z|**2 >= Z**2 written without dividing by the variance
     far = x * x + gamma * gamma >= 2.0 * variance * _SERIES_SWITCH_Z**2
-    out = [np.empty_like(x) for _ in range(4)]
+    out = [np.empty(x.shape) for _ in range(4)]
     if far.any():
-        for dst, src in zip(out, _derivatives_series(x[far], variance, gamma)):
+        for dst, src in zip(out, _derivatives_series(x[far], variance[far], gamma[far])):
             dst[far] = src
     if not far.all():
         near = ~far
-        for dst, src in zip(out, _derivatives_faddeeva(x[near], variance, gamma)):
+        for dst, src in zip(out, _derivatives_faddeeva(x[near], variance[near], gamma[near])):
             dst[near] = src
     return VoigtDerivatives(*out)
 
