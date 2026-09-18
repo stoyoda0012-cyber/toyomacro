@@ -1,7 +1,14 @@
 """Fermi-Dirac edge lineshape for valence band XPS analysis.
 
-Ported from MATLAB Toyomacro +toyomacro/+lineshape/FermiDirac.m and
-peak_analysis/ausi_project/vb_fermi_analysis.py.
+Ported from MATLAB Toyomacro +toyomacro/+lineshape/FermiDirac.m and a
+valence-band analysis script.
+
+For *fitting* a Fermi edge use :mod:`toyomacro.fitting.fermi_edge`,
+which evaluates the same model with two differences that matter near
+the ends of a cut spectrum: this lineshape convolves on the given axis
+only, so channels within ~2 FWHM of either end see a clamped copy of the
+end value (a fit in a narrow window is biased by it), and it skips the
+broadening entirely when the Gaussian sigma is at most half a channel.
 
 The Fermi-Dirac lineshape models the valence band Fermi edge as:
     I(E) = A × DOS(E) × f(E, EF, T) ⊗ G(σ_instr) + bg

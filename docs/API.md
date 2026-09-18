@@ -65,6 +65,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |
 | `data.transmission` | Scienta analyzer transmission adapter (§5); reads user-supplied vendor data, no data bundled |
 | `data.elastic_scattering` | overlayer-thickness effective attenuation length, mean escape depth and information depth from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
+| `fitting.fermi_edge` | Fermi-edge fit (Fermi-Dirac × low-order DOS ⊗ Gaussian + background): E_F and instrumental resolution with 1σ errors, energy-axis calibration to E_F = 0; the errors are statistical and do not cover the DOS-model choice (see the module docstring and `examples/06`) |
 | `data.sessa` | reads an IMFP/TRMFP pair out of a `sam_par.txt` the user generated with their own SESSA licence; no SESSA dependency, no SESSA data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for

@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,892 automated tests** across **75 files**, in two
+This suite has **1,920 automated tests** across **77 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 39 | 1,024 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 41 | 1,052 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,7 +16,7 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,460 tests, 77%) — guarantee the library
+- **Contract / regression** (1,488 tests, 77%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,024)
+## Library body — `tests/` (1,052)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -51,10 +51,11 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 
-### Lineshape & background — physics core (52)
+### Lineshape & background — physics core (77)
 | Tests | File | Guards |
 |--:|---|---|
 | 22 | `test_doniach_sunjic.py` | DS lineshape + MATLAB `LineshapeType` numbering |
+| 25 | `test_fermi_edge.py` | Fermi-edge fit: agreement with `FermiDirac`, axis-shift and KE/BE invariance, 1σ pulls of E_F and resolution over 200 seeds, `success` gates (bounds, singular covariance, E_F off-window, collapsed width), fine-step starts, window-independent 10–90% width |
 | 17 | `test_tougaard.py` | Tougaard background algorithm |
 | 13 | `test_energy_axis.py` | BE / KE energy-axis handling through the pipeline |
 
@@ -66,7 +67,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 17 | `test_fast_voigt_solvers.py` | `FastVoigtFitter` routing (incl. `use_mlx` on the multipeak path) + template binding-energy integration |
 | 12 | `test_fit_dirty_map.py` | Interactive fit-result accumulator |
 
-### GVRT / synthetic — paper reproduction (178)
+### GVRT / synthetic — paper reproduction (181)
 | Tests | File | Guards |
 |--:|---|---|
 | 62 | `test_si2p_gvrt.py` | Si 2p doublet linear-encoder round trip (synthetic) |
@@ -75,6 +76,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 23 | `test_multi_image.py` | Multi-image GVRT generalization (smoke) |
 | 9 | `test_ncomp_scaling.py` | `n_comp` scaling benchmark (smoke) |
 | 5 | `test_example_05_map_from_file.py` | Example 05: reader columns → spectra, KE→BE, background sort, synthetic map recovered |
+| 3 | `test_example_06_fermi_edge_calibration.py` | Example 06: a known axis offset and Au 4f7/2 = 84 eV recovered; default window finds E_F, not a steeper deeper band |
 | 4 | `test_example_data.py` | `examples/data/` generator reproduces the shipped file |
 | 2 | `test_gvrt_cli.py` | `gvrt` CLI subcommand (smoke) |
 

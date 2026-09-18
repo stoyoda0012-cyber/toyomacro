@@ -10,6 +10,29 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **Experimental** `fitting.fermi_edge`: Fermi-edge fitting for
+  energy-axis calibration and instrumental resolution. Fits
+  Fermi-Dirac × (flat / linear / quadratic DOS) ⊗ Gaussian + a constant
+  or linear background on a binding- or kinetic-energy axis, returns
+  E_F and the Gaussian FWHM with 1σ errors, and `to_binding_energy`
+  puts a spectrum on an axis with E_F at 0; `differential_ef` compares
+  two edges. The Gaussian convolution is padded 4σ past the axis ends,
+  so a spectrum cut to a fit window is modelled as the window of a full
+  spectrum: with the ends clamped instead (as `lineshape.FermiDirac`
+  does), a fit in a ±1.2 eV window on a sloped DOS biased E_F by −0.4σ
+  on average. Over 200 Poisson realisations the E_F and FWHM pulls
+  have unit width and zero mean at ~2000 counts per channel at the
+  edge (wider at ~100 counts). `success` is False when a parameter ends
+  on a bound, an uncertainty is not finite, E_F leaves the window, or
+  the resolution collapses below half a channel. The errors are
+  statistical only: on two measured Au reference edges (0.36–0.5 eV
+  resolution; not distributed) the choice of DOS model moved E_F by
+  0.05–0.14 eV, far beyond `ef_err` (0.01–0.05 eV between the two
+  models within 2× the best reduced χ²).
+  `examples/06_fermi_edge_calibration.py` reports that movement as a
+  sensitivity check, not an uncertainty. Temperature can be fitted but
+  is nearly degenerate with the resolution.
+
 - **`examples/05_fit_map_from_file.py`: from a file to chemical-state
   maps.** The step between the synthetic examples and a user's own
   measurement: reads an HDF5 `specdata` map or any reader-supported file
