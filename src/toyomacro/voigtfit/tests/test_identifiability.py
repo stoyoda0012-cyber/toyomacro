@@ -28,12 +28,14 @@ from toyomacro.voigtfit.identifiability import (
     PARAMETERIZATIONS,
     Background,
     IdentifiabilityThresholds,
+    ScanGrid,
     VoigtPeak,
     assess_identifiability,
     constant_background,
     effective_information,
     linear_background,
     poisson_fisher,
+    scan_identifiability,
     shirley_background,
     voigt_derivatives,
     voigt_fwhm,
@@ -918,3 +920,129 @@ class TestAssessment:
     def test_report_serialises(self):
         text = json.dumps(self._report(1.0).to_dict())
         assert "weakly_identified" in text and "worst_relative_sd" in text
+
+
+# ===================================================================
+# Scan
+# ===================================================================
+
+
+class TestScan:
+    GRID = ScanGrid(
+        half_widths=(0.3, 1.0, 5.0),
+        levels=(1.0, 100.0),
+        ratios=(0.0, 1e-3, 1e-2, 1.0),
+        separations=(None, 0.5),
+    )
+
+    @pytest.fixture(scope="class")
+    def scan(self):
+        return scan_identifiability(self.GRID)
+
+    @staticmethod
+    def _b(scan, name):
+        return list(scan["backgrounds"]).index(name)
+
+    def test_shapes_and_round_trip_through_npz(self, scan, tmp_path):
+        shape = (3, 2, 4, 3, 2)
+        for key in ("sd_variance", "sd_sigma", "status", "near_boundary", "condition_number"):
+            assert scan[key].shape == shape
+        assert np.isnan(scan["separations"][0]) and scan["separations"][1] == 0.5
+        path = tmp_path / "scan.npz"
+        np.savez(path, **scan)
+        loaded = np.load(path)
+        assert set(loaded.files) == set(scan)
+        assert np.array_equal(loaded["status"], scan["status"])
+        assert str(loaded["normalization"]) == "exposure"
+
+    def test_cell_is_the_direct_assessment(self, scan):
+        """Background 'estimated', single peak, sigma/gamma = 1, +-1 FWHM, level 100."""
+        sigma, gamma = idf._widths_at_fwhm(1.0, 1.0)
+        assert voigt_fwhm(sigma**2, gamma) == pytest.approx(1.0, rel=1e-14)
+        energy = np.linspace(-1.0, 1.0, 101)
+        peak = VoigtPeak(1.0e4, 0.0, sigma, gamma)
+        report = assess_identifiability(energy, [peak], _flat(energy, peak), exposure=100.0)
+        cell = (self._b(scan, "estimated"), 0, 3, 1, 1)
+        assert scan["sd_gamma"][cell] == pytest.approx(report.parameters[3].relative_sd, rel=1e-12)
+        assert scan["worst_relative_sd"][cell] == report.widths[0].worst_relative_sd
+        assert scan["n_energy"][cell] == 101
+
+    def test_coordinate_degeneracy_and_information_loss_come_apart(self, scan):
+        """Towards sigma = 0 only the sigma bound moves; towards a narrow
+        window both do."""
+        est = self._b(scan, "estimated")
+        along_ratio = (est, 0, slice(0, 3), 2, 0)  # ratios 0, 1e-3, 1e-2 at +-5 FWHM
+        variance = scan["sd_variance"][along_ratio]
+        assert np.ptp(variance) / variance.mean() < 1e-3
+        assert scan["sd_sigma"][along_ratio][0] == np.inf
+        assert scan["sd_sigma"][est, 0, 1, 2, 0] / scan["sd_sigma"][est, 0, 2, 2, 0] == pytest.approx(
+            10.0, rel=1e-3
+        )
+        # information on sigma vanishes like sigma**2, on the variance it does not
+        assert scan["info_sigma"][est, 0, 0, 2, 0] == 0.0
+        assert scan["info_sigma"][est, 0, 2, 2, 0] / scan["info_sigma"][est, 0, 1, 2, 0] == pytest.approx(
+            100.0, rel=1e-3
+        )
+        # and the label, taken in var_gamma, does not react to the coordinate
+        assert np.all(scan["status"][est, 0, :3, 2, 0] == 0)
+
+        along_window = (est, 0, 3, slice(None), 0)
+        assert np.all(np.diff(scan["sd_variance"][along_window]) < 0)
+        assert np.all(np.diff(scan["sd_sigma"][along_window]) < 0)
+        assert scan["status"][est, 0, 3, 0, 0] == 1
+
+    def test_window_dependence_without_any_background(self, scan):
+        none = self._b(scan, "none")
+        cond = scan["condition_number"][none, 0, 3, :, 0]
+        assert np.all(np.diff(cond) < 0) and cond[0] > 100 * cond[-1]
+
+    def test_background_ordering(self, scan):
+        """none <= known <= estimated in every cell, for both widths."""
+        none, known, est = (self._b(scan, k) for k in ("none", "known", "estimated"))
+        for key in ("sd_variance", "sd_gamma"):
+            assert np.all(scan[key][none] <= scan[key][known] * (1 + 1e-9))
+            assert np.all(scan[key][known] <= scan[key][est] * (1 + 1e-9))
+            assert np.all(scan[key + "_conditional"] <= scan[key] * (1 + 1e-9))
+
+    def test_levels_scale_the_bounds_and_nothing_else(self, scan):
+        ratio = scan["sd_gamma"][..., 0] / scan["sd_gamma"][..., 1]
+        assert np.allclose(ratio, 10.0, rtol=1e-6)
+        assert np.allclose(
+            scan["condition_number"][..., 0], scan["condition_number"][..., 1], rtol=1e-5
+        )
+        assert np.allclose(scan["total_counts"][..., 1], 100.0 * scan["total_counts"][..., 0])
+
+    def test_a_close_second_peak_costs_information(self, scan):
+        """Compared at +-5 FWHM only. The window is measured outward from
+        the outermost center, so a pair gets a window wider by its
+        separation; at +-0.3 FWHM that extra half FWHM of data outweighs
+        the overlap and the pair comes out *better* (1.9 against 2.5 for
+        sd_gamma). Cells are not comparable across separations there."""
+        est = self._b(scan, "estimated")
+        assert np.all(scan["sd_gamma"][est, 1, :, 2] > 1.5 * scan["sd_gamma"][est, 0, :, 2])
+        assert scan["sd_gamma"][est, 1, 3, 0, 0] < scan["sd_gamma"][est, 0, 3, 0, 0]
+
+    def test_total_counts_normalisation(self):
+        """Same counts in every window: what is left is the window's shape."""
+        grid = ScanGrid(
+            half_widths=(1.0, 5.0), levels=(1.0e6,), backgrounds=("none", "estimated"),
+            normalization="total_counts",
+        )
+        scan = scan_identifiability(grid)
+        assert np.allclose(scan["total_counts"], 1.0e6, rtol=1e-12)
+        assert np.all(scan["sd_gamma"][:, 0, 0, 0, 0] > scan["sd_gamma"][:, 0, 0, 1, 0])
+
+    @pytest.mark.parametrize("kind", ["linear", "shirley"])
+    def test_other_background_shapes(self, kind):
+        grid = ScanGrid(half_widths=(2.0,), backgrounds=("estimated",), background_kind=kind)
+        scan = scan_identifiability(grid)
+        assert np.isfinite(scan["sd_gamma"]).all() and scan["status"].min() >= 0
+
+    def test_rejects_unknown_options(self):
+        with pytest.raises(ValueError):
+            scan_identifiability(ScanGrid(half_widths=(1.0,), backgrounds=("fitted",)))
+        with pytest.raises(ValueError):
+            scan_identifiability(ScanGrid(half_widths=(1.0,), normalization="counts"))
+        with pytest.raises(ValueError):
+            scan_identifiability(ScanGrid(half_widths=(1.0,), background_kind="tougaard"))
+

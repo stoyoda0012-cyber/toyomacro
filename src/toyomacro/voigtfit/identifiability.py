@@ -136,6 +136,7 @@ __all__ = [
     "ParameterAssessment",
     "WidthAssessment",
     "IdentifiabilityReport",
+    "ScanGrid",
     "voigt_derivatives",
     "voigt_fwhm",
     "constant_background",
@@ -144,6 +145,7 @@ __all__ = [
     "poisson_fisher",
     "effective_information",
     "assess_identifiability",
+    "scan_identifiability",
 ]
 
 Parameterization = Literal[
@@ -1158,3 +1160,202 @@ def assess_identifiability(
         condition_number=condition, thresholds=thresholds,
         variance_floor=float(variance_floor), fisher=fisher,
     )
+
+
+# ---------------------------------------------------------------------------
+# Scan over measurement conditions
+# ---------------------------------------------------------------------------
+
+_STATUS_CODE = {"identified": 0, "weakly_identified": 1, "rank_deficient": 2}
+
+
+@dataclass(frozen=True)
+class ScanGrid:
+    """Conditions for ``scan_identifiability``. Lengths are in units of the
+    total FWHM, which is held fixed, so the grid is free of energy units.
+
+    Attributes:
+        half_widths: Window half-widths, measured outward from the
+            outermost peak center
+        levels: Exposure multipliers, or total counts in the window when
+            ``normalization='total_counts'``
+        ratios: ``sigma/gamma`` at fixed total FWHM. 0 is a pure
+            Lorentzian; use a large finite number, not ``inf``, for a
+            Gaussian (a pure Gaussian without background has channels
+            with no expected counts).
+        backgrounds: Any of 'none', 'known', 'estimated'
+        separations: Peak spacings for a second, identical peak; None is
+            a single peak. Because the window is measured outward from
+            the outermost center, a pair is given a window wider by its
+            separation, so at narrow half-widths a pair can come out
+            better determined than a single peak in the "same" cell.
+            Compare across separations at wide windows only.
+        normalization: 'exposure' keeps the energy step and the exposure
+            per point fixed, so a wider window has more points *and* more
+            counts -- how a measurement actually trades. 'total_counts'
+            rescales every window to the same total, which isolates what
+            the window's shape contributes from what its counts do.
+        background_kind: 'constant', 'linear' (zero true slope) or
+            'shirley' (a constant plus a Shirley-type step of the same
+            height); applies to 'known' and 'estimated'
+        background_fraction: Background level as a fraction of the height
+            of a single peak
+        step: Energy step
+        fwhm: Total FWHM in eV; only sets the unit of the energy axis
+        area: Peak area at unit exposure, in counts x eV per step, i.e.
+            ``area * V(E)`` counts per channel
+        variance_floor: As in ``assess_identifiability``, in units of
+            ``fwhm**2``
+        thresholds: As in ``assess_identifiability``
+    """
+
+    half_widths: tuple[float, ...]
+    levels: tuple[float, ...] = (1.0,)
+    ratios: tuple[float, ...] = (1.0,)
+    backgrounds: tuple[str, ...] = ("none", "known", "estimated")
+    separations: tuple[float | None, ...] = (None,)
+    normalization: Literal["exposure", "total_counts"] = "exposure"
+    background_kind: Literal["constant", "linear", "shirley"] = "constant"
+    background_fraction: float = 0.1
+    step: float = 0.02
+    fwhm: float = 1.0
+    area: float = 1.0e4
+    variance_floor: float = 0.0
+    thresholds: IdentifiabilityThresholds = field(default_factory=IdentifiabilityThresholds)
+
+
+def _widths_at_fwhm(ratio: float, fwhm: float) -> tuple[float, float]:
+    """(sigma, gamma) with sigma/gamma = ratio and Olivero-Longbothum FWHM = fwhm."""
+    gamma = fwhm / (2.0 * _OL_A + math.sqrt(4.0 * _OL_B + _EIGHT_LN2 * ratio * ratio))
+    return ratio * gamma, gamma
+
+
+def _scan_background(grid: ScanGrid, mode: str, energy: np.ndarray, peaks: list[VoigtPeak]):
+    if mode == "none":
+        return None
+    if mode not in ("known", "estimated"):
+        raise ValueError(f"background must be 'none', 'known' or 'estimated', got '{mode}'")
+    estimated = mode == "estimated"
+    first = peaks[0]
+    height = first.amplitude * voigt_derivatives(
+        np.array([first.center]), first.center, first.variance, first.gamma
+    ).value[0]
+    level = grid.background_fraction * height
+    if grid.background_kind == "constant":
+        return constant_background(energy, level, estimated=estimated)
+    if grid.background_kind == "linear":
+        return linear_background(energy, level, 0.0, estimated=estimated)
+    if grid.background_kind == "shirley":
+        return constant_background(energy, level, estimated=estimated) + shirley_background(
+            energy, peaks, level, estimated=estimated
+        )
+    raise ValueError(f"unknown background_kind '{grid.background_kind}'")
+
+
+def scan_identifiability(grid: ScanGrid) -> dict[str, np.ndarray]:
+    """Evaluate the assessment over a grid of measurement conditions.
+
+    Every cell is evaluated twice, in 'var_gamma' and in 'sigma_gamma',
+    so that the two ways a Gaussian width can look badly determined come
+    apart: along ``ratios`` towards 0 the ``sigma`` bound diverges while
+    the variance bound stays put (the coordinate), whereas along
+    ``half_widths`` towards 0, or with an estimated background, both
+    grow (the information). The no-background rows show the window
+    dependence on its own.
+
+    Returns:
+        A flat dict that ``np.savez(path, **result)`` stores as is. Axis
+        arrays ``backgrounds``, ``separations`` (NaN for a single peak),
+        ``ratios``, ``half_widths``, ``levels``, and result arrays of
+        shape ``(n_backgrounds, n_separations, n_ratios, n_half_widths,
+        n_levels)``, all for the first peak:
+
+        - ``total_counts``, ``n_energy``
+        - ``condition_number``: of the unit-diagonal matrix ('var_gamma')
+        - ``sd_variance``, ``sd_gamma``: full bounds over their reference
+          scales FWHM**2/(8 ln2) and FWHM; ``*_conditional`` the same
+          from the width sub-block with everything else known
+        - ``worst_relative_sd``, ``variance_relative_sd``,
+          ``near_boundary``, ``status`` (0 identified, 1 weakly
+          identified, 2 rank deficient): as in ``WidthAssessment``
+        - ``sd_sigma``: bound on sigma in 'sigma_gamma' coordinates over
+          FWHM/sqrt(8 ln2); ``inf`` at sigma = 0
+        - ``info_variance``, ``info_sigma``: effective information on the
+          single parameter, times its reference scale squared; the second
+          vanishes like sigma**2, the first does not
+
+        and ``normalization``, ``background_kind``, ``fwhm`` as 0-d
+        arrays.
+    """
+    if grid.normalization not in ("exposure", "total_counts"):
+        raise ValueError(f"unknown normalization '{grid.normalization}'")
+    shape = (
+        len(grid.backgrounds), len(grid.separations), len(grid.ratios),
+        len(grid.half_widths), len(grid.levels),
+    )
+    keys = (
+        "total_counts", "n_energy", "condition_number", "sd_variance", "sd_gamma",
+        "sd_variance_conditional", "sd_gamma_conditional", "worst_relative_sd",
+        "variance_relative_sd", "sd_sigma", "info_variance", "info_sigma",
+    )
+    out = {key: np.full(shape, np.nan) for key in keys}
+    out["near_boundary"] = np.zeros(shape, dtype=bool)
+    out["status"] = np.full(shape, -1, dtype=np.int8)
+
+    fwhm = grid.fwhm
+    sigma_scale = fwhm / math.sqrt(_EIGHT_LN2)
+    floor = grid.variance_floor * fwhm * fwhm
+    for index in np.ndindex(shape[:4]):
+        b, s_, r, h = index
+        sigma, gamma = _widths_at_fwhm(grid.ratios[r], fwhm)
+        separation = grid.separations[s_]
+        centers = [0.0] if separation is None else [-0.5 * separation * fwhm, 0.5 * separation * fwhm]
+        peaks = [VoigtPeak(grid.area, c, sigma, gamma) for c in centers]
+        lo = centers[0] - grid.half_widths[h] * fwhm
+        hi = centers[-1] + grid.half_widths[h] * fwhm
+        energy = np.linspace(lo, hi, int(round((hi - lo) / (grid.step * fwhm))) + 1)
+        background = _scan_background(grid, grid.backgrounds[b], energy, peaks)
+        unit_counts = poisson_fisher(energy, peaks, background).expected_counts.sum()
+
+        for j, level in enumerate(grid.levels):
+            exposure = level if grid.normalization == "exposure" else level / unit_counts
+            report = assess_identifiability(
+                energy, peaks, background, exposure=exposure,
+                variance_floor=floor, thresholds=grid.thresholds,
+            )
+            cell = index + (j,)
+            var_, gam_ = report.parameters[2], report.parameters[3]
+            width = report.widths[0]
+            out["total_counts"][cell] = exposure * unit_counts
+            out["n_energy"][cell] = energy.size
+            out["condition_number"][cell] = report.condition_number
+            out["sd_variance"][cell] = var_.relative_sd
+            out["sd_gamma"][cell] = gam_.relative_sd
+            out["sd_variance_conditional"][cell] = var_.sd_conditional / var_.reference_scale
+            out["sd_gamma_conditional"][cell] = gam_.sd_conditional / gam_.reference_scale
+            out["worst_relative_sd"][cell] = width.worst_relative_sd
+            out["variance_relative_sd"][cell] = width.variance_relative_sd
+            out["near_boundary"][cell] = width.near_boundary
+            out["status"][cell] = _STATUS_CODE[width.status]
+            out["info_variance"][cell] = (var_.reference_scale / var_.sd) ** 2
+
+            in_sigma = poisson_fisher(
+                energy, peaks, background, parameterization="sigma_gamma", exposure=exposure
+            )
+            covariance, unbounded, _, _ = _covariance_bound(in_sigma.fisher)
+            sd_sigma = np.inf if unbounded[2] else math.sqrt(max(covariance[2, 2], 0.0))
+            out["sd_sigma"][cell] = sd_sigma / sigma_scale
+            out["info_sigma"][cell] = (sigma_scale / sd_sigma) ** 2
+
+    out["backgrounds"] = np.array(grid.backgrounds)
+    out["separations"] = np.array(
+        [np.nan if s_ is None else s_ for s_ in grid.separations], dtype=np.float64
+    )
+    out["ratios"] = np.array(grid.ratios, dtype=np.float64)
+    out["half_widths"] = np.array(grid.half_widths, dtype=np.float64)
+    out["levels"] = np.array(grid.levels, dtype=np.float64)
+    out["normalization"] = np.array(grid.normalization)
+    out["background_kind"] = np.array(grid.background_kind)
+    out["fwhm"] = np.array(fwhm)
+    return out
+
