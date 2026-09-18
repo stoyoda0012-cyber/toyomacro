@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,885 automated tests** across **74 files**, in two
+This suite has **1,892 automated tests** across **75 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 38 | 1,017 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 39 | 1,024 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (931)
+## Library body — `tests/` (938)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -58,15 +58,15 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 17 | `test_tougaard.py` | Tougaard background algorithm |
 | 13 | `test_energy_axis.py` | BE / KE energy-axis handling through the pipeline |
 
-### Templates & bridge (76)
+### Templates & bridge (78)
 | Tests | File | Guards |
 |--:|---|---|
 | 29 | `test_fitting_templates.py` | Fitting template system |
 | 20 | `test_template_bridge.py` | `FittingTemplate` → `ComponentConfig` conversion |
-| 15 | `test_fast_voigt_solvers.py` | `FastVoigtFitter` routing + template binding-energy integration |
+| 17 | `test_fast_voigt_solvers.py` | `FastVoigtFitter` routing (incl. `use_mlx` on the multipeak path) + template binding-energy integration |
 | 12 | `test_fit_dirty_map.py` | Interactive fit-result accumulator |
 
-### GVRT / synthetic — paper reproduction (173)
+### GVRT / synthetic — paper reproduction (178)
 | Tests | File | Guards |
 |--:|---|---|
 | 62 | `test_si2p_gvrt.py` | Si 2p doublet linear-encoder round trip (synthetic) |
@@ -74,6 +74,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 26 | `test_synthetic.py` | Synthetic data generation |
 | 23 | `test_multi_image.py` | Multi-image GVRT generalization (smoke) |
 | 9 | `test_ncomp_scaling.py` | `n_comp` scaling benchmark (smoke) |
+| 5 | `test_example_05_map_from_file.py` | Example 05: reader columns → spectra, KE→BE, background sort, synthetic map recovered |
 | 4 | `test_example_data.py` | `examples/data/` generator reproduces the shipped file |
 | 2 | `test_gvrt_cli.py` | `gvrt` CLI subcommand (smoke) |
 

@@ -248,14 +248,15 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains four self-contained,
+The [`examples/`](examples/) directory contains five self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
 IMFP reference data, and a numerical validation of the fitted-center
 bias under systematic lineshape error (a first-order projection law,
 verified against the production `VarProFitter`; see
-[`docs/projection_law_validation.md`](docs/projection_law_validation.md)).
+[`docs/projection_law_validation.md`](docs/projection_law_validation.md)),
+and fitting a map read from a file — the step to your own measurement.
 They run in CI on every commit.
 
 ### GVRT roundtrip demo

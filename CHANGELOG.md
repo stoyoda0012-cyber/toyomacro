@@ -10,6 +10,20 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`examples/05_fit_map_from_file.py`: from a file to chemical-state
+  maps.** The step between the synthetic examples and a user's own
+  measurement: reads an HDF5 `specdata` map or any reader-supported file
+  (`.pxt`, `.vms`, `.npl`, SES `.txt`), whose columns — angles, slices —
+  become the pixels; converts a kinetic-energy axis with the file's or a
+  given photon energy (a recorded 0 is treated as missing, not used);
+  sorts the axis, subtracts a linear background anchored at the mean
+  energy of each averaged end window, and batch-fits one Voigt per
+  chemical state. Centers outside the energy window stop the run before
+  fitting. With no argument it fits the synthetic 8×8 Si 2p map and
+  reports recovery against its ground truth (fraction RMSE 0.011; Si⁰
+  area 92.5% because the spin-orbit doublet is fitted as one Voigt,
+  which the example states). Runs in CI.
+
 - **Experimental** `data.sessa`: a reader for the `sam_par.txt` that
   SESSA (NIST SRD 100) writes on `PROJECT SAVE OUTPUT`, which is the
   practical way to obtain the IMFP/TRMFP pair `data.elastic_scattering`
