@@ -17,6 +17,12 @@ Three things live here that the older Fisher modules do not have:
 - Voigt derivatives in the Gaussian *variance* ``v = sigma**2`` that stay
   accurate down to and including ``v = 0``.
 
+On top of those, ``assess_identifiability`` sorts each parameter into
+rank deficient, weakly identified or identified, and separately says
+whether the Gaussian variance sits near its boundary. What those labels
+do and do not mean is in its docstring; none of them is a statement
+about a fit.
+
 Why the variance. A Voigt profile is a Lorentzian convolved with a
 Gaussian, so it obeys the heat equation in ``v``::
 
@@ -117,6 +123,7 @@ import numpy as np
 from scipy import special as sps
 
 from ..lineshape.pseudovoigt import PseudoVoigt
+from .crlb import _NULL_PROJECTION_TOL
 
 __all__ = [
     "PARAMETERIZATIONS",
@@ -125,6 +132,10 @@ __all__ = [
     "Background",
     "PoissonFisherResult",
     "EffectiveInformation",
+    "IdentifiabilityThresholds",
+    "ParameterAssessment",
+    "WidthAssessment",
+    "IdentifiabilityReport",
     "voigt_derivatives",
     "voigt_fwhm",
     "constant_background",
@@ -132,6 +143,7 @@ __all__ = [
     "shirley_background",
     "poisson_fisher",
     "effective_information",
+    "assess_identifiability",
 ]
 
 Parameterization = Literal[
@@ -834,4 +846,315 @@ def effective_information(
         effective=schur * np.outer(d_safe[u], d_safe[u]),
         conditional=conditional,
         nuisance_null_dim=int(null.sum()),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Assessment
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IdentifiabilityThresholds:
+    """Where 'identified' ends. Conventions, not physics.
+
+    Attributes:
+        weak_relative_sd: A parameter is 'weakly_identified' when its
+            standard-deviation bound exceeds this fraction of its
+            reference scale. The default 0.1 means "a tenth of the total
+            FWHM" for positions and widths: a working rule of thumb for
+            when a width has stopped being a usable number, with no
+            deeper justification. Change it to suit the question.
+        boundary_sd: The Gaussian variance is 'near_boundary' when it
+            lies within this many standard-deviation bounds of its lower
+            limit. For an unconstrained, normally distributed estimator
+            the chance of falling below the limit would be 0.13 % at 3
+            and 2.3 % at 2 -- but that normal approximation is exactly
+            what fails near a boundary (Self & Liang 1987), so read the
+            default 3 as a margin of caution, not as a probability.
+    """
+
+    weak_relative_sd: float = 0.1
+    boundary_sd: float = 3.0
+
+    def __post_init__(self) -> None:
+        if not (self.weak_relative_sd > 0.0 and self.boundary_sd > 0.0):
+            raise ValueError("thresholds must be positive")
+
+
+@dataclass(frozen=True)
+class ParameterAssessment:
+    """One parameter of the model, in 'var_gamma' coordinates.
+
+    Attributes:
+        name: As in ``PoissonFisherResult.param_names``
+        role: 'amplitude', 'center', 'width' or 'background'
+        peak: Peak index, None for background coefficients
+        value: Parameter value
+        sd: ``sqrt([I^-1]_ii)``, the bound with every other parameter
+            estimated from the same spectrum; ``inf`` when rank deficient
+        sd_conditional: Widths only. The same from the width sub-block
+            alone, i.e. with amplitude, position and background taken as
+            known. Never larger than ``sd``; the gap is what estimating
+            the rest costs.
+        reference_scale: |amplitude| for an amplitude, the peak's total
+            FWHM for its center and gamma, FWHM**2 / (8 ln2) for its
+            variance; None for background coefficients, for which no
+            natural scale exists
+        relative_sd: ``sd / reference_scale``
+        status: 'rank_deficient', 'weakly_identified' or 'identified';
+            'not_assessed' for a background coefficient that is not rank
+            deficient, because without a scale its precision is not
+            judged
+    """
+
+    name: str
+    role: str
+    peak: int | None
+    value: float
+    sd: float
+    sd_conditional: float | None
+    reference_scale: float | None
+    relative_sd: float | None
+    status: str
+
+
+@dataclass(frozen=True)
+class WidthAssessment:
+    """The (variance, gamma) pair of one peak, judged as a block.
+
+    Attributes:
+        peak: Peak index
+        fwhm: Olivero-Longbothum total FWHM, the reference scale
+        variance_excess: ``sigma**2 - variance_floor``
+        sd_variance: Bound on the standard deviation of the variance
+        variance_relative_sd: ``sd_variance / variance_excess`` -- the
+            precision of the Gaussian component *relative to itself*.
+            Grows without limit as the component vanishes however good
+            ``worst_relative_sd`` looks; ``inf`` on the boundary.
+        near_boundary: ``variance_excess < boundary_sd * sd_variance``.
+            Independent of ``status``.
+        worst_relative_sd: Square root of the largest eigenvalue of the
+            2x2 covariance bound after dividing variance by
+            FWHM**2/(8 ln2) and gamma by FWHM: the relative bound along
+            the least determined direction of the pair. Never smaller
+            than either parameter's own ``relative_sd``.
+        worst_direction: That direction, in the same scaled coordinates
+        status: 'rank_deficient' if either width is; else
+            'weakly_identified' if ``worst_relative_sd`` exceeds the
+            threshold; else 'identified'
+    """
+
+    peak: int
+    fwhm: float
+    variance_excess: float
+    sd_variance: float
+    variance_relative_sd: float
+    near_boundary: bool
+    worst_relative_sd: float
+    worst_direction: tuple[float, float]
+    status: str
+
+
+@dataclass(frozen=True)
+class IdentifiabilityReport:
+    """Result of ``assess_identifiability``.
+
+    Attributes:
+        parameters: One entry per Fisher-matrix parameter
+        widths: One entry per peak
+        null_space_dim: Numerically null directions of the full matrix
+        condition_number: Of the unit-diagonal (correlation) matrix, so
+            it does not move with the units of any parameter
+        thresholds: The thresholds used
+        variance_floor: The lower limit of the Gaussian variance used
+        fisher: The underlying 'var_gamma' ``PoissonFisherResult``
+    """
+
+    parameters: tuple[ParameterAssessment, ...]
+    widths: tuple[WidthAssessment, ...]
+    null_space_dim: int
+    condition_number: float
+    thresholds: IdentifiabilityThresholds
+    variance_floor: float
+    fisher: PoissonFisherResult = field(repr=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-Python summary (no arrays), for JSON or a table row."""
+        return {
+            "null_space_dim": self.null_space_dim,
+            "condition_number": self.condition_number,
+            "variance_floor": self.variance_floor,
+            "weak_relative_sd": self.thresholds.weak_relative_sd,
+            "boundary_sd": self.thresholds.boundary_sd,
+            "parameters": [vars(a).copy() for a in self.parameters],
+            "widths": [vars(w).copy() for w in self.widths],
+        }
+
+
+def _covariance_bound(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray, int, float]:
+    """Inverse of a Fisher matrix with the rank decision of ``crlb``.
+
+    Returns the pseudo-inverse taken on the unit-diagonal matrix (``n *
+    eps`` rule), a mask of the axes that project onto its null space and
+    whose bound is therefore infinite, the null-space dimension and the
+    condition number of the unit-diagonal matrix. Entries of the
+    pseudo-inverse on masked axes are not bounds and must not be read.
+    """
+    n = matrix.shape[0]
+    d = np.sqrt(np.maximum(np.diag(matrix), 0.0))
+    d_safe = np.where(d > 0.0, d, 1.0)
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix / np.outer(d_safe, d_safe))
+    threshold = max(eigenvalues[-1] * n * np.finfo(np.float64).eps, 1e-300)
+    null = eigenvalues <= threshold
+    inverse = np.where(null, 0.0, 1.0 / np.where(null, 1.0, eigenvalues))
+    covariance = (eigenvectors * inverse[np.newaxis, :]) @ eigenvectors.T
+    covariance /= np.outer(d_safe, d_safe)
+    unbounded = (eigenvectors[:, null] ** 2).sum(axis=1) > _NULL_PROJECTION_TOL
+    positive = eigenvalues[eigenvalues > 0.0]
+    condition = float(positive[-1] / positive[0]) if positive.size >= 2 and not null.any() else np.inf
+    return covariance, unbounded, int(null.sum()), condition
+
+
+def assess_identifiability(
+    energy: np.ndarray,
+    peaks: list[VoigtPeak],
+    background: Background | None = None,
+    *,
+    exposure: float = 1.0,
+    variance_floor: float = 0.0,
+    thresholds: IdentifiabilityThresholds | None = None,
+) -> IdentifiabilityReport:
+    """Sort the parameters of a peaks-plus-background model by identifiability.
+
+    Always evaluated in 'var_gamma' coordinates, so that the degeneracy
+    of the ``sigma`` coordinate at ``sigma = 0`` cannot raise a flag by
+    itself, and from the full inverse Fisher matrix, i.e. from the
+    effective information with everything else estimated.
+
+    Three exclusive labels, in this order of precedence:
+
+    - 'rank_deficient': the unit-diagonal Fisher matrix is numerically
+      singular and this parameter's axis projects onto its null space.
+      The rank rule and both tolerances are those of
+      ``crlb.compute_multipeak_fisher``. The bound is infinite.
+    - 'weakly_identified': the bound on the standard deviation exceeds
+      ``thresholds.weak_relative_sd`` times the reference scale.
+    - 'identified': neither.
+
+    and one independent flag per peak, 'near_boundary', for a Gaussian
+    variance within ``thresholds.boundary_sd`` bounds of its lower limit
+    ``variance_floor`` (0, or a calibrated instrument variance when the
+    quantity of interest is the broadening in excess of it).
+
+    What the labels do not mean:
+
+    - 'identified' on the FWHM scale is **not** detection of a small
+      Gaussian component. The variance is judged against
+      FWHM**2/(8 ln2), a scale that stays finite as the component
+      vanishes, so a peak with ``sigma/gamma = 0.03`` can be
+      'identified' while ``variance_relative_sd`` is above 1. Read that
+      field, and ``near_boundary``, for the component itself.
+    - 'weakly_identified' is **not** structural non-identifiability. It
+      says the information in *this* window, at *this* exposure and with
+      *this* background is small against a chosen scale; more counts or
+      a wider window change it. Only 'rank_deficient' is a statement
+      about the model, and only a numerical one.
+    - Near the boundary the inverse Fisher matrix is not the variance of
+      a constrained estimator, and a Monte Carlo variance need not agree
+      with it (Self & Liang 1987). The bounds reported for a
+      'near_boundary' peak are still the Fisher numbers; they are not
+      corrected.
+    - Everything is computed at the stated parameters from a model. It
+      is not a property of any data set, and the conditions in the
+      module docstring of ``crlb`` apply.
+
+    Args:
+        energy: Energy axis (eV)
+        peaks: One or more peaks
+        background: None, or a ``Background``
+        exposure: Multiplier on the whole mean; bounds scale as
+            ``1/sqrt(exposure)``
+        variance_floor: Lower limit of every peak's Gaussian variance
+            (eV**2). 0 for the plain Voigt; ``sigma_inst**2`` when the
+            instrument width is calibrated and only the excess is in
+            question.
+        thresholds: Defaults to ``IdentifiabilityThresholds()``
+
+    Returns:
+        IdentifiabilityReport
+    """
+    thresholds = thresholds or IdentifiabilityThresholds()
+    if variance_floor < 0.0 or any(p.variance < variance_floor for p in peaks):
+        raise ValueError(
+            f"need 0 <= variance_floor <= sigma**2 for every peak, got {variance_floor}"
+        )
+    fisher = poisson_fisher(energy, peaks, background, exposure=exposure)
+    covariance, unbounded, null_dim, condition = _covariance_bound(fisher.fisher)
+
+    width_index = list(fisher.width_index)
+    information = effective_information(fisher.fisher, width_index)
+    cond_cov, cond_unbounded, _, _ = _covariance_bound(information.conditional)
+    sd_conditional = {
+        i: (np.inf if cond_unbounded[j] else math.sqrt(max(cond_cov[j, j], 0.0)))
+        for j, i in enumerate(information.target_index)
+    }
+
+    fwhm = [voigt_fwhm(p.variance, p.gamma) for p in peaks]
+    peak_of = []
+    for k in range(len(peaks)):
+        peak_of += [k] * 4
+    peak_of += [None] * (len(fisher.param_names) - len(peak_of))
+
+    parameters = []
+    for i, (name, role) in enumerate(zip(fisher.param_names, fisher.param_roles)):
+        k = peak_of[i]
+        sd = np.inf if unbounded[i] else math.sqrt(max(covariance[i, i], 0.0))
+        if role == "amplitude":
+            scale = abs(peaks[k].amplitude)
+        elif role == "background":
+            scale = None
+        elif name.startswith("var_"):
+            scale = fwhm[k] ** 2 / _EIGHT_LN2
+        else:
+            scale = fwhm[k]
+        relative = None if scale is None else sd / scale
+        if unbounded[i]:
+            status = "rank_deficient"
+        elif relative is None:
+            status = "not_assessed"
+        else:
+            status = "weakly_identified" if relative > thresholds.weak_relative_sd else "identified"
+        parameters.append(ParameterAssessment(
+            name=name, role=role, peak=k, value=float(fisher.param_values[i]), sd=float(sd),
+            sd_conditional=sd_conditional.get(i), reference_scale=scale,
+            relative_sd=relative, status=status,
+        ))
+
+    widths = []
+    for k, p in enumerate(peaks):
+        iv, ig = 4 * k + 2, 4 * k + 3
+        excess = p.variance - variance_floor
+        if unbounded[iv] or unbounded[ig]:
+            sd_v = np.inf if unbounded[iv] else math.sqrt(max(covariance[iv, iv], 0.0))
+            worst, direction, status = np.inf, (math.nan, math.nan), "rank_deficient"
+        else:
+            sd_v = math.sqrt(max(covariance[iv, iv], 0.0))
+            scales = np.array([fwhm[k] ** 2 / _EIGHT_LN2, fwhm[k]])
+            block = covariance[np.ix_([iv, ig], [iv, ig])] / np.outer(scales, scales)
+            eigenvalues, eigenvectors = np.linalg.eigh(block)
+            worst = math.sqrt(max(eigenvalues[-1], 0.0))
+            direction = (float(eigenvectors[0, -1]), float(eigenvectors[1, -1]))
+            status = "weakly_identified" if worst > thresholds.weak_relative_sd else "identified"
+        widths.append(WidthAssessment(
+            peak=k, fwhm=fwhm[k], variance_excess=excess, sd_variance=float(sd_v),
+            variance_relative_sd=float(sd_v / excess) if excess > 0.0 else np.inf,
+            near_boundary=bool(excess < thresholds.boundary_sd * sd_v),
+            worst_relative_sd=float(worst), worst_direction=direction, status=status,
+        ))
+
+    return IdentifiabilityReport(
+        parameters=tuple(parameters), widths=tuple(widths), null_space_dim=null_dim,
+        condition_number=condition, thresholds=thresholds,
+        variance_floor=float(variance_floor), fisher=fisher,
     )

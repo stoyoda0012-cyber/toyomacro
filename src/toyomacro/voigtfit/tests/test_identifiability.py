@@ -8,11 +8,14 @@ Two kinds of assertion, kept apart:
   v = 0 limit, parity on a symmetric window, linearity in exposure, the
   Loewner order of effective and conditional information, the Hessian of
   the expected Poisson deviance.
+- *Invariances* of the assessment: it must not move with the energy unit,
+  and its labels must move with exposure the way the docstring says.
 - *Measured numbers* with a written tolerance: the agreement of the two
   derivative routes across the switch, the Olivero-Longbothum error, the
   conditioning against window width.
 """
 
+import json
 import math
 
 import numpy as np
@@ -24,7 +27,9 @@ from toyomacro.voigtfit import identifiability as idf
 from toyomacro.voigtfit.identifiability import (
     PARAMETERIZATIONS,
     Background,
+    IdentifiabilityThresholds,
     VoigtPeak,
+    assess_identifiability,
     constant_background,
     effective_information,
     linear_background,
@@ -726,3 +731,190 @@ class TestEffectiveInformation:
         for bad in ((), (0, 0), (3,), (-1,)):
             with pytest.raises(ValueError):
                 effective_information(m, bad)
+
+
+# ===================================================================
+# Assessment
+# ===================================================================
+
+
+def _flat(energy, peak, fraction=0.1):
+    """Flat background at a fraction of the peak height."""
+    height = peak.amplitude * voigt_derivatives(
+        np.array([peak.center]), peak.center, peak.variance, peak.gamma
+    ).value[0]
+    return constant_background(energy, fraction * height)
+
+
+class TestAssessment:
+    PEAK = VoigtPeak(AMP, 0.0, GAMMA / 3, GAMMA)
+
+    def _report(self, half_width, **kwargs):
+        energy = np.arange(-half_width * GAMMA, half_width * GAMMA + 1e-9, 0.01)
+        return assess_identifiability(energy, [self.PEAK], _flat(energy, self.PEAK), **kwargs)
+
+    def test_wide_window_is_identified(self):
+        report = self._report(10.0)
+        status = {a.name: a.status for a in report.parameters}
+        assert status == {
+            "amp_0": "identified", "center_0": "identified", "var_0": "identified",
+            "gamma_0": "identified", "bg_level": "not_assessed",
+        }
+        width = report.widths[0]
+        assert width.status == "identified" and not width.near_boundary
+        assert report.null_space_dim == 0 and np.isfinite(report.condition_number)
+
+    def test_narrow_window_with_an_estimated_background_is_weak(self):
+        """+-gamma: sd(gamma)/FWHM is 0.24 with everything estimated and
+        7e-4 with the rest known -- the loss a sub-block diagnostic hides."""
+        report = self._report(1.0)
+        by_name = {a.name: a for a in report.parameters}
+        assert by_name["gamma_0"].status == "weakly_identified"
+        assert by_name["var_0"].status == "weakly_identified"
+        assert by_name["center_0"].status == "identified"
+        assert report.widths[0].status == "weakly_identified"
+        assert by_name["gamma_0"].relative_sd == pytest.approx(0.24, abs=0.02)
+        assert by_name["gamma_0"].sd / by_name["gamma_0"].sd_conditional > 100
+
+    def test_weak_is_not_structural_more_exposure_lifts_it(self):
+        weak = self._report(1.0)
+        strong = self._report(1.0, exposure=1.0e4)
+        assert weak.widths[0].status == "weakly_identified"
+        assert strong.widths[0].status == "identified"
+        for a, b in zip(weak.parameters, strong.parameters):
+            assert b.sd == pytest.approx(a.sd / 100.0, rel=1e-9)
+        # 8e6, so its smallest eigenvalue carries cond * eps ~ 1e-9 of rounding
+        assert strong.condition_number == pytest.approx(weak.condition_number, rel=1e-6)
+
+    def test_identified_is_not_detection_of_a_small_gaussian(self):
+        """sigma/gamma = 0.03: fine on the FWHM scale, hopeless against itself."""
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        peak = VoigtPeak(AMP, 0.0, 0.03 * GAMMA, GAMMA)
+        width = assess_identifiability(energy, [peak], _flat(energy, peak)).widths[0]
+        assert width.status == "identified" and width.worst_relative_sd < 0.01
+        assert width.variance_relative_sd > 1.0
+        assert width.near_boundary
+
+    def test_pure_lorentzian_sits_on_the_boundary(self):
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        peak = VoigtPeak(AMP, 0.0, 0.0, GAMMA)
+        width = assess_identifiability(energy, [peak], _flat(energy, peak)).widths[0]
+        assert width.near_boundary and width.variance_relative_sd == np.inf
+        assert width.status == "identified" and np.isfinite(width.sd_variance)
+
+    def test_boundary_follows_the_variance_floor(self):
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        peak = VoigtPeak(AMP, 0.0, 0.15, GAMMA)
+        background = _flat(energy, peak)
+        free = assess_identifiability(energy, [peak], background).widths[0]
+        assert not free.near_boundary and free.variance_excess == pytest.approx(0.15**2)
+
+        at_floor = assess_identifiability(
+            energy, [peak], background, variance_floor=0.15**2
+        ).widths[0]
+        assert at_floor.near_boundary and at_floor.variance_excess == 0.0
+        assert at_floor.variance_relative_sd == np.inf
+        # the floor moves the boundary and nothing else
+        assert at_floor.sd_variance == free.sd_variance
+        assert at_floor.worst_relative_sd == free.worst_relative_sd
+
+        just_above = peak.variance - 2.0 * free.sd_variance
+        assert assess_identifiability(
+            energy, [peak], background, variance_floor=just_above
+        ).widths[0].near_boundary
+        well_above = peak.variance - 4.0 * free.sd_variance
+        assert not assess_identifiability(
+            energy, [peak], background, variance_floor=well_above
+        ).widths[0].near_boundary
+        with pytest.raises(ValueError):
+            assess_identifiability(energy, [peak], background, variance_floor=0.16**2)
+
+    def test_sd_is_the_full_inverse_and_the_conditional_one_is_smaller(self):
+        report = self._report(3.0)
+        full = np.sqrt(np.diag(np.linalg.inv(report.fisher.fisher)))
+        for a, expected in zip(report.parameters, full):
+            assert a.sd == pytest.approx(expected, rel=1e-8)
+            if a.role == "width":
+                assert a.sd_conditional < a.sd
+            else:
+                assert a.sd_conditional is None
+
+    def test_worst_direction_is_no_better_than_either_width(self):
+        for half_width in (1.0, 3.0, 10.0):
+            report = self._report(half_width)
+            by_name = {a.name: a for a in report.parameters}
+            width = report.widths[0]
+            assert width.worst_relative_sd >= by_name["var_0"].relative_sd
+            assert width.worst_relative_sd >= by_name["gamma_0"].relative_sd
+            assert np.hypot(*width.worst_direction) == pytest.approx(1.0)
+
+    def test_does_not_depend_on_the_energy_unit(self):
+        """The same spectrum described in meV instead of eV.
+
+        Energies scale by c, the unit-area profile by 1/c, so the area
+        scales by c for the same counts per channel; a slope by 1/c; a
+        variance floor by c**2. Every relative number must stay put.
+        """
+        c = 1000.0
+        energy = np.arange(-1.0, 1.5 + 1e-9, 0.01)
+        peaks = [VoigtPeak(AMP, 0.0, 0.12, GAMMA), VoigtPeak(0.5 * AMP, 0.6, 0.2, 0.15)]
+        background = linear_background(energy, 4000.0, 300.0)
+        ev = assess_identifiability(energy, peaks, background, variance_floor=0.1**2)
+
+        scaled_peaks = [
+            VoigtPeak(c * p.amplitude, c * p.center, c * p.sigma, c * p.gamma) for p in peaks
+        ]
+        mev = assess_identifiability(
+            c * energy, scaled_peaks, linear_background(c * energy, 4000.0, 300.0 / c),
+            variance_floor=(c * 0.1) ** 2,
+        )
+        assert mev.condition_number == pytest.approx(ev.condition_number, rel=1e-8)
+        for a, b in zip(ev.parameters, mev.parameters):
+            assert a.status == b.status
+            if a.relative_sd is not None:
+                assert b.relative_sd == pytest.approx(a.relative_sd, rel=1e-8)
+        for a, b in zip(ev.widths, mev.widths):
+            assert (a.status, a.near_boundary) == (b.status, b.near_boundary)
+            assert b.worst_relative_sd == pytest.approx(a.worst_relative_sd, rel=1e-8)
+            assert b.variance_relative_sd == pytest.approx(a.variance_relative_sd, rel=1e-8)
+
+    def test_coincident_peaks_are_rank_deficient(self):
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        twin = VoigtPeak(AMP, 0.0, 0.1, GAMMA)
+        report = assess_identifiability(energy, [twin, twin])
+        assert report.null_space_dim == 4 and report.condition_number == np.inf
+        assert all(a.status == "rank_deficient" and a.sd == np.inf for a in report.parameters)
+        assert all(w.status == "rank_deficient" and w.near_boundary for w in report.widths)
+
+    def test_redundant_background_does_not_condemn_the_peak(self):
+        """The null direction bg_a - bg_b touches no peak axis."""
+        energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
+        level = _flat(energy, self.PEAK).coefficients[0]
+        duplicate = Background(
+            basis=np.ones((2, energy.size)),
+            coefficients=np.array([level / 2, level / 2]),
+            names=("bg_a", "bg_b"),
+            estimated=(True, True),
+        )
+        doubled = assess_identifiability(energy, [self.PEAK], duplicate)
+        single = assess_identifiability(energy, [self.PEAK], _flat(energy, self.PEAK))
+        assert doubled.null_space_dim == 1
+        status = {a.name: a.status for a in doubled.parameters}
+        assert status["bg_a"] == status["bg_b"] == "rank_deficient"
+        for a, b in zip(doubled.parameters[:4], single.parameters[:4]):
+            assert a.status == b.status == "identified"
+            assert a.sd == pytest.approx(b.sd, rel=1e-6)
+
+    def test_thresholds_are_the_callers(self):
+        strict = self._report(10.0, thresholds=IdentifiabilityThresholds(weak_relative_sd=1e-4))
+        assert strict.widths[0].status == "weakly_identified"
+        lax = self._report(1.0, thresholds=IdentifiabilityThresholds(weak_relative_sd=10.0))
+        assert lax.widths[0].status == "identified"
+        eager = self._report(10.0, thresholds=IdentifiabilityThresholds(boundary_sd=1e3))
+        assert eager.widths[0].near_boundary
+        with pytest.raises(ValueError):
+            IdentifiabilityThresholds(weak_relative_sd=0.0)
+
+    def test_report_serialises(self):
+        text = json.dumps(self._report(1.0).to_dict())
+        assert "weakly_identified" in text and "worst_relative_sd" in text
