@@ -95,6 +95,7 @@ from .fermi_edge import KB_EV, _sign_of
 
 __all__ = [
     "EDGE_PARAMETERIZATIONS",
+    "TEMPERATURE_MODES",
     "Background",
     "EdgeDerivatives",
     "EdgeFisherResult",
@@ -109,6 +110,8 @@ __all__ = [
 
 EdgeParameterization = Literal["var_tau", "sigma_T"]
 EDGE_PARAMETERIZATIONS: tuple[str, ...] = ("var_tau", "sigma_T")
+TemperatureMode = Literal["free", "fixed_temperature", "temperature_prior"]
+TEMPERATURE_MODES: tuple[str, ...] = ("free", "fixed_temperature", "temperature_prior")
 
 _SQRT_2PI = math.sqrt(2.0 * math.pi)
 _PI2 = math.pi * math.pi
@@ -464,7 +467,12 @@ class EdgeFisherResult:
             (n_energy, n_params)
         expected_counts: Poisson mean per channel at the stated exposure
         parameterization: 'var_tau' or 'sigma_T'
-        exposure: Multiplier on the whole mean; ``fisher`` is linear in it
+        exposure: Multiplier on the whole mean. The data part of ``fisher``
+            is linear in it; a prior is not
+        temperature_mode: 'free', 'fixed_temperature' or 'temperature_prior'
+        prior: The prior information included in ``fisher``, same shape
+            (zero unless ``temperature_mode='temperature_prior'``); the
+            information from the data alone is ``fisher - prior``
         config: Model echo
     """
 
@@ -477,6 +485,8 @@ class EdgeFisherResult:
     expected_counts: np.ndarray
     parameterization: str
     exposure: float
+    temperature_mode: str = "free"
+    prior: np.ndarray | None = None
     config: dict[str, Any] = field(default_factory=dict)
 
 
@@ -486,6 +496,8 @@ def edge_fisher(
     background: Background | None = None,
     *,
     parameterization: EdgeParameterization = "var_tau",
+    temperature_mode: TemperatureMode = "free",
+    temperature_sd: float | None = None,
     exposure: float = 1.0,
     convention: str = "BE",
     dos_form: Literal["occupied", "both_sides"] = "occupied",
@@ -512,11 +524,35 @@ def edge_fisher(
       with ``dv/dsigma = 2 sigma`` and ``dtau/dT = 2 k_B**2 T``: singular
       at sigma = 0 and at T = 0 by construction of the coordinates.
 
+    The temperature, three ways:
+
+    - 'free': estimated with everything else.
+    - 'fixed_temperature': held at ``edge.temperature``; the temperature
+      coordinate is dropped. **Fixing the temperature is an assumption
+      that the sample's electron temperature equals the given value** --
+      a thermocouple reading is not that. If it is wrong, what the fit
+      calls resolution absorbs the difference through ``v + (pi**2/3)
+      tau``.
+    - 'temperature_prior': estimated, with a normal prior of standard
+      deviation ``temperature_sd`` (K) centred on ``edge.temperature``.
+      Its information is added to the temperature coordinate's diagonal:
+      ``1/sd_T**2`` in 'sigma_T', ``1/sd_tau**2`` in 'var_tau' with
+      ``sd_tau = 2 k_B**2 T sd_T``, the same prior carried through the
+      linearised map, so the two coordinates stay one model. This is the
+      prior's information at the stated temperature added to the data's;
+      the van Trees bound, which averages over the prior, is not computed.
+      As ``temperature_sd`` goes to 0 the result tends to
+      'fixed_temperature', and as it grows, to 'free'.
+
     Args:
         energy: Energy axis (eV)
         edge: The edge
         background: None, or a ``Background`` on the same axis
         parameterization: 'var_tau' (default) or 'sigma_T'
+        temperature_mode: 'free' (default), 'fixed_temperature' or
+            'temperature_prior'
+        temperature_sd: Standard deviation of the temperature prior (K),
+            for 'temperature_prior' only
         exposure: Multiplier on the whole mean (acquisition time, flux)
         convention: 'BE' or 'KE'
         dos_form: As in ``edge_derivatives``
@@ -536,6 +572,14 @@ def edge_fisher(
             f"parameterization must be one of {EDGE_PARAMETERIZATIONS}, got {parameterization!r}")
     if not exposure > 0.0:
         raise ValueError(f"exposure must be positive, got {exposure}")
+    if temperature_mode not in TEMPERATURE_MODES:
+        raise ValueError(
+            f"temperature_mode must be one of {TEMPERATURE_MODES}, got {temperature_mode!r}")
+    if temperature_mode == "temperature_prior":
+        if temperature_sd is None or not (math.isfinite(temperature_sd) and temperature_sd > 0.0):
+            raise ValueError("temperature_prior needs a positive, finite temperature_sd (K)")
+    elif temperature_sd is not None:
+        raise ValueError("temperature_sd applies to temperature_mode='temperature_prior' only")
     energy = np.asarray(energy, dtype=np.float64)
     d = edge_derivatives(energy, edge.ef, edge.amplitude, edge.variance, edge.tau,
                          dos_c1=edge.dos_c1, dos_c2=edge.dos_c2, convention=convention,
@@ -551,10 +595,12 @@ def edge_fisher(
         width_columns = [2.0 * edge.sigma * d.d_variance,
                          2.0 * KB_EV * KB_EV * edge.temperature * d.d_tau]
 
+    if temperature_mode == "fixed_temperature":
+        width_names, width_values, width_columns = width_names[:1], width_values[:1], width_columns[:1]
     dos_names = _DOS_TERMS[edge.dos]
     columns = [d.d_ef, d.d_amplitude, *(getattr(d, "d_" + n) for n in dos_names), *width_columns]
     names = ["ef", "amplitude", *dos_names, *width_names]
-    roles = ["position", "amplitude", *(["dos"] * len(dos_names)), "width", "width"]
+    roles = ["position", "amplitude", *(["dos"] * len(dos_names)), *(["width"] * len(width_names))]
     values = [edge.ef, edge.amplitude, *(getattr(edge, n) for n in dos_names), *width_values]
 
     mean = d.value.copy()
@@ -576,8 +622,19 @@ def edge_fisher(
         )
 
     jac_unit = np.stack(columns, axis=1)
+    data = poisson_fisher_matrix(jac_unit, mean, exposure)
+    prior = np.zeros_like(data)
+    if temperature_mode == "temperature_prior":
+        i = names.index(width_names[1])
+        if parameterization == "sigma_T":
+            prior[i, i] = 1.0 / temperature_sd**2
+        else:
+            sd_tau = 2.0 * KB_EV * KB_EV * edge.temperature * temperature_sd
+            if not sd_tau > 0.0:
+                raise ValueError("a temperature prior at T = 0 has no width in tau")
+            prior[i, i] = 1.0 / sd_tau**2
     return EdgeFisherResult(
-        fisher=poisson_fisher_matrix(jac_unit, mean, exposure),
+        fisher=data + prior,
         param_names=tuple(names),
         param_roles=tuple(roles),
         param_values=np.array(values, dtype=np.float64),
@@ -586,7 +643,10 @@ def edge_fisher(
         expected_counts=exposure * mean,
         parameterization=parameterization,
         exposure=float(exposure),
+        temperature_mode=temperature_mode,
+        prior=prior,
         config={
+            "temperature_sd": temperature_sd,
             "edge": (edge.ef, edge.amplitude, edge.sigma, edge.temperature, edge.dos_c1,
                      edge.dos_c2, edge.dos),
             "background_terms": () if background is None else background.names,

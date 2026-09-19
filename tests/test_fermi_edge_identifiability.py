@@ -425,3 +425,87 @@ def test_edge_and_fisher_inputs_are_checked():
         fi.edge_fisher(E, _edge(), fi.constant_background(E, 5.0), parameterization="fwhm")
     with pytest.raises(ValueError, match="exposure"):
         fi.edge_fisher(E, _edge(), fi.constant_background(E, 5.0), exposure=0.0)
+
+
+# --- the temperature: free, fixed, or with a prior ----------------------------------
+
+
+@pytest.mark.parametrize("temperature,sigma", [(300.0, 0.05), (30.0, 0.02)])
+@pytest.mark.parametrize("parameterization", ["var_tau", "sigma_T"])
+def test_temperature_prior_tends_to_fixed_and_to_free(temperature, sigma, parameterization):
+    """Bounds on every parameter (square roots of the inverse's diagonal).
+    Measured: at sd_T = 1e-6 K within 1e-12 of 'fixed_temperature', at
+    1e9 K within 5e-13 of 'free', each approached as sd**2 and 1/sd**2.
+    Holding T fixed rather than free shrinks the bounds by up to 6.3x
+    (300 K, sigma 0.05 eV) and 56x (30 K, 0.02 eV) here."""
+    edge = _edge(temperature=temperature, sigma=sigma)
+    bg = fi.constant_background(E, 50.0)
+
+    def bounds(**kw):
+        f = fi.edge_fisher(E, edge, bg, parameterization=parameterization, **kw)
+        return np.sqrt(np.diag(np.linalg.inv(f.fisher))), f
+
+    free, f_free = bounds()
+    fixed, _ = bounds(temperature_mode="fixed_temperature")
+    keep = [i for i in range(free.size) if i != f_free.width_index[1]]
+
+    def gap_fixed(sd):
+        b, _ = bounds(temperature_mode="temperature_prior", temperature_sd=sd)
+        return np.abs(b[keep] / fixed - 1.0).max()
+
+    def gap_free(sd):
+        b, _ = bounds(temperature_mode="temperature_prior", temperature_sd=sd)
+        return np.abs(b / free - 1.0).max()
+
+    assert gap_fixed(1e-6) < 1e-10 and gap_free(1e9) < 1e-10
+    # the rates, from gaps well above the rounding floor (~1e-12)
+    assert 50.0 < gap_fixed(1e-2) / gap_fixed(1e-3) < 200.0     # ~ sd**2
+    assert 50.0 < gap_free(1e5) / gap_free(1e6) < 200.0         # ~ 1/sd**2
+    assert np.max(free[keep] / fixed) > 5.0
+
+
+def test_prior_is_the_same_prior_in_both_coordinates():
+    """A prior of sd_T in K becomes 1/sd_T**2 on T in 'sigma_T' and
+    1/(2 k^2 T sd_T)**2 on tau in 'var_tau'; the two matrices are then
+    related by I_phi = T^T I T as without a prior (measured 3e-16)."""
+    bg = fi.constant_background(E, 50.0)
+    kw = dict(temperature_mode="temperature_prior", temperature_sd=5.0)
+    vt = fi.edge_fisher(E, _edge(), bg, **kw)
+    st = fi.edge_fisher(E, _edge(), bg, parameterization="sigma_T", **kw)
+    jac = np.eye(vt.fisher.shape[0])
+    iv, it = vt.width_index
+    jac[iv, iv], jac[it, it] = 2.0 * 0.05, 2.0 * KB_EV**2 * 300.0
+    np.testing.assert_allclose(st.fisher, jac.T @ vt.fisher @ jac, rtol=1e-12)
+    assert st.prior[it, it] == pytest.approx(1.0 / 25.0)
+    assert np.count_nonzero(vt.prior) == 1
+
+
+def test_fixed_temperature_is_the_free_matrix_without_its_temperature():
+    bg = fi.linear_background(E, 50.0, 3.0)
+    free = fi.edge_fisher(E, _edge(), bg)
+    fixed = fi.edge_fisher(E, _edge(), bg, temperature_mode="fixed_temperature")
+    keep = [i for i in range(len(free.param_names)) if free.param_names[i] != "tau"]
+    np.testing.assert_allclose(fixed.fisher, free.fisher[np.ix_(keep, keep)], rtol=1e-14)
+    assert "tau" not in fixed.param_names and fixed.width_index == (keep.index(free.width_index[0]),)
+
+
+def test_the_prior_does_not_scale_with_exposure():
+    bg = fi.constant_background(E, 50.0)
+    kw = dict(temperature_mode="temperature_prior", temperature_sd=5.0)
+    one = fi.edge_fisher(E, _edge(), bg, **kw)
+    ten = fi.edge_fisher(E, _edge(), bg, exposure=10.0, **kw)
+    np.testing.assert_allclose(ten.fisher - ten.prior, 10.0 * (one.fisher - one.prior), rtol=1e-13)
+    np.testing.assert_array_equal(ten.prior, one.prior)
+
+
+def test_temperature_mode_inputs_are_checked():
+    bg = fi.constant_background(E, 50.0)
+    with pytest.raises(ValueError, match="temperature_sd"):
+        fi.edge_fisher(E, _edge(), bg, temperature_mode="temperature_prior")
+    with pytest.raises(ValueError, match="applies to"):
+        fi.edge_fisher(E, _edge(), bg, temperature_sd=5.0)
+    with pytest.raises(ValueError, match="temperature_mode"):
+        fi.edge_fisher(E, _edge(), bg, temperature_mode="known")
+    with pytest.raises(ValueError, match="no width in tau"):
+        fi.edge_fisher(E, _edge(temperature=0.0), bg, temperature_mode="temperature_prior",
+                       temperature_sd=1.0)
