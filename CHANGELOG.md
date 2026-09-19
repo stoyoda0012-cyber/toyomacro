@@ -8,6 +8,19 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Changed
+
+- **`CITATION.cff` is titled "toyomacro: X-ray photoelectron spectroscopy
+  analysis toolkit".** That is the title of the Zenodo records of v0.1.0
+  and v0.2.0. Both were retitled by hand after archiving, because the
+  file carried the title of the paper in `paper/` — "toyomacro.voigtfit:
+  high-throughput Voigt-profile fitting for X-ray photoelectron
+  spectroscopy" — which describes the fitting engine, not the whole
+  package. Zenodo takes a release's title from this file, so a later
+  release is archived under the package's title without that step. The
+  copies of the file inside the v0.1.0 and v0.2.0 archives keep the
+  previous title; the paper keeps its own.
+
 ## [0.2.0] - 2026-09-19
 
 Archived on Zenodo:

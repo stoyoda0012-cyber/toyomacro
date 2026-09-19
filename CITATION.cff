@@ -6,8 +6,7 @@ message: >-
   DOI from the list of identifiers or the Zenodo record.
 type: software
 title: >-
-  toyomacro.voigtfit: high-throughput Voigt-profile fitting for
-  X-ray photoelectron spectroscopy
+  toyomacro: X-ray photoelectron spectroscopy analysis toolkit
 authors:
   - family-names: Toyoda
     given-names: Satoshi
