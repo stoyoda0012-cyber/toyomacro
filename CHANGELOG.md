@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.2.0] - 2026-09-19
 
+Archived on Zenodo:
+[10.5281/zenodo.22842084](https://doi.org/10.5281/zenodo.22842084).
+
 ### Added
 
 - **Experimental** `fitting.fermi_edge`: Fermi-edge fitting for
