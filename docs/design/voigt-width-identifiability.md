@@ -280,7 +280,7 @@ Towards σ = 0 the variance bound does not move (it changes by under
 0.1 % from σ/γ = 10⁻² down to 0, at 0.009 of its scale for the example's
 counts) while the σ bound grows as 1/σ and the information
 on σ falls as σ²; towards a narrow window both grow. That is how item 1
-of §1 is told from items 4 and 5. `examples/05_width_identifiability_map.py`
+of §1 is told from items 4 and 5. `examples/07_width_identifiability_map.py`
 draws the maps; its output is not tracked.
 
 A pair of peaks is given a window wider by its separation, so at narrow

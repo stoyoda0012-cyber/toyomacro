@@ -13,7 +13,7 @@ python examples/03_quantification.py
 python examples/04_projection_law_validation.py   # ~1-2 min
 python examples/05_fit_map_from_file.py           # or: ... my_map.h5 --state ...
 python examples/06_fermi_edge_calibration.py      # or: ... data.vms --vb-region 2 ...
-python examples/05_width_identifiability_map.py
+python examples/07_width_identifiability_map.py
 ```
 
 | Script | What it shows | Key API |
@@ -24,7 +24,7 @@ python examples/05_width_identifiability_map.py
 | `04_projection_law_validation.py` | Systematic-error sensitivity: validates the first-order projection law for the fitted-center bias under lineshape misspecification, incl. the production solver — details in [`docs/projection_law_validation.md`](../docs/projection_law_validation.md) | `VarProFitter`, `voigt_profile` |
 | `05_fit_map_from_file.py` | From a file to chemical-state maps: reads an HDF5 `specdata` map or a reader-supported file (`.pxt`, `.vms`, `.npl`, SES `.txt`; columns become pixels), subtracts a linear background, batch-fits one Voigt per state. Defaults to the synthetic map in `data/` and reports recovery against its ground truth | `read_spectra`, `create_reader`, `FastVoigtFitter` |
 | `06_fermi_edge_calibration.py` | Energy-axis calibration on a metal Fermi edge: E_F and resolution for three DOS models (their spread is the calibration uncertainty on real data), axis shifted to E_F = 0, Au 4f7/2 read on the calibrated axis. Synthetic by default, with a known offset recovered; takes a file with a VB and an Au 4f region | `fermi_edge.fit_fermi_edge`, `to_binding_energy` |
-| `05_width_identifiability_map.py` | How well a spectrum can tell the Gaussian from the Lorentzian width, mapped over window, shape and background — separating the degenerate σ coordinate from real loss of information. Model bounds, not a fit — details in [`docs/design/voigt-width-identifiability.md`](../docs/design/voigt-width-identifiability.md) | `scan_identifiability`, `ScanGrid` (experimental) |
+| `07_width_identifiability_map.py` | How well a spectrum can tell the Gaussian from the Lorentzian width, mapped over window, shape and background — separating the degenerate σ coordinate from real loss of information. Model bounds, not a fit — details in [`docs/design/voigt-width-identifiability.md`](../docs/design/voigt-width-identifiability.md) | `scan_identifiability`, `ScanGrid` (experimental) |
 
 All examples run on the pure-numpy backend. Installing the `mlx` extra
 (`pip install toyomacro[mlx]`) moves the batch fit in example 02 onto the

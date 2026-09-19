@@ -1,5 +1,5 @@
 """
-Example 05: how well can a spectrum tell the Gaussian from the Lorentzian width?
+Example 07: how well can a spectrum tell the Gaussian from the Lorentzian width?
 ===============================================================================
 
 Maps the identifiability of the two Voigt widths over measurement
@@ -28,7 +28,7 @@ Everything here is computed from a model (Poisson Fisher information at
 stated parameters). It is not a measurement and not a statement about any
 fit; see the module docstring for what the labels do and do not mean.
 
-Output: examples/output/05_width_identifiability.{png,npz} (not tracked).
+Output: examples/output/07_width_identifiability.{png,npz} (not tracked).
 Runs in a few seconds, NumPy only.
 """
 
@@ -42,7 +42,7 @@ from toyomacro.voigtfit.identifiability import ScanGrid, scan_identifiability
 
 OUT_DIR = Path(__file__).resolve().parent / "output"
 OUT_DIR.mkdir(exist_ok=True)
-STEM = "05_width_identifiability"
+STEM = "07_width_identifiability"
 
 # one sequential hue for magnitude, fixed categorical order for identity
 SEQUENTIAL = LinearSegmentedColormap.from_list(

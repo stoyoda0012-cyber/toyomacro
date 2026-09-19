@@ -86,7 +86,7 @@ archived on Zenodo for a citable DOI.
   asserted. NumPy float64 only, no MLX
   path. Design record:
   [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md);
-  runnable map: `examples/05_width_identifiability_map.py`.
+  runnable map: `examples/07_width_identifiability_map.py`.
 - **Experimental** `data.sessa`: a reader for the `sam_par.txt` that
   SESSA (NIST SRD 100) writes on `PROJECT SAVE OUTPUT`, which is the
   practical way to obtain the IMFP/TRMFP pair `data.elastic_scattering`
