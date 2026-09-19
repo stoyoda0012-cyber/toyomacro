@@ -509,3 +509,107 @@ def test_temperature_mode_inputs_are_checked():
     with pytest.raises(ValueError, match="no width in tau"):
         fi.edge_fisher(E, _edge(temperature=0.0), bg, temperature_mode="temperature_prior",
                        temperature_sd=1.0)
+
+
+# --- effective information on (v, tau), in the edge's own scale ----------------------
+
+
+def _width_info(temperature=300.0, sigma=0.05, form="occupied", dos="linear", c1=0.35, **kw):
+    edge = _edge(temperature=temperature, sigma=sigma, dos=dos, dos_c1=c1)
+    return fi.edge_width_information(
+        fi.edge_fisher(E, edge, fi.constant_background(E, 50.0), dos_form=form, **kw))
+
+
+def test_effective_is_the_inverse_of_the_full_inverse_and_below_conditional():
+    """inv(effective) is the (v, tau) block of the full inverse Fisher
+    matrix, in the same coordinates; conditional - effective is positive
+    semi-definite (measured sd ratios effective/conditional 1.18 and 1.17
+    for x_v and x_tau at 300 K, sigma 0.05 eV)."""
+    edge = _edge()
+    f = fi.edge_fisher(E, edge, fi.constant_background(E, 50.0))
+    w = fi.edge_width_information(f)
+    iv, it = f.width_index
+    block = np.linalg.inv(f.fisher)[np.ix_([iv, it], [iv, it])]
+    scale_inv = np.diag([1.0 / w.kappa2, (math.pi**2 / 3.0) / w.kappa2])
+    np.testing.assert_allclose(np.linalg.inv(w.effective), scale_inv @ block @ scale_inv,
+                               rtol=1e-8)
+    gap = np.linalg.eigvalsh(w.conditional - w.effective)
+    assert gap.min() > -1e-12 * np.abs(w.conditional).max()
+    assert math.sqrt(np.linalg.inv(w.effective)[0, 0] / np.linalg.inv(w.conditional)[0, 0]) > 1.1
+
+
+def test_reported_quantities_do_not_depend_on_the_energy_unit():
+    """The same model with energies in meV: each Fisher entry picks up the
+    unit factors of its two parameters (E_F 1/c, v and tau 1/c**2, the
+    DOS slope c) and the parameter values scale the other way. Every
+    reported quantity is unit-free and must not move."""
+    f = fi.edge_fisher(E, _edge(), fi.linear_background(E, 50.0, 3.0))
+    c = 1000.0
+    unit = {"ef": 1 / c, "amplitude": 1.0, "dos_c1": c, "variance": 1 / c**2, "tau": 1 / c**2,
+            "bg_level": 1.0, "bg_slope": c}
+    d = np.array([unit[n] for n in f.param_names])
+    import dataclasses
+    g = dataclasses.replace(f, fisher=f.fisher * np.outer(d, d), param_values=f.param_values / d)
+    a, b = fi.edge_width_information(f), fi.edge_width_information(g)
+    assert b.kappa2 == pytest.approx(c * c * a.kappa2, rel=1e-14)
+    np.testing.assert_allclose(b.effective, a.effective, rtol=1e-10)
+    for name in ("alignment", "sd_kappa2", "sd_share"):
+        assert getattr(b, name) == pytest.approx(getattr(a, name), rel=1e-10)
+    np.testing.assert_allclose(b.stiff_direction, a.stiff_direction, rtol=1e-10, atol=1e-12)
+
+
+@pytest.mark.parametrize("form,dos,c1", [("occupied", "linear", 0.35),
+                                         ("both_sides", "linear", 0.35),
+                                         ("occupied", "flat", 0.0)])
+def test_the_data_fix_the_total_width_and_not_its_split(form, dos, c1):
+    """Window +-0.6 eV, 5 meV, amplitude 1000, estimated constant
+    background 50, sigma 0.05 eV. The stiff direction is v + (pi^2/3) tau:
+    |cos| >= 0.99974 for kT/sigma <= 0.3 in all three DOS forms (0.99974
+    to 1.000000 measured), and >= 0.9961 at kT/sigma = 1. kappa_2 itself is
+    bounded at 3.5-4.2% relative throughout, while the instrument's share
+    of it is bounded at 12 (kT/sigma 0.05), 0.49 (0.3) and 0.14 (1.0)."""
+    for ratio, floor in ((0.1, 0.9999), (0.3, 0.9997), (1.0, 0.995)):
+        w = _width_info(temperature=ratio * 0.05 / KB_EV, form=form, dos=dos, c1=c1)
+        assert w.alignment > floor, ratio
+        assert 0.03 < w.sd_kappa2 < 0.05
+    shares = [_width_info(temperature=r * 0.05 / KB_EV, form=form, dos=dos, c1=c1).sd_share
+              for r in (0.05, 0.3, 1.0)]
+    assert shares[0] > 5.0 and 0.3 < shares[1] < 0.7 and 0.1 < shares[2] < 0.2
+
+
+@pytest.mark.parametrize("form,dos,c1", [("occupied", "linear", 0.35),
+                                         ("both_sides", "linear", 0.35),
+                                         ("occupied", "flat", 0.0)])
+def test_the_separating_information_vanishes_as_tau_squared(form, dos, c1):
+    """soft/stiff eigenvalue ratio from 40 K down to 2.5 K, sigma 0.05 eV.
+    Its slope against log tau tends to 2 in every DOS form (1.998-2.000
+    between 5 K and 2.5 K): the fourth cumulant, not the first, carries
+    the separation. The kink of the occupied-side DOS adds a tau**(3/2)
+    term to the mean, but its column lies in the E_F and DOS directions
+    and does not change the rate."""
+    temps = (5.0, 2.5)
+    ratio = [(lambda w: w.eigenvalues[0] / w.eigenvalues[1])(
+        _width_info(temperature=t, form=form, dos=dos, c1=c1)) for t in temps]
+    slope = math.log(ratio[0] / ratio[1]) / math.log(fi.tau_from_temperature(temps[0])
+                                                     / fi.tau_from_temperature(temps[1]))
+    assert abs(slope - 2.0) < 0.01
+
+
+def test_a_temperature_prior_sharpens_the_split():
+    """300 K, sigma 0.05: the instrument's share bounded at 0.25 with T
+    free, 0.19 / 0.086 / 0.034 / 0.016 with a prior of sd 100 / 30 / 10 /
+    1 K; kappa_2 moves much less (0.036 to 0.033)."""
+    free = _width_info().sd_share
+    shares = [_width_info(temperature_mode="temperature_prior", temperature_sd=s).sd_share
+              for s in (100.0, 30.0, 10.0, 1.0)]
+    assert free > shares[0] > shares[1] > shares[2] > shares[3]
+    assert shares[3] < 0.1 * free
+
+
+def test_width_information_needs_both_width_coordinates():
+    bg = fi.constant_background(E, 50.0)
+    with pytest.raises(ValueError, match="var_tau"):
+        fi.edge_width_information(fi.edge_fisher(E, _edge(), bg, parameterization="sigma_T"))
+    with pytest.raises(ValueError, match="var_tau"):
+        fi.edge_width_information(fi.edge_fisher(E, _edge(), bg,
+                                                 temperature_mode="fixed_temperature"))

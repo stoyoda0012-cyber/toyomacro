@@ -87,7 +87,9 @@ from scipy.special import expit, ndtr, zeta
 
 from .._identifiability import (
     Background,
+    EffectiveInformation,
     constant_background,
+    effective_information,
     linear_background,
     poisson_fisher_matrix,
 )
@@ -99,10 +101,12 @@ __all__ = [
     "Background",
     "EdgeDerivatives",
     "EdgeFisherResult",
+    "EdgeWidthInformation",
     "FermiEdge",
     "constant_background",
     "edge_derivatives",
     "edge_fisher",
+    "edge_width_information",
     "linear_background",
     "tau_from_temperature",
     "temperature_from_tau",
@@ -656,4 +660,115 @@ def edge_fisher(
             "n_energy": int(energy.size),
             "energy_range": (float(energy[0]), float(energy[-1])),
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# What the data say about (v, tau), in the scale of the edge itself
+# ---------------------------------------------------------------------------
+
+_C_TAU = _PI2 / 3.0  # kappa_2 = v + (pi^2/3) tau
+
+
+@dataclass(frozen=True)
+class EdgeWidthInformation:
+    """The (v, tau) block with everything else profiled out, made unit-free.
+
+    Coordinates are the two contributions to the edge's second cumulant
+    as fractions of it: ``x_v = v / kappa_2`` and ``x_tau = (pi^2/3) tau /
+    kappa_2`` with ``kappa_2 = v + (pi^2/3) tau``, so ``x_v + x_tau = 1`` at
+    the stated parameters. Both are dimensionless; nothing reported here
+    depends on the energy unit.
+
+    The prediction from the cumulants is that the data fix ``x_v + x_tau``
+    (the total width) well and ``x_v - x_tau`` (how the width divides
+    between instrument and temperature) poorly. ``stiff_direction`` and
+    ``soft_direction`` are the eigenvectors of the effective information
+    in these coordinates, and ``alignment`` measures how close the stiff
+    one is to (1, 1)/sqrt(2).
+
+    Attributes:
+        kappa2: v + (pi^2/3) tau (eV**2)
+        shares: (x_v, x_tau) at the stated parameters
+        effective: 2x2 effective information, everything else estimated
+        conditional: 2x2 sub-block, everything else known exactly;
+            ``conditional - effective`` is positive semi-definite
+        eigenvalues: (soft, stiff) eigenvalues of ``effective``
+        stiff_direction, soft_direction: unit eigenvectors (x_v, x_tau),
+            signs fixed so the first non-zero component is positive
+        alignment: |cos| between the stiff direction and (1, 1)/sqrt(2)
+        sd_kappa2: bound on sd(kappa_2)/kappa_2 from the inverse of
+            ``effective``; inf if it is singular
+        sd_share: bound on sd(x_v), the instrument's share of the width;
+            inf if singular
+        nuisance_null_dim: As in ``EffectiveInformation``
+        temperature_mode: Echo of the Fisher matrix's mode
+    """
+
+    kappa2: float
+    shares: tuple[float, float]
+    effective: np.ndarray
+    conditional: np.ndarray
+    eigenvalues: tuple[float, float]
+    stiff_direction: tuple[float, float]
+    soft_direction: tuple[float, float]
+    alignment: float
+    sd_kappa2: float
+    sd_share: float
+    nuisance_null_dim: int
+    temperature_mode: str
+
+
+def _oriented(vector: np.ndarray) -> tuple[float, float]:
+    first = vector[np.flatnonzero(np.abs(vector) > 1e-300)[0]]
+    vector = vector if first > 0 else -vector
+    return float(vector[0]), float(vector[1])
+
+
+def edge_width_information(fisher: EdgeFisherResult) -> EdgeWidthInformation:
+    """Effective information on (v, tau) in the edge's own scale.
+
+    Needs a 'var_tau' matrix with both width coordinates, i.e. the
+    temperature 'free' or with a prior: with it fixed there is nothing to
+    divide the width between.
+
+    The bounds are inverse-Fisher numbers at the stated parameters. Near
+    ``tau = 0`` the separating direction's information vanishes (see
+    ``edge_fisher``) and they grow without limit; near either boundary the
+    normal approximation behind them fails (Self & Liang 1987). They are
+    not confidence intervals.
+    """
+    if fisher.parameterization != "var_tau" or len(fisher.width_index) != 2:
+        raise ValueError("needs a 'var_tau' matrix with v and tau both estimated "
+                         "(temperature_mode 'free' or 'temperature_prior')")
+    iv, it = fisher.width_index
+    v, tau = float(fisher.param_values[iv]), float(fisher.param_values[it])
+    kappa2 = v + _C_TAU * tau
+    scale = np.diag([kappa2, kappa2 / _C_TAU])  # d(v, tau)/d(x_v, x_tau)
+
+    info: EffectiveInformation = effective_information(fisher.fisher, [iv, it])
+    effective = scale @ info.effective @ scale
+    conditional = scale @ info.conditional @ scale
+    eigenvalues, eigenvectors = np.linalg.eigh(effective)
+    stiff, soft = eigenvectors[:, 1], eigenvectors[:, 0]
+    alignment = float(abs(stiff @ np.array([1.0, 1.0])) / math.sqrt(2.0))
+
+    shares = (v / kappa2, _C_TAU * tau / kappa2)
+    try:
+        cov = np.linalg.inv(effective)
+        ones = np.ones(2)
+        gradient = np.array([1.0 - shares[0], -shares[0]])  # of x_v / (x_v + x_tau) at x_v + x_tau = 1
+        sd_kappa2 = math.sqrt(max(float(ones @ cov @ ones), 0.0))
+        sd_share = math.sqrt(max(float(gradient @ cov @ gradient), 0.0))
+        if not (math.isfinite(sd_kappa2) and math.isfinite(sd_share)):
+            raise np.linalg.LinAlgError
+    except np.linalg.LinAlgError:
+        sd_kappa2 = sd_share = math.inf
+
+    return EdgeWidthInformation(
+        kappa2=kappa2, shares=shares, effective=effective, conditional=conditional,
+        eigenvalues=(float(eigenvalues[0]), float(eigenvalues[1])),
+        stiff_direction=_oriented(stiff), soft_direction=_oriented(soft), alignment=alignment,
+        sd_kappa2=sd_kappa2, sd_share=sd_share, nuisance_null_dim=info.nuisance_null_dim,
+        temperature_mode=fisher.temperature_mode,
     )
