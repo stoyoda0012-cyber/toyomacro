@@ -15,6 +15,13 @@ jobs:
       matrix:
         os: [ubuntu-26.04, macos-latest]
         python-version: ["3.11", "3.12"]
+    env:
+      # .python-version pins 3.12 for development, and uv follows it unless
+      # told otherwise: without this, `uv python install 3.11` installed an
+      # interpreter that `uv sync` and `uv run` then never used, and the
+      # "3.11" jobs ran 3.12. UV_PYTHON takes precedence over the file for
+      # every uv command in the job.
+      UV_PYTHON: ${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +39,10 @@ jobs:
 
       - name: Install dependencies (core + dev + mcp, no MLX)
         run: uv sync --extra dev --extra mcp
+
+      - name: Assert the job runs the Python it is named after
+        run: |
+          uv run python -c "import sys; want = tuple(int(n) for n in '${{ matrix.python-version }}'.split('.')); assert sys.version_info[:2] == want, (sys.version, want)"
 
       - name: Run test suite (engine + top-level)
         run: uv run pytest
