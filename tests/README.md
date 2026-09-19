@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **1,920 automated tests** across **77 files**, in two
+This suite has **1,922 automated tests** across **77 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 41 | 1,052 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 41 | 1,054 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 36 | 868 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -16,11 +16,11 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,488 tests, 77%) — guarantee the library
+- **Contract / regression** (1,490 tests, 78%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 23%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 22%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -39,7 +39,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,052)
+## Library body — `tests/` (1,054)
 
 ### Claim guards — noise model, versions, backends, comparisons (48)
 | Tests | File | Guards |
@@ -51,11 +51,11 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 
-### Lineshape & background — physics core (77)
+### Lineshape & background — physics core (79)
 | Tests | File | Guards |
 |--:|---|---|
 | 22 | `test_doniach_sunjic.py` | DS lineshape + MATLAB `LineshapeType` numbering |
-| 25 | `test_fermi_edge.py` | Fermi-edge fit: agreement with `FermiDirac`, axis-shift and KE/BE invariance, 1σ pulls of E_F and resolution over 200 seeds, `success` gates (bounds, singular covariance, E_F off-window, collapsed width), fine-step starts, window-independent 10–90% width |
+| 27 | `test_fermi_edge.py` | Fermi-edge fit: agreement with `FermiDirac`, axis-shift and KE/BE invariance, 1σ pulls of E_F and resolution over 200 seeds, `success` gates (bounds, singular covariance, E_F off-window, collapsed width), fine-step starts, window-independent 10–90% width |
 | 17 | `test_tougaard.py` | Tougaard background algorithm |
 | 13 | `test_energy_axis.py` | BE / KE energy-axis handling through the pipeline |
 

@@ -53,8 +53,9 @@ Validity and limits -- read before trusting a number:
   described by a low-order DOS and the fit fails (typically with the
   resolution running to its upper bound). ``success`` is False, with
   the reason in ``message``, when a parameter ends on a bound, an
-  uncertainty is not finite, E_F falls outside the window, or the fitted
-  resolution is below half a channel. When the resolution is below
+  uncertainty is not finite, E_F falls outside the window or its 1-sigma
+  error is wider than the window, or the fitted resolution is below half
+  a channel. When the resolution is below
   about a channel, or much smaller than the thermal width, it cannot be
   determined: hold it fixed (``fit_resolution=False``) and E_F is still
   fitted normally.
@@ -435,8 +436,10 @@ def fit_fermi_edge(
     # bound" means within 0.1% of the smaller of the allowed range and the
     # value's own magnitude (so a wide range does not flag a good fit that
     # merely sits near its lower end, e.g. T = 10 K in [1, 1e4] K).
-    at_bound = []
+    at_bound = [n for n, a in zip(names, result.active_mask) if a != 0]
     for n, x, lo_, hi_ in zip(names, result.x, lb, ub):
+        if n in at_bound:
+            continue
         tol = (1e-3 * min(hi_ - lo_, max(1.0, abs(x))) if np.isfinite(hi_ - lo_)
                else 1e-6 * max(1.0, abs(x)))
         if (np.isfinite(lo_) and x - lo_ < tol) or (np.isfinite(hi_) and hi_ - x < tol):
@@ -451,6 +454,8 @@ def fit_fermi_edge(
         problems.append("non-finite uncertainty (singular covariance)")
     if not float(np.min(E)) <= result.x[0] <= float(np.max(E)):
         problems.append("E_F outside the fit window")
+    elif perr[0] > span:
+        problems.append("E_F undetermined (1-sigma wider than the window)")
     if fit_resolution:
         step = float(np.median(np.diff(np.sort(E))))
         if dict(zip(names, result.x))["fwhm_g"] < 0.5 * step:

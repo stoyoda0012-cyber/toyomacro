@@ -23,8 +23,9 @@ archived on Zenodo for a citable DOI.
   on average. Over 200 Poisson realisations the E_F and FWHM pulls
   have unit width and zero mean at ~2000 counts per channel at the
   edge (wider at ~100 counts). `success` is False when a parameter ends
-  on a bound, an uncertainty is not finite, E_F leaves the window, or
-  the resolution collapses below half a channel. The errors are
+  on a bound, an uncertainty is not finite, E_F leaves the window or
+  its 1σ error is wider than the window, or the resolution collapses
+  below half a channel. The errors are
   statistical only: on two measured Au reference edges (0.36–0.5 eV
   resolution; not distributed) the choice of DOS model moved E_F by
   0.05–0.14 eV, far beyond `ef_err` (0.01–0.05 eV between the two
