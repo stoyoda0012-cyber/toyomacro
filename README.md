@@ -394,6 +394,8 @@ release is archived on Zenodo:
 
 - **All versions** (resolves to the latest release):
   [10.5281/zenodo.22092076](https://doi.org/10.5281/zenodo.22092076)
+- **v0.2.0**:
+  [10.5281/zenodo.22842084](https://doi.org/10.5281/zenodo.22842084)
 - **v0.1.0**:
   [10.5281/zenodo.22092077](https://doi.org/10.5281/zenodo.22092077)
 
