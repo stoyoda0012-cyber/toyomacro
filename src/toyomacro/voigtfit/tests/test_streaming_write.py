@@ -428,7 +428,7 @@ class TestIntegration:
         """Test that streaming mode returns FitResultSummary."""
         # This test requires the full pipeline, which may not be available
         # in all environments. Skip if dependencies are missing.
-        pytest.importorskip('voigtfit.pipeline')
+        pytest.importorskip('toyomacro.voigtfit.pipeline')
 
         try:
             from toyomacro.voigtfit.h5io import FitResultSummary
