@@ -82,11 +82,11 @@ archived on Zenodo for a citable DOI.
   boundary) are conventions. Checked, in one single-peak configuration,
   against exact constrained Poisson maximum likelihood on 10⁴ simulated
   spectra: replica standard deviations within 2 % of the bound in the
-  interior (sampling error 0.7 %); near the boundary the disagreement is recorded, not
-  asserted. NumPy float64 only, no MLX
-  path. Design record:
+  interior (sampling error 0.7 %); near the boundary the disagreement is
+  recorded, not asserted. NumPy float64 only, no MLX path. Design record:
   [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md);
   runnable map: `examples/07_width_identifiability_map.py`.
+
 - **Experimental** `data.sessa`: a reader for the `sam_par.txt` that
   SESSA (NIST SRD 100) writes on `PROJECT SAVE OUTPUT`, which is the
   practical way to obtain the IMFP/TRMFP pair `data.elastic_scattering`
