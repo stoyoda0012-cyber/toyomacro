@@ -248,7 +248,7 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains six self-contained,
+The [`examples/`](examples/) directory contains seven self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
@@ -256,8 +256,11 @@ IMFP reference data, and a numerical validation of the fitted-center
 bias under systematic lineshape error (a first-order projection law,
 verified against the production `VarProFitter`; see
 [`docs/projection_law_validation.md`](docs/projection_law_validation.md)),
-fitting a map read from a file — the step to your own measurement — and
-calibrating the energy axis on a metal Fermi edge.
+fitting a map read from a file — the step to your own measurement —
+calibrating the energy axis on a metal Fermi edge, and mapping how well
+a spectrum can tell the Gaussian from the Lorentzian width of a Voigt
+peak (model bounds, not a fit; see
+[`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md)).
 They run in CI on every commit.
 
 ### GVRT roundtrip demo
@@ -386,10 +389,17 @@ Python 3.11 / 3.12 on every push. See
 ## Citing
 
 Citation metadata lives in [CITATION.cff](CITATION.cff) — GitHub's
-"Cite this repository" button renders it as BibTeX/APA. There is no
-DOI yet; the first tagged release will be archived on Zenodo and the
-DOI added here and to `CITATION.cff`. Release history is tracked in
-[CHANGELOG.md](CHANGELOG.md).
+"Cite this repository" button renders it as BibTeX/APA. Every tagged
+release is archived on Zenodo:
+
+- **All versions** (resolves to the latest release):
+  [10.5281/zenodo.22092076](https://doi.org/10.5281/zenodo.22092076)
+- **v0.1.0**:
+  [10.5281/zenodo.22092077](https://doi.org/10.5281/zenodo.22092077)
+
+A Zenodo download is a snapshot of one release, without git history.
+To follow development between releases, clone this repository instead.
+Release history is tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

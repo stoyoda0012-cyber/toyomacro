@@ -156,12 +156,19 @@ def test_fixed_resolution_and_fitted_temperature():
 
 
 def test_a_parameter_on_its_bound_marks_the_fit_unsuccessful():
-    # E_F forced away from the edge: the fit can only compensate by
-    # driving something onto a bound, and must say so
+    # E_F bounded just past the edge: the solver pins it to the lower bound
+    res = _fit(_noisy(10), ef_init=0.55, ef_bounds=(0.5, 0.6))
+    assert not res.success
+    assert "at a bound: ef" in res.message
+    assert _fit(_noisy(10)).success  # and a normal fit is not flagged
+
+
+def test_a_fit_forced_off_the_edge_is_not_successful():
+    """E_F bounded far from the edge ends wherever the platform's solver
+    stops -- on a bound, or inside with a 1-sigma error wider than the
+    window; either way it must not be reported as a success."""
     res = _fit(_noisy(10), ef_init=1.5, ef_bounds=(1.4, 1.6))
     assert not res.success
-    assert "at a bound" in res.message
-    assert _fit(_noisy(10)).success  # and a normal fit is not flagged
 
 
 def test_fine_steps_still_find_the_edge():
@@ -179,12 +186,28 @@ def test_fine_steps_still_find_the_edge():
 
 
 def test_low_temperature_fit_is_not_flagged_as_on_a_bound():
+    """T = 10 K sits near the lower end of its [1, 1e4] K range.
+
+    The resolution (1 meV) is well below the thermal 10-90% width
+    (3.4 meV) so T is identifiable; the error bound on T keeps the test
+    from passing on a degenerate fit with a huge error.
+    """
+    truth = dict(TRUTH, temperature=10.0, fwhm_g=0.001)
+    e = np.arange(-0.04, 0.04 + 1e-9, 0.0005)
+    res = _fit(_noisy(11, energy=e, truth=truth), energy=e, fit_resolution=False,
+               resolution=0.001, fit_temperature=True, temperature=30.0)
+    assert res.success, res.message
+    assert res.temperature_err < 2.0
+    assert abs(res.temperature - 10.0) < 4 * res.temperature_err
+
+
+def test_unidentifiable_temperature_is_not_a_success():
+    """Resolution 20 meV against a 3.4 meV thermal width: T cannot be fitted."""
     truth = dict(TRUTH, temperature=10.0, fwhm_g=0.02)
     e = np.arange(-0.3, 0.3 + 1e-9, 0.002)
     res = _fit(_noisy(11, energy=e, truth=truth), energy=e, fit_resolution=False,
                resolution=0.02, fit_temperature=True, temperature=50.0)
-    assert res.success, res.message
-    assert abs(res.temperature - 10.0) < 4 * res.temperature_err
+    assert not res.success
 
 
 def test_width_1090_does_not_depend_on_the_window():
