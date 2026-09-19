@@ -230,8 +230,8 @@ class FastVoigtFitter:
         """
         if not VOIGTFIT_AVAILABLE:
             raise ImportError(
-                "voigtfit not available. Install toyomacro[voigtfit] or "
-                "ensure toyomacro.voigtfit is importable."
+                "voigtfit not available: toyomacro.voigtfit failed to "
+                "import. It is part of the base install, not an extra."
             )
 
         self.config = config or FastFitConfig()

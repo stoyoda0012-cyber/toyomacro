@@ -1,6 +1,6 @@
 [project]
 name = "toyomacro"
-version = "0.1.0"
+version = "0.2.0"
 description = "XPS Peak Fitting Software - Python Edition"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -79,9 +79,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/toyomacro"]
-# Belt-and-braces: these local development layers are .gitignore'd (and
-# therefore excluded by hatchling's VCS-based file selection), but list
-# them explicitly so a build from a non-git tree can never ship them.
+# These local development layers and notes are .gitignore'd, but that is
+# not enough: hatchling drops EVERY VCS ignore rule when the project root
+# itself lies under an ignored path -- a git worktree below `.claude/`,
+# for one -- and also when the tree is not a git checkout. The explicit
+# list is what holds in every case.
 exclude = [
     "src/toyomacro/gui",
     "src/toyomacro/api",
@@ -89,14 +91,21 @@ exclude = [
     "src/toyomacro/piar",
     "src/toyomacro/depth",
     "src/toyomacro/outputs",
+    "_archived",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "*.local.md",
 ]
 
 [tool.hatch.build.targets.sdist]
 # NOTE: hatchling's default file selection excludes .gitignore'd paths
-# but INCLUDES untracked-yet-unignored files, so local working files
-# can leak into an sdist built from a development tree. Release builds
-# must run from a clean clone; the explicit excludes below are the
-# second line of defense, and CI asserts the archive contents.
+# only when it can load them, and it loads none when the project root
+# lies under an ignored path (see the wheel target above): an sdist built
+# from such a tree shipped generated figures and example data. It also
+# INCLUDES untracked-yet-unignored files. Release builds must run from a
+# clean clone; the explicit excludes below mirror the project-specific
+# rules of .gitignore and are the line of defense that does not depend on
+# where the tree sits, and CI asserts the archive contents.
 #
 # AGENTS.md and CLAUDE.md are tracked in git but are repository
 # instructions, not package content, so they are excluded here rather
@@ -120,6 +129,23 @@ exclude = [
     # specs. .gitignore'd, so a clean-clone build never sees them — but
     # a build from a development tree relies on nothing else.
     "_internal",
+    # The rest of .gitignore that is specific to this project. Keep the
+    # two in step; the CI archive assertion checks the same set.
+    "_archived",
+    "/scripts",
+    "output",
+    "outputs",
+    "examples/data/*.h5",
+    "_slsqp_diagnostic_*.npz",
+    ".mcp.json",
+    "IMPLEMENTATION_PLAN.md",
+    ".claude",
+    "node_modules",
+    "/.venv",
+    "/build",
+    "/dist",
+    "/wheels",
+    ".DS_Store",
 ]
 
 [tool.ruff]

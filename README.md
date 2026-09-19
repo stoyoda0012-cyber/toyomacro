@@ -313,9 +313,9 @@ test suite need no external tools or data.
 - `toyomacro.fitting` — high-level peak-fitting templates that wrap
   the engine for common XPS analyses.
 
-### Quantification boundary in v0.1
+### Quantification boundary
 
-The v0.1 release includes quantification-oriented reference utilities: binding-energy and
+The package includes quantification-oriented reference utilities: binding-energy and
 photoionization cross-section lookup, TPP-2M IMFP calculation, and interpolation of a
 user-supplied, authorized analyzer-transmission curve. Their outputs retain the selected source,
 units, energy range, extrapolation status, and instrument-specific assumptions where available.
@@ -379,7 +379,7 @@ as data — are written up in
 uv sync --extra dev --extra mlx
 uv run pytest                                    # full suite; inventory in tests/README.md
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
-uv run ruff check src/ tests/                    # lint
+uv run ruff check src/ tests/ examples/          # lint (what CI runs)
 ```
 
 CI (GitHub Actions) runs the full suite on Ubuntu and macOS for

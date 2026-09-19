@@ -71,8 +71,9 @@ def require_mlx() -> None:
         raise RuntimeError(
             'MLX backend requested but the mlx package is not installed. '
             'Install the MLX build for your platform — this package '
-            'distributes the Apple Silicon one as `pip install '
-            'toyomacro[mlx]` — or use the NumPy backend (use_mlx=False).')
+            'declares the Apple Silicon one as the `mlx` extra '
+            '(`pip install -e ".[mlx]"` from a clone; the package is not '
+            'on PyPI) — or use the NumPy backend (use_mlx=False).')
     raise RuntimeError(
         'MLX is installed but could not execute work on the default '
         'device, so the accelerated path is unavailable. Use the NumPy '

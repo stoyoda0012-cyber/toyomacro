@@ -110,6 +110,15 @@ jobs:
                '_internal/'
           deny "Vendor analyzer-transmission data" \
                'Slit[0-9]+p[0-9]+_spot|ScientaXOP'
+          # The project-specific rules of .gitignore. hatchling ignores
+          # .gitignore altogether when the tree sits under an ignored
+          # path, so the archive is checked for them by name.
+          deny "Generated outputs and example data" \
+               '(^|/)outputs?/|examples/data/.*\.h5|_slsqp_diagnostic_'
+          deny "Archived or personal working material" \
+               '(^|/)_archived/|^toyomacro-[^/]+/scripts/|IMPLEMENTATION_PLAN'
+          deny "Local tool state" \
+               '\.mcp\.json|(^|/)\.claude/|(^|/)node_modules/|(^|/)\.venv/|\.DS_Store'
 
           # Guard the guard: the patterns above are worthless if the
           # contents listings are empty or unwritten.

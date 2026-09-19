@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-19
+
 ### Added
 
 - **Experimental** `fitting.fermi_edge`: Fermi-edge fitting for
@@ -60,7 +62,8 @@ archived on Zenodo for a citable DOI.
   amplitude, position and background are estimated from the same
   spectrum, next to the sub-block that assumes them known — at σ/γ = 1/3
   on a window of ±γ, with an estimated flat background at a tenth of the
-  peak height, the first bound on γ is about 3×10² times the second
+  peak height, the first standard-deviation bound on γ is about 3×10²
+  times the second
   (318 on 61 points, 338 with fine sampling), whatever the exposure.
   (3) `voigt_derivatives` works in the Gaussian *variance*, in which the
   Fisher matrix is regular at σ = 0, and stays accurate there: built from
@@ -115,6 +118,7 @@ archived on Zenodo for a citable DOI.
   tags that say which IMFP formula and which elastic cross sections the
   run used. Code only — no SESSA data is bundled, SESSA is not a
   dependency, and the fixtures are invented text in SESSA's layout.
+
 - **Experimental** `data.elastic_scattering` gained the two remaining
   albedo-corrected depths, from Jablonski & Powell, *J. Vac. Sci.
   Technol. A* **27**, 253 (2009), DOI 10.1116/1.3071947:
@@ -145,6 +149,7 @@ archived on Zenodo for a citable DOI.
   `IMFP.sampling_depth()` is the elastic-free limit of the new
   information depth at normal emission, and a test pins that the two
   agree.
+
 - **Experimental** `data.elastic_scattering` grew a provenance-carrying
   layer: `DescribedLength` (a length plus its declared unit, source,
   material and kinetic energy) and `overlayer_eal_report`, which
@@ -164,6 +169,132 @@ archived on Zenodo for a citable DOI.
   implies for callers — for gold at 7.4 keV a +10% TRMFP error moves
   the EAL by ~+1.3%, while a +10% IMFP error moves it by ~+8.5%, so
   the EAL's error budget is dominated by the IMFP fed into it.
+
+- **Two findings from the depthprofiler project are recorded in the
+  provenance table.** Where the circulating Si3N4 E_g of 5.3 eV comes
+  from — or one step of it. The trail leads to Robertson, *J. Vac. Sci.
+  Technol. B* **18**, 1785 (2000), which **adopts** the figure rather
+  than producing it: its Table I lists 5.3 eV under a column headed
+  "Gap", beside "calculated EA" and "Calculated CB offset", and the text
+  says the table gives "the experimental values of their band gaps and
+  electron affinities". What that paper calculates is the charge
+  neutrality level, by tight binding. The 5.6–5.7 eV elsewhere is a
+  measurement on CVD SiN/Si films (*Appl. Phys. Lett.* **87**, 102901
+  (2005)), so the two differ by specimen and method — not as a
+  calculation differs from an experiment, which is how it was first
+  reported and is wrong. Both
+  join `comparisons`; the entry stays `not_recorded` with an `asserted`
+  origin, because identifying the source of a circulating figure is not
+  evidence that the hand-entered value came from it — the same rule
+  already applied to the TPP 1991 comparison. A citation trap is
+  recorded beside them: the abstract of *J. Vac. Sci. Technol. A* **22**,
+  1 (2004) reads as the source of 5.3 eV, but its body withholds the
+  attribution. Separately, verified against the primary source: the 2019
+  table prints M = 60.008 for SiO2 where the formula weight is 60.0843,
+  0.127% low, while every other entry checked agrees to better than
+  0.005% — a 29× outlier, propagated into SESSA v2.2.2. The bundled
+  value is the formula weight and is unaffected. **No bundled value
+  changed.**
+
+- **The provenance table now records why the bundled parameters were
+  *not* replaced with their published counterparts.** Five compounds
+  have counterparts in the TPP series, and the natural next step was to
+  adopt them. A third `investigation` record says why that was not done.
+  The argument for it — feed a formula the parameter set it was fitted
+  on, which would select the 1991 table — is refuted by the TPP-2M paper
+  itself: Tanuma, Powell & Penn, *Surf. Interface Anal.* **21**, 165
+  (1994), p. 170 derives the modified expression for β from the 27
+  elements and 14 organic compounds and states that the 15 inorganic
+  compounds "have been excluded from this analysis because the optical
+  data on which their IMFPs are based are much less reliable than for
+  the other two groups of materials". Neither generation was in that
+  fit, so adopting one wholesale on that basis would be a preference
+  rather than a correction — a conclusion about a **blanket** choice on
+  fit-consistency grounds only, which leaves open any future change to
+  an individual entry argued from its own primary source or an explicit
+  phase specification. The size of the effect is recorded separately
+  from the argument, because it does not carry it: substituting either
+  set moves λ by at most 3.8% at 1 keV and 7.6% at 50 eV, and the
+  yardstick is not the 18.9% group average but the per-compound RMS
+  deviations the same paper tabulates (Table 8: SiC 3.2, SiO2 3.6,
+  Si3N4 11.8, Al2O3 15.3, GaAs 39.6) — against which the differences are
+  **about 3× below the formula's own error for SiC and SiO2**, the two
+  with the smallest RMS there, not negligible. The record
+  states its own limits: this settles a blanket replacement and not the
+  merit of any individual value — Al2O3's E_g of 7.6 eV differs from
+  both published figures with no recorded basis, and SiC remains
+  unlabelled with an E_g implying a different polytype from its
+  counterparts. **No bundled value changed.**
+
+- **`CompoundDB` now reports where each bundled value came from.**
+  `get_provenance(name)` returns a record per field, `get_comparisons(name)`
+  the published values found later that disagree with it, and
+  `get_investigations()` what was searched and what the search did not
+  cover. The data lives in a new bundled table,
+  `data/_cache/compounds_provenance.json`, deliberately **separate from
+  the values**: `get_properties()` still returns the four numbers and
+  nothing else, so no calculation sees a difference, and the CSV rebuild
+  path — which knows only the numeric columns — cannot silently drop the
+  provenance. The file is hand-authored and has no rebuild source.
+  Three distinctions are kept apart because collapsing any of them
+  states something untrue. **`availability` vs `origin`**: what is known
+  about the basis for a value is not how the value came to be what it
+  is. Almost every field is `not_recorded` with an `asserted` origin —
+  a number was typed in and the basis was never written down — and a
+  test being able to re-derive that number now does not make its origin
+  `derived`. **No stored value is `derived`**: the one field this change
+  set touched, the Si3N4 molecular weight, is `corrected`, because the
+  commit repaired a digit transposition and left the fractional part
+  untouched — the value is the one the original entry intended, not one
+  authored here. Its record carries the previous value, the commit, and
+  the check that settled it, including that the check used the pre-2009
+  atomic weights those digits imply rather than IUPAC 2021, which gives
+  140.283 (3 ppm away, immaterial to `U = N_v·ρ/M`). **A source vs a later
+  comparison**: Shinotsuka *et al.* 2019 is not where SiO2's 2.2 g/cm³
+  came from, so it appears under `comparisons`, never as an origin; a
+  test fails if any entry with only a comparison acquires a `cited`
+  origin. **A property of the material vs a fact about a search**: "no
+  published counterpart" describes which three compilations were read,
+  and is recorded with its limits under `investigation`. A `phase`
+  record sits beside the value fields because density depends on it and
+  the table has no phase label — `rutile` for TiO2 and `monoclinic` for
+  HfO2 and ZrO2, each recording that the identification is an inference
+  made here, but **`unknown` for GeO2**, whose two forms differ by about
+  47% in density and which is therefore the largest unrecorded
+  uncertainty in the table. What the ambiguity bears on is recorded and
+  is not always density: for SiC the polytype densities differ by under
+  1% while the band gaps span 2.31–3.26 eV. `tests/test_compound_provenance.py` (22
+  tests) pins key parity with `compounds.json`, coverage of every field,
+  a mandatory reason on every non-`known` state, the required members of
+  a `derived`, `cited` or `corrected` origin, that a comparison reports
+  agreement and disagreement accurately — some agree exactly, and an
+  exact agreement with a table that carries no sources of its own is not
+  corroboration — and that the values themselves are unchanged.
+
+- **The CRLB utilities now state when their bound is a bound.**
+  `voigtfit.crlb` presented `Var(θ̂) ≥ [g⁻¹]ᵢᵢ` as unconditional; the
+  words *unbiased*, *bias* and *misspecification* did not appear in the
+  file. The inequality needs an unbiased estimator of a correctly
+  specified model and a non-singular Fisher matrix, and the module also
+  conditions on everything outside θ — no background parameter enters
+  the Fisher matrix, `mode='3d'` treats the Lorentzian widths as known,
+  and the component count is assumed known. Three consequences are now
+  written down at the point of use rather than left to be rediscovered:
+  eigenvalues at or below `1e-12·λ_max` are inverted to **zero**, so in
+  a strongly overlapped configuration the reported `crlb` *understates*
+  the bound and can fall as the problem gets harder; `classify_solvability()`
+  — which `process_multipeak()` attaches to every result — computes its
+  meV figure from a default SNR of 100 and unit amplitudes, not from the
+  data being fitted; and `efficiency_*` is moved by an aggregation
+  artefact (variances averaged over squared averages of standard
+  deviations), by an oracle relabelling step, and by a profile-normalisation
+  mismatch between the generated spectra and the Fisher matrix, before
+  any property of the solver enters. No returned number changes; the
+  three defects named here are documented, not fixed. [Later in this
+  release, under Fixed: the first is fixed — a singular direction now
+  gives `inf` — and of the third, the aggregation and the normalisation
+  mismatch are fixed while the relabelling step remains. The second
+  stands.]
 
 ### Changed
 
@@ -187,6 +318,7 @@ archived on Zenodo for a citable DOI.
   must supply instead (same unit, same material, same kinetic energy
   as the paired IMFP, source recorded) is now stated there and
   enforceable via `overlayer_eal_report`.
+
 - `docs/elastic_scattering_sessa_comparison.md` records where the EAL
   relations stand against a controlled SESSA v2.2.2 series (elastic
   scattering toggled, everything else fixed): input-level albedo
@@ -196,6 +328,44 @@ archived on Zenodo for a citable DOI.
   recovers SESSA's own IMFP only to 1.7–9.2% and the fitted ratio
   moves by ±6% with the thickness window, so no accuracy figure is
   adopted from it.
+
+- **The `/provenance` HDF5 schema design record is no longer published.**
+  `docs/hdf5_provenance_phase_b1_design.md` was a dated internal working
+  document — an approval and phase log, in the maintainer's working
+  language, built on a non-public audit note it cited throughout — which
+  the repository's own publication policy excludes. It moves to
+  `docs/_internal/`. Five shipped modules cited it as their design
+  contract; they now cite it the way this project already cites its
+  non-public development log, and `CONTRIBUTING.md` documents that
+  convention. The rules the note fixes are stated where they are
+  implemented and asserted by `tests/test_provenance_schema.py`, so no
+  behaviour, schema or test changed. Internal documents are now excluded
+  by directory rather than by listing each filename in `.gitignore`,
+  which had put those filenames in a public file and did not catch new
+  ones.
+
+- **Documentation only: `docs/DATA_SOURCES.md` now states where the
+  `compounds.json` values actually came from.** The entry read "in-house
+  curation" and "project-original selection", which described the
+  *choice* of entries but implied a curation process the file never had.
+  The values were hand-entered in 2020–2021 from Wikipedia and commonly
+  quoted literature figures, with no per-entry source recorded — the
+  absence of citations was already flagged, but not its cause. A new
+  section separates the two questions the entry had run together: the
+  rights position is clean (the set reproduces no published table, and
+  is not derived from the TPP-series parameter compilations), while
+  accuracy is weak and uneven. Five of the eleven compounds appear
+  somewhere in that series — Al2O3, GaAs, SiC and SiO2 in Shinotsuka
+  *et al.* 2019, and Si3N4 in Tanuma, Powell &amp; Penn 1991 — and where a
+  published set exists the hand-entered parameters give λ within 2.6% of
+  it, against the one generation compared per entry. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the
+  three compilations checked, so no published parameter set is available
+  there. A measured sensitivity table (TPP-2M at 1 keV, inside the
+  fitted range) shows
+  where this costs anything: ρ ±10% moves λ by 2–3% for most oxides but
+  5% for HfO2, whose bundled 9.68 g/cm³ is the bulk monoclinic density
+  and overestimates amorphous ALD films by 8–14%, biasing λ 3.5–6% in
+  one direction. No bundled value changed.
 
 ### Fixed
 
@@ -216,6 +386,16 @@ archived on Zenodo for a citable DOI.
   bound. The docstrings now give both figures and keep the two fits
   apart, and a test pins the maximum. Docstrings only; no returned number
   changes.
+
+- **CI now tests Python 3.11.** The matrix jobs named "Python 3.11" ran
+  3.12: `.python-version` pins 3.12 for development and uv follows it, so
+  the 3.11 interpreter the job installed was never used. Workflow and pin
+  have had that shape since the first commit of the public history, and
+  the pytest header of the runs checked reads 3.12, so the 0.1.0 notes'
+  "CI on … Python 3.11/3.12" was true of the job names only. The jobs now set `UV_PYTHON` from
+  the matrix and assert the interpreter they run. The first real run,
+  Linux and macOS on 3.11.16, passed the whole suite; no 3.11
+  incompatibility was found.
 
 - **`FastFitConfig(use_mlx=False)` now applies to multi-component fits.**
   With two or more components, `FastVoigtFitter` routes to the multipeak
@@ -288,6 +468,7 @@ archived on Zenodo for a citable DOI.
   reverse the sign alone on 21.4% of rows. Those fractions are
   recomputed from the bundled tables by a test, under a stated
   definition, rather than quoted.
+
 - **`voigtfit.crlb` decided identifiability from a quantity that
   depended on the amplitude unit.** The Fisher matrix mixes units — the
   amplitude block is in area units, `dE` and `dsigma` in eV — so
@@ -361,18 +542,21 @@ archived on Zenodo for a citable DOI.
   `diag(pinv(g))` by anything from a couple of percent to nine orders of
   magnitude; maps of the old and new arrays are not interchangeable.
 
-  This completes the fix begun in the previous entry, which reported
+  This completes the fix begun in the earlier entry "`voigtfit.crlb`
+  reported a small bound where it should have reported no bound at all"
+  (further down: entries are newest first), which reported
   `inf` from the same unit-dependent test and so removed the
   understatement at one grid point while leaving it elsewhere.
 
-- **`clear_cache()` deleted shipped reference data, and
-  `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
+- **Breaking: `clear_cache()` now raises. It deleted shipped reference
+  data, and `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
   every `*.json` under `data/_cache/` — the package's own bundled
   tables. `regenerate_cache()` called it first and then rebuilt only
   five of the seven: `scofield.json` and `trzhaskovskaya.json` were
   absent from its list, so they were deleted with nothing to restore
   them, after which `CrossSection` silently fell back to an **empty
-  table** rather than reporting the loss. The loader change above made
+  table** rather than reporting the loss. The loader change (the next
+  entry, "Deleting a bundled reference table no longer rebuilds it") made
   it worse, turning a partial loss into a total one — the first loader
   now raises, so all seven files were gone and none rebuilt. Both
   functions are Supported-tier, so the names stay: `clear_cache()` now
@@ -494,7 +678,8 @@ archived on Zenodo for a citable DOI.
   as written.
   `EfficiencyResult` also exposes `rmse_*_per` so no averaging is
   hidden. The remaining upstream defect — singular directions inverted
-  to zero rather than diverging — is unchanged.
+  to zero rather than diverging — is unchanged. [Fixed since, in this
+  release: the two `voigtfit.crlb` entries above.]
 
 - **`voigtfit.crlb.compute_efficiency_point()` measured its spectra and
   its bound in different amplitude conventions.** The synthetic spectra
@@ -525,110 +710,21 @@ archived on Zenodo for a citable DOI.
   end of the efficiency bracket, which is deliberately loose while the
   artefacts in that ratio remain. Two further artefacts in the same ratio — the
   aggregation formula and an oracle relabelling step — remain
-  documented and unfixed.
+  documented and unfixed. [The aggregation formula is fixed since, in
+  this release: the entry above. The relabelling step remains.]
+
+## [0.1.0] - 2026-08-25
+
+The public history starts with a squashed commit of 2026-07-07. The
+`v0.1.0` tag is on a commit of 2026-07-31; the release was published and
+archived on Zenodo on 2026-08-25
+([10.5281/zenodo.22092077](https://doi.org/10.5281/zenodo.22092077)).
+
+The changes below were made between that first commit and the tag and
+are part of v0.1.0. In the file that shipped with the tag they were
+still listed under "Unreleased"; they are moved here unedited.
 
 ### Added
-
-- **Two findings from the depthprofiler project are recorded in the
-  provenance table.** Where the circulating Si3N4 E_g of 5.3 eV comes
-  from — or one step of it. The trail leads to Robertson, *J. Vac. Sci.
-  Technol. B* **18**, 1785 (2000), which **adopts** the figure rather
-  than producing it: its Table I lists 5.3 eV under a column headed
-  "Gap", beside "calculated EA" and "Calculated CB offset", and the text
-  says the table gives "the experimental values of their band gaps and
-  electron affinities". What that paper calculates is the charge
-  neutrality level, by tight binding. The 5.6–5.7 eV elsewhere is a
-  measurement on CVD SiN/Si films (*Appl. Phys. Lett.* **87**, 102901
-  (2005)), so the two differ by specimen and method — not as a
-  calculation differs from an experiment, which is how it was first
-  reported and is wrong. Both
-  join `comparisons`; the entry stays `not_recorded` with an `asserted`
-  origin, because identifying the source of a circulating figure is not
-  evidence that the hand-entered value came from it — the same rule
-  already applied to the TPP 1991 comparison. A citation trap is
-  recorded beside them: the abstract of *J. Vac. Sci. Technol. A* **22**,
-  1 (2004) reads as the source of 5.3 eV, but its body withholds the
-  attribution. Separately, verified against the primary source: the 2019
-  table prints M = 60.008 for SiO2 where the formula weight is 60.0843,
-  0.127% low, while every other entry checked agrees to better than
-  0.005% — a 29× outlier, propagated into SESSA v2.2.2. The bundled
-  value is the formula weight and is unaffected. **No bundled value
-  changed.**
-
-- **The provenance table now records why the bundled parameters were
-  *not* replaced with their published counterparts.** Five compounds
-  have counterparts in the TPP series, and the natural next step was to
-  adopt them. A third `investigation` record says why that was not done.
-  The argument for it — feed a formula the parameter set it was fitted
-  on, which would select the 1991 table — is refuted by the TPP-2M paper
-  itself: Tanuma, Powell & Penn, *Surf. Interface Anal.* **21**, 165
-  (1994), p. 170 derives the modified expression for β from the 27
-  elements and 14 organic compounds and states that the 15 inorganic
-  compounds "have been excluded from this analysis because the optical
-  data on which their IMFPs are based are much less reliable than for
-  the other two groups of materials". Neither generation was in that
-  fit, so adopting one wholesale on that basis would be a preference
-  rather than a correction — a conclusion about a **blanket** choice on
-  fit-consistency grounds only, which leaves open any future change to
-  an individual entry argued from its own primary source or an explicit
-  phase specification. The size of the effect is recorded separately
-  from the argument, because it does not carry it: substituting either
-  set moves λ by at most 3.8% at 1 keV and 7.6% at 50 eV, and the
-  yardstick is not the 18.9% group average but the per-compound RMS
-  deviations the same paper tabulates (Table 8: SiC 3.2, SiO2 3.6,
-  Si3N4 11.8, Al2O3 15.3, GaAs 39.6) — against which the differences are
-  **about 3× below the formula's own error for SiC and SiO2**, the two
-  with the smallest RMS there, not negligible. The record
-  states its own limits: this settles a blanket replacement and not the
-  merit of any individual value — Al2O3's E_g of 7.6 eV differs from
-  both published figures with no recorded basis, and SiC remains
-  unlabelled with an E_g implying a different polytype from its
-  counterparts. **No bundled value changed.**
-
-- **`CompoundDB` now reports where each bundled value came from.**
-  `get_provenance(name)` returns a record per field, `get_comparisons(name)`
-  the published values found later that disagree with it, and
-  `get_investigations()` what was searched and what the search did not
-  cover. The data lives in a new bundled table,
-  `data/_cache/compounds_provenance.json`, deliberately **separate from
-  the values**: `get_properties()` still returns the four numbers and
-  nothing else, so no calculation sees a difference, and the CSV rebuild
-  path — which knows only the numeric columns — cannot silently drop the
-  provenance. The file is hand-authored and has no rebuild source.
-  Three distinctions are kept apart because collapsing any of them
-  states something untrue. **`availability` vs `origin`**: what is known
-  about the basis for a value is not how the value came to be what it
-  is. Almost every field is `not_recorded` with an `asserted` origin —
-  a number was typed in and the basis was never written down — and a
-  test being able to re-derive that number now does not make its origin
-  `derived`. **No stored value is `derived`**: the one field this change
-  set touched, the Si3N4 molecular weight, is `corrected`, because the
-  commit repaired a digit transposition and left the fractional part
-  untouched — the value is the one the original entry intended, not one
-  authored here. Its record carries the previous value, the commit, and
-  the check that settled it, including that the check used the pre-2009
-  atomic weights those digits imply rather than IUPAC 2021, which gives
-  140.283 (3 ppm away, immaterial to `U = N_v·ρ/M`). **A source vs a later
-  comparison**: Shinotsuka *et al.* 2019 is not where SiO2's 2.2 g/cm³
-  came from, so it appears under `comparisons`, never as an origin; a
-  test fails if any entry with only a comparison acquires a `cited`
-  origin. **A property of the material vs a fact about a search**: "no
-  published counterpart" describes which three compilations were read,
-  and is recorded with its limits under `investigation`. A `phase`
-  record sits beside the value fields because density depends on it and
-  the table has no phase label — `rutile` for TiO2 and `monoclinic` for
-  HfO2 and ZrO2, each recording that the identification is an inference
-  made here, but **`unknown` for GeO2**, whose two forms differ by about
-  47% in density and which is therefore the largest unrecorded
-  uncertainty in the table. What the ambiguity bears on is recorded and
-  is not always density: for SiC the polytype densities differ by under
-  1% while the band gaps span 2.31–3.26 eV. `tests/test_compound_provenance.py` (18
-  tests) pins key parity with `compounds.json`, coverage of every field,
-  a mandatory reason on every non-`known` state, the required members of
-  a `derived`, `cited` or `corrected` origin, that a comparison reports
-  agreement and disagreement accurately — some agree exactly, and an
-  exact agreement with a table that carries no sources of its own is not
-  corroboration — and that the values themselves are unchanged.
 
 - **`AngularCorrection` now warns when the x-ray incidence angle was
   never stated.** `angular_distribution()` and
@@ -642,6 +738,7 @@ archived on Zenodo for a citable DOI.
   its scale: over one 51°–9° emission fan the peak-to-peak spread of
   `L_dipole` relative to its mean is 85% at 88° incidence, 194% at 60°
   and 216% at 55°.
+
 - The angle conventions are now written down where they are used — a
   geometry sketch and a table of θ (measured), `xray_from_normal`
   (instrument) and ψ (derived) in `docs/API.md` and the module
@@ -652,26 +749,7 @@ archived on Zenodo for a citable DOI.
   `angular_distribution()` already takes θ and derives ψ itself; it is
   now documented as the entry point rather than a variant.
   `tests/test_angular_geometry.py` (16 tests) pins all of it.
-- **The CRLB utilities now state when their bound is a bound.**
-  `voigtfit.crlb` presented `Var(θ̂) ≥ [g⁻¹]ᵢᵢ` as unconditional; the
-  words *unbiased*, *bias* and *misspecification* did not appear in the
-  file. The inequality needs an unbiased estimator of a correctly
-  specified model and a non-singular Fisher matrix, and the module also
-  conditions on everything outside θ — no background parameter enters
-  the Fisher matrix, `mode='3d'` treats the Lorentzian widths as known,
-  and the component count is assumed known. Three consequences are now
-  written down at the point of use rather than left to be rediscovered:
-  eigenvalues at or below `1e-12·λ_max` are inverted to **zero**, so in
-  a strongly overlapped configuration the reported `crlb` *understates*
-  the bound and can fall as the problem gets harder; `classify_solvability()`
-  — which `process_multipeak()` attaches to every result — computes its
-  meV figure from a default SNR of 100 and unit amplitudes, not from the
-  data being fitted; and `efficiency_*` is moved by an aggregation
-  artefact (variances averaged over squared averages of standard
-  deviations), by an oracle relabelling step, and by a profile-normalisation
-  mismatch between the generated spectra and the Fisher matrix, before
-  any property of the solver enters. No returned number changes; the
-  three defects named here are documented, not fixed.
+
 - The Scofield summation convention is now checked against a number the
   source states rather than against our own arithmetic. Table A2 of
   UCRL-51326 prints TOTAL and K/L/M SHELL columns beside the individual
@@ -685,6 +763,7 @@ archived on Zenodo for a citable DOI.
   of Scofield's already-included fractional occupancies (130%). No
   implementation change was needed; this records agreement that was
   previously untested.
+
 - `CrossSection.unit_info(table)` reports the unit *and how well
   established it is*: `unit`, `inferred_unit`, `status`,
   `values_rescaled`, plus a `note` where inferred. The three tables are
@@ -696,12 +775,14 @@ archived on Zenodo for a citable DOI.
   separately rather than inheriting that inference: the UCL
   digitization's own sheet states kb explicitly, and that those σ are
   for completely filled subshells. Recorded in `docs/DATA_SOURCES.md`.
+
 - The MCP `calculate_sensitivity` result carries the unit with its
   status intact — `cross_section_unit`, `cross_section_inferred_unit`,
   `cross_section_unit_status`, `sensitivity_unit`,
   `sensitivity_inferred_unit` — so an inferred unit cannot be collapsed
   into a single confirmed-looking string at the layer where an agent
   would act on it.
+
 - **Experimental** `toyomacro.data.elastic_scattering`: overlayer-thickness
   effective attenuation length from the single-scattering albedo
   ω = IMFP/(IMFP+TRMFP), with a required `model` keyword selecting the
@@ -711,6 +792,7 @@ archived on Zenodo for a citable DOI.
   TRMFP or albedo tables are bundled. Scope is overlayer thickness only —
   mean escape depth, information depth and marker depth follow different
   slopes and are not implemented.
+
 - CUDA backend proof-of-concept and validation record
   (`docs/CUDA_BACKEND_POC.md`): the MLX↔NumPy parity suite run against
   MLX's CUDA backend on an RTX 5070 Laptop under WSL2, plus the
@@ -718,6 +800,7 @@ archived on Zenodo for a citable DOI.
   batch > 65,535 multipeak crash, and the four upstream MLX issues filed
   from it (`docs/upstream-issues/`). Validation only — CUDA is **not** a
   supported installation target and no `[cuda]` extra ships.
+
 - **Experimental** `newton_jacobian_mode` on the multipeak solver
   (`"raw"` | `"kaufman"` | `"golub_pereyra"` | `"gp_lm"`): compact
   Golub-Pereyra normal equations (no projector, no inverse; one
@@ -729,63 +812,29 @@ archived on Zenodo for a citable DOI.
   outside the public API stability guarantee — their names, defaults,
   and diagnostics may change in any release. See
   `src/toyomacro/voigtfit/benchmarks/GP_LM_HARDENING_REPORT.md`.
+
 - Machine-readable benchmark provenance records
   (`paper/figures/results/`): kernel throughput (median + range +
   environment + per-repetition timings) and a same-problem
   scipy/lmfit comparison benchmark
   (`toyomacro.voigtfit.benchmarks.solver_comparison_benchmark`).
+
 - MLX capability API: `mlx_installed()` / `mlx_usable()` /
   `require_mlx()`; the package now distinguishes "MLX installed"
   from "MLX can execute work" and falls back to NumPy on headless
   or virtualized macOS. `TOYOMACRO_DISABLE_MLX=1` forces the NumPy
   backend.
+
 - Noise-semantics helpers `level_to_peak_snr` / `level_to_peak_lambda`
   with tests pinning the sampler's statistics to the documented
   conversions.
+
 - Core API reference (`docs/API.md`), related-software survey
   (`docs/RELATED_SOFTWARE.md`), measured-data schema
   (`examples/data/README.md`), test inventory (`tests/README.md`),
   `CITATION.cff`, and this changelog.
 
 ### Changed
-
-- **The `/provenance` HDF5 schema design record is no longer published.**
-  `docs/hdf5_provenance_phase_b1_design.md` was a dated internal working
-  document — an approval and phase log, in the maintainer's working
-  language, built on a non-public audit note it cited throughout — which
-  the repository's own publication policy excludes. It moves to
-  `docs/_internal/`. Five shipped modules cited it as their design
-  contract; they now cite it the way this project already cites its
-  non-public development log, and `CONTRIBUTING.md` documents that
-  convention. The rules the note fixes are stated where they are
-  implemented and asserted by `tests/test_provenance_schema.py`, so no
-  behaviour, schema or test changed. Internal documents are now excluded
-  by directory rather than by listing each filename in `.gitignore`,
-  which had put those filenames in a public file and did not catch new
-  ones.
-
-- **Documentation only: `docs/DATA_SOURCES.md` now states where the
-  `compounds.json` values actually came from.** The entry read "in-house
-  curation" and "project-original selection", which described the
-  *choice* of entries but implied a curation process the file never had.
-  The values were hand-entered in 2020–2021 from Wikipedia and commonly
-  quoted literature figures, with no per-entry source recorded — the
-  absence of citations was already flagged, but not its cause. A new
-  section separates the two questions the entry had run together: the
-  rights position is clean (the set reproduces no published table, and
-  is not derived from the TPP-series parameter compilations), while
-  accuracy is weak and uneven. Five of the eleven compounds appear
-  somewhere in that series — Al2O3, GaAs, SiC and SiO2 in Shinotsuka
-  *et al.* 2019, and Si3N4 in Tanuma, Powell &amp; Penn 1991 — and where a
-  published set exists the hand-entered parameters give λ within 2.6% of
-  it, against the one generation compared per entry. TiO2, HfO2, ZrO2, Ta2O5, SrTiO3 and GeO2 appear in none of the
-  three compilations checked, so no published parameter set is available
-  there. A measured sensitivity table (TPP-2M at 1 keV, inside the
-  fitted range) shows
-  where this costs anything: ρ ±10% moves λ by 2–3% for most oxides but
-  5% for HfO2, whose bundled 9.68 g/cm³ is the bulk monoclinic density
-  and overestimates amorphous ALD films by 8–14%, biasing λ 3.5–6% in
-  one direction. No bundled value changed.
 
 - **Documentation only: "Stage 2" now says what it is and what it is
   for.** Two unrelated constructions here have two phases, and both were
@@ -800,6 +849,7 @@ archived on Zenodo for a citable DOI.
   dictionary solvers are the recommended route for new code. No
   identifier, default, or executable line changed; the parsed source is
   identical once docstrings are removed.
+
 - **TPP-2M IMFP provenance and validity limits are now stated**
   (`data/imfp.py`, `docs/API.md`, `docs/DATA_SOURCES.md`). The formula
   itself is unchanged and every returned value inside the documented
@@ -821,6 +871,7 @@ archived on Zenodo for a citable DOI.
   energies; omitting its α(T) factor overestimates the IMFP by ~1.8% at
   7.4 keV and ~7% at 30 keV, one-sided and growing with energy. Now
   documented and pinned by test.
+
 - `IMFP.tpp2m()` and `IMFP.sampling_depth()` now reject non-physical
   input with a `ValueError` naming the offending argument, instead of
   surfacing a bare `math domain error` (E ≤ 0, ρ ≤ 0) or
@@ -832,11 +883,13 @@ archived on Zenodo for a citable DOI.
   just above that root the formula returns absurdly large positive
   values instead, which is documented but not caught. Both regimes are
   well below the 50 eV fit floor.
+
 - The MCP `calculate_sensitivity` tool now returns `imfp_model`,
   `imfp_fitted_range_eV` and `imfp_extrapolated` alongside `imfp_nm`.
   Its default photon energy is a HAXPES line, so its *default* call was
   returning a TPP-2M value four times beyond the source's stated
   ceiling with nothing in the response to say so.
+
 - **Sensitivity-factor terminology is now stated precisely**
   (`data/cross_section.py`, `data/transmission.py`, `mcp_server.py`,
   `docs/API.md`, `examples/03_quantification.py`, README). No formula,
@@ -860,6 +913,7 @@ archived on Zenodo for a citable DOI.
   `AngularCorrection` and `elastic_scattering` experimental — versus
   what composing them still would not reproduce. The method name is
   retained for backward compatibility; renaming is deferred.
+
 - Analyzer transmission documentation now warns against applying the
   correction twice (`data/transmission.py`, `docs/API.md` §5). The two
   equivalent workflows — correcting the spectrum, or correcting the
@@ -871,6 +925,7 @@ archived on Zenodo for a citable DOI.
   but name at HAXPES ratios. Transmission data remains instrument- and
   configuration-specific and is **not** bundled; the module is an
   adapter for curves the user is authorized to use.
+
 - The MCP `calculate_sensitivity` result now names its own provenance:
   `cross_section_table` (the table actually used — the docstring
   claimed Scofield while the call resolves the process default, Yeh &
@@ -887,6 +942,7 @@ archived on Zenodo for a citable DOI.
   says so: out-of-range is certainly extrapolated, in-range is not a
   guarantee for a sparsely tabulated orbital. Numerical values are
   unaffected.
+
 - Every magnitude `docs/API.md` §5 quotes for the cross-section tables is
   now pinned by `tests/test_cross_section_spin_orbit_limits.py`, and
   pinned **over the population** the claim describes rather than over
@@ -900,6 +956,7 @@ archived on Zenodo for a citable DOI.
   −0.71/−0.03/−0.26 transmission power-law exponents — are *not* pinned.
   They were audited in their own change set; extending the rule to them
   is deferred rather than silently skipped.
+
 - `AngularCorrection` is now documented, and documented as
   **experimental** (`docs/API.md` §5). It was a public export named
   nowhere in the docs while §5 listed the angular/polarization factor it
@@ -908,15 +965,18 @@ archived on Zenodo for a citable DOI.
   lookups below that clamp to the edge value rather than refusing, so
   Al Kα at 1486.6 eV silently returns the 1500 eV parameters — now
   stated, and unflagged in the return value.
+
 - MLX capability messaging is now device-neutral. `mlx_usable()` probes
   MLX's default device and always did; the docstrings and
   `require_mlx()` errors wrongly described it as looking for a Metal
   device and told callers MLX was "Apple Silicon only" — false, and a
   dead end for non-Apple users. Detection behavior is unchanged.
+
 - README and `docs/API.md` now state the backend boundary explicitly:
   NumPy and Apple Metal supported, CUDA experimentally validated with
   its caveats (TF32 default, the 65,535-batch multipeak crash, no CI)
   rather than left unmentioned.
+
 - Public CLI surface reduced to implemented, distributed commands:
   `gui` (private companion layer, not installed by this package) and
   `fit` (placeholder) are no longer registered; `import` and `convert`
@@ -927,22 +987,60 @@ archived on Zenodo for a citable DOI.
   `FastVoigtFitter`, `VarProFitter`); a `fit` command may return once
   its data schema is defined, and a `gui` command if a distributable
   companion product exists.
+
 - Single version source: `pyproject.toml` — `toyomacro.__version__`,
   `toyomacro.voigtfit.__version__`, and the CLI `--version` all
   derive from package metadata (previously the voigtfit subpackage
   reported an independent 0.6.0).
+
 - Figure 1 (paper) no longer labels reference constants as measured;
   measurement bars require a live run or a committed record.
+
 - Figure 2 (paper) x-axis changed from the misleading "Poisson λ" to
   peak-count SNR; the collapse criterion is now stated physically
   (peak signal = shot noise at SNR ≈ 1).
+
 - `mx.compile` calls moved from import time to first call
   (`LazyCompiled`), so importing the package never touches the Metal
   compiler.
+
 - JOSS paper restructured (State of the field, Software design,
   Research impact statement, AI usage disclosure sections added).
 
+### Removed
+
+- **Breaking:** a j-resolved request against a table that stores only
+  bare subshells now returns `None` instead of a fabricated value.
+  Yeh–Lindau is the **default** table and carries no j-resolved key for
+  any of its 105 elements, so `CrossSection.lookup('Au', '4f7/2', hv)`
+  with no `table=` argument is now `None`; previously it fell through to
+  the cross-element log(Z) fit and returned roughly the *whole* shell,
+  so summing two components double-counted by ~2×. Splitting a total by
+  an assumed branching ratio is not available: the statistical ratio is
+  not exact (Scofield's own Si 2p3/2 : 2p1/2 is 1.966) and a split value
+  would be indistinguishable from a tabulated one. Ask `scofield` or
+  `trzhaskovskaya` for j-resolved values, or use the bare label.
+
+- `CrossSection.unit()` was **not** published, deliberately. A method
+  returning a bare `'kb'` string would let a caller convert on an
+  inference by reading one field; `unit_info()` is the only accessor.
+
+- `IMFP.attenuation_length()`, which multiplied the TPP-2M IMFP by a
+  hardcoded 0.9 and described that as accounting for elastic scattering.
+  It had no callers and was never part of the documented surface; use
+  `data.elastic_scattering` with an explicit IMFP/TRMFP pair instead.
+
+- `ReconstructionBenchmark.run_with_noise()`, reachable from the
+  `toyomacro.voigtfit` surface, accepted a `noise_levels` list and
+  ignored it: it always returned `{0.0: baseline}` and printed a note
+  that noise injection needed a MATLAB routine not in this repository.
+  A caller reading the return value got a silently truncated sweep. It
+  had no callers. Working noise sweeps live in
+  `RoundtripBenchmark.run_noise_sweep()`, the module-level
+  `run_noise_sweep()`, and `spectra_generator.generate_noise_sweep()`.
+
 ### Fixed
+
 - **`AngularCorrection.L_full`'s convention is flagged as unresolved.**
   Its dipole term is the polarization-*averaged* coefficient
   `1 − (β/2)P₂` applied to an angle documented as being from the photon
@@ -960,6 +1058,7 @@ archived on Zenodo for a citable DOI.
   non-dipole term runs from 4.5% of the dipole value to 132% across one
   emission fan. `L_dipole` and `L_unpolarized` are unaffected; each
   matches its form in the module docstring.
+
 - **The solvers no longer warn on their own first iteration.** Both
   Gauss-Newton refiners seed the previous residual norm with infinity and
   divided by it on iteration 0, so `inf/inf` raised "invalid value
@@ -972,6 +1071,7 @@ archived on Zenodo for a citable DOI.
   tolerance/iteration regimes. The ratio is simply not formed until there
   is a previous norm. Regression tests fail on the pre-fix code
   (`test_convergence_warnings.py`), which nothing else did.
+
 - **Documented commands that could not run.** 45 `Usage:` lines across
   19 modules invoked `python -m voigtfit.…` — the import path from
   before the engine moved under `toyomacro`, so every one raised
@@ -981,6 +1081,7 @@ archived on Zenodo for a citable DOI.
   `voigtfit` and from a top-level `benchmark` module respectively;
   `test_compression` reached `h5io` through a `sys.path` insertion that
   assumed a POSIX path separator. All now use the installed paths.
+
 - **`src/toyomacro/voigtfit/scripts/` was excluded from linting.** The
   `.gitignore` rule for the repository's private `scripts/` directory
   was unanchored, so it also matched the tracked package directory of
@@ -988,6 +1089,7 @@ archived on Zenodo for a citable DOI.
   rule is now `/scripts/`; the previously hidden import-order error is
   fixed. New files added under any nested `scripts/` are no longer
   silently untracked.
+
 - Test inventory (`tests/README.md`) reported 1,149 tests across 50
   files; the suite collects **1,578 across 67**. Fifteen files were
   missing from the tables, including the TPP-2M IMFP, elastic-scattering
@@ -995,6 +1097,7 @@ archived on Zenodo for a citable DOI.
   subtotal sums to the stated count. `README.md`'s own two test counts,
   and its architecture tree's stale `toyomacro-python/` root, are
   corrected with it.
+
 - **A bare orbital label now returns the whole spin-orbit doublet**
   (`data/cross_section.py`). It previously returned a single j
   component: the suffix search tried `3/2, 5/2, 7/2, 1/2` and took the
@@ -1043,6 +1146,7 @@ archived on Zenodo for a citable DOI.
     elements would replace a known gap with a fabricated number that is
     indistinguishable from a tabulated one. Where the table carries no
     component of the subshell at all, the extrapolation still applies.
+
 - **The CI archive-content guards never failed** (`.github/workflows/ci.yml`).
   They were written as `! grep <pattern> …` under `set -e`, and `set -e`
   explicitly does not exit when a command's status is inverted with `!` —
@@ -1057,6 +1161,7 @@ archived on Zenodo for a citable DOI.
   listings are non-empty — an empty listing would otherwise satisfy every
   pattern. Verified to exit 1 on each denied pattern and 0 on a clean
   archive. The archives themselves were, and are, clean.
+
 - **TPP-2M IMFP transcription error** (`data/imfp.py`): the C and D
   terms of Tanuma, Powell & Penn substituted `Ep/1000` for the parameter
   `U = Nv·ρ/M = Ep²/829.4`. The error grows as kinetic energy falls —
@@ -1068,38 +1173,7 @@ archived on Zenodo for a citable DOI.
   explicitly; physical plausibility with justified tolerances) added in
   `tests/test_imfp_tpp2m.py`, where there had been none.
 
-### Removed
-- **Breaking:** a j-resolved request against a table that stores only
-  bare subshells now returns `None` instead of a fabricated value.
-  Yeh–Lindau is the **default** table and carries no j-resolved key for
-  any of its 105 elements, so `CrossSection.lookup('Au', '4f7/2', hv)`
-  with no `table=` argument is now `None`; previously it fell through to
-  the cross-element log(Z) fit and returned roughly the *whole* shell,
-  so summing two components double-counted by ~2×. Splitting a total by
-  an assumed branching ratio is not available: the statistical ratio is
-  not exact (Scofield's own Si 2p3/2 : 2p1/2 is 1.966) and a split value
-  would be indistinguishable from a tabulated one. Ask `scofield` or
-  `trzhaskovskaya` for j-resolved values, or use the bare label.
-- `CrossSection.unit()` was **not** published, deliberately. A method
-  returning a bare `'kb'` string would let a caller convert on an
-  inference by reading one field; `unit_info()` is the only accessor.
-- `IMFP.attenuation_length()`, which multiplied the TPP-2M IMFP by a
-  hardcoded 0.9 and described that as accounting for elastic scattering.
-  It had no callers and was never part of the documented surface; use
-  `data.elastic_scattering` with an explicit IMFP/TRMFP pair instead.
-- `ReconstructionBenchmark.run_with_noise()`, reachable from the
-  `toyomacro.voigtfit` surface, accepted a `noise_levels` list and
-  ignored it: it always returned `{0.0: baseline}` and printed a note
-  that noise injection needed a MATLAB routine not in this repository.
-  A caller reading the return value got a silently truncated sweep. It
-  had no callers. Working noise sweeps live in
-  `RoundtripBenchmark.run_noise_sweep()`, the module-level
-  `run_noise_sweep()`, and `spectra_generator.generate_noise_sweep()`.
-
-## [0.1.0] - 2026-07-07
-
-Initial public code (squashed history; no tagged release yet — the
-`v0.1.0` tag and Zenodo archive are pending release approval).
+### Initial code (squashed commit of 2026-07-07)
 
 - `toyomacro.voigtfit`: batch-first Voigt solvers (amplitude-only
   projection, Taylor residual projection, dictionary + parabola,
@@ -1110,3 +1184,7 @@ Initial public code (squashed history; no tagged release yet — the
   (Scofield, Yeh-Lindau, Trzhaskovskaya, TPP-2M), file readers
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
+
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0

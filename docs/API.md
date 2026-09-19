@@ -2,7 +2,8 @@
 
 The entry points a researcher needs, with array shapes, units, and
 backend behavior stated explicitly. Everything below is importable
-from a plain `pip install toyomacro` (NumPy backend) — the MLX GPU
+from a plain install from a clone (`pip install -e .`, NumPy backend;
+the package is not on PyPI — see the README) — the MLX GPU
 path activates automatically on Apple Silicon when usable.
 
 **Conventions.** Energy in eV; `sigma` is the Gaussian standard
@@ -110,7 +111,7 @@ questions, and the answer differs:
 | Backend | Status | Installation |
 |---|---|---|
 | NumPy / CPU | Supported | base install; runs anywhere CPython runs |
-| MLX / Apple Metal | Supported accelerator | `pip install "toyomacro[mlx]"` |
+| MLX / Apple Metal | Supported accelerator | `pip install -e ".[mlx]"` from a clone |
 | MLX / CUDA | Experimentally validated, **not a supported install target** | manual; no extra ships for it |
 
 Apple Metal is the accelerator this project distributes and quotes

@@ -171,8 +171,11 @@ def main(argv=None):
     if path is None:
         path = DEFAULT_MAP
         if not path.exists():
-            runpy.run_path(str(HERE / "data" / "make_example_data.py"),
-                           run_name="__main__")
+            # Call the generator's writer, not its main(): that one parses
+            # sys.argv and ends in sys.exit(), which would end this script
+            # too, silently, right after writing the data.
+            generator = runpy.run_path(str(HERE / "data" / "make_example_data.py"))
+            generator["write_h5"](path)
         if args.shape is None:
             args.shape = (8, 8)
     states = [parse_state(s) for s in (args.state or DEFAULT_STATES)]
