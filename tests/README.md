@@ -1,22 +1,27 @@
 # Test inventory
 
-This suite has **2,036 automated tests** across **79 files**, in two
+This suite has **2,040 automated tests** across **80 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 42 | 1,060 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 43 | 1,064 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 976 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
-data required). Counts below come from `pytest --collect-only`.
+data required). Counts below come from `pytest --collect-only` on an
+install with the `mcp` extra, which is what CI uses; without it the 13
+MCP-server tests collapse into one skipped module. The MLX extra does
+not change what is collected. `test_readme_inventory.py` compares every
+number on this page with a fresh collection and fails, listing the
+values to copy in, when one of them drifts.
 
 ## Two kinds of test
 
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,604 tests, 79%) — guarantee the library
+- **Contract / regression** (1,608 tests, 79%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -39,15 +44,16 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,060)
+## Library body — `tests/` (1,064)
 
-### Claim guards — noise model, versions, backends, comparisons (54)
+### Claim guards — noise model, versions, backends, comparisons (58)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
 | 10 | `test_mlx_support.py` | MLX absent / installed-but-unusable / usable; NumPy fallback end-to-end |
 | 10 | `test_solver_comparison.py` | Same-problem scipy/lmfit comparison benchmark stays runnable + seed reproducibility |
 | 4 | `test_cli_surface.py` | CLI entry points stay importable and keep their documented flags |
+| 4 | `test_readme_inventory.py` | Every count on this page — total, per location, per section, per file, contract / reproduction split — against a fresh `pytest --collect-only` |
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
