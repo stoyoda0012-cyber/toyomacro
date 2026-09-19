@@ -62,7 +62,8 @@ archived on Zenodo for a citable DOI.
   amplitude, position and background are estimated from the same
   spectrum, next to the sub-block that assumes them known — at σ/γ = 1/3
   on a window of ±γ, with an estimated flat background at a tenth of the
-  peak height, the first bound on γ is about 3×10² times the second
+  peak height, the first standard-deviation bound on γ is about 3×10²
+  times the second
   (318 on 61 points, 338 with fine sampling), whatever the exposure.
   (3) `voigt_derivatives` works in the Gaussian *variance*, in which the
   Fisher matrix is regular at σ = 0, and stays accurate there: built from
@@ -262,7 +263,7 @@ archived on Zenodo for a citable DOI.
   47% in density and which is therefore the largest unrecorded
   uncertainty in the table. What the ambiguity bears on is recorded and
   is not always density: for SiC the polytype densities differ by under
-  1% while the band gaps span 2.31–3.26 eV. `tests/test_compound_provenance.py` (18
+  1% while the band gaps span 2.31–3.26 eV. `tests/test_compound_provenance.py` (22
   tests) pins key parity with `compounds.json`, coverage of every field,
   a mandatory reason on every non-`known` state, the required members of
   a `derived`, `cited` or `corrected` origin, that a comparison reports
@@ -289,7 +290,11 @@ archived on Zenodo for a citable DOI.
   deviations), by an oracle relabelling step, and by a profile-normalisation
   mismatch between the generated spectra and the Fisher matrix, before
   any property of the solver enters. No returned number changes; the
-  three defects named here are documented, not fixed.
+  three defects named here are documented, not fixed. [Later in this
+  release, under Fixed: the first is fixed — a singular direction now
+  gives `inf` — and of the third, the aggregation and the normalisation
+  mismatch are fixed while the relabelling step remains. The second
+  stands.]
 
 ### Changed
 
@@ -381,6 +386,16 @@ archived on Zenodo for a citable DOI.
   bound. The docstrings now give both figures and keep the two fits
   apart, and a test pins the maximum. Docstrings only; no returned number
   changes.
+
+- **CI now tests Python 3.11.** The matrix jobs named "Python 3.11" ran
+  3.12: `.python-version` pins 3.12 for development and uv follows it, so
+  the 3.11 interpreter the job installed was never used. Workflow and pin
+  have had that shape since the first commit of the public history, and
+  the pytest header of the runs checked reads 3.12, so the 0.1.0 notes'
+  "CI on … Python 3.11/3.12" was true of the job names only. The jobs now set `UV_PYTHON` from
+  the matrix and assert the interpreter they run. The first real run,
+  Linux and macOS on 3.11.16, passed the whole suite; no 3.11
+  incompatibility was found.
 
 - **`FastFitConfig(use_mlx=False)` now applies to multi-component fits.**
   With two or more components, `FastVoigtFitter` routes to the multipeak
@@ -527,18 +542,21 @@ archived on Zenodo for a citable DOI.
   `diag(pinv(g))` by anything from a couple of percent to nine orders of
   magnitude; maps of the old and new arrays are not interchangeable.
 
-  This completes the fix begun in the previous entry, which reported
+  This completes the fix begun in the earlier entry "`voigtfit.crlb`
+  reported a small bound where it should have reported no bound at all"
+  (further down: entries are newest first), which reported
   `inf` from the same unit-dependent test and so removed the
   understatement at one grid point while leaving it elsewhere.
 
-- **`clear_cache()` deleted shipped reference data, and
-  `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
+- **Breaking: `clear_cache()` now raises. It deleted shipped reference
+  data, and `regenerate_cache()` could not put it back.** `clear_cache()` unlinked
   every `*.json` under `data/_cache/` — the package's own bundled
   tables. `regenerate_cache()` called it first and then rebuilt only
   five of the seven: `scofield.json` and `trzhaskovskaya.json` were
   absent from its list, so they were deleted with nothing to restore
   them, after which `CrossSection` silently fell back to an **empty
-  table** rather than reporting the loss. The loader change above made
+  table** rather than reporting the loss. The loader change (the next
+  entry, "Deleting a bundled reference table no longer rebuilds it") made
   it worse, turning a partial loss into a total one — the first loader
   now raises, so all seven files were gone and none rebuilt. Both
   functions are Supported-tier, so the names stay: `clear_cache()` now
@@ -660,7 +678,8 @@ archived on Zenodo for a citable DOI.
   as written.
   `EfficiencyResult` also exposes `rmse_*_per` so no averaging is
   hidden. The remaining upstream defect — singular directions inverted
-  to zero rather than diverging — is unchanged.
+  to zero rather than diverging — is unchanged. [Fixed since, in this
+  release: the two `voigtfit.crlb` entries above.]
 
 - **`voigtfit.crlb.compute_efficiency_point()` measured its spectra and
   its bound in different amplitude conventions.** The synthetic spectra
@@ -691,17 +710,18 @@ archived on Zenodo for a citable DOI.
   end of the efficiency bracket, which is deliberately loose while the
   artefacts in that ratio remain. Two further artefacts in the same ratio — the
   aggregation formula and an oracle relabelling step — remain
-  documented and unfixed.
+  documented and unfixed. [The aggregation formula is fixed since, in
+  this release: the entry above. The relabelling step remains.]
 
 ## [0.1.0] - 2026-08-25
 
-The code was first made public on 2026-07-07 (squashed history). The
+The public history starts with a squashed commit of 2026-07-07. The
 `v0.1.0` tag is on a commit of 2026-07-31; the release was published and
 archived on Zenodo on 2026-08-25
 ([10.5281/zenodo.22092077](https://doi.org/10.5281/zenodo.22092077)).
 
-The changes below were made between the first public code and the tag
-and are part of v0.1.0. In the file that shipped with the tag they were
+The changes below were made between that first commit and the tag and
+are part of v0.1.0. In the file that shipped with the tag they were
 still listed under "Unreleased"; they are moved here unedited.
 
 ### Added
@@ -1153,7 +1173,7 @@ still listed under "Unreleased"; they are moved here unedited.
   explicitly; physical plausibility with justified tolerances) added in
   `tests/test_imfp_tpp2m.py`, where there had been none.
 
-### Initial public code (2026-07-07)
+### Initial code (squashed commit of 2026-07-07)
 
 - `toyomacro.voigtfit`: batch-first Voigt solvers (amplitude-only
   projection, Taylor residual projection, dictionary + parabola,
@@ -1164,3 +1184,7 @@ still listed under "Unreleased"; they are moved here unedited.
   (Scofield, Yeh-Lindau, Trzhaskovskaya, TPP-2M), file readers
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
+
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0
