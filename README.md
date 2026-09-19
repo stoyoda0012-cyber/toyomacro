@@ -20,6 +20,13 @@
 > See [How fast](#how-fast) below for what these numbers actually
 > measure and how the MLX and NumPy backends compare.
 
+The engine is not tied to photoelectrons: it takes one axis and a stack
+of spectra and fits Voigt peaks to all of them in one call, so a
+spectral map from another technique — Raman, photoluminescence or EELS,
+for example — has the same shape. It has been validated only on XPS
+data, though, and the backgrounds, templates and reference tables here
+are XPS-specific.
+
 ## What's in the box
 
 | Subpackage | What it does | Install extra |

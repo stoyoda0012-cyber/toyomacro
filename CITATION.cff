@@ -34,6 +34,9 @@ keywords:
   - photoelectron spectroscopy
   - Voigt profile
   - peak fitting
+  - batch fitting
+  - spectral imaging
+  - hyperspectral imaging
   - GPU
   - Apple Silicon
   - MLX
