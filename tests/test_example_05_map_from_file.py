@@ -119,6 +119,21 @@ def test_end_to_end_writes_figure(ex, synthetic_h5, tmp_path, monkeypatch):
     assert (tmp_path / "05_map_from_file.png").exists()
 
 
+@pytest.mark.skipif(not VOIGTFIT_AVAILABLE, reason="voigtfit not available")
+def test_missing_default_map_is_generated_and_then_fitted(ex, tmp_path, monkeypatch):
+    """A fresh clone has no map file. The example must write one and carry
+    on; it used to stop, with exit code 0, right after writing it, because
+    the generator it ran ends in sys.exit(). CI never saw that: it runs the
+    generator first."""
+    missing = tmp_path / "data" / "si2p_map_8x8.h5"
+    missing.parent.mkdir()
+    monkeypatch.setattr(ex, "DEFAULT_MAP", missing)
+    monkeypatch.setattr(ex, "OUT_DIR", tmp_path / "output")
+    ex.main([])
+    assert missing.exists()
+    assert (tmp_path / "output" / "05_map_from_file.png").exists()
+
+
 def test_center_outside_window_stops_before_fitting(ex, synthetic_h5):
     with pytest.raises(SystemExit, match="outside the energy window"):
         ex.main([str(synthetic_h5), "--state", "Ta:26.0:0.6"])
