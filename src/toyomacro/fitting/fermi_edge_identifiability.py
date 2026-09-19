@@ -79,19 +79,36 @@ Not exported from ``toyomacro.fitting``; not wired to any CLI.
 from __future__ import annotations
 
 import math
-from typing import Literal, NamedTuple
+from dataclasses import dataclass, field
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from scipy.special import expit, ndtr, zeta
 
+from .._identifiability import (
+    Background,
+    constant_background,
+    linear_background,
+    poisson_fisher_matrix,
+)
 from .fermi_edge import KB_EV, _sign_of
 
 __all__ = [
+    "EDGE_PARAMETERIZATIONS",
+    "Background",
     "EdgeDerivatives",
+    "EdgeFisherResult",
+    "FermiEdge",
+    "constant_background",
     "edge_derivatives",
+    "edge_fisher",
+    "linear_background",
     "tau_from_temperature",
     "temperature_from_tau",
 ]
+
+EdgeParameterization = Literal["var_tau", "sigma_T"]
+EDGE_PARAMETERIZATIONS: tuple[str, ...] = ("var_tau", "sigma_T")
 
 _SQRT_2PI = math.sqrt(2.0 * math.pi)
 _PI2 = math.pi * math.pi
@@ -374,3 +391,209 @@ def edge_derivatives(
 
 # kT / sigma below which 'auto' takes the series. Set from measurement; see the tests.
 _SERIES_SWITCH = 0.07
+
+
+# ---------------------------------------------------------------------------
+# Model specification and Poisson Fisher matrix
+# ---------------------------------------------------------------------------
+
+_DOS_TERMS = {"flat": (), "linear": ("dos_c1",), "quadratic": ("dos_c1", "dos_c2")}
+
+
+@dataclass(frozen=True)
+class FermiEdge:
+    """A Fermi edge, in the units a measurement is quoted in.
+
+    Attributes:
+        ef: Fermi level (eV)
+        amplitude: Height of the occupied-side step at E_F, counts per
+            channel at unit exposure; must be positive
+        sigma: Instrumental Gaussian standard deviation (eV), >= 0.
+            FWHM = 2 sqrt(2 ln 2) sigma
+        temperature: Electron temperature (K), >= 0
+        dos_c1, dos_c2: Density-of-states coefficients (1/eV, 1/eV**2)
+        dos: Which DOS coefficients are estimated, as in ``fit_fermi_edge``:
+            'flat' (neither; both must be 0), 'linear' (c1; c2 must be 0)
+            or 'quadratic'
+    """
+
+    ef: float
+    amplitude: float
+    sigma: float
+    temperature: float
+    dos_c1: float = 0.0
+    dos_c2: float = 0.0
+    dos: Literal["flat", "linear", "quadratic"] = "linear"
+
+    def __post_init__(self) -> None:
+        values = (self.ef, self.amplitude, self.sigma, self.temperature, self.dos_c1, self.dos_c2)
+        if not all(math.isfinite(v) for v in values):
+            raise ValueError(f"edge parameters must be finite, got {values}")
+        if not self.amplitude > 0.0:
+            raise ValueError(f"amplitude must be positive, got {self.amplitude}")
+        if self.sigma < 0.0 or self.temperature < 0.0:
+            raise ValueError("need sigma >= 0 and temperature >= 0")
+        if self.sigma == 0.0 and self.temperature == 0.0:
+            raise ValueError("sigma = 0 and temperature = 0 is a bare step")
+        if self.dos not in _DOS_TERMS:
+            raise ValueError(f"dos must be 'flat', 'linear' or 'quadratic', got {self.dos!r}")
+        if (self.dos == "flat" and (self.dos_c1 or self.dos_c2)) or (
+                self.dos == "linear" and self.dos_c2):
+            raise ValueError(f"dos={self.dos!r} holds the omitted coefficients at 0")
+
+    @property
+    def variance(self) -> float:
+        return self.sigma * self.sigma
+
+    @property
+    def tau(self) -> float:
+        return tau_from_temperature(self.temperature)
+
+
+@dataclass
+class EdgeFisherResult:
+    """Poisson Fisher matrix of an edge-plus-background model.
+
+    Attributes:
+        fisher: Fisher matrix in the chosen coordinates, (n_params, n_params)
+        param_names: e.g. ('ef', 'amplitude', 'dos_c1', 'variance', 'tau', 'bg_level')
+        param_roles: 'position', 'amplitude', 'dos', 'width' or 'background'
+        param_values: Parameter values in the chosen coordinates
+        width_index: Positions of the two width parameters
+        jacobian: d(expected counts)/d(parameters) at the stated exposure,
+            (n_energy, n_params)
+        expected_counts: Poisson mean per channel at the stated exposure
+        parameterization: 'var_tau' or 'sigma_T'
+        exposure: Multiplier on the whole mean; ``fisher`` is linear in it
+        config: Model echo
+    """
+
+    fisher: np.ndarray
+    param_names: tuple[str, ...]
+    param_roles: tuple[str, ...]
+    param_values: np.ndarray
+    width_index: tuple[int, ...]
+    jacobian: np.ndarray
+    expected_counts: np.ndarray
+    parameterization: str
+    exposure: float
+    config: dict[str, Any] = field(default_factory=dict)
+
+
+def edge_fisher(
+    energy: np.ndarray,
+    edge: FermiEdge,
+    background: Background | None = None,
+    *,
+    parameterization: EdgeParameterization = "var_tau",
+    exposure: float = 1.0,
+    convention: str = "BE",
+    dos_form: Literal["occupied", "both_sides"] = "occupied",
+    route: Literal["auto", "quadrature", "series"] = "auto",
+) -> EdgeFisherResult:
+    """Fisher matrix ``J^T diag(1/mu) J`` for Poisson counts on a Fermi edge.
+
+    ``mu(E) = exposure * (edge(E) + background(E))``. Parameters, in
+    order: E_F, the amplitude, the DOS coefficients ``edge.dos`` estimates,
+    the two width coordinates, and every background term flagged
+    ``estimated``. A known background raises ``mu`` without adding a
+    parameter.
+
+    Width coordinates:
+
+    - 'var_tau': (v, tau) = (sigma**2, (kT)**2), eV**2 both. Regular at
+      sigma = 0 and at T = 0 in the sense that each column stays finite.
+      At tau = 0 the tau column is, to first order, a combination of the
+      v, E_F and DOS columns (the Sommerfeld expansion; see the module
+      docstring), so what the data say about tau apart from v comes from
+      higher orders and vanishes there. That is a property of the model,
+      not of the coordinates, and no coordinate removes it.
+    - 'sigma_T': (sigma, T) in eV and K, related by ``I_phi = T^T I T``
+      with ``dv/dsigma = 2 sigma`` and ``dtau/dT = 2 k_B**2 T``: singular
+      at sigma = 0 and at T = 0 by construction of the coordinates.
+
+    Args:
+        energy: Energy axis (eV)
+        edge: The edge
+        background: None, or a ``Background`` on the same axis
+        parameterization: 'var_tau' (default) or 'sigma_T'
+        exposure: Multiplier on the whole mean (acquisition time, flux)
+        convention: 'BE' or 'KE'
+        dos_form: As in ``edge_derivatives``
+        route: As in ``edge_derivatives``
+
+    Returns:
+        EdgeFisherResult. The matrix is returned as computed and can be
+        singular; nothing here inverts it.
+
+    Raises:
+        ValueError: if the expected count is not positive in every
+            channel (without a background the unoccupied side underflows
+            a few sigma past the edge: add one or narrow the window).
+    """
+    if parameterization not in EDGE_PARAMETERIZATIONS:
+        raise ValueError(
+            f"parameterization must be one of {EDGE_PARAMETERIZATIONS}, got {parameterization!r}")
+    if not exposure > 0.0:
+        raise ValueError(f"exposure must be positive, got {exposure}")
+    energy = np.asarray(energy, dtype=np.float64)
+    d = edge_derivatives(energy, edge.ef, edge.amplitude, edge.variance, edge.tau,
+                         dos_c1=edge.dos_c1, dos_c2=edge.dos_c2, convention=convention,
+                         dos_form=dos_form, route=route)
+
+    if parameterization == "var_tau":
+        width_names = ("variance", "tau")
+        width_values = [edge.variance, edge.tau]
+        width_columns = [d.d_variance, d.d_tau]
+    else:
+        width_names = ("sigma", "temperature")
+        width_values = [edge.sigma, edge.temperature]
+        width_columns = [2.0 * edge.sigma * d.d_variance,
+                         2.0 * KB_EV * KB_EV * edge.temperature * d.d_tau]
+
+    dos_names = _DOS_TERMS[edge.dos]
+    columns = [d.d_ef, d.d_amplitude, *(getattr(d, "d_" + n) for n in dos_names), *width_columns]
+    names = ["ef", "amplitude", *dos_names, *width_names]
+    roles = ["position", "amplitude", *(["dos"] * len(dos_names)), "width", "width"]
+    values = [edge.ef, edge.amplitude, *(getattr(edge, n) for n in dos_names), *width_values]
+
+    mean = d.value.copy()
+    if background is not None:
+        if background.basis.shape[1] != energy.size:
+            raise ValueError("background is on a different energy axis")
+        mean += background.counts()
+        for term, name, coef, estimated in zip(background.basis, background.names,
+                                               background.coefficients, background.estimated):
+            if estimated:
+                columns.append(term)
+                names.append(name)
+                roles.append("background")
+                values.append(float(coef))
+    if not np.all(mean > 0.0):
+        raise ValueError(
+            "expected counts must be positive in every channel; the minimum is "
+            f"{mean.min():.3e}. Add a background or narrow the window."
+        )
+
+    jac_unit = np.stack(columns, axis=1)
+    return EdgeFisherResult(
+        fisher=poisson_fisher_matrix(jac_unit, mean, exposure),
+        param_names=tuple(names),
+        param_roles=tuple(roles),
+        param_values=np.array(values, dtype=np.float64),
+        width_index=tuple(i for i, r in enumerate(roles) if r == "width"),
+        jacobian=exposure * jac_unit,
+        expected_counts=exposure * mean,
+        parameterization=parameterization,
+        exposure=float(exposure),
+        config={
+            "edge": (edge.ef, edge.amplitude, edge.sigma, edge.temperature, edge.dos_c1,
+                     edge.dos_c2, edge.dos),
+            "background_terms": () if background is None else background.names,
+            "background_estimated": () if background is None else background.estimated,
+            "convention": convention,
+            "dos_form": dos_form,
+            "n_energy": int(energy.size),
+            "energy_range": (float(energy[0]), float(energy[-1])),
+        },
+    )

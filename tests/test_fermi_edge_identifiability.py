@@ -264,3 +264,164 @@ def test_bad_inputs_raise():
         _derivs(tau=1e-4, form="kinked")
     with pytest.raises(ValueError, match="route"):
         _derivs(tau=1e-4, route="fast")
+
+
+# --- Poisson Fisher matrix -------------------------------------------------------------
+
+from toyomacro._identifiability import effective_information  # noqa: E402
+
+
+def _edge(**kw):
+    base = dict(ef=0.0031, amplitude=1000.0, sigma=0.05, temperature=300.0, dos_c1=0.35)
+    base.update(kw)
+    return fi.FermiEdge(**base)
+
+
+def _unit_free(m):
+    d = np.sqrt(np.diag(m))
+    return m / np.outer(d, d)
+
+
+def test_axis_rescaling_moves_no_hidden_constant():
+    """Energies times c: the value is unchanged and each column scales as its
+    coordinate does (E_F by 1/c, v and tau by 1/c**2). Nothing in the columns
+    is tied to eV."""
+    c, tau = 1000.0, fi.tau_from_temperature(80.0)
+    a = fi.edge_derivatives(E, 0.0031, 1.0, SIGMA**2, tau, dos_c1=0.35)
+    b = fi.edge_derivatives(c * E, c * 0.0031, 1.0, c * c * SIGMA**2, c * c * tau,
+                            dos_c1=0.35 / c)
+    np.testing.assert_allclose(b.value, a.value, rtol=1e-12, atol=1e-15)
+    for name, power in (("d_ef", 1), ("d_variance", 2), ("d_tau", 2), ("d_dos_c1", -1)):
+        scale = np.abs(getattr(a, name)).max()
+        np.testing.assert_allclose(getattr(b, name) * c**power, getattr(a, name),
+                                   rtol=1e-11, atol=1e-11 * scale)
+
+
+def test_fisher_is_linear_in_exposure():
+    bg = fi.constant_background(E, 50.0)
+    one = fi.edge_fisher(E, _edge(), bg)
+    three = fi.edge_fisher(E, _edge(), bg, exposure=3.0)
+    np.testing.assert_allclose(three.fisher, 3.0 * one.fisher, rtol=1e-13)
+    np.testing.assert_allclose(three.expected_counts, 3.0 * one.expected_counts, rtol=1e-15)
+
+
+@pytest.mark.parametrize("temperature,sigma", [(300.0, 0.05), (30.0, 0.05), (300.0, 0.01)])
+@pytest.mark.parametrize("parameterization", ["var_tau", "sigma_T"])
+def test_fisher_is_the_hessian_of_the_expected_deviance(temperature, sigma, parameterization):
+    """Linear DOS, estimated linear background. Second differences of the
+    expected Poisson negative log-likelihood at the truth, written as
+    sum(mu - mu0 - mu0 log1p((mu - mu0)/mu0)) so no large constant cancels,
+    steps of 1e-3 of each parameter's bound (at most 1e-3 of its value).
+    Measured, relative to sqrt(I_ii I_jj): 1e-7 to 2.7e-6."""
+    edge = _edge(sigma=sigma, temperature=temperature)
+    bg = fi.linear_background(E, 50.0, 3.0)
+    fisher = fi.edge_fisher(E, edge, bg, parameterization=parameterization)
+    theta0, mu0 = fisher.param_values.copy(), fisher.expected_counts
+    mid = 0.5 * (E[0] + E[-1])
+
+    def mean(theta):
+        p = dict(zip(fisher.param_names, theta))
+        if parameterization == "var_tau":
+            v, tau = p["variance"], p["tau"]
+        else:
+            v, tau = p["sigma"] ** 2, fi.tau_from_temperature(p["temperature"])
+        d = fi.edge_derivatives(E, p["ef"], p["amplitude"], v, tau, dos_c1=p["dos_c1"])
+        return d.value + p["bg_level"] + p["bg_slope"] * (E - mid)
+
+    def nll(theta):
+        dm = mean(theta) - mu0
+        return float(np.sum(dm - mu0 * np.log1p(dm / mu0)))
+
+    sd = np.sqrt(np.diag(np.linalg.inv(fisher.fisher)))
+    h = np.minimum(1e-3 * sd, 1e-3 * np.maximum(np.abs(theta0), 1e-4))
+    n = theta0.size
+    hess = np.zeros((n, n))
+    for i in range(n):
+        for j in range(i, n):
+            ei, ej = np.zeros(n), np.zeros(n)
+            ei[i], ej[j] = h[i], h[j]
+            hess[i, j] = hess[j, i] = (nll(theta0 + ei + ej) - nll(theta0 + ei - ej)
+                                       - nll(theta0 - ei + ej) + nll(theta0 - ei - ej)) / (
+                4.0 * h[i] * h[j])
+    d = np.sqrt(np.diag(fisher.fisher))
+    assert np.abs((hess - fisher.fisher) / np.outer(d, d)).max() < 1e-5
+
+
+def test_the_two_coordinates_are_one_model():
+    """I_sigma_T = T^T I_var_tau T with dv/dsigma = 2 sigma, dtau/dT = 2 k^2 T."""
+    bg = fi.constant_background(E, 50.0)
+    vt = fi.edge_fisher(E, _edge(), bg)
+    st = fi.edge_fisher(E, _edge(), bg, parameterization="sigma_T")
+    jac = np.eye(vt.fisher.shape[0])
+    iv, it = vt.width_index
+    jac[iv, iv] = 2.0 * 0.05
+    jac[it, it] = 2.0 * KB_EV**2 * 300.0
+    np.testing.assert_allclose(st.fisher, jac.T @ vt.fisher @ jac, rtol=1e-12)
+    assert st.param_names[iv] == "sigma" and st.param_names[it] == "temperature"
+
+
+def test_temperature_coordinate_degenerates_at_zero_and_tau_does_not():
+    """Flat DOS, constant background, sigma 0.05 eV, T from 20 K down to
+    1.25 K: I_TT / T^2 settles (4.965e-7 at 20 K, 5.001e-7 at 1.25 K) --
+    the coordinate's own zero -- while I_tau_tau stays finite (2.251e9 to
+    2.267e9)."""
+    bg = fi.constant_background(E, 50.0)
+    ratios, info = [], []
+    for t in (20.0, 10.0, 5.0, 2.5, 1.25):
+        edge = _edge(temperature=t, dos_c1=0.0, dos="flat")
+        st = fi.edge_fisher(E, edge, bg, parameterization="sigma_T")
+        vt = fi.edge_fisher(E, edge, bg)
+        ratios.append(st.fisher[st.width_index[1], st.width_index[1]] / t**2)
+        info.append(vt.fisher[vt.width_index[1], vt.width_index[1]])
+    assert abs(ratios[-1] / ratios[-2] - 1.0) < 1e-3 and abs(ratios[0] / ratios[-1] - 1.0) < 0.01
+    assert abs(info[-1] / info[-2] - 1.0) < 1e-3 and abs(info[0] / info[-1] - 1.0) < 0.01
+
+
+def test_the_routes_agree_at_the_fisher_level_around_the_switch():
+    """The switch is set where the full Fisher matrix, not a profile, agrees
+    between routes. Measured: correlation matrices within 5e-14; the stiff
+    eigenvalue of the effective (v, tau) block within 5e-15; the soft one --
+    the information that separates v from tau, 3e-7 to 3e-5 of the stiff --
+    within 2.3e-10 at kT/sigma = 0.03 and 1.9e-11 at the switch."""
+    bg = fi.constant_background(E, 50.0)
+    scale = np.diag([1.0, 3.0 / math.pi**2])  # tau -> (pi^2/3) tau
+    for ratio, soft_tol in ((0.03, 1e-9), (0.05, 3e-10), (0.069, 1e-10), (0.1, 1e-10)):
+        edge = _edge(temperature=ratio * 0.05 / KB_EV)
+        q = fi.edge_fisher(E, edge, bg, route="quadrature")
+        s = fi.edge_fisher(E, edge, bg, route="series")
+        assert np.abs(_unit_free(q.fisher) - _unit_free(s.fisher)).max() < 1e-12
+        lq = np.linalg.eigvalsh(scale @ effective_information(q.fisher, q.width_index).effective
+                                @ scale)
+        ls = np.linalg.eigvalsh(scale @ effective_information(s.fisher, s.width_index).effective
+                                @ scale)
+        assert abs(lq[1] - ls[1]) < 1e-13 * lq[1]
+        assert abs(lq[0] - ls[0]) < soft_tol * lq[0], ratio
+
+
+def test_dos_terms_and_background_terms_become_parameters():
+    bg = fi.linear_background(E, 50.0, 3.0) + fi.constant_background(E, 5.0, estimated=False)
+    for dos, names in (("flat", ()), ("linear", ("dos_c1",)), ("quadratic", ("dos_c1", "dos_c2"))):
+        edge = _edge(dos=dos, dos_c1=0.0 if dos == "flat" else 0.35,
+                     dos_c2=0.1 if dos == "quadratic" else 0.0)
+        f = fi.edge_fisher(E, edge, bg)
+        assert f.param_names == ("ef", "amplitude", *names, "variance", "tau", "bg_level", "bg_slope")
+        assert f.param_roles[-2:] == ("background", "background")
+        known = fi.edge_derivatives(E, edge.ef, edge.amplitude, edge.variance, edge.tau,
+                                    dos_c1=edge.dos_c1, dos_c2=edge.dos_c2).value
+        np.testing.assert_allclose(f.expected_counts, known + bg.counts(), rtol=1e-14)
+
+
+def test_edge_and_fisher_inputs_are_checked():
+    with pytest.raises(ValueError, match="positive"):
+        fi.FermiEdge(ef=0.0, amplitude=0.0, sigma=0.05, temperature=300.0)
+    with pytest.raises(ValueError, match="bare step"):
+        fi.FermiEdge(ef=0.0, amplitude=1.0, sigma=0.0, temperature=0.0)
+    with pytest.raises(ValueError, match="omitted"):
+        fi.FermiEdge(ef=0.0, amplitude=1.0, sigma=0.05, temperature=300.0, dos_c1=0.3, dos="flat")
+    with pytest.raises(ValueError, match="expected counts"):
+        # 2.5 eV below E_F at 1 K is 50 sigma: the mean underflows to 0 with no background
+        fi.edge_fisher(np.linspace(-2.5, 0.3, 200), _edge(temperature=1.0), None)
+    with pytest.raises(ValueError, match="parameterization"):
+        fi.edge_fisher(E, _edge(), fi.constant_background(E, 5.0), parameterization="fwhm")
+    with pytest.raises(ValueError, match="exposure"):
+        fi.edge_fisher(E, _edge(), fi.constant_background(E, 5.0), exposure=0.0)
