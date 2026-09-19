@@ -8,6 +8,18 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`examples/08_map_viewer_frontend.py`: a minimal front end on the
+  batch engine.** Click a pixel of a fitted chemical-state map to see its
+  spectrum, the fit and its components. The back end fits the map once
+  and hands the front end parameter maps and one pixel at a time; a
+  pixel's model is rebuilt on demand from its fitted parameters, and no
+  fitted curves are built for the whole map. Everything runs on the main
+  thread (see "Threads" in `docs/API.md`). matplotlib only, no new
+  dependency; `--smoke` runs it without a window, which is how CI runs
+  it. Synthetic data, like example 02's.
+
 ### Changed
 
 - **`CITATION.cff` is titled "toyomacro: X-ray photoelectron spectroscopy
