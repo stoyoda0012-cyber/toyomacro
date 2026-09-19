@@ -103,6 +103,33 @@ from toyomacro.voigtfit import mlx_installed, mlx_usable, require_mlx
 - `TOYOMACRO_DISABLE_MLX=1` — environment variable forcing the NumPy
   backend (useful for A/B validation).
 
+### Threads
+
+With the MLX backend, make every call from one thread for the life of
+the process: the main thread, or a single worker thread reused for every
+job. Do not start a new thread per fit — for example, a GUI that spawns
+a worker for each click.
+
+The failure behind this rule, as measured with MLX 0.31.2 and Python
+3.12 on Apple Silicon: an `mx.compile`d kernel of this package, called
+from successive short-lived threads, crashed the process with a
+segmentation fault before the third thread returned, in each of three
+runs. The same function without `mx.compile` did not crash. It is MLX
+behaviour that this package cannot guard against from the outside, and
+other MLX versions have not been checked.
+
+The default fit reaches such a kernel. `FastVoigtFitter` in its default
+`"fast"` mode with a single component, run once on each of ten
+successive threads, crashed in each of three runs; the same fit ran 50
+times without error on the main thread and on one reused worker thread.
+In that test the other four modes, and all five with two components,
+made no compiled-kernel call and did not crash — but which paths compile
+a kernel is a property of the current code and can change, so the rule
+applies to every MLX-backed call. `use_mlx=False` or
+`TOYOMACRO_DISABLE_MLX=1` keeps MLX out altogether; with
+`use_mlx=False`, the single-component `"fast"` fit ran on ten
+successive threads without a crash.
+
 ### What is distributed, and what merely runs
 
 The device-agnostic probe and the distribution boundary are separate
