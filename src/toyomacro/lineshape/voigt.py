@@ -72,7 +72,23 @@ class Voigt(BaseLineshape):
         Uses the Olivero-Longbothum approximation (1977):
         FWHM_V ≈ 0.5346 * fwhm_l + √(0.2166 * fwhm_l² + fwhm_g²)
 
-        Accurate to within 0.02% for all fwhm_l/fwhm_g ratios.
+        Olivero & Longbothum give two fits. This is the simpler one, a
+        modification of Whiting's expression, for which their abstract
+        states an accuracy of about 0.02%; the 0.01% stated there belongs
+        to their other, more elaborate expression, which is not the one
+        used here. The largest error measured against the exact
+        half-maximum width of the profile is 2.37e-4, at
+        fwhm_l/fwhm_g = 0.29, over ratios from 1e-4 to 1e4 (exact for a
+        Gaussian, 3e-6 for a Lorentzian); Wang et al. (2022) report the
+        same maximum, 2.37e-4. Pinned in
+        voigtfit/tests/test_identifiability.py.
+
+        References:
+            J. J. Olivero and R. L. Longbothum, J. Quant. Spectrosc.
+                Radiat. Transfer 17, 233-236 (1977),
+                doi:10.1016/0022-4073(77)90161-3
+            Y. Wang, B. Zhou, R. Zhao, B. Wang, Q. Liu and M. Dai,
+                Mathematics 10, 210 (2022), doi:10.3390/math10020210
         """
         return 0.5346 * fwhm_l + np.sqrt(0.2166 * fwhm_l**2 + fwhm_g**2)
 

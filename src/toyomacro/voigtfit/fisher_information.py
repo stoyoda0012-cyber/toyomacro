@@ -207,10 +207,15 @@ def compute_fisher_matrix_batch(
 def eta_from_sigma_gamma(sigma: float, gamma: float) -> float:
     """Compute Voigt mixing ratio eta = f_L / f_V.
 
-    Uses Thompson et al. (1987) approximation for Voigt FWHM:
+    Uses the Olivero & Longbothum (1977) approximation for Voigt FWHM:
         f_V = 0.5346 * f_L + sqrt(0.2166 * f_L^2 + f_G^2)
 
     where f_G = 2*sqrt(2*ln(2))*sigma, f_L = 2*gamma.
+
+    Reference:
+        J. J. Olivero and R. L. Longbothum, "Empirical fits to the Voigt
+        line width: A brief review", J. Quant. Spectrosc. Radiat.
+        Transfer 17, 233-236 (1977), doi:10.1016/0022-4073(77)90161-3
     """
     f_G = sigma / FWHM_TO_SIGMA  # = 2*sqrt(2*ln2) * sigma
     f_L = 2 * gamma
@@ -225,7 +230,7 @@ def sigma_gamma_from_eta(eta: float, fwhm_total: float = 1.0) -> tuple[float, fl
 
     Given eta = f_L / f_V and target f_V:
         f_L = eta * f_V
-        Solve Thompson formula for f_G:
+        Solve the Olivero & Longbothum (1977) formula for f_G:
             f_V = 0.5346 * f_L + sqrt(0.2166 * f_L^2 + f_G^2)
             => f_G = sqrt((f_V - 0.5346*f_L)^2 - 0.2166*f_L^2)
 
@@ -239,7 +244,7 @@ def sigma_gamma_from_eta(eta: float, fwhm_total: float = 1.0) -> tuple[float, fl
     f_V = fwhm_total
     f_L = eta * f_V
 
-    # From Thompson: f_V = 0.5346*f_L + sqrt(0.2166*f_L^2 + f_G^2)
+    # Olivero & Longbothum: f_V = 0.5346*f_L + sqrt(0.2166*f_L^2 + f_G^2)
     remainder = f_V - 0.5346 * f_L
     f_G_sq = remainder**2 - 0.2166 * f_L**2
 

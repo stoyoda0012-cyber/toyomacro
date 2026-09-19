@@ -60,6 +60,7 @@ release, and no CLI or documented workflow depends on them:
 | `voigtfit.exact_k` | component-count (model order) selection |
 | `voigtfit.auto_grouping` | Fisher-justified component grouping for hierarchical fits |
 | `voigtfit.fisher_*`, `voigtfit.crlb` | Fisher information, coordinate transforms, CRLB bounds (referenced in §4 as a diagnostic, not a stable entry point) |
+| `voigtfit.identifiability` | how much a counting spectrum says about the Gaussian and Lorentzian widths: Poisson Fisher matrix *with* a background (absent / known / estimated), effective versus conditional information, width coordinates regular at σ = 0, labels `rank_deficient` / `weakly_identified` / `identified` plus `near_boundary`, and a scan over window, intensity, shape and background. NumPy float64 only. Model bounds, not confidence intervals — design record in [`docs/design/voigt-width-identifiability.md`](design/voigt-width-identifiability.md) |
 | `voigtfit.gp_compact`, `voigtfit.gp_reference` | Golub-Pereyra / LM reference layer behind `newton_jacobian_mode` |
 | `voigtfit.dictionary_solver_3d` | δE × δσ × δγ dictionary (2-D version is the supported path) |
 | `voigtfit.matlab_bridge`, `voigtfit.prefetch_pipeline`, `voigtfit.simulation` | workflow adapters and validation harnesses |

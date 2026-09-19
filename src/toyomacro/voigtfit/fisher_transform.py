@@ -66,7 +66,7 @@ class FisherCoordinateTransform:
         sigma: Nominal Gaussian width (eV). Mutually exclusive with eta.
         gamma: Nominal Lorentzian half-width (eV). Mutually exclusive with eta.
         eta: Voigt mixing ratio. If provided, (sigma, gamma) computed via
-             Thompson approximation with fwhm_total.
+             the Olivero & Longbothum (1977) approximation with fwhm_total.
         fwhm_total: Total Voigt FWHM (eV), used with eta. Default: 1.0
         amplitude: Nominal peak amplitude for Fisher computation.
         center: Nominal peak center (eV). Default: 284.4 (C 1s)

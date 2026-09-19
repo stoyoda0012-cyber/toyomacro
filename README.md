@@ -248,7 +248,7 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains six self-contained,
+The [`examples/`](examples/) directory contains seven self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
@@ -256,8 +256,11 @@ IMFP reference data, and a numerical validation of the fitted-center
 bias under systematic lineshape error (a first-order projection law,
 verified against the production `VarProFitter`; see
 [`docs/projection_law_validation.md`](docs/projection_law_validation.md)),
-fitting a map read from a file — the step to your own measurement — and
-calibrating the energy axis on a metal Fermi edge.
+fitting a map read from a file — the step to your own measurement —
+calibrating the energy axis on a metal Fermi edge, and mapping how well
+a spectrum can tell the Gaussian from the Lorentzian width of a Voigt
+peak (model bounds, not a fit; see
+[`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md)).
 They run in CI on every commit.
 
 ### GVRT roundtrip demo
