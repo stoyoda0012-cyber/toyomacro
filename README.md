@@ -386,10 +386,17 @@ Python 3.11 / 3.12 on every push. See
 ## Citing
 
 Citation metadata lives in [CITATION.cff](CITATION.cff) — GitHub's
-"Cite this repository" button renders it as BibTeX/APA. There is no
-DOI yet; the first tagged release will be archived on Zenodo and the
-DOI added here and to `CITATION.cff`. Release history is tracked in
-[CHANGELOG.md](CHANGELOG.md).
+"Cite this repository" button renders it as BibTeX/APA. Every tagged
+release is archived on Zenodo:
+
+- **All versions** (resolves to the latest release):
+  [10.5281/zenodo.22092076](https://doi.org/10.5281/zenodo.22092076)
+- **v0.1.0**:
+  [10.5281/zenodo.22092077](https://doi.org/10.5281/zenodo.22092077)
+
+A Zenodo download is a snapshot of one release, without git history.
+To follow development between releases, clone this repository instead.
+Release history is tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

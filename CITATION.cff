@@ -1,8 +1,9 @@
 cff-version: 1.2.0
 message: >-
   If you use this software, please cite it using the metadata below.
-  A Zenodo DOI will be added at the first tagged release; until then,
-  cite the repository URL and version.
+  The DOI is the Zenodo concept DOI, which always resolves to the
+  latest archived release; to cite a specific release, use its version
+  DOI from the list of identifiers or the Zenodo record.
 type: software
 title: >-
   toyomacro.voigtfit: high-throughput Voigt-profile fitting for
@@ -15,6 +16,14 @@ authors:
       Advanced Equipment Division, Vacuum Products Corporation,
       Tokyo, Japan
 version: 0.1.0
+doi: 10.5281/zenodo.22092076
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22092076
+    description: Concept DOI (all versions; resolves to the latest)
+  - type: doi
+    value: 10.5281/zenodo.22092077
+    description: Version DOI for v0.1.0
 license: MIT
 repository-code: 'https://github.com/stoyoda0012-cyber/toyomacro'
 keywords:
