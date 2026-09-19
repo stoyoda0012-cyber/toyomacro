@@ -54,8 +54,9 @@ Validity and limits -- read before trusting a number:
   resolution running to its upper bound). ``success`` is False, with
   the reason in ``message``, when a parameter ends on a bound, an
   uncertainty is not finite, E_F falls outside the window or its 1-sigma
-  error is wider than the window, or the fitted resolution is below half
-  a channel. When the resolution is below
+  error is wider than the window or than the fitted edge's own 10-90%
+  width (the data do not place the edge within its own width), or the
+  fitted resolution is below half a channel. When the resolution is below
   about a channel, or much smaller than the thermal width, it cannot be
   determined: hold it fixed (``fit_resolution=False``) and E_F is still
   fitted normally.
@@ -84,6 +85,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 from scipy.optimize import least_squares
+from scipy.signal import fftconvolve
 
 __all__ = [
     "KB_EV",
@@ -99,6 +101,7 @@ __all__ = [
 KB_EV = 8.617333262e-5
 
 _FWHM_TO_SIGMA = 1.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+_MAX_REFINEMENT = 1000
 
 
 def _sign_of(convention: str) -> int:
@@ -132,6 +135,35 @@ def _broaden(grid: NDArray, profile: NDArray, fwhm_g: float) -> NDArray:
     if sigma_pts < 0.05:  # much narrower than the grid: no-op
         return profile
     return gaussian_filter1d(profile, sigma_pts, mode="nearest")
+
+
+def _broaden_fft(grid: NDArray, profile: NDArray, fwhm_g: float) -> NDArray:
+    """The kernel ``_broaden`` uses (sampled, cut at 4 sigma, unit sum), applied by FFT.
+
+    Zero padding instead of 'nearest' at the ends: callers keep every
+    point they read at least the kernel radius inside the grid, where the
+    two agree to rounding. For the long kernels of a refined grid.
+    """
+    sigma_pts = fwhm_g * _FWHM_TO_SIGMA / float(grid[1] - grid[0])
+    radius = int(4.0 * sigma_pts + 0.5)
+    kernel = np.exp(-0.5 * (np.arange(-radius, radius + 1) / sigma_pts) ** 2)
+    return fftconvolve(profile, kernel / kernel.sum(), mode="same")
+
+
+def _refinement(grid: NDArray, fwhm_g: float, temperature: float) -> int:
+    """Integer refinement of a uniform grid so its step is at most kT and sigma.
+
+    The occupation is sampled before it is convolved. On a step coarser
+    than kT the samples cannot follow the edge: the model stops depending
+    on E_F inside a channel, and on T, and a fitted E_F is pulled toward
+    the nearest grid point. Capped at 1000; 1 where the grid is already
+    fine enough, which leaves the model as it was.
+    """
+    step = float(grid[1] - grid[0])
+    scale = KB_EV * temperature
+    if fwhm_g > 1e-9:
+        scale = min(scale, fwhm_g * _FWHM_TO_SIGMA)
+    return int(min(max(np.ceil(step / scale), 1.0), _MAX_REFINEMENT))
 
 
 def _padded_grid(e_sorted: NDArray, pad: float) -> tuple[NDArray, slice | None]:
@@ -194,6 +226,12 @@ def fermi_edge(
     edge profile that continues past them instead of a clamped copy of
     the end value. A spectrum cut to a fit window is therefore modelled
     as the window of a full spectrum.
+
+    Where the step of that grid is coarser than kT or the Gaussian
+    sigma, the occupation is evaluated on a grid refined by an integer
+    factor (at most 1000) and read back at the original points, so the
+    model follows E_F inside a channel and follows T when kT is below
+    a channel. Where the grid is fine enough the model is unchanged.
     """
     e = np.asarray(energy, dtype=float)
     s = _sign_of(convention)
@@ -202,13 +240,22 @@ def fermi_edge(
     order = np.argsort(e)
     e_sorted = e[order]
     grid, inner = _padded_grid(e_sorted, 4.0 * float(fwhm_g) * _FWHM_TO_SIGMA)
-    u_signed = s * (grid - ef)
+    m = _refinement(grid, float(fwhm_g), t_k) if grid.size >= 2 else 1
+    fine = grid if m == 1 else grid[0] + (float(grid[1] - grid[0]) / m) * np.arange(
+        (grid.size - 1) * m + 1)
+    u_signed = s * (fine - ef)
     u = np.maximum(u_signed, 0.0)
     dos = np.maximum(1.0 + dos_c1 * u + dos_c2 * u * u, 0.0)
     arg = np.clip(-u_signed / (KB_EV * t_k), -700.0, 700.0)
     occupation = 1.0 / (1.0 + np.exp(arg))
 
-    profile = _broaden(grid, amplitude * dos * occupation, float(fwhm_g))
+    profile = amplitude * dos * occupation
+    if m == 1:
+        profile = _broaden(fine, profile, float(fwhm_g))
+    elif fwhm_g > 1e-9:
+        profile = _broaden_fft(fine, profile, float(fwhm_g))[::m]
+    else:
+        profile = profile[::m]
     profile = profile[inner] if inner is not None else np.interp(e_sorted, grid, profile)
     profile = profile[np.argsort(order)]
     ref = float(np.mean(e)) if bg_ref is None else float(bg_ref)
@@ -447,6 +494,8 @@ def fit_fermi_edge(
     # Sanity gates: a converged solver can still return a degenerate fit
     # (at low counts the edge can collapse between two channels, leaving a
     # singular covariance and E_F outside the window).
+    best = unpack(result.x)
+    width_1090 = _width_1090(best["ef"], best["fwhm_g"], best["temperature"], convention)
     problems = []
     if at_bound:
         problems.append(f"parameter(s) at a bound: {', '.join(at_bound)}")
@@ -456,13 +505,14 @@ def fit_fermi_edge(
         problems.append("E_F outside the fit window")
     elif perr[0] > span:
         problems.append("E_F undetermined (1-sigma wider than the window)")
+    elif perr[0] > width_1090:
+        problems.append("E_F undetermined (1-sigma wider than the edge's own 10-90% width)")
     if fit_resolution:
         step = float(np.median(np.diff(np.sort(E))))
         if dict(zip(names, result.x))["fwhm_g"] < 0.5 * step:
             problems.append("resolution below half a channel")
     message = "; ".join(problems + [str(result.message)])
 
-    best = unpack(result.x)
     fit_curve = model(result.x, E)
     ss_res = float(np.sum((Y - fit_curve) ** 2))
     ss_tot = float(np.sum((Y - np.mean(Y)) ** 2))
@@ -480,7 +530,7 @@ def fit_fermi_edge(
         dos_c2=float(best["dos_c2"]),
         bg_const=float(best["bg_const"]),
         bg_slope=float(best["bg_slope"]),
-        width_1090=_width_1090(best["ef"], best["fwhm_g"], best["temperature"], convention),
+        width_1090=width_1090,
         energy=E,
         fit_curve=fit_curve,
         background=best["bg_const"] + best["bg_slope"] * (E - e_ref),
