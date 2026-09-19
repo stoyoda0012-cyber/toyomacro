@@ -112,6 +112,8 @@ References:
         Transfer 17, 233-236 (1977), doi:10.1016/0022-4073(77)90161-3
     P. Thompson, D. E. Cox and J. B. Hastings, J. Appl. Cryst. 20, 79-83
         (1987), doi:10.1107/S0021889887087090
+    Y. Wang, B. Zhou, R. Zhao, B. Wang, Q. Liu and M. Dai, Mathematics
+        10, 210 (2022), doi:10.3390/math10020210
     S. G. Self and K.-Y. Liang, J. Am. Stat. Assoc. 82, 605-610 (1987),
         doi:10.1080/01621459.1987.10478472
 """
@@ -328,10 +330,13 @@ def voigt_fwhm(variance: float, gamma: float) -> float:
 
     ``f_V = 0.5346 f_L + sqrt(0.2166 f_L**2 + f_G**2)`` with
     ``f_G**2 = 8 ln2 * variance`` and ``f_L = 2 gamma``. The same
-    expression as ``toyomacro.lineshape.Voigt.fwhm``. Against the exact
-    half-maximum width of the profile its error is at most 2.4e-4
-    (measured over f_L/f_G from 1e-4 to 1e4, pinned by the tests), exact
-    for a Gaussian and 3e-6 for a Lorentzian. It is used here as the
+    expression as ``toyomacro.lineshape.Voigt.fwhm``: the simpler of the
+    two fits in that paper, stated there as accurate to about 0.02 % (the
+    0.01 % belongs to the other one). Against the exact half-maximum width
+    of the profile its error is at most 2.37e-4 (measured over f_L/f_G
+    from 1e-4 to 1e4 and pinned by the tests; Wang et al. 2022 report the
+    same maximum), exact for a Gaussian and 3e-6 for a Lorentzian. It is
+    used here as the
     *definition* of the width coordinate in 'fwhm_shape', so that map is
     exactly invertible whatever the approximation error.
     """

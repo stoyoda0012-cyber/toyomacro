@@ -208,9 +208,13 @@ archived on Zenodo for a citable DOI.
   within 0.02% for all ratios" and `rank_diagnostics` "relative error
   < 0.02 %". Measured against the exact half-maximum width, the largest
   error is 2.37×10⁻⁴, at f_L/f_G = 0.29 (exact for a Gaussian, 3×10⁻⁶ for
-  a Lorentzian): 0.02 % is the right size and the figure usually quoted,
-  but it is not a bound, and the docstrings now give both and a test
-  pins the maximum. Docstrings only; no returned number changes.
+  a Lorentzian), the maximum Wang et al. (2022,
+  doi:10.3390/math10020210) also report. About 0.02 % is what Olivero &
+  Longbothum state for this expression — the simpler of their two fits;
+  their 0.01 % belongs to the other — so it is the right size but not a
+  bound. The docstrings now give both figures and keep the two fits
+  apart, and a test pins the maximum. Docstrings only; no returned number
+  changes.
 
 - **`FastFitConfig(use_mlx=False)` now applies to multi-component fits.**
   With two or more components, `FastVoigtFitter` routes to the multipeak

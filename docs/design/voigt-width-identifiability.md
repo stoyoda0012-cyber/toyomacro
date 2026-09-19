@@ -305,10 +305,13 @@ Open questions:
   is wanted is undecided.
 - The Doniach–Šunjić asymmetry is not covered. It adds a parameter that
   competes with γ for the same tail.
-- The Olivero–Longbothum width is used as the reference scale. Its
-  largest error against the exact half-maximum width is 2.37×10⁻⁴ (at
-  f_L/f_G = 0.29), slightly above the nominal 0.02 %; irrelevant for a
-  scale, stated because the package said "within 0.02 %" before.
+- The Olivero–Longbothum width is used as the reference scale. It is the
+  simpler of the two fits in that paper, stated there as accurate to
+  about 0.02 %; their 0.01 % is the other, more elaborate expression.
+  Its largest error against the exact half-maximum width is 2.37×10⁻⁴ (at
+  f_L/f_G = 0.29), the figure Wang et al. (2022) also report: the right
+  size, not a bound. Irrelevant for a scale; stated because the package
+  said "within 0.02 %" before.
 
 ## References
 
@@ -316,5 +319,7 @@ Open questions:
   Transfer* **17**, 233–236 (1977), doi:10.1016/0022-4073(77)90161-3
 - P. Thompson, D. E. Cox and J. B. Hastings, *J. Appl. Cryst.* **20**,
   79–83 (1987), doi:10.1107/S0021889887087090
+- Y. Wang, B. Zhou, R. Zhao, B. Wang, Q. Liu and M. Dai, *Mathematics*
+  **10**, 210 (2022), doi:10.3390/math10020210
 - S. G. Self and K.-Y. Liang, *J. Am. Stat. Assoc.* **82**, 605–610
   (1987), doi:10.1080/01621459.1987.10478472

@@ -52,9 +52,11 @@ _GAUSS_FWHM = 2.0 * math.sqrt(2.0 * math.log(2.0))  # sigma -> Gaussian FWHM
 def voigt_fwhm_approx(sigma: float, gamma: float) -> float:
     """Olivero–Longbothum Voigt FWHM approximation.
 
-    Nominal accuracy about 0.02 %; the largest error measured against the
-    exact half-maximum width is 2.37e-4 (at f_L/f_G = 0.29), so "< 0.02 %"
-    is not a bound. See ``identifiability.voigt_fwhm``.
+    Stated accuracy about 0.02 % (Olivero & Longbothum 1977, for this, the
+    simpler of their two fits; their 0.01 % is the other one). The largest
+    error measured against the exact half-maximum width is 2.37e-4, at
+    f_L/f_G = 0.29, so "< 0.02 %" is not a bound. See
+    ``identifiability.voigt_fwhm`` and ``lineshape.Voigt.fwhm``.
     """
     f_g = _GAUSS_FWHM * sigma
     f_l = 2.0 * gamma
