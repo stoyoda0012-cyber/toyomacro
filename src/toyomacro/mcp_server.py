@@ -6,7 +6,7 @@ fitting, and GVRT roundtrip experiments.
 
 Requires the ``mcp`` extra::
 
-    pip install toyomacro[mcp]
+    pip install -e ".[mcp]"      # from a clone; the package is not on PyPI
 
 Run::
 
