@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,059 automated tests** across **81 files**, in two
+This suite has **2,108 automated tests** across **82 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 44 | 1,082 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 45 | 1,131 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 977 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,11 +21,11 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,627 tests, 79%) — guarantee the library
+- **Contract / regression** (1,676 tests, 80%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 21%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 20%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -44,7 +44,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,082)
+## Library body — `tests/` (1,131)
 
 ### Claim guards — noise model, versions, backends, comparisons (58)
 | Tests | File | Guards |
@@ -58,11 +58,12 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
 
-### Lineshape & background — physics core (90)
+### Lineshape & background — physics core (139)
 | Tests | File | Guards |
 |--:|---|---|
 | 22 | `test_doniach_sunjic.py` | DS lineshape + MATLAB `LineshapeType` numbering |
 | 38 | `test_fermi_edge.py` | Fermi-edge fit: agreement with `FermiDirac`, axis-shift and KE/BE invariance, 1σ pulls of E_F and resolution over 200 seeds, `success` gates (bounds, singular covariance, E_F off-window or located less well than the edge's own width, collapsed width), fine-step starts, window-independent 10–90% width; with kT below a channel, the model against a quadrature reference and E_F off the grid recovered without bias |
+| 49 | `test_fermi_edge_identifiability.py` | Fermi-edge identifiability: the edge and its derivatives in (v, tau) -- both routes against adaptive quadrature, the switch and the asymptotic term limit, the tau -> 0 and v -> 0 limits and their rates, the two DOS forms, finite differences, agreement with `fermi_edge` |
 | 17 | `test_tougaard.py` | Tougaard background algorithm |
 | 13 | `test_energy_axis.py` | BE / KE energy-axis handling through the pipeline |
 
