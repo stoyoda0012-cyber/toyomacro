@@ -27,6 +27,7 @@ These are the subpackages that exist here:
 | `src/toyomacro/io/` | HDF5 cache, readers, writers |
 | `src/toyomacro/cli/` | command-line entry points |
 | `src/toyomacro/mcp_server.py` | MCP server over the public layer |
+| `src/toyomacro/_identifiability.py` | private: the lineshape-independent parts of the identifiability diagnostics (Poisson Fisher product, rank rule, effective information, thresholds, linear backgrounds); imports nothing from the package |
 | `tests/` and `src/toyomacro/voigtfit/tests/` | both are collected by pytest |
 | `docs/`, `examples/`, `paper/` | documentation, runnable examples, JOSS paper |
 

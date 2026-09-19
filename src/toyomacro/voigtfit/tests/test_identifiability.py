@@ -838,6 +838,24 @@ class TestEffectiveInformation:
         assert idf._null_directions(ten).tolist() == [True] + [False] * 9
         assert idf._null_directions(np.array([1e-15, 1.0])).tolist() == [False, False]
 
+    def test_shared_core_does_not_import_the_voigt_engine(self):
+        """The model-independent parts live outside voigtfit so that a
+        model other than a Voigt peak can use them without importing the
+        engine; that only holds while the module imports nothing from the
+        package. Checked in a fresh interpreter, where nothing else has
+        loaded voigtfit already."""
+        import subprocess
+        import sys
+
+        code = ("import sys, toyomacro._identifiability; "
+                "print(sorted(m for m in sys.modules if m.startswith('toyomacro')))")
+        loaded = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                                check=True).stdout.strip()
+        assert loaded == "['toyomacro', 'toyomacro._identifiability']"
+        for name in ("Background", "EffectiveInformation", "IdentifiabilityThresholds",
+                     "constant_background", "linear_background", "effective_information"):
+            assert getattr(idf, name) is getattr(sys.modules["toyomacro._identifiability"], name)
+
     def test_no_nuisance_means_no_loss(self):
         m = np.array([[4.0, 1.0], [1.0, 3.0]])
         info = effective_information(m, (0, 1))
