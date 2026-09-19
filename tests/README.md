@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,031 automated tests** across **79 files**, in two
+This suite has **2,034 automated tests** across **79 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 42 | 1,058 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 973 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 976 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only`.
@@ -16,7 +16,7 @@ data required). Counts below come from `pytest --collect-only`.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,599 tests, 79%) — guarantee the library
+- **Contract / regression** (1,602 tests, 79%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -111,7 +111,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (973)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (976)
 
 ### Solvers & fitting core (297)
 | Tests | File | Guards |
@@ -142,10 +142,10 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (363)
+### Statistics & information theory (366)
 | Tests | File | Guards |
 |--:|---|---|
-| 105 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan |
+| 108 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan |
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
 | 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |
