@@ -17,8 +17,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-# Default Common/data/ path (relative to this file's location)
-# paths.py → data/ → toyomacro/ → src/ → toyomacro/ → SourceCode/ → Common/
+# Default location of the source tables the bundled JSON was built from:
+# a directory named Common/ beside the checkout. Not distributed; only the
+# cache-rebuilding helpers look there. TOYOMACRO_COMMON_PATH overrides it.
 _DEFAULT_COMMON_PATH = Path(__file__).parent.parent.parent.parent.parent / "Common"
 
 # Bundled reference tables. The directory name is historical: these JSON
@@ -347,7 +348,7 @@ def load_cross_section_data() -> dict[str, Any]:
 def _get_trzh2018_xlsx_path() -> Path:
     """Get path to Trzhaskovskaya 2018 HAXPES Excel file.
 
-    Located in SESSAAnalyser database (sibling of Common/).
+    A non-distributed source file under the Common/ data directory.
     """
     env_path = os.environ.get("TOYOMACRO_COMMON_PATH")
     if env_path:

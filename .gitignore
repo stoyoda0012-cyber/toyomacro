@@ -18,7 +18,7 @@ CLAUDE.local.md
 _slsqp_diagnostic_*.npz
 
 # Generated outputs (benchmark results, images). ``outputs`` may be a
-# symlink to an external store (e.g. ~/Documents/ResearchOutputs/toyomacro),
+# symlink to an external store,
 # so match it with and without a trailing slash.
 output/
 outputs
