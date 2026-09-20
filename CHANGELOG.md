@@ -33,6 +33,39 @@ archived on Zenodo for a citable DOI.
   copies of the file inside the v0.1.0 and v0.2.0 archives keep the
   previous title; the paper keeps its own.
 
+### Fixed
+
+- **`fitting.fermi_edge`: E_F and T are followed inside a channel when
+  kT is below it.** The model sampled the Fermi-Dirac occupation on the
+  channel grid before the Gaussian convolution, so below about half a
+  channel it stopped depending on E_F within a channel, and on T. On
+  20 meV channels with a 0.3 eV resolution, d(model)/dE_F was off by 55%
+  at 30 K and by 100% at 10 K, and a fitted E_F 0.37 channel off a grid
+  point came out 4.6 meV low at 10 K with a pull width of 6.8 (Poisson
+  data from a quadrature reference, 150 realisations); on a grid point
+  its scatter was about a sixth of the Poisson bound. The occupation is now
+  evaluated on a grid refined by an integer factor until its step is at
+  most kT and the Gaussian sigma, and read back at the channels. On 5
+  and 20 meV channels, FWHM 50-300 meV and 3-300 K, the model is within
+  3.2e-5 of the reference and d/dE_F within 1.7e-4, and the 10 K fits
+  are unbiased with unit pulls. Where the channels are already finer than kT and
+  sigma nothing changes: on 20 meV channels at 300 K (the tests' own
+  setting) model and fits are bit-identical. Coarser channels change
+  slightly: at 300 K the model moves by 3e-5 of the step on 50 meV
+  channels and 4e-3 on 100 meV ones, where the old model, fitted to the
+  corrected noiseless curve, put E_F 1.7 meV off. Example 06 uses 50 meV channels:
+  its linear-DOS E_F moves from -0.4508 to -0.4494 eV (true -0.45,
+  1-sigma 0.0048) and the spread across DOS models from 0.011 to
+  0.003 eV.
+- **`fit_fermi_edge` no longer reports an edge it cannot place as a
+  success.** With the model able to follow a resolution below a channel,
+  a low-count fit could settle on a noise feature with a 1-sigma on E_F
+  wider than the fitted edge itself (E_F 1.14 eV, FWHM 16 meV, 1-sigma
+  0.26 eV). `success` is now False when the E_F error exceeds the fitted
+  edge's own 10-90% width. Over 400 low-count seeds (100 counts on 100)
+  the ratio is below 0.08 for 99% of the successful fits and above 1 for
+  two; over 200 seeds at 2000 counts it stays below 0.009.
+
 ## [0.2.0] - 2026-09-19
 
 Archived on Zenodo:

@@ -210,6 +210,90 @@ def test_unidentifiable_temperature_is_not_a_success():
     assert not res.success
 
 
+_W = np.linspace(-12.0, 12.0, 24001)
+_PHI = np.exp(-0.5 * _W**2) / np.sqrt(2.0 * np.pi) * (_W[1] - _W[0])
+
+
+def _edge_by_quadrature(energy, ef, fwhm_g, temperature):
+    """Flat-DOS edge, amplitude 1, by quadrature over the Gaussian variable.
+
+    The occupation is evaluated at every quadrature node, so nothing is
+    tied to the channel grid. The integrand is analytic in a strip of
+    half-width pi kT around the real axis, so the trapezoid rule converges
+    exponentially; at 3 K and FWHM 0.3 eV the node spacing is half of kT
+    and the rule error is below 1e-15 of the step.
+    """
+    sigma = fwhm_g / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+    x = energy[:, None] - ef - sigma * _W[None, :]
+    return (0.5 * (1.0 + np.tanh(x / (2.0 * KB_EV * temperature)))) @ _PHI
+
+
+@pytest.mark.parametrize("temperature", [100.0, 30.0, 10.0, 3.0])
+@pytest.mark.parametrize("offset", [0.0, 0.37])
+def test_model_follows_ef_and_t_when_kt_is_below_a_channel(temperature, offset):
+    """20 meV channels, kT from 0.43 down to 0.013 of a channel, E_F on a
+    grid point or 0.37 of a channel off it.
+
+    The occupation used to be sampled on the channel grid before the
+    convolution: below about half a channel the model stopped following
+    E_F inside a channel (d/dE_F off by 55% at 30 K and 100% at 10 K) and
+    T (off by 88% at 30 K). Refined, the errors measured here are at most
+    3.2e-5 in the model, 1.7e-4 in d/dE_F and 1.5e-3 in d/dT, over these
+    cases and 5 meV channels; the bounds are about three times that.
+    """
+    e = np.arange(-1.0, 1.0 + 1e-9, 0.02)
+    ef, fwhm, h = offset * 0.02, 0.30, 1e-5
+
+    def model(ef_, t_):
+        return fermi_edge(e, ef=ef_, fwhm_g=fwhm, temperature=t_)
+
+    def ref(ef_, t_):
+        return _edge_by_quadrature(e, ef_, fwhm, t_)
+
+    assert np.max(np.abs(model(ef, temperature) - ref(ef, temperature))) < 1e-4
+    d_model = (model(ef + h, temperature) - model(ef - h, temperature)) / (2 * h)
+    d_ref = (ref(ef + h, temperature) - ref(ef - h, temperature)) / (2 * h)
+    assert np.linalg.norm(d_model - d_ref) / np.linalg.norm(d_ref) < 1e-3
+    t_up, t_dn = 1.001 * temperature, 0.999 * temperature
+    dt_model = (model(ef, t_up) - model(ef, t_dn)) / (t_up - t_dn)
+    dt_ref = (ref(ef, t_up) - ref(ef, t_dn)) / (t_up - t_dn)
+    assert np.linalg.norm(dt_model - dt_ref) / np.linalg.norm(dt_ref) < 5e-3
+
+
+@pytest.mark.parametrize("offset", [0.0, 0.37])
+def test_fermi_level_below_a_channel_is_unbiased_with_its_poisson_scatter(offset):
+    """10 K on 20 meV channels (kT = 0.04 channel), data drawn from the
+    quadrature model, 80 Poisson realisations.
+
+    Before the refinement E_F was pulled toward the nearest grid point:
+    0.37 channel off it, bias -4.6 meV and pull width 6.8 over 150
+    realisations; on it, a scatter of 0.31 meV, a sixth of the Poisson
+    bound, because the model could not move E_F inside a channel. The
+    bound here is 1.74 meV (Poisson Fisher of this model with E_F, the
+    amplitude, the resolution and the background estimated); after the
+    fix the scatter over 150 realisations was 1.00 and 1.08 times it and
+    the pulls had unit width.
+    """
+    e = np.arange(-1.2, 1.2 + 1e-9, 0.02)
+    ef, fwhm, temperature = offset * 0.02, 0.30, 10.0
+    mean = 2000.0 * _edge_by_quadrature(e, ef, fwhm, temperature) + 100.0
+    rng = np.random.default_rng(700 + int(100 * offset))
+    est, err = [], []
+    for _ in range(80):
+        y = rng.poisson(mean).astype(float)
+        res = fit_fermi_edge(e, y, convention="BE", dos="flat", background="constant",
+                             weights=1.0 / np.maximum(y, 1.0), temperature=temperature,
+                             resolution=fwhm)
+        est.append(res.ef)
+        err.append(res.ef_err)
+    est, err = np.asarray(est), np.asarray(err)
+    pulls = (est - ef) / err
+    # 80 draws: the pull mean has a standard error of 0.11, the sample sd one of about 0.08
+    assert abs(pulls.mean()) < 0.35
+    assert 0.8 < pulls.std(ddof=1) < 1.25
+    assert 0.8 < est.std(ddof=1) / 1.74e-3 < 1.25
+
+
 def test_width_1090_does_not_depend_on_the_window():
     y = _noisy(12)
     wide = _fit(y, window=(-1.5, 1.5))
@@ -244,6 +328,22 @@ def test_degenerate_low_count_fits_are_not_reported_as_successful():
         if res.success:
             assert np.isfinite(res.ef_err) and np.isfinite(res.resolution_err)
             assert abs(res.ef) < 1.0, (seed, res.ef, res.message)
+
+
+def test_an_edge_located_less_well_than_its_own_width_is_not_a_success():
+    """Seed 9074 of the population above. Once the model could follow a
+    resolution below a channel, the fit settled on a noise feature: E_F
+    1.14 eV, FWHM 16 meV, and a 1-sigma of 0.26 eV on E_F, twice the
+    fitted edge's own 10-90% width. The earlier gates (window, half a
+    channel) let it through. Over the 400 seeds the ratio of the E_F error
+    to that width is below 0.08 for 99% of the successful fits and above 1
+    for two, this one and seed 9315 (E_F 0.89 eV); over the 200-seed pull
+    population at 2000 counts it never exceeds 0.009."""
+    truth = dict(TRUTH, amplitude=100.0, bg_const=100.0, bg_slope=15.0)
+    res = _fit(_noisy(9074, truth=truth), window=(-1.2, 1.2))
+    assert not res.success
+    assert "10-90% width" in res.message
+    assert res.ef_err > res.width_1090
 
 
 def test_zero_weights_do_not_count_as_degrees_of_freedom():
