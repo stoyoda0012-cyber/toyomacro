@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,167 automated tests** across **83 files**, in two
+This suite has **2,173 automated tests** across **83 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 46 | 1,186 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 46 | 1,192 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 981 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,735 tests, 80%) — guarantee the library
+- **Contract / regression** (1,741 tests, 80%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -44,9 +44,9 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,186)
+## Library body — `tests/` (1,192)
 
-### Claim guards — noise model, versions, backends, comparisons (65)
+### Claim guards — noise model, versions, backends, comparisons (71)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
@@ -57,7 +57,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
-| 7 | `test_fermi_edge_bootstrap.py` | Fermi-edge resampling: the Monte Carlo spread against the bound at an interior point, the boundary and the non-separable region recorded rather than judged, the constrained fit against a different optimiser, the draws against the Poisson law, and `fit_fermi_edge`'s own spread against its sandwich covariance |
+| 13 | `test_fermi_edge_bootstrap.py` | Fermi-edge resampling: the Monte Carlo spread against the bound at an interior point, the boundary and the non-separable region recorded rather than judged, the constrained fit against a different optimiser, a replica held at a bound against the Karush-Kuhn-Tucker condition, the draws against the Poisson law, the deviance against its own value, a per-replica start through the chunked path, whether a nested bootstrap interval covers the truth, whether zero channels split the parametric and nonparametric draws, and `fit_fermi_edge`'s own spread against its sandwich covariance |
 
 ### Lineshape & background — physics core (187)
 | Tests | File | Guards |

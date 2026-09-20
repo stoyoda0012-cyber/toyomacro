@@ -32,7 +32,11 @@ A bound is handled as an active set. A replica sits on one when the
 parameter is at the bound and the score points outward; that parameter
 is then held and the rest are solved without it, which is the
 Karush-Kuhn-Tucker point of the constrained problem. Tests cross-check
-it against a different optimiser on the same deviance.
+the unconstrained case against a different optimiser on the same
+deviance, and check the constrained one directly -- raising a held
+parameter off its bound must not lower the deviance. The two are
+separate because the cross-check is at an interior point, where nothing
+is held and the active set has nothing to do.
 
 Any estimator can be bootstrapped, not only this one: ``bootstrap``
 takes the fitting step as a callable, and the Fermi-edge tests pass it
@@ -113,11 +117,18 @@ def fit_poisson_mle(
             is several hundred megabytes
     """
     counts = np.asarray(counts, dtype=np.float64)
+    start = np.asarray(start, dtype=np.float64)
     if counts.ndim != 2:
         raise ValueError(f"counts must be (n_replicas, n_channels), got {counts.shape}")
+    if start.ndim == 2 and start.shape[0] != counts.shape[0]:
+        raise ValueError(f"one start per replica or one for all: start {start.shape} "
+                         f"against counts {counts.shape}")
     if counts.shape[0] > chunk:
-        parts = [fit_poisson_mle(counts[lo:lo + chunk], model, start, lower=lower,
-                                 max_iter=max_iter, score_tol=score_tol, chunk=chunk)
+        # a per-replica start has to be cut with the counts it belongs to
+        parts = [fit_poisson_mle(counts[lo:lo + chunk], model,
+                                 start[lo:lo + chunk] if start.ndim == 2 else start,
+                                 lower=lower, max_iter=max_iter, score_tol=score_tol,
+                                 chunk=chunk)
                  for lo in range(0, counts.shape[0], chunk)]
         return MLEResult(
             params=np.concatenate([q.params for q in parts]),
@@ -126,7 +137,6 @@ def fit_poisson_mle(
             at_bound=np.concatenate([q.at_bound for q in parts]),
             n_iter=max(q.n_iter for q in parts))
 
-    start = np.asarray(start, dtype=np.float64)
     n = counts.shape[0]
     theta = np.tile(start, (n, 1)) if start.ndim == 1 else start.copy()
     p = theta.shape[1]
