@@ -376,3 +376,28 @@ def test_why_the_reported_ef_error_is_small(ratio):
     assert 1.15 < math.sqrt(sandwich_cov[i, i] / equal_variance[i, i]) < 1.25
     assert 0.98 < math.sqrt(sandwich_cov[v, v] / equal_variance[v, v]) < 1.02
 
+
+@pytest.mark.parametrize("ratio", [0.1, 1.0, 3.0])
+def test_the_poisson_error_field_describes_the_scatter(ratio):
+    """``FermiEdgeResult.poisson_err`` against 150 realisations, temperature
+    fixed. Over 300 realisations at each of the three kT/sigma the scatter
+    is 1.27, 1.22 and 1.09 times ``ef_err`` -- the reported error is 8 to
+    21% small -- and 1.04, 1.00 and 0.88 times ``poisson_err['ef']``. For
+    the resolution the two are within 20% of the scatter and of each
+    other. Fewer realisations here, so the band is wider."""
+    sigma, temperature = conditions(ratio)
+    mean = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", 0.3)
+    rng = np.random.default_rng(23)
+    ef, reported, poisson = [], [], []
+    for _ in range(150):
+        f = pseudo_true(rng.poisson(mean).astype(float), sigma, temperature)
+        if f.success:
+            ef.append(f.ef)
+            reported.append(f.ef_err)
+            poisson.append(f.poisson_err["ef"])
+            assert set(f.poisson_err) == {"ef", "amplitude", "resolution", "dos_c1", "bg_const"}
+    spread = np.std(ef, ddof=1)
+    assert len(ef) > 100
+    # sampling error of a standard deviation from ~150 draws is 6%
+    assert spread / np.median(poisson) == pytest.approx(1.0, abs=0.25)
+    assert spread / np.median(reported) > spread / np.median(poisson)

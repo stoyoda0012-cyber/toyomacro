@@ -10,6 +10,23 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`fit_fermi_edge` also reports the error bars that raw counts
+  deserve.** `FermiEdgeResult.poisson_err` is a dict of 1-sigma values
+  from the sandwich covariance of the estimator the function actually
+  computes, alongside the unchanged `*_err` fields. The `*_err` fields
+  are the covariance scaled by the reduced chi-squared, which is exact
+  only if every channel had the same variance; on a Fermi edge the
+  Poisson mean runs from the background to the plateau, a factor of 53
+  in the case measured, and E_F's sensitivity sits where the mean is
+  above its average. Over 300 simulated realisations at each of three
+  kT/sigma with the temperature fixed, `ef_err` came out 8 to 21%
+  smaller than the actual scatter of E_F while `poisson_err['ef']` was
+  within 12% of it; for the resolution the two agree. The new field is
+  meaningful only when `intensity` is raw counts, is not a Cramer-Rao
+  bound, and describes nothing when the temperature is fitted as well,
+  where the estimator is pinned by its bounds. Defaults are unchanged
+  and no existing value moves.
+
 - **`examples/08_map_viewer_frontend.py`: a minimal front end on the
   batch engine.** Click a pixel of a fitted chemical-state map to see its
   spectrum, the fit and its components. The back end fits the map once

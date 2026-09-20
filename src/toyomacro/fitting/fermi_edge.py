@@ -44,7 +44,22 @@ Validity and limits -- read before trusting a number:
   edges with about 2000 counts per channel at the edge: over 200
   realisations the E_F and FWHM pulls have unit width and zero mean. At
   low counts (~100 per channel) the pulls widen to about 1.25, partly
-  because the weights are taken from the data.
+  because the weights are taken from the data. With the **default unit
+  weights** on counts that span the background and the plateau,
+  ``ef_err`` runs 8 to 21% below the actual scatter of E_F; when
+  ``intensity`` is raw counts, ``poisson_err`` carries the sandwich
+  covariance of the same estimator, which does not make that
+  assumption.
+- **The DOS is flat below E_F and rises above it**, so its slope changes
+  at E_F. That kink is an assumption about the sample, and it is not
+  free: on simulated data whose DOS instead runs smoothly through E_F,
+  the fitted resolution comes out low by 0.19 to 1.7 of its own error
+  bar once kT is comparable with the resolution, and at kT/sigma = 0.1
+  not at all. A DOS with curvature through E_F that ``dos='linear'``
+  cannot hold moved E_F by up to 49 meV -- an energy-axis calibration
+  error, not a resolution one -- which ``dos='quadratic'`` removes.
+  Refit with both and treat the spread as a systematic (see "Compare
+  DOS models on real data" below).
 - **E_F is where the fitted Fermi-Dirac function is 1/2 before
   broadening**; it is not the inflection point of the measured edge,
   which a sloped DOS moves.
@@ -79,7 +94,7 @@ temperature to find the DOS shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
@@ -262,6 +277,10 @@ def fermi_edge(
     return profile + bg_const + bg_slope * (e - ref)
 
 
+#: internal parameter name -> the result field it belongs to
+_PUBLIC_NAME = {"amp": "amplitude", "fwhm_g": "resolution"}
+
+
 @dataclass
 class FermiEdgeResult:
     """Result of :func:`fit_fermi_edge`.
@@ -294,6 +313,34 @@ class FermiEdgeResult:
     convention: str
     dos: str
     message: str = ""
+    poisson_err: dict[str, float] = field(default_factory=dict)
+    """1-sigma from the sandwich covariance, **valid only if ``intensity``
+    was raw counts**, keyed by the names above (``'ef'``, ``'resolution'``,
+    ``'temperature'``, ``'amplitude'``, ``'dos_c1'``, ``'dos_c2'``,
+    ``'bg_const'``, ``'bg_slope'``), for the parameters that were fitted.
+
+    The ``*_err`` fields are what a least-squares solver reports: the
+    covariance scaled by the reduced chi-squared, which is the right
+    answer only if every channel had the same variance. Poisson channels
+    do not -- on a Fermi edge the mean runs from the background to the
+    plateau. Over a 53-fold range of it, 300 simulated realisations at
+    each of three kT/sigma with the temperature fixed, ``ef_err`` came
+    out 8 to 21% smaller than the actual scatter of E_F, while this
+    field was within 12% of it; for the resolution the two agree, both
+    within 20%. Empty if the covariance was singular.
+
+    With the temperature *fitted* neither describes the scatter: the
+    estimator is then pinned by its bounds and the linearisation both
+    rest on does not apply. See
+    ``toyomacro.fitting.fermi_edge_identifiability`` for whether the
+    temperature and the resolution can be separated at all in a given
+    measurement.
+
+    This is *not* a Cramer-Rao bound: this function computes a weighted
+    least-squares estimator, not a maximum-likelihood one, and with the
+    default unit weights its spread is about a third above the bound. The
+    ``*_err`` fields are unchanged; which of the two to quote is the
+    caller's decision."""
 
     def summary(self) -> str:
         """One-line summary for logs."""
@@ -423,6 +470,7 @@ def fit_fermi_edge(
         ef_bounds = (ef_init - 1.0, ef_init + 1.0)
 
     # --- parameter vector: ef, amp, [fwhm_g], [T], [c1], [c2], [bg_const], [bg_slope] ---
+    # (internal names; `poisson_err` is keyed by the result's own field names)
     p0 = [float(ef_init), float(amp0)]
     lb = [float(min(ef_bounds)), 0.0]
     ub = [float(max(ef_bounds)), np.inf]
@@ -514,6 +562,23 @@ def fit_fermi_edge(
     message = "; ".join(problems + [str(result.message)])
 
     fit_curve = model(result.x, E)
+    # A second set of 1-sigma errors, for intensities that are raw counts.
+    # `perr` above is the least-squares covariance scaled by the reduced
+    # chi-squared, which is exact only if every channel had the same
+    # variance; Poisson channels do not, and the difference is not small
+    # (see the module docstring). This is the sandwich covariance of the
+    # same estimator, (G'WG)^-1 G'W diag(mu) WG (G'WG)^-1, with mu the
+    # fitted model. result.jac is G scaled by sqrt(W), so G'WG = J'J and
+    # the middle factor is J' diag(W mu) J.
+    poisson_err: dict[str, float] = {}
+    try:
+        a_inv = np.linalg.inv(result.jac.T @ result.jac)
+        middle = result.jac.T @ (result.jac * (W * np.maximum(fit_curve, 0.0))[:, np.newaxis])
+        sandwich = np.sqrt(np.clip(np.diag(a_inv @ middle @ a_inv), 0.0, np.inf))
+        poisson_err = {_PUBLIC_NAME.get(n, n): float(v) for n, v in zip(names, sandwich)}
+    except np.linalg.LinAlgError:
+        pass
+
     ss_res = float(np.sum((Y - fit_curve) ** 2))
     ss_tot = float(np.sum((Y - np.mean(Y)) ** 2))
 
@@ -541,6 +606,7 @@ def fit_fermi_edge(
         convention=convention,
         dos=dos,
         message=message,
+        poisson_err=poisson_err,
     )
 
 
