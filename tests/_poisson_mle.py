@@ -5,7 +5,9 @@ counts. It is deliberately not part of the package and is not a solver
 anyone should fit data with: one peak, a background linear in its
 coefficients, NumPy only, no robustness beyond what the tests need.
 
-What it minimises is the exact Poisson deviance
+The fit itself is ``toyomacro._bootstrap.fit_poisson_mle``; what stays
+here is the Voigt model, its Jacobian and the one lower bound. What that
+fitter minimises is the exact Poisson deviance
 
     D(theta) = 2 * sum_E [ mu - y + y * log(y / mu) ],   mu = mu(E; theta)
 
@@ -44,6 +46,8 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.special import xlogy
 
+from toyomacro._bootstrap import fit_poisson_mle as core_fit
+from toyomacro._bootstrap import poisson_deviance
 from toyomacro.voigtfit.identifiability import voigt_derivatives
 
 I_AMP, I_CENTER, I_VAR, I_GAMMA = 0, 1, 2, 3
@@ -86,11 +90,8 @@ def model(energy, params, basis):
 
 
 def deviance(counts, mean):
-    """Exact Poisson deviance per replica; +inf where the mean is not positive."""
-    ok = np.all(np.isfinite(mean) & (mean > 0), axis=1)
-    safe = np.where(ok[:, None], mean, 1.0)
-    value = 2.0 * np.sum(safe - counts + xlogy(counts, counts) - xlogy(counts, safe), axis=1)
-    return np.where(ok, value, np.inf)
+    """Exact Poisson deviance per replica; the core's, under this file's name."""
+    return poisson_deviance(counts, mean)
 
 
 def fit_poisson_mle(
@@ -102,87 +103,25 @@ def fit_poisson_mle(
     variance_floor: float = 0.0,
     max_iter: int = 60,
     score_tol: float = 1e-6,
+    chunk: int = 2500,
 ) -> MLEResult:
     """Constrained Poisson MLE for every row of ``counts``.
 
-    Args:
-        counts: (n_replicas, n_energy) Poisson counts
-        energy: (n_energy,)
-        start: (n_params,) starting point, normally the truth
-        basis: (n_bg, n_energy) background shape functions, or None
-        variance_floor: Lower limit of the Gaussian variance
-        max_iter: Iteration cap
-        score_tol: Convergence when every free parameter has
-            ``|score_i| / sqrt(I_ii) < score_tol``, i.e. the remaining
-            step is that fraction of a standard deviation
+    A thin adapter over ``toyomacro._bootstrap.fit_poisson_mle``: this
+    file only says what the Voigt model is and where its one lower bound
+    sits. The algorithm, and every tolerance in it, live there.
     """
-    counts = np.asarray(counts, dtype=np.float64)
-    n, p = counts.shape[0], start.size
-    theta = np.tile(np.asarray(start, dtype=np.float64), (n, 1))
-    damping = np.zeros(n)
-    dev = np.empty(n)
-    converged = np.zeros(n, dtype=bool)
-    at_floor = np.zeros(n, dtype=bool)
-    eye = np.eye(p)
-    rounding = 1e-9 * energy.size
-
-    mean, jac = model(energy, theta, basis)
-    dev[:] = deviance(counts, mean)
-    todo = np.arange(n)  # replicas still iterating; mean and jac are kept for these only
-
-    for iteration in range(1, max_iter + 1):
-        y = counts[todo]
-        score = np.einsum("nep,ne->np", jac, y / mean - 1.0)
-        info = np.einsum("nep,neq->npq", jac / mean[:, :, None], jac)
-        scale = np.sqrt(np.einsum("npp->np", info))
-
-        floor_now = (theta[todo, I_VAR] <= variance_floor) & (score[:, I_VAR] <= 0.0)
-        free = np.ones((todo.size, p), dtype=bool)
-        free[floor_now, I_VAR] = False
-        done = np.all(~free | (np.abs(score) / scale < score_tol), axis=1)
-        at_floor[todo] = floor_now
-        converged[todo] = done
-        if done.all():
-            break
-        keep = ~done
-        todo, y, score, info, scale, free = (a[keep] for a in (todo, y, score, info, scale, free))
-        mean, jac = mean[keep], jac[keep]
-
-        # held parameters: unit row/column, zero right-hand side -> zero step
-        both = free[:, :, None] & free[:, None, :]
-        system = np.where(both, info, 0.0) + np.where(free, 0.0, 1.0)[:, :, None] * eye
-        system += (damping[todo, None] * scale**2)[:, :, None] * eye * both
-        step = np.linalg.solve(system, np.where(free, score, 0.0)[:, :, None])[:, :, 0]
-
-        trial = theta[todo] + step
-        trial[:, I_VAR] = np.maximum(trial[:, I_VAR], variance_floor)
-        trial_mean, trial_jac = model(energy, trial, basis)
-        trial_dev = deviance(y, trial_mean)
-
-        accept = trial_dev <= dev[todo] + rounding
-        theta[todo[accept]] = trial[accept]
-        dev[todo[accept]] = trial_dev[accept]
-        mean = np.where(accept[:, None], trial_mean, mean)
-        jac = np.where(accept[:, None, None], trial_jac, jac)
-        damping[todo] = np.where(accept, damping[todo] / 10.0, np.maximum(damping[todo] * 10.0, 1e-4))
-
-    return MLEResult(theta, dev, converged, at_floor, iteration)
+    start = np.asarray(start, dtype=np.float64)
+    lower = np.full(start.size, -np.inf)
+    lower[I_VAR] = variance_floor
+    out = core_fit(counts, lambda theta: model(energy, theta, basis), start, lower=lower,
+                   max_iter=max_iter, score_tol=score_tol, chunk=chunk)
+    return MLEResult(out.params, out.deviance, out.converged, out.at_bound[:, I_VAR], out.n_iter)
 
 
 def fit_in_chunks(counts, energy, start, basis=None, *, chunk=2500, **kwargs) -> MLEResult:
-    """``fit_poisson_mle`` over slices of the replicas; the Jacobian of ten
-    thousand replicas at once is several hundred megabytes."""
-    parts = [
-        fit_poisson_mle(counts[lo:lo + chunk], energy, start, basis, **kwargs)
-        for lo in range(0, counts.shape[0], chunk)
-    ]
-    return MLEResult(
-        params=np.concatenate([q.params for q in parts]),
-        deviance=np.concatenate([q.deviance for q in parts]),
-        converged=np.concatenate([q.converged for q in parts]),
-        at_floor=np.concatenate([q.at_floor for q in parts]),
-        n_iter=max(q.n_iter for q in parts),
-    )
+    """``fit_poisson_mle``; the core splits the replicas into batches itself."""
+    return fit_poisson_mle(counts, energy, start, basis, chunk=chunk, **kwargs)
 
 
 def fit_reference(counts_row, energy, start, basis=None, *, variance_floor=0.0):

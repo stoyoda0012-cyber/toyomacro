@@ -79,6 +79,7 @@ Not exported from ``toyomacro.fitting``; not wired to any CLI.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, NamedTuple
 
@@ -113,6 +114,7 @@ __all__ = [
     "constant_background",
     "edge_derivatives",
     "edge_fisher",
+    "edge_mle_model",
     "edge_width_information",
     "edge_wls_covariance",
     "assess_edge_identifiability",
@@ -1307,3 +1309,89 @@ def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
                 "separation_codes": np.asarray(list(_SEPARATION_CODE)),
                 "status_codes": np.asarray(list(_STATUS_CODE))})
     return out
+
+
+# ---------------------------------------------------------------------------
+# The model as a batch, for resampling
+# ---------------------------------------------------------------------------
+
+
+def edge_mle_model(
+    energy: np.ndarray,
+    edge: FermiEdge,
+    background: Background | None = None,
+    *,
+    exposure: float = 1.0,
+    convention: str = "BE",
+    dos_form: Literal["occupied", "both_sides"] = "occupied",
+    route: Literal["auto", "quadrature", "series"] = "auto",
+) -> tuple[Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]], tuple[str, ...],
+           np.ndarray, np.ndarray]:
+    """The edge as ``toyomacro._bootstrap`` wants it: a batched model.
+
+    Returns ``(model, names, lower, start)``:
+
+    - ``model(theta)`` takes (n, p) parameter vectors in 'var_tau'
+      coordinates and returns the expected counts (n, n_channels) and
+      their Jacobian (n, n_channels, p), at the stated exposure. Rows
+      with an infeasible parameter (a negative width, an amplitude at or
+      below zero, a DOS that is not positive) come back as NaN, which the
+      fitter reads as an infinite deviance.
+    - ``names`` are the parameters, in the order ``edge_fisher`` uses.
+    - ``lower`` holds 0 for the amplitude, v and tau, ``-inf`` elsewhere.
+    - ``start`` is ``edge`` itself, the usual starting point for a Monte
+      Carlo check; for a bootstrap, pass the fitted values instead.
+
+    One parameter set at a time is evaluated inside; the edge model is
+    vectorised over channels, not over replicas.
+    """
+    energy = np.asarray(energy, dtype=np.float64)
+    dos_names = _DOS_TERMS[edge.dos]
+    names = ("ef", "amplitude", *dos_names, "variance", "tau")
+    basis = None
+    if background is not None:
+        estimated = [i for i, flag in enumerate(background.estimated) if flag]
+        names = names + tuple(background.names[i] for i in estimated)
+        basis = background.basis[estimated] if estimated else None
+        known = background.counts() - (background.coefficients[estimated] @ basis
+                                       if basis is not None else 0.0)
+    else:
+        known = np.zeros_like(energy)
+    n_edge = 2 + len(dos_names)
+
+    def model(theta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        theta = np.atleast_2d(np.asarray(theta, dtype=np.float64))
+        n = theta.shape[0]
+        mean = np.empty((n, energy.size))
+        jac = np.empty((n, energy.size, theta.shape[1]))
+        for i, row in enumerate(theta):
+            dos_values = dict(zip(dos_names, row[2:n_edge]))
+            try:
+                d = edge_derivatives(energy, row[0], row[1], row[n_edge], row[n_edge + 1],
+                                     dos_c1=dos_values.get("dos_c1", 0.0),
+                                     dos_c2=dos_values.get("dos_c2", 0.0),
+                                     convention=convention, dos_form=dos_form, route=route)
+            except ValueError:
+                mean[i] = np.nan
+                jac[i] = np.nan
+                continue
+            columns = [d.d_ef, d.d_amplitude, *(getattr(d, "d_" + n_) for n_ in dos_names),
+                       d.d_variance, d.d_tau]
+            total = d.value + known
+            if basis is not None:
+                total = total + row[n_edge + 2:] @ basis
+                columns += [b for b in basis]
+            mean[i] = exposure * total
+            jac[i] = exposure * np.stack(columns, axis=1)
+        return mean, jac
+
+    lower = np.full(len(names), -np.inf)
+    lower[1] = 0.0                      # amplitude
+    lower[n_edge] = 0.0                 # v
+    lower[n_edge + 1] = 0.0             # tau
+    start = np.array([edge.ef, edge.amplitude, *(getattr(edge, n_) for n_ in dos_names),
+                      edge.variance, edge.tau,
+                      *(background.coefficients[i] for i in
+                        ([j for j, f in enumerate(background.estimated) if f]
+                         if background is not None else []))], dtype=np.float64)
+    return model, names, lower, start
