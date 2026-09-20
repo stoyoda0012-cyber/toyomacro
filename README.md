@@ -412,6 +412,30 @@ A Zenodo download is a snapshot of one release, without git history.
 To follow development between releases, clone this repository instead.
 Release history is tracked in [CHANGELOG.md](CHANGELOG.md).
 
+**When you publish a result computed with this package, cite the
+version DOI of the release you used**, not the all-versions DOI: the
+latter follows development and will resolve to a later release than the
+one behind your numbers.
+
+### Reproducing a published figure
+
+A paper that cites the all-versions DOI still names the release it
+used; take the version DOI for that release from the list above.
+
+| Published figure | Release it was computed with |
+|---|---|
+| Angular-modulation figure (Fig. S11) of the HAXPES paper that cites this repository as Ref. 29 (Surface and Interface Analysis; DOI to be added on publication) | v0.1.0 |
+
+Later releases do not necessarily reproduce an earlier figure. Where
+they do, it is recorded here. For the row above: between v0.1.0 and
+v0.2.0 the entry points of `data.angular_correction`
+(`lookup`, `angular_distribution`,
+`angular_distribution_unpolarized`) return bit-identical values —
+checked over 4,665 numbers (5 elements x 3 photon energies x 37
+emission angles) — because that release changed only the documentation
+of the angle conventions and added geometry warnings. Anything not
+stated in this table is unverified.
+
 ## License
 
 Released under the [MIT License](LICENSE).
