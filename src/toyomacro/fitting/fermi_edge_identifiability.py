@@ -89,10 +89,12 @@ from .._identifiability import (
     Background,
     EffectiveInformation,
     constant_background,
+    covariance_bound,
     effective_information,
     linear_background,
     poisson_fisher_matrix,
 )
+from ..voigtfit.crlb import _NULL_PROJECTION_TOL
 from .fermi_edge import KB_EV, _sign_of
 
 __all__ = [
@@ -101,12 +103,18 @@ __all__ = [
     "Background",
     "EdgeDerivatives",
     "EdgeFisherResult",
+    "EdgeIdentifiabilityReport",
+    "EdgeParameterAssessment",
+    "EdgeThresholds",
     "EdgeWidthInformation",
     "FermiEdge",
+    "InstrumentalResolution",
     "constant_background",
     "edge_derivatives",
     "edge_fisher",
     "edge_width_information",
+    "edge_wls_covariance",
+    "assess_edge_identifiability",
     "linear_background",
     "tau_from_temperature",
     "temperature_from_tau",
@@ -771,4 +779,333 @@ def edge_width_information(fisher: EdgeFisherResult) -> EdgeWidthInformation:
         stiff_direction=_oriented(stiff), soft_direction=_oriented(soft), alignment=alignment,
         sd_kappa2=sd_kappa2, sd_share=sd_share, nuisance_null_dim=info.nuisance_null_dim,
         temperature_mode=fisher.temperature_mode,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Judgement
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class EdgeThresholds:
+    """Where the labels change. Conventions, not physics.
+
+    Attributes:
+        weak_relative_sd: A parameter is 'weakly_identified' when its
+            bound exceeds this fraction of its reference scale. 0.1, as
+            in ``voigtfit.identifiability``: a tenth of the edge's own
+            width is a working rule of thumb for when a number has
+            stopped being usable, with no deeper justification.
+        boundary_sd: v (or tau) is 'near_boundary' when it lies within
+            this many bounds of zero. The probability behind 3 comes from
+            the normal approximation for an unconstrained estimator,
+            which is exactly what fails at a boundary (Self & Liang
+            1987): read it as a margin of caution.
+        separation_sd: v and tau count as separable when the bound on
+            ``x_v = v / kappa_2``, the instrument's share of the edge's
+            second cumulant, is at most this. 0.1 means "the split is
+            known to a tenth" -- a working threshold, not physics.
+    """
+
+    weak_relative_sd: float = 0.1
+    boundary_sd: float = 3.0
+    separation_sd: float = 0.1
+
+    def __post_init__(self) -> None:
+        if not (self.weak_relative_sd > 0.0 and self.boundary_sd > 0.0
+                and self.separation_sd > 0.0):
+            raise ValueError("thresholds must be positive")
+
+
+@dataclass(frozen=True)
+class EdgeParameterAssessment:
+    """One parameter of the model.
+
+    Attributes:
+        name, role: As in ``EdgeFisherResult``
+        value: Its value
+        sd: Bound on its standard deviation; ``inf`` when rank deficient
+        reference_scale: What ``sd`` is judged against -- sqrt(kappa_2)
+            for E_F, |A| for the amplitude, kappa_2 for v and tau,
+            1/sqrt(kappa_2) and 1/kappa_2 for the DOS coefficients, None
+            for a background term
+        relative_sd: ``sd / reference_scale``, or None
+        status: 'rank_deficient', 'weakly_identified', 'identified',
+            'undersampled' (widths only) or 'not_assessed'
+    """
+
+    name: str
+    role: str
+    value: float
+    sd: float
+    reference_scale: float | None
+    relative_sd: float | None
+    status: str
+
+
+@dataclass(frozen=True)
+class InstrumentalResolution:
+    """The Gaussian width, with what it is worth and what it rests on.
+
+    ``variance`` and one of the two standard deviations are what
+    ``voigtfit.identifiability.assess_identifiability`` takes as
+    ``variance_floor`` and ``variance_floor_sd``, when the Voigt peaks
+    come from the same instrument and settings.
+
+    Attributes:
+        variance, sigma, fwhm: The Gaussian width, three ways (eV**2, eV, eV)
+        sd_bound: Bound on sd(v) from the Poisson Fisher matrix in this
+            temperature mode -- what an efficient estimator could reach.
+            **Do not pair it with an estimate from a fit whose weights
+            are not the Poisson ones**: an unweighted least-squares fit
+            of this model scatters about 1.3 times wider, so its own
+            covariance is the honest partner.
+        sd_estimator: sd(v) of the weighted least-squares estimator whose
+            weights were given (sandwich covariance), or None
+        estimator: What ``sd_estimator`` belongs to
+        sd_sigma_bound: ``sd_bound / (2 sigma)``, the same bound on sigma
+        temperature_sensitivity: **d sigma / dT (eV per K)**: how far the
+            fitted resolution moves when the temperature held fixed is
+            wrong by one kelvin, to first order and with everything else
+            estimated. The most practical number here when the
+            temperature is fixed, because a thermocouple reading is not
+            the electron temperature.
+        temperature_mode, temperature: The mode and the temperature used
+    """
+
+    variance: float
+    sigma: float
+    fwhm: float
+    sd_bound: float
+    sd_estimator: float | None
+    estimator: str | None
+    sd_sigma_bound: float
+    temperature_sensitivity: float
+    temperature_mode: str
+    temperature: float
+
+
+@dataclass(frozen=True)
+class EdgeIdentifiabilityReport:
+    """What a counting spectrum of this edge determines.
+
+    Attributes:
+        parameters: One assessment per parameter
+        width: The (v, tau) block, unit-free
+        resolution: The Gaussian width and what it rests on
+        separation: 'separable' when the bound on the instrument's share
+            of the width is within ``thresholds.separation_sd``;
+            'not_separable' when it is not, and ``sd_tau`` is then None;
+            'assumed' when the temperature was held fixed, where the
+            split is an assumption rather than a measurement;
+            'undersampled' when the edge is thinner than two channels
+        sd_variance: Bound on sd(v) (eV**2)
+        sd_tau: Bound on sd(tau) (eV**2), or None when not separable
+        near_boundary_v: v within ``boundary_sd`` bounds of 0
+        near_boundary_tau: The same for tau, or None when not separable
+            or the temperature is fixed
+        undersampled: sqrt(kappa_2) below twice the channel spacing,
+            where a model sampled at channel centres says little about a
+            width; every width label is then 'undersampled'
+        null_space_dim, condition_number: Of the unit-diagonal Fisher matrix
+        thresholds: The thresholds used
+        fisher: The Fisher matrix it all came from
+    """
+
+    parameters: tuple[EdgeParameterAssessment, ...]
+    width: EdgeWidthInformation
+    resolution: InstrumentalResolution
+    separation: str
+    sd_variance: float
+    sd_tau: float | None
+    near_boundary_v: bool
+    near_boundary_tau: bool | None
+    undersampled: bool
+    null_space_dim: int
+    condition_number: float
+    thresholds: EdgeThresholds
+    fisher: EdgeFisherResult = field(repr=False)
+
+
+def edge_wls_covariance(
+    energy: np.ndarray,
+    edge: FermiEdge,
+    background: Background | None = None,
+    *,
+    weights: np.ndarray | Literal["poisson", "unit"] = "poisson",
+    exposure: float = 1.0,
+    **kwargs: Any,
+) -> tuple[np.ndarray, tuple[str, ...], str]:
+    """Sandwich covariance of a weighted least-squares fit of this model.
+
+    ``fit_fermi_edge`` minimises a weighted sum of squares, not the
+    Poisson likelihood, so what it returns is the weighted least-squares
+    estimator, whose covariance is
+    ``(J^T W J)^-1 J^T W diag(mu) W J (J^T W J)^-1``. With
+    ``weights = 1/mu`` that is the inverse Fisher matrix; with unit
+    weights -- the fitter's default -- it is not, and the difference is
+    not small.
+
+    Args:
+        energy, edge, background, exposure: As in ``edge_fisher``
+        weights: 'poisson' (1/mu, what the fitter's docstring
+            recommends), 'unit' (its default), or an array
+        kwargs: Passed to ``edge_fisher`` (convention, dos_form, route,
+            temperature_mode, temperature_sd)
+
+    Returns:
+        (covariance, parameter names, a label for the estimator)
+    """
+    fisher = edge_fisher(energy, edge, background, exposure=exposure, **kwargs)
+    jac, mean = fisher.jacobian, fisher.expected_counts
+    if isinstance(weights, str):
+        if weights == "poisson":
+            w, label = 1.0 / mean, "weighted least squares (poisson weights)"
+        elif weights == "unit":
+            w, label = np.ones_like(mean), "least squares (unit weights)"
+        else:
+            raise ValueError(f"weights must be 'poisson', 'unit' or an array, got {weights!r}")
+    else:
+        w = np.asarray(weights, dtype=np.float64)
+        if w.shape != mean.shape or np.any(w < 0.0) or not np.all(np.isfinite(w)):
+            raise ValueError("weights must be finite, non-negative and one per channel")
+        label = "weighted least squares (given weights)"
+    a = jac.T @ (jac * w[:, np.newaxis])
+    b = jac.T @ (jac * (w * w * mean)[:, np.newaxis])
+    a_inv = np.linalg.inv(a)
+    return a_inv @ b @ a_inv, fisher.param_names, label
+
+
+def assess_edge_identifiability(
+    energy: np.ndarray,
+    edge: FermiEdge,
+    background: Background | None = None,
+    *,
+    exposure: float = 1.0,
+    temperature_mode: TemperatureMode = "free",
+    temperature_sd: float | None = None,
+    estimator_weights: np.ndarray | Literal["poisson", "unit"] | None = None,
+    thresholds: EdgeThresholds | None = None,
+    convention: str = "BE",
+    dos_form: Literal["occupied", "both_sides"] = "occupied",
+    route: Literal["auto", "quadrature", "series"] = "auto",
+) -> EdgeIdentifiabilityReport:
+    """Sort the parameters of an edge-plus-background model by identifiability.
+
+    Always in 'var_tau' coordinates, and always from the full inverse
+    Fisher matrix: every other parameter is estimated from the same
+    spectrum.
+
+    What the labels do not mean:
+
+    - 'identified' on the width scale is not a measurement of the
+      temperature or of the resolution separately. Read ``separation``
+      and the bound on the instrument's share of the width for that.
+    - 'not_separable' says the data in *this* window, at *this* exposure,
+      cannot divide the width between instrument and temperature. The
+      information that separates them is real, but it vanishes as
+      tau**2 as the temperature falls (see ``edge_fisher``), so at low
+      temperature no exposure within reach recovers it.
+    - Near a boundary, or where the split is not separable, the inverse
+      Fisher matrix is not the variance of a constrained estimator and a
+      Monte Carlo variance need not agree with it (Self & Liang 1987).
+    - Everything is computed from a model at stated parameters. It is
+      not a property of any data set, and the conditions in the module
+      docstring of ``voigtfit.crlb`` apply.
+
+    Args:
+        energy, edge, background, exposure, convention, dos_form, route:
+            As in ``edge_fisher``
+        temperature_mode, temperature_sd: As in ``edge_fisher``
+        estimator_weights: When given, ``resolution.sd_estimator`` is the
+            sandwich sd of a weighted least-squares fit with these
+            weights ('poisson', 'unit', or an array)
+        thresholds: Defaults to ``EdgeThresholds()``
+
+    Returns:
+        EdgeIdentifiabilityReport
+    """
+    thresholds = thresholds or EdgeThresholds()
+    fisher = edge_fisher(energy, edge, background, parameterization="var_tau",
+                         temperature_mode=temperature_mode, temperature_sd=temperature_sd,
+                         exposure=exposure, convention=convention, dos_form=dos_form, route=route)
+    covariance, unbounded, null_dim, condition = covariance_bound(fisher.fisher,
+                                                                  _NULL_PROJECTION_TOL)
+    kappa2 = edge.variance + _C_TAU * edge.tau
+    root = math.sqrt(kappa2)
+    scales = {"ef": root, "amplitude": abs(edge.amplitude), "dos_c1": 1.0 / root,
+              "dos_c2": 1.0 / kappa2, "variance": kappa2, "tau": kappa2}
+    step = float(np.median(np.diff(np.sort(np.asarray(energy, dtype=np.float64)))))
+    undersampled = root < 2.0 * step
+
+    parameters = []
+    for i, (name, role) in enumerate(zip(fisher.param_names, fisher.param_roles)):
+        sd = math.inf if unbounded[i] else math.sqrt(max(covariance[i, i], 0.0))
+        scale = scales.get(name)
+        relative = None if scale is None else sd / scale
+        if undersampled and role == "width":
+            # the sampling, not the matrix, is why there is nothing to read
+            status = "undersampled"
+        elif unbounded[i]:
+            status = "rank_deficient"
+        elif relative is None:
+            status = "not_assessed"
+        else:
+            status = ("weakly_identified" if relative > thresholds.weak_relative_sd
+                      else "identified")
+        parameters.append(EdgeParameterAssessment(
+            name=name, role=role, value=float(fisher.param_values[i]), sd=float(sd),
+            reference_scale=scale, relative_sd=relative, status=status))
+
+    iv = fisher.width_index[0]
+    sd_variance = math.inf if unbounded[iv] else math.sqrt(max(covariance[iv, iv], 0.0))
+    if temperature_mode == "fixed_temperature":
+        # the split is an assumption here; the trade between v and tau still
+        # comes from the matrix that estimates both
+        free = edge_fisher(energy, edge, background, exposure=exposure, convention=convention,
+                           dos_form=dos_form, route=route)
+        width = edge_width_information(free)
+        separation, sd_tau, near_boundary_tau = "assumed", None, None
+        block = effective_information(free.fisher, free.width_index).effective
+    else:
+        width = edge_width_information(fisher)
+        separation = ("not_separable" if width.sd_share > thresholds.separation_sd
+                      else "separable")
+        it = fisher.width_index[1]
+        sd_tau_value = math.inf if unbounded[it] else math.sqrt(max(covariance[it, it], 0.0))
+        sd_tau = None if separation == "not_separable" else sd_tau_value
+        near_boundary_tau = (None if sd_tau is None
+                             else bool(edge.tau < thresholds.boundary_sd * sd_tau))
+        block = effective_information(fisher.fisher, fisher.width_index).effective
+    if undersampled:
+        separation = "undersampled"
+
+    # How far a fit's resolution moves when the temperature it holds fixed is
+    # wrong by 1 K: -(I_vv)^-1 I_v_tau dtau/dT on the effective block, i.e.
+    # the first-order trade along the edge's width with everything else estimated.
+    d_tau_d_t = 2.0 * KB_EV * KB_EV * edge.temperature
+    d_variance_d_t = (-block[0, 1] / block[0, 0] * d_tau_d_t) if block[0, 0] > 0.0 else math.nan
+    sigma = edge.sigma
+    sd_estimator = estimator = None
+    if estimator_weights is not None:
+        cov_wls, names_wls, estimator = edge_wls_covariance(
+            energy, edge, background, weights=estimator_weights, exposure=exposure,
+            convention=convention, dos_form=dos_form, route=route,
+            temperature_mode=temperature_mode, temperature_sd=temperature_sd)
+        i = names_wls.index("variance")
+        sd_estimator = math.sqrt(max(cov_wls[i, i], 0.0))
+    resolution = InstrumentalResolution(
+        variance=edge.variance, sigma=sigma, fwhm=2.0 * math.sqrt(2.0 * math.log(2.0)) * sigma,
+        sd_bound=sd_variance, sd_estimator=sd_estimator, estimator=estimator,
+        sd_sigma_bound=sd_variance / (2.0 * sigma) if sigma > 0.0 else math.inf,
+        temperature_sensitivity=d_variance_d_t / (2.0 * sigma) if sigma > 0.0 else math.nan,
+        temperature_mode=temperature_mode, temperature=edge.temperature)
+
+    return EdgeIdentifiabilityReport(
+        parameters=tuple(parameters), width=width, resolution=resolution, separation=separation,
+        sd_variance=sd_variance, sd_tau=sd_tau,
+        near_boundary_v=bool(edge.variance < thresholds.boundary_sd * sd_variance),
+        near_boundary_tau=near_boundary_tau, undersampled=undersampled,
+        null_space_dim=null_dim, condition_number=condition, thresholds=thresholds, fisher=fisher,
     )

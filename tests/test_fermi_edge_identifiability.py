@@ -613,3 +613,159 @@ def test_width_information_needs_both_width_coordinates():
     with pytest.raises(ValueError, match="var_tau"):
         fi.edge_width_information(fi.edge_fisher(E, _edge(), bg,
                                                  temperature_mode="fixed_temperature"))
+
+
+# --- judgement, and the resolution handed to the Voigt side --------------------------
+
+
+def _report(temperature=300.0, sigma=0.05, energy=E, **kw):
+    edge = _edge(temperature=temperature, sigma=sigma)
+    return fi.assess_edge_identifiability(energy, edge, fi.constant_background(energy, 50.0), **kw)
+
+
+def test_poisson_weights_reach_the_bound_and_unit_weights_do_not():
+    """The sandwich covariance of a weighted least-squares fit: with
+    weights 1/mu it is the inverse Fisher matrix exactly; with the
+    fitter's default unit weights the resolution's sd is 1.7 times the
+    bound with T free and 1.25 times with T fixed (this model, 1000
+    counts on a background of 50)."""
+    edge = _edge()
+    bg = fi.constant_background(E, 50.0)
+    fisher = fi.edge_fisher(E, edge, bg)
+    cov, names, label = fi.edge_wls_covariance(E, edge, bg, weights="poisson")
+    np.testing.assert_allclose(cov, np.linalg.inv(fisher.fisher), rtol=1e-9)
+    assert "poisson" in label
+    unit, _, unit_label = fi.edge_wls_covariance(E, edge, bg, weights="unit")
+    i = names.index("variance")
+    ratio = math.sqrt(unit[i, i] / cov[i, i])
+    assert 1.5 < ratio < 2.0 and "unit" in unit_label
+    fixed = fi.edge_wls_covariance(E, edge, bg, weights="unit",
+                                   temperature_mode="fixed_temperature")[0]
+    fixed_bound = np.linalg.inv(fi.edge_fisher(E, edge, bg,
+                                               temperature_mode="fixed_temperature").fisher)
+    assert 1.1 < math.sqrt(fixed[i, i] / fixed_bound[i, i]) < 1.5
+
+
+def test_the_labels_follow_the_temperature_mode():
+    """300 K, sigma 0.05 eV (kT/sigma 0.52), 1000 counts on 50: with T
+    free the split is not separable and sd(tau) is withheld; a 10 K prior
+    makes it separable; with T fixed it is 'assumed' and there is no tau
+    parameter at all."""
+    free = _report()
+    assert free.separation == "not_separable" and free.sd_tau is None
+    assert free.near_boundary_tau is None
+    assert next(p.status for p in free.parameters if p.name == "variance") == "weakly_identified"
+
+    prior = _report(temperature_mode="temperature_prior", temperature_sd=10.0)
+    assert prior.separation == "separable" and prior.sd_tau is not None
+    assert prior.near_boundary_tau is False
+    assert next(p.status for p in prior.parameters if p.name == "variance") == "identified"
+
+    fixed = _report(temperature_mode="fixed_temperature")
+    assert fixed.separation == "assumed" and fixed.sd_tau is None
+    assert "tau" not in [p.name for p in fixed.parameters]
+    assert fixed.sd_variance < free.sd_variance / 5.0
+
+
+def test_reference_scales_are_the_edges_own_width():
+    """sqrt(kappa_2) for E_F, |A| for the amplitude, kappa_2 for v and
+    tau, 1/sqrt(kappa_2) for the DOS slope; a background term is not
+    judged."""
+    report = _report()
+    kappa2 = report.width.kappa2
+    expected = {"ef": math.sqrt(kappa2), "amplitude": 1000.0, "dos_c1": 1.0 / math.sqrt(kappa2),
+                "variance": kappa2, "tau": kappa2, "bg_level": None}
+    for p in report.parameters:
+        assert p.reference_scale == pytest.approx(expected[p.name]) if expected[p.name] else (
+            p.reference_scale is None)
+        if p.reference_scale is not None:
+            assert p.relative_sd == pytest.approx(p.sd / p.reference_scale)
+        else:
+            assert p.status == "not_assessed"
+
+
+def test_an_edge_thinner_than_two_channels_is_not_judged():
+    coarse = np.arange(-1.2, 1.2 + 1e-9, 0.1)
+    report = _report(temperature=10.0, sigma=0.01, energy=coarse)
+    assert report.undersampled and report.separation == "undersampled"
+    assert all(p.status == "undersampled" for p in report.parameters if p.role == "width")
+    assert not _report().undersampled
+
+
+def test_a_vanishing_gaussian_is_flagged_near_the_boundary():
+    assert _report(sigma=0.002, temperature_mode="fixed_temperature").near_boundary_v
+    assert not _report(sigma=0.05, temperature_mode="fixed_temperature").near_boundary_v
+
+
+@pytest.mark.parametrize("temperature,sigma,expected", [(300.0, 0.05, -0.1351e-3),
+                                                        (30.0, 0.02, -0.0363e-3)])
+def test_temperature_sensitivity_matches_a_refit_with_a_wrong_temperature(temperature, sigma,
+                                                                          expected):
+    """d sigma / dT is what a fit actually does when the temperature it
+    holds fixed is wrong. Refitting the noiseless model with tau fixed 5 K
+    either side (Nelder-Mead on the expected deviance, everything else
+    free) moves sigma by -0.1351 meV/K at 300 K and -0.0364 meV/K at 30 K;
+    the reported numbers are -0.1351 and -0.0363. The kappa_2-conserving
+    guess, -(pi^2/3) dtau/dT / (2 sigma), gives -0.1466 and -0.0366."""
+    from scipy.optimize import minimize
+
+    edge = _edge(temperature=temperature, sigma=sigma)
+    bg = fi.constant_background(E, 50.0)
+    report = fi.assess_edge_identifiability(E, edge, bg, temperature_mode="fixed_temperature")
+    assert report.resolution.temperature_sensitivity == pytest.approx(expected, rel=0.02)
+
+    coarse = E[::2]  # 121 channels: the refit below is the slow part of this file
+    truth = fi.edge_derivatives(coarse, edge.ef, edge.amplitude, edge.variance, edge.tau,
+                                dos_c1=edge.dos_c1).value + 50.0
+
+    def deviance(p, tau_fixed):
+        ef, amplitude, c1, variance, level = p
+        mu = fi.edge_derivatives(coarse, ef, amplitude, max(variance, 1e-12), tau_fixed,
+                                 dos_c1=c1).value + level
+        return float(np.sum(mu - truth - truth * np.log(mu / truth)))
+
+    sigmas = []
+    for shift in (-5.0, 5.0):
+        best = minimize(deviance, [edge.ef, edge.amplitude, edge.dos_c1, edge.variance, 50.0],
+                        args=(fi.tau_from_temperature(temperature + shift),), method="Nelder-Mead",
+                        options=dict(xatol=1e-11, fatol=1e-13, maxiter=4000, maxfev=4000))
+        sigmas.append(math.sqrt(best.x[3]))
+    refit = (sigmas[1] - sigmas[0]) / 10.0
+    assert refit == pytest.approx(report.resolution.temperature_sensitivity, rel=0.02)
+
+
+def test_the_resolution_hands_the_voigt_side_a_floor_and_its_sd():
+    """What the two sides exchange: variance and one of the two sds. The
+    Voigt peak's excess Gaussian variance then carries the edge's
+    uncertainty too."""
+    from toyomacro.voigtfit.identifiability import (
+        VoigtPeak,
+        assess_identifiability,
+        constant_background,
+    )
+
+    report = _report(temperature_mode="fixed_temperature", estimator_weights="unit")
+    resolution = report.resolution
+    assert resolution.estimator == "least squares (unit weights)"
+    assert resolution.sd_estimator > resolution.sd_bound
+    assert resolution.fwhm == pytest.approx(2.0 * math.sqrt(2.0 * math.log(2.0)) * 0.05)
+
+    energy = np.linspace(-6.0, 6.0, 241)
+    peaks = [VoigtPeak(amplitude=2.0e4, center=0.0, sigma=0.09, gamma=0.3)]
+    bg = constant_background(energy, 50.0)
+    without = assess_identifiability(energy, peaks, bg, variance_floor=resolution.variance)
+    with_sd = assess_identifiability(energy, peaks, bg, variance_floor=resolution.variance,
+                                     variance_floor_sd=resolution.sd_estimator)
+    assert with_sd.widths[0].sd_variance == pytest.approx(
+        math.hypot(without.widths[0].sd_variance, resolution.sd_estimator))
+    assert with_sd.widths[0].variance_relative_sd > without.widths[0].variance_relative_sd
+
+
+def test_assessment_inputs_are_checked():
+    bg = fi.constant_background(E, 50.0)
+    with pytest.raises(ValueError, match="thresholds"):
+        fi.assess_edge_identifiability(E, _edge(), bg, thresholds=fi.EdgeThresholds(0.1, 3.0, 0.0))
+    with pytest.raises(ValueError, match="weights"):
+        fi.edge_wls_covariance(E, _edge(), bg, weights="inverse")
+    with pytest.raises(ValueError, match="weights"):
+        fi.edge_wls_covariance(E, _edge(), bg, weights=np.ones(3))
