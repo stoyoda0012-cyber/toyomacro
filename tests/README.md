@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,152 automated tests** across **82 files**, in two
+This suite has **2,160 automated tests** across **82 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 45 | 1,171 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 45 | 1,179 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 981 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,720 tests, 80%) — guarantee the library
+- **Contract / regression** (1,728 tests, 80%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -44,7 +44,7 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
-## Library body — `tests/` (1,171)
+## Library body — `tests/` (1,179)
 
 ### Claim guards — noise model, versions, backends, comparisons (58)
 | Tests | File | Guards |
@@ -58,12 +58,12 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
 
-### Lineshape & background — physics core (179)
+### Lineshape & background — physics core (187)
 | Tests | File | Guards |
 |--:|---|---|
 | 22 | `test_doniach_sunjic.py` | DS lineshape + MATLAB `LineshapeType` numbering |
 | 38 | `test_fermi_edge.py` | Fermi-edge fit: agreement with `FermiDirac`, axis-shift and KE/BE invariance, 1σ pulls of E_F and resolution over 200 seeds, `success` gates (bounds, singular covariance, E_F off-window or located less well than the edge's own width, collapsed width), fine-step starts, window-independent 10–90% width; with kT below a channel, the model against a quadrature reference and E_F off the grid recovered without bias |
-| 89 | `test_fermi_edge_identifiability.py` | Fermi-edge identifiability: the edge and its derivatives in (v, tau) -- both routes against adaptive quadrature, the switch and the asymptotic term limit, the tau -> 0 and v -> 0 limits and their rates, the two DOS forms, finite differences, agreement with `fermi_edge`; the Poisson Fisher matrix -- the Hessian of the expected deviance, exposure, the (sigma, T) coordinates and their zero, route agreement at the Fisher level; the temperature free, fixed or with a prior, and the prior's limits; effective information on (v, tau) in units of kappa_2 -- unit invariance, the stiff direction v + (pi^2/3) tau, the separating information vanishing as tau squared; the labels per temperature mode, the reference scales, the sandwich covariance of a least-squares fit, and d(sigma)/dT against a refit with a wrong temperature |
+| 97 | `test_fermi_edge_identifiability.py` | Fermi-edge identifiability: the edge and its derivatives in (v, tau) -- both routes against adaptive quadrature, the switch and the asymptotic term limit, the tau -> 0 and v -> 0 limits and their rates, the two DOS forms, finite differences, agreement with `fermi_edge`; the Poisson Fisher matrix -- the Hessian of the expected deviance, exposure, the (sigma, T) coordinates and their zero, route agreement at the Fisher level; the temperature free, fixed or with a prior, and the prior's limits; effective information on (v, tau) in units of kappa_2 -- unit invariance, the stiff direction v + (pi^2/3) tau, the separating information vanishing as tau squared; the labels per temperature mode, the reference scales, the sandwich covariance of a least-squares fit, and d(sigma)/dT against a refit with a wrong temperature; the scan over conditions, its unit-freedom and what the DOS kink is worth |
 | 17 | `test_tougaard.py` | Tougaard background algorithm |
 | 13 | `test_energy_axis.py` | BE / KE energy-axis handling through the pipeline |
 

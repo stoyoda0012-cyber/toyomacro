@@ -10,6 +10,7 @@ limits and the rates at which they are reached.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import numpy as np
@@ -104,16 +105,9 @@ def test_routes_match_adaptive_quadrature(ratio, form, c1, c2):
     """kT/sigma from 0.02 to 3, 17 energies across +-0.4 eV. Measured: at
     most 2.6e-13 for the quadrature route (at kT/sigma = 0.02, where the
     d/dtau integrand cancels, in both it and the reference) and 6e-13 for
-    the series (at 0.1, above its switch). The linear DOS continued below
-    E_F turns negative inside the thermal tail at kT/sigma = 3; that case
-    is refused, not evaluated."""
+    the series (at 0.1, above its switch)."""
     variance, tau = SIGMA**2, (ratio * SIGMA) ** 2
     u = np.linspace(-0.4, 0.4, 17) + 0.0031
-    if form == "both_sides" and c1 > 0 and c2 == 0 and ratio >= 3.0:
-        # 1 + 0.35 y is negative below y = -2.9 eV, inside 37 kT = 5.6 eV
-        with pytest.raises(ValueError, match="not positive"):
-            _derivs(u, 0.0, variance, tau, c1, c2, form)
-        return
     ref = np.array([_reference(x, variance, tau, c1, c2, form) for x in u])
     routes = ("quadrature", "series") if ratio <= 0.1 else ("quadrature",)
     for route in routes:
@@ -257,7 +251,9 @@ def test_bad_inputs_raise():
     with pytest.raises(ValueError):
         _derivs(variance=-1e-6, tau=1e-4)
     with pytest.raises(ValueError, match="not positive"):
-        _derivs(tau=1e-4, c1=-5.0)
+        _derivs(tau=1e-4, c1=-5.0)       # falls through zero on the occupied side
+    with pytest.raises(ValueError, match="not positive"):
+        _derivs(tau=1e-4, c1=200.0, form="both_sides")  # and below E_F, within 3 kT
     with pytest.raises(ValueError, match="delta"):
         fi.edge_derivatives(np.array([-0.1, 0.0, 0.1]), 0.0, 1.0, 0.0, 1e-4, dos_c1=0.35)
     with pytest.raises(ValueError, match="dos_form"):
@@ -769,3 +765,124 @@ def test_assessment_inputs_are_checked():
         fi.edge_wls_covariance(E, _edge(), bg, weights="inverse")
     with pytest.raises(ValueError, match="weights"):
         fi.edge_wls_covariance(E, _edge(), bg, weights=np.ones(3))
+
+
+# --- scan over measurement conditions -------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def scan():
+    return fi.EdgeScanGrid(), fi.scan_edge_identifiability(fi.EdgeScanGrid())
+
+
+def test_scan_has_an_axis_per_condition_and_saves(scan, tmp_path):
+    grid, out = scan
+    shape = (len(grid.ratios), len(grid.half_widths), len(grid.levels), len(grid.slopes),
+             len(grid.backgrounds), len(grid.temperature_modes), len(grid.dos_forms))
+    for name in ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
+                 "temperature_sensitivity", "separation", "variance_status", "near_boundary_v",
+                 "condition_number", "null_space_dim", "n_energy", "total_counts"):
+        assert out[name].shape == shape, name
+    np.savez(tmp_path / "scan.npz", **out)
+    back = np.load(tmp_path / "scan.npz")
+    np.testing.assert_array_equal(back["sd_share"], out["sd_share"])
+    assert list(back["temperature_modes"]) == list(np.asarray(grid.temperature_modes))
+
+
+def test_nothing_in_the_scan_depends_on_the_energy_unit(scan):
+    """``width`` is sqrt(kappa_2) in eV and sets the unit of the axis;
+    every reported number is dimensionless."""
+    _, out = scan
+    other = fi.scan_edge_identifiability(fi.EdgeScanGrid(width=0.4))
+    for name in ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
+                 "temperature_sensitivity", "separation", "near_boundary_v", "n_energy"):
+        np.testing.assert_allclose(other[name], out[name], rtol=1e-9, equal_nan=True, err_msg=name)
+
+
+def test_the_scan_spans_the_three_regimes_and_labels_them(scan):
+    """Window 6 widths, estimated constant background at 5% of the step,
+    slope 0.3 per width, occupied-side DOS: with the temperature free the
+    instrument's share is bounded at 3.35 (kT/sigma 0.1), 0.29 (0.5), 0.18
+    (1.0) and 0.089 (3.0), so only the last counts as separable at the
+    default threshold of 0.1."""
+    grid, out = scan
+    free = list(grid.temperature_modes).index("free")
+    cell = (slice(None), 1, 0, 1, list(grid.backgrounds).index("estimated"), free, 0)
+    share = out["sd_share"][cell]
+    assert share[0] > 3.0 and share[-1] < 0.1
+    assert np.all(np.diff(share) < 0.0)
+    codes = out["separation"][cell]
+    assert codes[0] == 1 and codes[-1] == 0  # not_separable -> separable
+    assert np.all(out["separation"][:, 1, 0, 1, 2,
+                                    list(grid.temperature_modes).index("fixed_temperature"),
+                                    0] == 2)
+
+
+def test_a_temperature_prior_and_a_known_background_both_sharpen_the_split(scan):
+    grid, out = scan
+    modes = list(grid.temperature_modes)
+    backgrounds = list(grid.backgrounds)
+    free = out["sd_share"][:, 1, 0, 1, backgrounds.index("estimated"), modes.index("free"), 0]
+    prior = out["sd_share"][:, 1, 0, 1, backgrounds.index("estimated"),
+                            modes.index("temperature_prior"), 0]
+    assert np.all(prior <= free + 1e-12)
+    estimated = out["sd_sigma"][:, 1, 0, 1, backgrounds.index("estimated"), modes.index("free"), 0]
+    known = out["sd_sigma"][:, 1, 0, 1, backgrounds.index("known"), modes.index("free"), 0]
+    none = out["sd_sigma"][:, 1, 0, 1, backgrounds.index("none"), modes.index("free"), 0]
+    assert np.all(known <= estimated + 1e-12) and np.all(none <= known + 1e-12)
+
+
+def test_the_kink_in_the_density_of_states_is_worth_a_factor_in_the_split(scan):
+    """The fitter's DOS is flat below E_F and rises above it, so its slope
+    changes exactly where the thermal tail is. Continuing the same
+    polynomial smoothly instead widens the bound on the instrument's share
+    by 1.6 to 3.0 over these conditions (measured 3.35 vs 5.22 at
+    kT/sigma 0.1, 0.089 vs 0.263 at 3.0). The split is that much a
+    property of the DOS model, not only of the fourth cumulant."""
+    grid, out = scan
+    occupied = out["sd_share"][:, 1, 0, 1, 2, 0, list(grid.dos_forms).index("occupied")]
+    smooth = out["sd_share"][:, 1, 0, 1, 2, 0, list(grid.dos_forms).index("both_sides")]
+    ratio = smooth / occupied
+    assert np.all(ratio > 1.5) and np.all(ratio < 3.5)
+    flat = out["sd_share"][:, 1, 0, 0, 2, 0, :]  # slope 0: the forms coincide
+    np.testing.assert_allclose(flat[:, 0], flat[:, 1], rtol=1e-12)
+
+
+def test_bounds_scale_with_the_exposure_and_with_the_total_counts():
+    """Every bound is a square root of an inverse Fisher matrix, and the
+    matrix is linear in exposure."""
+    base = fi.EdgeScanGrid(ratios=(1.0,), half_widths=(6.0,), levels=(1.0, 4.0), slopes=(0.3,),
+                           backgrounds=("estimated",), temperature_modes=("free",),
+                           dos_forms=("occupied",))
+    out = fi.scan_edge_identifiability(base)
+    np.testing.assert_allclose(out["sd_sigma"][0, 0, 1], out["sd_sigma"][0, 0, 0] / 2.0, rtol=1e-9)
+    counts = fi.scan_edge_identifiability(
+        dataclasses.replace(base, normalization="total_counts", levels=(1e5, 4e5)))
+    np.testing.assert_allclose(counts["total_counts"][0, 0, 0], 1e5, rtol=1e-9)
+    np.testing.assert_allclose(counts["sd_sigma"][0, 0, 1], counts["sd_sigma"][0, 0, 0] / 2.0,
+                               rtol=1e-9)
+
+
+def test_refused_cells_stay_nan():
+    """A DOS that is negative where it carries weight, and a window with no
+    background where the mean underflows, are both refused; the scan
+    leaves those cells NaN rather than guessing."""
+    steep = fi.scan_edge_identifiability(fi.EdgeScanGrid(
+        ratios=(3.0,), half_widths=(6.0,), slopes=(2.0,), backgrounds=("estimated",),
+        temperature_modes=("free",), dos_forms=("both_sides",)))
+    assert np.isnan(steep["sd_share"]).all()
+    # 100 edge widths below E_F at kT/sigma = 0.1 the mean is below 1e-308
+    empty = fi.scan_edge_identifiability(fi.EdgeScanGrid(
+        ratios=(0.1,), half_widths=(100.0,), slopes=(0.0,), backgrounds=("none",),
+        temperature_modes=("free",), dos_forms=("occupied",)))
+    assert np.isnan(empty["sd_share"]).all()
+
+
+def test_scan_grid_inputs_are_checked():
+    for kw in (dict(ratios=()), dict(ratios=(-1.0,)), dict(half_widths=(0.0,)),
+               dict(levels=(0.0,)), dict(step=0.0), dict(width=-1.0), dict(amplitude=0.0),
+               dict(backgrounds=("shirley",)), dict(temperature_modes=("guessed",)),
+               dict(dos_forms=("kinked",)), dict(normalization="counts"),
+               dict(background_kind="shirley"), dict(prior_fraction=0.0)):
+        with pytest.raises(ValueError):
+            fi.EdgeScanGrid(**kw)

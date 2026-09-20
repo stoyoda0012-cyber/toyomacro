@@ -105,6 +105,7 @@ __all__ = [
     "EdgeFisherResult",
     "EdgeIdentifiabilityReport",
     "EdgeParameterAssessment",
+    "EdgeScanGrid",
     "EdgeThresholds",
     "EdgeWidthInformation",
     "FermiEdge",
@@ -115,6 +116,7 @@ __all__ = [
     "edge_width_information",
     "edge_wls_covariance",
     "assess_edge_identifiability",
+    "scan_edge_identifiability",
     "linear_background",
     "tau_from_temperature",
     "temperature_from_tau",
@@ -370,11 +372,13 @@ def edge_derivatives(
     energy = np.asarray(energy, dtype=np.float64)
     s = _sign_of(convention)
     u = s * (energy - ef)
-    # D must be positive wherever the integrand is not negligible: the occupied
-    # side up to the convolution's reach, and below E_F (for 'both_sides') down
-    # to where f has fallen to e**-37
+    # D must be positive where it carries weight: the occupied side up to the
+    # convolution's reach, and, for 'both_sides', the first few kT below E_F,
+    # where f is still of order 1. Deeper than that f suppresses D
+    # exponentially (e**-3 at 3 kT), and the check that every expected count is
+    # positive covers what is left.
     y_hi = max(float(np.max(u)), 0.0) + 10.0 * math.sqrt(variance) + 37.0 * math.sqrt(tau)
-    y_lo = -37.0 * math.sqrt(tau) if dos_form == "both_sides" else 0.0
+    y_lo = -3.0 * math.sqrt(tau) if dos_form == "both_sides" else 0.0
     _, d_check, _, _ = _dos(np.linspace(y_lo, y_hi, 513), dos_c1, dos_c2, dos_form)
     if np.any(d_check <= 0.0):
         raise ValueError("the density of states is not positive over the energies the "
@@ -1109,3 +1113,197 @@ def assess_edge_identifiability(
         near_boundary_tau=near_boundary_tau, undersampled=undersampled,
         null_space_dim=null_dim, condition_number=condition, thresholds=thresholds, fisher=fisher,
     )
+
+
+# ---------------------------------------------------------------------------
+# Scan over measurement conditions
+# ---------------------------------------------------------------------------
+
+_SEPARATION_CODE = {"separable": 0, "not_separable": 1, "assumed": 2, "undersampled": 3}
+_STATUS_CODE = {"identified": 0, "weakly_identified": 1, "rank_deficient": 2, "undersampled": 3,
+                "not_assessed": 4}
+
+
+@dataclass(frozen=True)
+class EdgeScanGrid:
+    """Conditions for ``scan_edge_identifiability``.
+
+    Lengths are in units of the edge's own width sqrt(kappa_2), which is
+    held fixed, so the grid carries no energy unit: ``width`` only sets
+    what that unit is, and no result depends on it.
+
+    Attributes:
+        ratios: kT/sigma. Covers the three regimes: instrument-dominated
+            (<< 1), comparable (~1) and temperature-dominated (>> 1)
+        half_widths: Window half-widths in units of sqrt(kappa_2),
+            measured from E_F
+        levels: Exposure multipliers, or total counts in the window when
+            ``normalization='total_counts'``
+        slopes: DOS coefficient c1 in units of 1/sqrt(kappa_2), i.e. the
+            fractional rise of the DOS over one edge width
+        backgrounds: Any of 'none', 'known', 'estimated'
+        temperature_modes: Any of 'free', 'fixed_temperature',
+            'temperature_prior'
+        dos_forms: Any of 'occupied', 'both_sides' -- ``fermi_edge``'s
+            density of states, flat below E_F, and the same polynomial
+            continued smoothly, to see what the change of slope at E_F
+            is worth
+        normalization: 'exposure' keeps the energy step and the exposure
+            per point fixed, so a wider window has more points and more
+            counts -- how a measurement actually trades. 'total_counts'
+            rescales every window to the same total.
+        background_kind: 'constant' or 'linear' (zero true slope)
+        background_fraction: Background level as a fraction of the
+            occupied-side step height
+        prior_fraction: sd(T)/T for 'temperature_prior'
+        step: Energy step in units of sqrt(kappa_2)
+        width: sqrt(kappa_2) in eV. Sets the unit of the energy axis and
+            nothing else
+        amplitude: Step height in counts per channel at unit exposure
+        thresholds: As in ``assess_edge_identifiability``
+    """
+
+    ratios: tuple[float, ...] = (0.1, 0.5, 1.0, 3.0)
+    half_widths: tuple[float, ...] = (3.0, 6.0, 12.0)
+    levels: tuple[float, ...] = (1.0,)
+    slopes: tuple[float, ...] = (0.0, 0.3)
+    backgrounds: tuple[str, ...] = ("none", "known", "estimated")
+    temperature_modes: tuple[str, ...] = ("free", "fixed_temperature", "temperature_prior")
+    dos_forms: tuple[str, ...] = ("occupied", "both_sides")
+    normalization: Literal["exposure", "total_counts"] = "exposure"
+    background_kind: Literal["constant", "linear"] = "constant"
+    background_fraction: float = 0.05
+    prior_fraction: float = 0.1
+    step: float = 0.1
+    width: float = 0.1
+    amplitude: float = 1000.0
+    thresholds: EdgeThresholds = field(default_factory=EdgeThresholds)
+
+    def __post_init__(self) -> None:
+        if not all(r > 0.0 for r in self.ratios) or not self.ratios:
+            raise ValueError("ratios must be positive")
+        if not all(h > 0.0 for h in self.half_widths) or not all(v > 0.0 for v in self.levels):
+            raise ValueError("half_widths and levels must be positive")
+        if not (self.step > 0.0 and self.width > 0.0 and self.amplitude > 0.0):
+            raise ValueError("step, width and amplitude must be positive")
+        for name, allowed in (("backgrounds", ("none", "known", "estimated")),
+                              ("temperature_modes", TEMPERATURE_MODES),
+                              ("dos_forms", ("occupied", "both_sides"))):
+            bad = set(getattr(self, name)) - set(allowed)
+            if bad or not getattr(self, name):
+                raise ValueError(f"{name} must be a non-empty subset of {allowed}, got {bad}")
+        if self.normalization not in ("exposure", "total_counts"):
+            raise ValueError("normalization must be 'exposure' or 'total_counts'")
+        if self.background_kind not in ("constant", "linear"):
+            raise ValueError("background_kind must be 'constant' or 'linear'")
+        if self.background_fraction < 0.0 or self.prior_fraction <= 0.0:
+            raise ValueError("background_fraction must be >= 0 and prior_fraction > 0")
+
+
+def _scan_edge(grid: EdgeScanGrid, ratio: float) -> tuple[float, float]:
+    """(sigma, temperature) at this kT/sigma with kappa_2 = width**2 fixed."""
+    kappa2 = grid.width * grid.width
+    sigma = math.sqrt(kappa2 / (1.0 + _C_TAU * ratio * ratio))
+    return sigma, ratio * sigma / KB_EV
+
+
+def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
+    """Assess an edge over a grid of measurement conditions.
+
+    Returns a dict of arrays of shape ``(len(ratios), len(half_widths),
+    len(levels), len(slopes), len(backgrounds), len(temperature_modes),
+    len(dos_forms))``, plus the axes themselves, ready for ``np.savez``:
+
+    - 'sd_kappa2': bound on sd(kappa_2)/kappa_2
+    - 'sd_share': bound on the instrument's share of the width
+    - 'sd_sigma': bound on sd(sigma)/sigma
+    - 'alignment': |cos| between the stiff direction and v + (pi^2/3) tau
+    - 'soft_over_stiff': the eigenvalue ratio of the effective block
+    - 'temperature_sensitivity': (d sigma/dT) T / sigma, the fractional
+      change in the fitted resolution per fractional error in a fixed
+      temperature
+    - 'separation', 'variance_status': codes, see 'separation_codes' and
+      'status_codes' in the result
+    - 'near_boundary_v': 1.0 where v is within boundary_sd bounds of 0
+    - 'condition_number', 'null_space_dim', 'n_energy', 'total_counts'
+
+    Nothing here depends on ``grid.width``: every reported number is
+    dimensionless.
+
+    Cells the model refuses stay NaN. Two ways that happens: a rising DOS
+    continued below E_F ('both_sides') turns negative inside the thermal
+    tail, which it does whenever the slope times the tail's reach exceeds
+    1; and, with no background, the mean underflows in a window many
+    sigma below the edge.
+    """
+    shape = (len(grid.ratios), len(grid.half_widths), len(grid.levels), len(grid.slopes),
+             len(grid.backgrounds), len(grid.temperature_modes), len(grid.dos_forms))
+    names = ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
+             "temperature_sensitivity", "separation", "variance_status", "near_boundary_v",
+             "condition_number", "null_space_dim", "n_energy", "total_counts")
+    out = {name: np.full(shape, np.nan) for name in names}
+
+    for i, ratio in enumerate(grid.ratios):
+        sigma, temperature = _scan_edge(grid, ratio)
+        for j, half in enumerate(grid.half_widths):
+            energy = np.arange(-half, half + 1e-12, grid.step) * grid.width
+            for m, slope in enumerate(grid.slopes):
+                dos = "flat" if slope == 0.0 else "linear"
+                edge = FermiEdge(ef=0.0, amplitude=grid.amplitude, sigma=sigma,
+                                 temperature=temperature, dos_c1=slope / grid.width, dos=dos)
+                for k, level in enumerate(grid.levels):
+                    for n, background in enumerate(grid.backgrounds):
+                        level_counts = grid.background_fraction * grid.amplitude
+                        if background == "none":
+                            bg = None
+                        elif grid.background_kind == "constant":
+                            bg = constant_background(energy, level_counts,
+                                                     estimated=background == "estimated")
+                        else:
+                            bg = linear_background(energy, level_counts, 0.0,
+                                                   estimated=background == "estimated")
+                        exposure = level
+                        if grid.normalization == "total_counts":
+                            unit = edge_fisher(energy, edge, bg, dos_form=grid.dos_forms[0])
+                            exposure = level / float(unit.expected_counts.sum())
+                        for p, mode in enumerate(grid.temperature_modes):
+                            sd = (grid.prior_fraction * temperature
+                                  if mode == "temperature_prior" else None)
+                            for q, form in enumerate(grid.dos_forms):
+                                try:
+                                    report = assess_edge_identifiability(
+                                        energy, edge, bg, exposure=exposure,
+                                        temperature_mode=mode, temperature_sd=sd,
+                                        thresholds=grid.thresholds, dos_form=form)
+                                except ValueError:
+                                    continue  # refused cell, left as NaN (see the docstring)
+                                index = (i, j, k, m, n, p, q)
+                                width = report.width
+                                out["sd_kappa2"][index] = width.sd_kappa2
+                                out["sd_share"][index] = width.sd_share
+                                out["sd_sigma"][index] = report.resolution.sd_sigma_bound / sigma
+                                out["alignment"][index] = width.alignment
+                                out["soft_over_stiff"][index] = (width.eigenvalues[0]
+                                                                 / width.eigenvalues[1])
+                                out["temperature_sensitivity"][index] = (
+                                    report.resolution.temperature_sensitivity * temperature / sigma)
+                                out["separation"][index] = _SEPARATION_CODE[report.separation]
+                                out["variance_status"][index] = _STATUS_CODE[
+                                    next(a.status for a in report.parameters
+                                         if a.name == "variance")]
+                                out["near_boundary_v"][index] = float(report.near_boundary_v)
+                                out["condition_number"][index] = report.condition_number
+                                out["null_space_dim"][index] = report.null_space_dim
+                                out["n_energy"][index] = energy.size
+                                out["total_counts"][index] = float(
+                                    report.fisher.expected_counts.sum())
+    out.update({"ratios": np.asarray(grid.ratios, dtype=np.float64),
+                "half_widths": np.asarray(grid.half_widths, dtype=np.float64),
+                "levels": np.asarray(grid.levels, dtype=np.float64),
+                "slopes": np.asarray(grid.slopes, dtype=np.float64),
+                "backgrounds": np.asarray(grid.backgrounds),
+                "temperature_modes": np.asarray(grid.temperature_modes),
+                "dos_forms": np.asarray(grid.dos_forms),
+                "separation_codes": np.asarray(list(_SEPARATION_CODE)),
+                "status_codes": np.asarray(list(_STATUS_CODE))})
+    return out
