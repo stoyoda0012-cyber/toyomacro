@@ -170,7 +170,18 @@ The report flags each boundary separately (`near_boundary_v`,
 is `not_separable` **τ's standard deviation is returned as `None`**, not
 as a large number: a number there invites a reader to use it. With the
 temperature fixed the verdict is `assumed`, which is a statement about
-the analysis and not about the data. `undersampled` — fewer than about
+the analysis and not about the data.
+
+`assumed` carries one asymmetry worth stating plainly, because it reads
+like a bug. A matrix with τ held has no (v, τ) block, so the width
+information reported alongside `assumed` is computed from the matrix
+that estimates *both* widths. It answers "could this spectrum have
+divided the width?", not "how well did this fit divide it?" — the
+second question has no answer, since a fit holding T fixed measured
+nothing about the split. Three fields have to be read together to see
+this, and a test pins all three: `separation` is `assumed`,
+`width.temperature_mode` is `free`, and `fisher.temperature_mode` is
+`fixed_temperature`. The two modes differing is the signal. `undersampled` — fewer than about
 two channels across the edge — takes precedence over `rank_deficient`
 for the width parameters, because the cure is different.
 

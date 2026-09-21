@@ -716,7 +716,13 @@ class EdgeWidthInformation:
         sd_share: bound on sd(x_v), the instrument's share of the width;
             inf if singular
         nuisance_null_dim: As in ``EffectiveInformation``
-        temperature_mode: Echo of the Fisher matrix's mode
+        temperature_mode: Echo of the Fisher matrix's mode -- which is
+            'free' or 'temperature_prior', never 'fixed_temperature',
+            since dividing a width needs both of its parts estimated.
+            When an ``EdgeIdentifiabilityReport`` was asked for a fixed
+            temperature this field says 'free' while the report's own
+            ``fisher.temperature_mode`` says 'fixed_temperature', and
+            the report's ``separation`` is 'assumed'.
     """
 
     kappa2: float
@@ -898,14 +904,26 @@ class EdgeIdentifiabilityReport:
 
     Attributes:
         parameters: One assessment per parameter
-        width: The (v, tau) block, unit-free
+        width: The (v, tau) block, unit-free. **With
+            ``temperature_mode='fixed_temperature'`` this comes from
+            the matrix that estimates both widths, not from the one
+            that was asked for** -- a matrix with tau held has no
+            (v, tau) block to report. So it answers 'could this
+            spectrum have divided the width?', not 'how well did this
+            fit divide it?', which is why ``separation`` is then
+            'assumed'. ``width.temperature_mode`` reads 'free' there
+            while ``fisher.temperature_mode`` reads
+            'fixed_temperature'; the two differing is the signal, not
+            a mistake. Every other field of this report comes from the
+            mode that was asked for.
         resolution: The Gaussian width and what it rests on
         separation: 'separable' when the bound on the instrument's share
             of the width is within ``thresholds.separation_sd``;
             'not_separable' when it is not, and ``sd_tau`` is then None;
-            'assumed' when the temperature was held fixed, where the
-            split is an assumption rather than a measurement;
-            'undersampled' when the edge is thinner than two channels
+            'assumed' when the temperature was held fixed -- the split is
+            then an assumption and not a measurement, whatever ``width``
+            reports (see ``width`` above); 'undersampled' when the edge
+            is thinner than two channels
         sd_variance: Bound on sd(v) (eV**2)
         sd_tau: Bound on sd(tau) (eV**2), or None when not separable
         near_boundary_v: v within ``boundary_sd`` bounds of 0
@@ -1030,7 +1048,17 @@ def assess_edge_identifiability(
         thresholds: Defaults to ``EdgeThresholds()``
 
     Returns:
-        EdgeIdentifiabilityReport
+        EdgeIdentifiabilityReport.
+
+        One field does not come from ``temperature_mode``: with
+        ``'fixed_temperature'`` there is no (v, tau) block to report, so
+        ``report.width`` is computed from the matrix that estimates both
+        widths and ``report.separation`` is ``'assumed'``. It answers
+        what this spectrum could have said about the split, not what a
+        fit holding T fixed measured -- that fit measured nothing about
+        it. ``report.width.temperature_mode`` reads ``'free'`` there,
+        beside a ``report.fisher.temperature_mode`` of
+        ``'fixed_temperature'``.
     """
     thresholds = thresholds or EdgeThresholds()
     fisher = edge_fisher(energy, edge, background, parameterization="var_tau",

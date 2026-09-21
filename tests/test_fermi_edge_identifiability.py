@@ -938,3 +938,35 @@ def test_the_unit_weight_estimator_stays_above_the_bound(fwhm, temperature, rati
     sandwich = resolution.sd_estimator / (2.0 * sigma)
     assert sandwich / resolution.sd_sigma_bound == pytest.approx(ratio, abs=0.05)
     assert "unit" in resolution.estimator
+
+
+def test_a_fixed_temperature_report_says_where_its_width_block_came_from():
+    """With the temperature held fixed there is no (v, tau) block to
+    report, so ``width`` comes from the matrix that estimates both -- the
+    same numbers a 'free' report gives. That is deliberate: it answers
+    what the spectrum could have said about the split, not what a fit
+    holding T fixed measured, which is nothing. A reader must be able to
+    tell that from the object alone, so three things have to line up:
+    ``separation`` is 'assumed', ``width.temperature_mode`` is 'free',
+    and ``fisher.temperature_mode`` is 'fixed_temperature'."""
+    fixed = _report(temperature_mode="fixed_temperature")
+    free = _report(temperature_mode="free")
+
+    assert fixed.separation == "assumed"
+    assert fixed.width.temperature_mode == "free"
+    assert fixed.fisher.temperature_mode == "fixed_temperature"
+    assert fixed.resolution.temperature_mode == "fixed_temperature"
+
+    # the width block is the free one, to the last bit
+    assert fixed.width.sd_share == free.width.sd_share
+    assert fixed.width.kappa2 == free.width.kappa2
+    np.testing.assert_array_equal(fixed.width.effective, free.width.effective)
+    # while everything the mode does own differs
+    assert fixed.sd_variance < free.sd_variance
+    assert "tau" not in [p.name for p in fixed.parameters]
+
+    # and a prior is a third case again: its own matrix, its own verdict
+    prior = _report(temperature_mode="temperature_prior", temperature_sd=10.0)
+    assert prior.width.temperature_mode == "temperature_prior"
+    assert prior.separation in ("separable", "not_separable")
+    assert prior.width.sd_share < free.width.sd_share
