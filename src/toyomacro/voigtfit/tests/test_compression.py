@@ -39,11 +39,31 @@ def _median_time(fn, repeats=5, warmup=3):
     return float(np.median(times))
 
 
-# Decoding and copying the same array are both memory-bandwidth bound, so
-# a decode/copy ratio moves with the machine where an absolute rate does
-# not. This bound therefore has to absorb drift in that ratio, not
-# differences in hardware speed. Measured on a 4-vCPU cloud Xeon:
-# 8.6-10.9 for the fitpara codec, 6.3-7.3 for the array codec.
+# Gate decode against a copy of the array it produces, rather than against
+# an absolute spec/s. An absolute rate is not calibratable here: the same
+# workload measures 16.1-17.0M spec/s inside a full pytest run and
+# 22.7-33.3M standalone on this host, so the harness moves it further than
+# some hardware does.
+#
+# The two sides are NOT symmetric, and the bound has to be read with that
+# in mind. A copy is bandwidth-bound; decode is not. Decomposed on the
+# array codec (40 MB payload, 4-vCPU Xeon @2.80GHz):
+#
+#     lz4.frame.decompress   27.8 ms   73.5% of decode   1.44 GB/s out
+#     frombuffer().copy()     5.4 ms   14.3% of decode
+#     bare ndarray.copy()     5.3 ms                    15.0 GB/s (r+w)
+#
+# Decode moves 80 MB and the copy moves 80 MB, so a bandwidth-only floor
+# would be 1.0; the measured ratio is ~7 because the LZ4 token loop runs
+# an order of magnitude below memcpy per byte. For the fitpara codec the
+# int16 -> float32 dequantise dominates instead. The ratio is therefore
+# (scalar, branchy) / (streaming copy), and those track each other only
+# loosely across microarchitectures -- the bound is deliberately far above
+# anything measured rather than tight.
+#
+# Measured ratios, five runs each on that host: 10.3-13.2 (fitpara),
+# 6.7-7.4 (array). Not established on other hardware: the CI matrix
+# (ubuntu + macOS x 3.11/3.12) passes, but records no value.
 MAX_DECODE_OVER_COPY = 40
 
 
@@ -160,20 +180,26 @@ class TestFitparaCodec:
         assert compressed.compressed_size < compressed.original_size / 3
 
     def test_decode_speed(self):
-        """Decoding costs the same order as touching the data once.
+        """Decode stays within a fixed multiple of copying its output.
 
         The claim this guards is that decode does not bottleneck the E2E
         pipeline, which is a statement about cost relative to the data,
         not an absolute rate -- so the assertion is a ratio against a
         plain copy of the array decode produces.
 
-        An absolute target cannot be calibrated here. The same
-        Ryzen 9 8940HX measures 8.5M spec/s on the sibling array codec
-        under WSL2 and 35.8M natively: a 4.2x spread from the execution
-        environment alone, on one piece of silicon. A decode/copy ratio
-        moves with the machine instead, because both operations are
-        memory-bandwidth bound. See the decode_speed history in
-        docs/CUDA_BACKEND_POC.md.
+        An absolute target was not calibratable: this workload measures
+        16.1-17.0M spec/s inside a full pytest run and 22.7-33.3M
+        standalone on one host, and the published figures for it span
+        3.4M to 35.8M across environments whose measurement commands
+        differ (see the decode_speed history in
+        docs/CUDA_BACKEND_POC.md).
+
+        Validity limit: this is not a bandwidth-vs-bandwidth comparison.
+        Decode here is dominated by the int16 -> float32 dequantise loop,
+        the copy by memcpy, so the ratio is compute over bandwidth and is
+        only loosely stable across microarchitectures. See
+        MAX_DECODE_OVER_COPY for the decomposition and the measured
+        range; the bound is set far above it rather than tight.
         """
         fitpara = generate_realistic_fitpara(1000000, n_comp=3)
         codec = FitparaCodec()
@@ -369,14 +395,20 @@ class TestArrayLZ4Compression:
         np.testing.assert_array_equal(otherpara, restored)
 
     def test_decode_speed(self):
-        """Decoding a large array costs the same order as copying it.
+        """Decode of a large array stays within a fixed multiple of a copy.
 
-        A ratio for the same reason as `TestFitparaCodec.test_decode_speed`:
-        this is the codec whose absolute rate moves 4.2x between WSL2 and
-        native Windows on one machine. Note that decode is *slower* than
-        encode here -- the payload is nearly constant, so compression is
-        almost free while decompression still writes 40 MB -- which is
-        why encode is not the baseline.
+        A ratio for the same reason as `TestFitparaCodec.test_decode_speed`.
+        Two things worth knowing about this one:
+
+        Encode is not the baseline because decode is *slower* than encode
+        here -- a nearly constant payload compresses almost for free,
+        while decompression writes 80 MB (40 MB out of LZ4, then 40 MB
+        again through `np.frombuffer(...).copy()`).
+
+        That second copy is literally the operation this test compares
+        against, so the ratio has a structural floor near 1, and the
+        headroom above it is the LZ4 token loop -- 73.5% of decode at
+        1.44 GB/s against 15.0 GB/s for memcpy on the host measured.
         """
         n_spectra = 1_000_000
 
