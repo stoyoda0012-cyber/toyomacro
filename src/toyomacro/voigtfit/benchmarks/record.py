@@ -179,8 +179,13 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
         # A sample taken after the benchmark contains the benchmark. Only
         # the processes that are NOT us say whether the host was shared.
         others = [(v, n) for v, n, pid in rows_pid if pid not in skip]
+        others.sort(reverse=True)
         snap["cpu_percent_others"] = round(sum(v for v, _ in others), 1)
         if exclude_self:
+            # Must be re-sorted: `rows_pid` is in iteration order, so
+            # taking the first `top_n` of it drops the heaviest consumer
+            # whenever idle processes happen to come first -- in the one
+            # sample the verdict is based on.
             rows = others
         # These records are committed to a public repository, so the
         # process list discloses which applications the machine runs.
@@ -303,10 +308,13 @@ def assess_quality(load: dict, steal: float | None,
     -- it was that nothing recorded the busyness.
     """
     reasons: list[str] = []
-    if load.get("looks_quiet") is False:
-        # Cite the sample that actually decided. When a before-sample is
-        # present it is the judge, so quoting the trailing load average
-        # would name a number that did not determine the verdict.
+    # `looks_quiet` is composite: a busy start OR foreign load mid-run sets
+    # it False. Only the first of those is a statement about load average,
+    # so gate on the load verdict itself -- otherwise a genuinely idle
+    # 0.7-on-32-cores gets printed as a reason the host was contended.
+    load_verdict = load.get("looks_quiet_before",
+                            load.get("looks_quiet"))
+    if load_verdict is False:
         before = load.get("load_average_before")
         la = (before or load.get("load_average") or [None])[0]
         which = "before the run" if before else "after the run"
@@ -519,7 +527,7 @@ def environment(command: str | None = None, origin: str | None = None,
     """
     if command is None:
         command = sanitize_command(sys.argv)
-    load = load_snapshot()
+    load = load_snapshot(exclude_self=True)
     if load_before is not None:
         # **The BEFORE sample decides.** A load average taken afterwards
         # necessarily contains the benchmark that just ran, so on a CPU
@@ -534,6 +542,7 @@ def environment(command: str | None = None, origin: str | None = None,
         load["cpu_percent_before"] = load_before.get("cpu_percent")
         load["top_processes_before"] = load_before.get("top_processes")
         load["looks_quiet_after_incl_self"] = load.get("looks_quiet")
+        load["looks_quiet_before"] = load_before.get("looks_quiet")
         load["looks_quiet"] = load_before.get("looks_quiet")
         # The after sample still earns a say, but only through processes
         # that are not ours: that is work which appeared mid-run.
@@ -541,6 +550,9 @@ def environment(command: str | None = None, origin: str | None = None,
         cores = load.get("logical_cores")
         if others is not None and cores:
             load["others_busy_after"] = others > 25.0 * cores
+            load["others_busy_convention"] = (
+                "cpu_percent_others > 25 * logical_cores, where 100 = one "
+                "core; a convention, not a calibrated threshold")
             if load["others_busy_after"] and load["looks_quiet"]:
                 load["looks_quiet"] = False
         load["sampled"] = (

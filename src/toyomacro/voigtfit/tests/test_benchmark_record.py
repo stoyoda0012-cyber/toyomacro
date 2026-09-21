@@ -398,3 +398,55 @@ class TestVerdictUsesTheBeforeSample:
         assert "cpu_percent_others" in snap
         names = [r["name"] for r in snap["top_processes"] or []]
         assert not any("pytest" in n for n in names), names
+
+
+class TestRoundTwoAuditFindings:
+    """Defects the fixes for round 1 introduced. Both were real."""
+
+    def test_excluded_sample_stays_sorted(self):
+        """`exclude_self` rebuilt the list from unsorted iteration order,
+        so the heaviest consumer could fall past `top_n` — in the one
+        sample the verdict is based on."""
+        snap = record.load_snapshot(interval=0.2, top_n=5, exclude_self=True)
+        rates = [p["cpu_percent"] for p in snap["top_processes"] or []]
+        assert rates == sorted(rates, reverse=True), rates
+
+    def test_both_samples_are_sorted(self):
+        for excl in (False, True):
+            snap = record.load_snapshot(interval=0.1, top_n=5,
+                                        exclude_self=excl)
+            rates = [p["cpu_percent"] for p in snap["top_processes"] or []]
+            assert rates == sorted(rates, reverse=True), (excl, rates)
+
+    def test_idle_load_is_not_given_as_a_reason_for_contention(self):
+        """Foreign load mid-run condemned the record, and the reason
+        printed was an emphatically quiet load average."""
+        load = {"looks_quiet": False, "looks_quiet_before": True,
+                "load_average_before": [0.7, 0.5, 0.4], "logical_cores": 32,
+                "others_busy_after": True, "cpu_percent_others": 3000.0}
+        q = record.assess_quality(load, None, None)
+        assert q["verdict"] == "contended"
+        assert not any("load average" in r for r in q["reasons"]), q["reasons"]
+        assert any("other processes" in r for r in q["reasons"])
+
+    def test_a_busy_start_still_cites_its_load(self):
+        load = {"looks_quiet": False, "looks_quiet_before": False,
+                "load_average_before": [12.0, 12.0, 12.0],
+                "logical_cores": 32}
+        q = record.assess_quality(load, None, None)
+        assert any("12.0 before the run" in r for r in q["reasons"])
+
+    def test_the_before_verdict_survives_the_composite(self):
+        """Overwriting looks_quiet destroyed the before-sample's own answer."""
+        before = {"load_average": [0.5, 0.5, 0.5], "looks_quiet": True,
+                  "cpu_percent": 1.0, "top_processes": []}
+        env = record.environment(origin="t", load_before=before)
+        assert env["load"]["looks_quiet_before"] is True
+        assert "looks_quiet_after_incl_self" in env["load"]
+
+    def test_the_others_threshold_is_recorded(self):
+        before = {"load_average": [0.5, 0.5, 0.5], "looks_quiet": True,
+                  "cpu_percent": 1.0, "top_processes": []}
+        env = record.environment(origin="t", load_before=before)
+        if env["load"].get("others_busy_after") is not None:
+            assert "others_busy_convention" in env["load"]

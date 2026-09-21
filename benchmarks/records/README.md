@@ -65,9 +65,11 @@ four machines pushing to one repository never conflict.
 
 No filesystem path, no interpreter location, no repository location, no
 sibling project's version. Paths in the recorded command line are
-reduced to bare filenames. `tests/test_benchmark_record.py` asserts
-this; treat a failure there as a repository-wide problem rather than a
-benchmark one.
+reduced to bare filenames.
+`src/toyomacro/voigtfit/tests/test_benchmark_record.py` asserts this;
+treat a failure there as a repository-wide problem rather than a
+benchmark one. Run it by that full path — `pytest` on a non-existent
+path exits 0.
 
 Process names in the load snapshot **are** recorded, because they are
 what makes a contended record diagnosable — an orphaned worker pool is

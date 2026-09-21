@@ -519,7 +519,13 @@ def main(argv: list[str] | None = None) -> None:
 
     load = report["environment"]["load"]
     if load.get("looks_quiet") is False:
-        print(f"\nWARNING: load average {load['load_average'][0]:.1f} on "
+        # Quote the sample that decided, not the trailing one -- printing a
+        # different number from the verdict is how a reader learns to
+        # distrust both.
+        la = (load.get("load_average_before") or load.get("load_average")
+              or [None])[0]
+        where = "before the run" if load.get("load_average_before") else ""
+        print(f"\nWARNING: load average {la:.1f} {where} on "
               f"{load['logical_cores']} cores - this host was busy. "
               "Throughput here is not comparable with a record taken on an "
               "idle machine.", flush=True)

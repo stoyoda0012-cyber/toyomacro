@@ -150,11 +150,16 @@ thresholds, which points at the thresholds. No performance claim
 anywhere derives from M3.
 
 **A Linux-only measurement bug, fixed.** `ru_maxrss` is in kibibytes on
-Linux; `memory.get_rss_gb` converted it at 1000 bytes per kilobyte, and
-five benchmark modules treated it as bytes outright, so peak-RSS figures
-measured on M2 or M3 were wrong by 1000x or 1024x depending on the call
-site. All six call sites now go through `memory.get_peak_rss_bytes()`,
-which converts at 1024 and reads the peak working set through psutil on
+Linux, and two different mistakes were made about it.
+`memory.get_rss_gb` converted at 1000 bytes per kilobyte rather than
+1024, which is **2.4% low**; four benchmark modules —
+`bench_gvrt_1b`, `benchmark_mlx_pipeline`, `bottleneck_analysis` and
+`chunk_optimization_benchmark` — treated the value as bytes outright,
+which is **1024x low**. A fifth, `bench_gvrt_multipeak_1b`, branched on
+the platform and was already correct.
+
+All six call sites now go through `memory.get_peak_rss_bytes()`, which
+converts at 1024 and reads the peak working set through psutil on
 Windows. No published number was affected — the figures come from M1,
 where `ru_maxrss` is already in bytes.
 
@@ -251,7 +256,10 @@ Records are committed, so the schema deliberately carries no filesystem
 path, no interpreter location, no repository path and no sibling
 project's version; process names in the load snapshot are bare names.
 `record.py` states this as its contract and
-`tests/test_benchmark_record.py` asserts it.
+`src/toyomacro/voigtfit/tests/test_benchmark_record.py` asserts it.
+(Note the path: `pytest` on a path that does not exist reports "no tests
+ran" and exits **0**, so a wrong path here would read as a passing
+check.)
 
 ### When a record disagrees with a published number
 

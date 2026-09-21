@@ -111,6 +111,12 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
         if len(batches) > 1:
             print(f"   !! mixed batch sizes {batches} - these rows are NOT "
                   "comparable with each other")
+        group_hashes = {r.get("problem", {}).get("input_sha256")
+                        for r in recs} - {None}
+        if len(group_hashes) > 1:
+            print(f"   !! {len(group_hashes)} different input hashes pooled "
+                  "into the rows below - throughput compares, accuracy does "
+                  "not")
 
         # Only quiet records feed the table. Falling back to contended
         # ones and then printing "excluded" in the footer would make the
