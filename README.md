@@ -391,9 +391,12 @@ uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check .                              # lint (what CI runs)
 ```
 
-CI (GitHub Actions) runs the full suite on Ubuntu and macOS for
-Python 3.11 / 3.12 on every push. See
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI (GitHub Actions) runs the full suite on Ubuntu, macOS and Windows
+for Python 3.11 / 3.12 on every push. See
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). The accelerated
+MLX path is Apple-Silicon only and no runner provides one, so every
+platform in CI exercises the NumPy backend; the Metal path is covered
+by the headless-Mac job and by hand.
 
 ## Citing
 

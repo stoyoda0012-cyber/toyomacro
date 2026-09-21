@@ -14,8 +14,8 @@ CUDA support claim come later, if the PoC passes.
 `toyomacro.voigtfit` currently has two verified backends:
 
 1. **MLX (Metal)** on Apple Silicon — the accelerated path.
-2. **NumPy** everywhere else — CI-tested on Ubuntu and macOS; selected
-   automatically when MLX is absent or unusable, or forced with
+2. **NumPy** everywhere else — CI-tested on Ubuntu, macOS and Windows;
+   selected automatically when MLX is absent or unusable, or forced with
    `TOYOMACRO_DISABLE_MLX=1`.
 
 MLX itself now ships an official CUDA backend for Linux
