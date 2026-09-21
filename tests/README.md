@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,232 automated tests** across **84 files**, in two
+This suite has **2,231 automated tests** across **84 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 47 | 1,249 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 983 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 37 | 982 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,800 tests, 80%) — guarantee the library
+- **Contract / regression** (1,799 tests, 80%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,220. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,219. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -147,9 +147,9 @@ them would take real coverage with them:
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (983)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (982)
 
-### Solvers & fitting core (297)
+### Solvers & fitting core (296)
 | Tests | File | Guards |
 |--:|---|---|
 | 68 | `test_dictionary_solver.py` | δE / δE×δσ dictionary solver (single & two-peak) |
@@ -162,7 +162,7 @@ them would take real coverage with them:
 | 17 | `test_ds_basis.py` | Doniach-Sunjic basis generation (amplitude-only) |
 | 15 | `test_gp_lm.py` | GP Levenberg-Marquardt acceptance rules and background designs |
 | 5 | `test_integration.py` | Synthetic accuracy + MATLAB bridge + performance |
-| 3 | `test_voigtfit.py` | Top-level smoke |
+| 2 | `test_voigtfit.py` | Top-level smoke |
 | 1 | `test_pipeline_mlx.py` | MLX pipeline smoke |
 
 ### GVRT & encoders — paper reproduction (225)
