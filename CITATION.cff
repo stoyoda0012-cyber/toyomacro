@@ -14,8 +14,8 @@ authors:
     affiliation: >-
       Advanced Equipment Division, Vacuum Products Corporation,
       Tokyo, Japan
-version: 0.2.0
-date-released: '2026-09-19'
+version: 0.3.0
+date-released: '2026-09-21'
 doi: 10.5281/zenodo.22092076
 identifiers:
   - type: doi

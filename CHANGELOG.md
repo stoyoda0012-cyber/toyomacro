@@ -8,6 +8,22 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-21
+
+### Known issues
+
+- **`fermi_edge_identifiability`: tau's bound is withheld in one field
+  and offered in another.** Where the width split is `not_separable`,
+  `EdgeIdentifiabilityReport.sd_tau` is `None` — a number there invites
+  a reader to use it — but `report.parameters` still carries the same
+  bound, with a status computed against the edge's own width, where
+  "tau known to a few percent of kappa_2" can read `identified`.
+  Knowing tau to a fraction of the edge width is not knowing the
+  temperature, and `assess_edge_identifiability`'s docstring says so;
+  the object does not yet. Making the two agree needs a new status
+  value, so it waits for a release that is changing labels. See
+  `docs/design/fermi-edge-identifiability.md` §10.
+
 ### Added
 
 - **`fitting.fermi_edge_identifiability` (experimental): whether a Fermi
@@ -1348,6 +1364,7 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0
