@@ -769,15 +769,25 @@ class FitparaCodec:
     - Compressed: 17.7 MB (6.1x compression)
     - Max relative error: 0.14% (amplitude) -- a bound, not a typical value
 
-    No decode rate is quoted, because it is machine-dependent and this
-    docstring had no recorded machine for the one it used to quote.
-    "30M spec/s (exceeds 28M target)" does not reproduce: a 4-vCPU Xeon
-    @2.80GHz measures 5.2M spec/s on this exact workload, and no run
-    recorded anywhere in this repository has reached 30M. Neither that
-    figure nor the "28M target" has provenance -- both trace only to the
-    squashed import commit. For what is established across hosts, and
-    why an absolute rate is not calibratable for this codec, see
-    docs/CUDA_BACKEND_POC.md.
+    Decode speed is machine-bound, and the figure this docstring used to
+    quote -- "30M spec/s (exceeds 28M target)" -- was an Apple M3 Max
+    measurement that lost its attribution, not a wrong number. The
+    package header records the machine for its sibling: "Performance
+    (8K image = 33M spectra; recorded on Apple M3 Max) ... Roundtrip
+    E2E: 28M spec/s" (see toyomacro/voigtfit/__init__.py). So the "28M
+    target" is that pipeline's end-to-end rate on that host, and this
+    test's own docstring says the same thing in words -- decode must not
+    bottleneck the E2E pipeline. Only the decode line lost its label.
+
+    It is removed rather than restated because it has not been
+    re-derived on a quiet machine. Measured on this exact workload: a
+    contended M3 Max (1-minute load ~11 of 16 cores) gives 20.1-20.8M
+    spec/s by direct call and 16.4M under pytest -- a lower bound, 32%
+    short of 30M, and the only host to have met the 20M gate. Two
+    4-vCPU virtualised Xeons give 4.7-6.7M, and a Ryzen 9 8940HX 3.4M
+    under WSL2 and 4.9M natively. A figure from one of those would be
+    just as unportable as the one it replaced. For the measured range
+    with the command beside every entry, see docs/CUDA_BACKEND_POC.md.
     """
 
     # Column indices for fitpara format

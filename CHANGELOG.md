@@ -32,19 +32,23 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
-- **`FitparaCodec` no longer advertises a decode rate it cannot
-  reproduce.** The class docstring claimed "Decode speed: 30M spec/s
-  (exceeds 28M target)" for a 1M x 3-component workload, and
-  `FitparaCodecConfig` claimed "30M+ spec/s". Measured on that exact
-  workload, a 4-vCPU Xeon @2.80GHz reaches 5.2M spec/s -- 5.8x below the
-  claim -- and no run recorded anywhere in this repository has reached
-  30M. Neither the figure nor the "28M target" has provenance; both
-  trace only to the squashed import commit. The size and accuracy
-  figures in the same block are deterministic and do reproduce
-  (108.0 MB, 17.6 MB, 6.15x, 0.130% against a stated 0.14% bound), so
-  they are kept and re-verified; the decode rate is removed rather than
-  restated, because it is machine-dependent and no machine was ever
-  recorded for it. No behaviour changes.
+- **`FitparaCodec` no longer advertises an unattributed decode rate.**
+  The class docstring claimed "Decode speed: 30M spec/s (exceeds 28M
+  target)" for a 1M x 3-component workload, and `FitparaCodecConfig`
+  claimed "30M+ spec/s", with no machine named. The "28M target" is the
+  E2E roundtrip rate the package header records for an Apple M3 Max
+  (`voigtfit/__init__.py`), and the decode figure comes from the same
+  block; only it lost the attribution. Measured on that exact workload,
+  a contended M3 Max gives 20.1-20.8M spec/s by direct call and 16.4M
+  under pytest; two 4-vCPU virtualised Xeons give 4.7-6.7M and a
+  Ryzen 9 8940HX 3.4M under WSL2, 4.9M natively -- a span of six times
+  across hosts, and about a quarter again within one host depending on
+  the command. The rate is therefore removed rather than restated on
+  any one of them, and the docstring now says which machine the claim
+  came from and what has since been measured where. The size and
+  accuracy figures in the same block are deterministic, reproduce, and
+  are kept (108.0 MB, 17.6 MB, 6.15x, 0.130% against a stated 0.14%
+  bound). No behaviour changes.
 
 - **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`
   and five modules under `voigtfit/benchmarks/` imported the Unix-only

@@ -584,12 +584,23 @@ hardware:
 
 | host | command | fitpara | array |
 |---|---|---|---|
-| Ryzen, WSL2 | `pytest src/toyomacro/voigtfit/tests` | 3.4M spec/s | 8.5M spec/s |
-| Ryzen, native | bare `pytest` (both roots) | 4.9M spec/s | 35.8M spec/s |
-| Xeon, 4 vCPU | two tests in isolation | 3.9–4.0M spec/s | 16.1–17.0M spec/s |
-| Xeon, 4 vCPU | bare `pytest` (both roots) | 3.8M, 6.0M | > 50M (passed) |
-| Xeon, 4 vCPU | direct call, 5 runs | 5.2–6.7M spec/s | 22.7–33.3M spec/s |
+| Ryzen 9 8940HX, WSL2 | `pytest src/toyomacro/voigtfit/tests` | 3.4M spec/s | 8.5M spec/s |
+| Ryzen 9 8940HX, native Win11 | bare `pytest` (both roots) | 4.9M spec/s | 35.8M spec/s |
+| Xeon @2.80GHz, 4 vCPU | two tests in isolation, ×5 | 3.9–4.0M spec/s | 16.1–17.0M spec/s |
+| Xeon @2.80GHz, 4 vCPU | bare `pytest` (both roots) | 3.8M, 6.0M | > 50M (passed) |
+| Xeon @2.80GHz, 4 vCPU | direct call, ×5 | 5.2–6.7M spec/s | 22.7–33.3M spec/s |
+| Xeon @2.10GHz, 4 vCPU | direct call, ×8 | 4.7–5.7M spec/s | 19.8–23.4M spec/s |
+| Apple M3 Max, load ≈11 | `pytest` | 16.4M spec/s | — |
+| Apple M3 Max, load ≈11 | direct call, ×7 | 20.1–20.8M spec/s | — |
 | target | | 20M | 50M |
+
+Two of those Xeon rows are not the same machine: the container was
+re-provisioned mid-session from a 2.80GHz part to a 2.10GHz one, which
+is why its figures drop. Both are 4-vCPU virtualised instances with
+hypervisor steal measured at 0.00–0.01% over the measurement windows,
+so contention is not what separates them. The M3 Max rows were taken
+under a 1-minute load average of about 11 on 16 cores and are therefore
+lower bounds on that host, not clean figures.
 
 **No WSL2 cost can be read off this table.** An earlier draft asserted
 1.44× and 4.21× from the first two rows; those rows differ in the
@@ -597,20 +608,27 @@ command as well as the environment, and the section above already
 records that the command alone moves the array figure from ~16.7M to
 over 50M on one host. The difference-of-differences is not attributable.
 
-What survives, comparing like with like:
+What survives:
 
-- **The 20M target was not met by any measurement here.** The best is
-  6.0M, on this Xeon under a bare `pytest` — not the 4.9M an earlier
-  draft called the best, which came from a different host *and* a
-  different command. Still 3.3× under.
-- **The 50M target is within reach of real hardware.** Native Ryzen
-  35.8M and this Xeon 22.7–33.3M standalone are the same order; the
-  Xeon is at rough parity, not the 2.1× slower an earlier draft
-  claimed. Neither clears 50M, but neither misses it by the margin the
-  20M gate misses by.
+- **Only an Apple host has met the 20M target.** A contended M3 Max
+  reaches 20.1–20.8M by direct call; the best x86 figure on any host,
+  command or clock is 6.7M, 3.0× under. An earlier draft called 6.0M
+  the best and computed 3.3× from it, while a row of this same table
+  recorded 6.7M — the superlative was updated without being re-derived
+  against the data added beside it.
+- **The 50M target has been met once**, by this Xeon under a bare
+  `pytest` (> 50M, passed). Comparing like with like is only possible
+  within a command: by direct call the Ryzen has no figure, the two
+  Xeons give 19.8–33.3M, and under a bare `pytest` the Ryzen gives
+  35.8M against the Xeon's > 50M. An earlier draft compared the Ryzen's
+  bare-`pytest` figure to a Xeon direct call and read "rough parity"
+  off it; that is a cross-command comparison, the thing this section
+  exists to stop.
 - **The spread is dominated by measurement context, not by silicon.**
-  On this one Xeon the array figure spans 16.1M to over 50M depending
-  only on what else pytest collected.
+  On one Xeon the array figure spans 16.1M to over 50M on collection
+  scope alone, and the same pattern appears on Apple hardware: 16.4M
+  under `pytest` against 20.1–20.8M by direct call. That is the finding
+  this table is for, and it is the one that holds across every host.
 
 ### What was done about it
 
