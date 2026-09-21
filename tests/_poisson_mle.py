@@ -44,7 +44,6 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import minimize
-from scipy.special import xlogy
 
 from toyomacro._bootstrap import fit_poisson_mle as core_fit
 from toyomacro._bootstrap import poisson_deviance

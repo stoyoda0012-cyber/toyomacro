@@ -780,7 +780,7 @@ def test_scan_has_an_axis_per_condition_and_saves(scan, tmp_path):
     shape = (len(grid.ratios), len(grid.half_widths), len(grid.levels), len(grid.slopes),
              len(grid.backgrounds), len(grid.temperature_modes), len(grid.dos_forms))
     for name in ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
-                 "temperature_sensitivity", "separation", "variance_status", "near_boundary_v",
+                 "temperature_sensitivity_relative", "separation", "variance_status", "near_boundary_v",
                  "condition_number", "null_space_dim", "n_energy", "total_counts"):
         assert out[name].shape == shape, name
     np.savez(tmp_path / "scan.npz", **out)
@@ -795,7 +795,7 @@ def test_nothing_in_the_scan_depends_on_the_energy_unit(scan):
     _, out = scan
     other = fi.scan_edge_identifiability(fi.EdgeScanGrid(width=0.4))
     for name in ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
-                 "temperature_sensitivity", "separation", "near_boundary_v", "n_energy"):
+                 "temperature_sensitivity_relative", "separation", "near_boundary_v", "n_energy"):
         np.testing.assert_allclose(other[name], out[name], rtol=1e-9, equal_nan=True, err_msg=name)
 
 

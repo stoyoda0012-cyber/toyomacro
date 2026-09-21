@@ -46,16 +46,18 @@ Validity and limits -- read before trusting a number:
   low counts (~100 per channel) the pulls widen to about 1.25, partly
   because the weights are taken from the data. With the **default unit
   weights** on counts that span the background and the plateau,
-  ``ef_err`` runs 8 to 21% below the actual scatter of E_F; when
+  ``ef_err`` runs 9 to 20% below the actual scatter of E_F; when
   ``intensity`` is raw counts, ``poisson_err`` carries the sandwich
   covariance of the same estimator, which does not make that
   assumption.
 - **The DOS is flat below E_F and rises above it**, so its slope changes
   at E_F. That kink is an assumption about the sample, and it is not
   free: on simulated data whose DOS instead runs smoothly through E_F,
-  the fitted resolution comes out low by 0.19 to 1.7 of its own error
+  the fitted resolution comes out low by 0.19 to 1.55 of its own error
   bar once kT is comparable with the resolution, and at kT/sigma = 0.1
-  not at all. A DOS with curvature through E_F that ``dos='linear'``
+  not at all. Past that it stops being merely biased: it collapses onto
+  its lower bound and the fit reports itself a failure, naming the
+  parameter. A DOS with curvature through E_F that ``dos='linear'``
   cannot hold moved E_F by up to 49 meV -- an energy-axis calibration
   error, not a resolution one -- which ``dos='quadratic'`` removes.
   Refit with both and treat the spread as a systematic:
@@ -88,9 +90,11 @@ Validity and limits -- read before trusting a number:
   clearly right, and understate it because all three share the
   Gaussian, no-lifetime assumptions. On simulated data where the true
   DOS is known, the spread between the two ``dos_form`` values recovered
-  63 to 110% of the actual bias of the resolution; that is the evidence
-  for using a spread this way, and it is evidence from one model family
-  over one range of conditions, not a general result.
+  54 to 103% of the actual bias of the resolution, worst where the
+  misspecification is strongest. That is the evidence for using a
+  spread this way, and it says to read it as a *lower bound* on the
+  systematic; it is also evidence from one model family over one range
+  of conditions, not a general result.
 
 Origin: a generalisation of ``toyomacro.lineshape.FermiDirac`` (same
 model on a binding-energy axis, :func:`fermi_edge` adds kinetic axes and
@@ -343,16 +347,23 @@ class FermiEdgeResult:
     was raw counts**, keyed by the names above (``'ef'``, ``'resolution'``,
     ``'temperature'``, ``'amplitude'``, ``'dos_c1'``, ``'dos_c2'``,
     ``'bg_const'``, ``'bg_slope'``), for the parameters that were fitted.
+    **Empty when ``intensity`` is not non-negative integers**, since
+    nothing else here can tell raw counts from counts per second or from
+    a spectrum that has had a background subtracted, and the sandwich is
+    wrong by sqrt(dwell) on the wrong scale. Also empty if the
+    covariance was singular.
 
     The ``*_err`` fields are what a least-squares solver reports: the
     covariance scaled by the reduced chi-squared, which is the right
     answer only if every channel had the same variance. Poisson channels
     do not -- on a Fermi edge the mean runs from the background to the
-    plateau. Over a 53-fold range of it, 300 simulated realisations at
-    each of three kT/sigma with the temperature fixed, ``ef_err`` came
-    out 8 to 21% smaller than the actual scatter of E_F, while this
-    field was within 12% of it; for the resolution the two agree, both
-    within 20%. Empty if the covariance was singular.
+    plateau. Over a 53-fold range of it, nine runs of 400 simulated
+    realisations (three kT/sigma x three seeds) with the temperature
+    fixed, ``ef_err`` came out 9 to 20% smaller than the actual scatter
+    of E_F while this field was within 10% of it. For the resolution the
+    two agree with each other and are within 25% of the scatter; the
+    worst of that is at kT/sigma = 3, where a sixth of the fits are
+    rejected and the survivors are a selected subset.
 
     With the temperature *fitted* neither describes the scatter: the
     estimator is then pinned by its bounds and the linearisation both
@@ -604,8 +615,16 @@ def fit_fermi_edge(
     # same estimator, (G'WG)^-1 G'W diag(mu) WG (G'WG)^-1, with mu the
     # fitted model. result.jac is G scaled by sqrt(W), so G'WG = J'J and
     # the middle factor is J' diag(W mu) J.
+    # Only for raw counts. Nothing else here can tell counts from
+    # counts-per-second or from a background-subtracted spectrum, and a
+    # sandwich built on the wrong scale is wrong by sqrt(dwell) -- a larger
+    # error than the one this field exists to remove. Non-integer
+    # intensities leave it empty rather than quietly wrong.
     poisson_err: dict[str, float] = {}
+    counts_like = bool(np.all(Y >= 0.0) and np.all(Y == np.rint(Y)))
     try:
+        if not counts_like:
+            raise np.linalg.LinAlgError
         a_inv = np.linalg.inv(result.jac.T @ result.jac)
         middle = result.jac.T @ (result.jac * (W * np.maximum(fit_curve, 0.0))[:, np.newaxis])
         sandwich = np.sqrt(np.clip(np.diag(a_inv @ middle @ a_inv), 0.0, np.inf))
@@ -675,18 +694,22 @@ class DosFormComparison:
     How far the spread can be trusted as the systematic was measured on
     simulated data, and only there. On a window of +-0.6 eV in steps of
     0.01 eV, 2000 counts per channel on the plateau over a background of
-    50, with v + (pi^2/3)(kT)^2 held at (0.1 eV)^2, at kT/sigma = 0.1, 1
-    and 3 and DOS changes across the window up to 0.9, the spread
-    between the two forms reproduced the true bias of the resolution to
-    -2.00, -5.99 and -16.25 meV against -2.07, -6.58 and -17.65 meV.
-    That works because the bias is nearly antisymmetric in which form is
-    wrong -- fitting a kinked model to a smooth truth and a smooth model
-    to a kinked truth gave -2.068/+2.010, -6.584/+6.002 and
-    -17.650/+16.278 meV. It is not a guarantee for an arbitrary true
-    DOS, and the range tested is bounded: a linear DOS through E_F
-    reaches zero at the window edge once its change across the window
-    reaches 1, which caps the slope at half of what the identifiability
-    scan uses.
+    50, with v + (pi^2/3)(kT)^2 held at (0.1 eV)^2, swept over kT/sigma
+    from 0.1 to 3 and DOS changes across the window from 0.02 to 0.9:
+    over the 66 cells where both fits succeed and the bias exceeds
+    0.1 meV, **the spread recovers 54 to 103% of the true bias**. It
+    works because the bias is antisymmetric in which form is wrong, and
+    it works less well the further that antisymmetry goes -- the
+    recovery falls smoothly with both kT/sigma and the DOS slope, and at
+    its worst corner, kT/sigma around 2 to 2.5 with a steep DOS, it
+    understates the systematic by a factor of 1.9. **Read the spread as
+    a lower bound on the systematic, not an estimate of it.**
+
+    Two limits on that. It is one model family over one range of
+    conditions, not a general result. And the range that could be tested
+    at all is capped: a linear DOS through E_F reaches zero at the
+    window edge once its change across the window reaches 1, which holds
+    the slope to half of what the identifiability scan uses.
     """
 
     forms: tuple[str, ...]

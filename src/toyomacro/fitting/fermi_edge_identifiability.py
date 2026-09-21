@@ -871,8 +871,9 @@ class InstrumentalResolution:
             temperature mode -- what an efficient estimator could reach.
             **Do not pair it with an estimate from a fit whose weights
             are not the Poisson ones**: an unweighted least-squares fit
-            of this model scatters about 1.3 times wider, so its own
-            covariance is the honest partner.
+            of this model scatters 1.25 to 2.55 times wider over the
+            conditions measured, so its own covariance -- ``sd_estimator``
+            below -- is the honest partner.
         sd_estimator: sd(v) of the weighted least-squares estimator whose
             weights were given (sandwich covariance), or None
         estimator: What ``sd_estimator`` belongs to
@@ -1240,6 +1241,17 @@ def _scan_edge(grid: EdgeScanGrid, ratio: float) -> tuple[float, float]:
 def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
     """Assess an edge over a grid of measurement conditions.
 
+    Five of the arrays are the same for ``'free'`` and
+    ``'fixed_temperature'``: ``sd_kappa2``, ``sd_share``, ``alignment``,
+    ``soft_over_stiff`` and ``temperature_sensitivity_relative`` all come
+    from ``report.width``, which under a fixed temperature is computed
+    from the matrix that estimates both widths (see
+    ``assess_edge_identifiability``). Plot them against the temperature
+    mode and two of the curves will lie on top of each other, by
+    construction and not by accident. Only ``sd_sigma``, ``separation``,
+    ``condition_number`` and ``near_boundary_v`` differ between those two
+    modes.
+
     Returns a dict of arrays of shape ``(len(ratios), len(half_widths),
     len(levels), len(slopes), len(backgrounds), len(temperature_modes),
     len(dos_forms))``, plus the axes themselves, ready for ``np.savez``:
@@ -1249,7 +1261,7 @@ def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
     - 'sd_sigma': bound on sd(sigma)/sigma
     - 'alignment': |cos| between the stiff direction and v + (pi^2/3) tau
     - 'soft_over_stiff': the eigenvalue ratio of the effective block
-    - 'temperature_sensitivity': (d sigma/dT) T / sigma, the fractional
+    - 'temperature_sensitivity_relative': (d sigma/dT) T / sigma, the fractional
       change in the fitted resolution per fractional error in a fixed
       temperature
     - 'separation', 'variance_status': codes, see 'separation_codes' and
@@ -1269,7 +1281,8 @@ def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
     shape = (len(grid.ratios), len(grid.half_widths), len(grid.levels), len(grid.slopes),
              len(grid.backgrounds), len(grid.temperature_modes), len(grid.dos_forms))
     names = ("sd_kappa2", "sd_share", "sd_sigma", "alignment", "soft_over_stiff",
-             "temperature_sensitivity", "separation", "variance_status", "near_boundary_v",
+             "temperature_sensitivity_relative", "separation", "variance_status",
+             "near_boundary_v",
              "condition_number", "null_space_dim", "n_energy", "total_counts")
     out = {name: np.full(shape, np.nan) for name in names}
 
@@ -1315,7 +1328,7 @@ def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
                                 out["alignment"][index] = width.alignment
                                 out["soft_over_stiff"][index] = (width.eigenvalues[0]
                                                                  / width.eigenvalues[1])
-                                out["temperature_sensitivity"][index] = (
+                                out["temperature_sensitivity_relative"][index] = (
                                     report.resolution.temperature_sensitivity * temperature / sigma)
                                 out["separation"][index] = _SEPARATION_CODE[report.separation]
                                 out["variance_status"][index] = _STATUS_CODE[

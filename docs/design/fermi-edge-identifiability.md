@@ -167,10 +167,21 @@ and `τ = 0` (a zero-temperature edge) are both edges of the parameter
 space, and `v = τ = 0` is the corner where the model does not exist.
 The report flags each boundary separately (`near_boundary_v`,
 `near_boundary_tau`) rather than collapsing them, and where the split
-is `not_separable` **τ's standard deviation is returned as `None`**, not
-as a large number: a number there invites a reader to use it. With the
+is `not_separable` **`report.sd_tau` is returned as `None`**, not as a
+large number: a number there invites a reader to use it. With the
 temperature fixed the verdict is `assumed`, which is a statement about
 the analysis and not about the data.
+
+That withholding is not complete, and an audit was right to say so.
+`report.parameters` still carries τ's bound, under a status computed
+against the edge's own width — where "τ known to 6% of κ₂" can read
+`identified` at a point the report calls `not_separable`, because
+knowing τ to a fraction of the edge width is not knowing the
+temperature. `assess_edge_identifiability`'s docstring says that in
+words, but the object still offers the number twice and withholds it
+once. Making the two agree is §10 item 3; it was not changed here
+because it means adding a status value, and this is not the release to
+change a label on.
 
 `assumed` carries one asymmetry worth stating plainly, because it reads
 like a bug. A matrix with τ held has no (v, τ) block, so the width
@@ -216,10 +227,14 @@ The same distinction reached `fit_fermi_edge` itself: its `*_err`
 fields are the least-squares covariance scaled by the reduced
 chi-squared, which assumes one variance for every channel. On an edge
 the Poisson mean spans a factor of 53 from background to plateau, and
-that assumption makes `ef_err` 8 to 21% smaller than the actual scatter
-of E_F while leaving the resolution's error within 20%. `poisson_err`
-was added as a second field carrying the sandwich; the default was left
-alone so that no existing number moves.
+that assumption makes `ef_err` 9 to 20% smaller than the actual scatter
+of E_F (nine runs of 400 realisations, three kT/σ × three seeds) while
+leaving the resolution's error within 25%. `poisson_err` was added as a
+second field carrying the sandwich, offered only when the intensities
+are non-negative integers — on counts per second, or after a background
+subtraction, it would be wrong by √(dwell), which is larger than the
+error it removes. The default `*_err` was left alone so that no existing
+number moves; whether the sandwich should replace it is §10.
 
 **The temperature sensitivity is reported because a thermocouple is not
 the electron temperature.** `temperature_sensitivity` is dσ/dT in eV per
@@ -234,8 +249,11 @@ per channel:
 | 50 meV | 300 K | 1.22 | 1.87 | 2.34 | −303 µeV/K | 14% |
 | 30 meV | 30 K | 0.20 | 0.41 | 0.55 | −57 µeV/K | 4.5% |
 
-(standard deviations in meV). The last two rows are labelled
-`undersampled` on a 10 meV grid, which is the point of that label.
+(standard deviations in meV). Only the last row is labelled
+`undersampled` on this 10 meV grid: √κ₂ is 13.6 meV there, below two
+channels. The 30 meV row above it is not — at 300 K the thermal width
+alone keeps √κ₂ at 51 meV. (An audit caught this sentence claiming two
+rows.)
 
 ## 7. Resampling: a Monte Carlo and a bootstrap are the same machinery
 
@@ -264,25 +282,42 @@ Elsewhere the distribution is **recorded, not judged**:
 **Coverage is a different question from spread**, and A9 did not answer
 it. Nesting a bootstrap inside each Monte Carlo replica and asking
 whether the 95% percentile interval holds the truth, pooled over three
-independent sets of trials at the interior point (1200 parametric, 1000
-nonparametric, 200 draws each, standard error 0.7–0.8%):
+independent sets of 200 trials at the interior point with 200 bootstrap
+draws each (600 trials, binomial standard error 0.89% at the null):
 
 | | E_F | amplitude | DOS slope | v | τ | background |
 |---|---|---|---|---|---|---|
-| parametric | 93.6 | 95.1 | 95.1 | 93.6 | 93.6 | 94.2 |
-| nonparametric | 92.5 | 94.5 | 93.7 | 93.8 | 93.5 | 95.0 |
+| parametric | 94.33 | 95.00 | 95.17 | 96.50 | 95.83 | 94.50 |
+| nonparametric | 94.67 | 94.83 | 95.67 | 96.00 | 96.00 | 94.17 |
 
-Eleven of the twelve are within three standard errors of 95%, and E_F
-nonparametric sits exactly on the edge at −3.00. Ten of the twelve are
-below 95%, so a deficit of one to two and a half points is real rather
-than a property of which trials were drawn — single runs of 400 and 200
-gave 91.5% and 95.5% for the same cell, four standard errors apart,
-which is why nothing here is quoted from one run. It is **not** the
-number of bootstrap draws (holding the trials fixed, 200 → 1000 moves
-nothing downward) and not width alone (the bootstrap sd is 0.98 to 1.05
-of the Monte Carlo sd). A percentile interval is first-order accurate
-and this is the size of error that buys; separating that from any other
-cause needs a bias-corrected interval, which is §10.
+All twelve are within 1.7 standard errors of nominal, six above and six
+below. The bootstrap standard deviation is 0.97 to 1.06 of the Monte
+Carlo one. There is no deficit here to explain.
+
+**There appeared to be one, and it was ours.** The first version of this
+section reported 92.5–95.1% and argued that the shortfall was a
+percentile interval's first-order accuracy, with a bias-corrected
+interval needed to establish it. An audit found the cause instead:
+numpy's default quantile method interpolates at index `q(B−1)`, which
+at q = 0.025 and B = 200 draws reads the 5.975-th of 200 order
+statistics — whose expected position in the distribution is 5.975/201 =
+2.97%, not 2.5%. A "95%" interval built that way is **nominally 94.06%
+at B = 200** and 94.81% at B = 1000. The measured shortfall was the
+convention, not the bootstrap.
+
+Two things went wrong at once, and the second is the instructive one.
+The experiment that was supposed to rule the draw count out — holding
+the trials fixed and raising B from 200 to 1000 — measured a rise of
+about 0.8 points and recorded it as "moves nothing downward", when it
+was the nominal level climbing from 94.06% toward 95% exactly as the
+convention predicts. **A test that can only fail one way cannot rule
+anything out.** The prediction was available in closed form and was
+never computed.
+
+The intervals now use the `(B+1)` plotting position (`method='weibull'`,
+Efron & Tibshirani 1993 §13.3), which is nominally 95.00% at any B. The
+same correction applied to the *old* draws moves the pooled coverage up
+by 0.33 to 1.17 points per parameter, against a predicted 0.95.
 
 At the boundary, 98.5% of the intervals for v begin at the bound and are
 4.5 times the Cramér–Rao width — coverage bought with width. Where the
@@ -290,6 +325,13 @@ split is `not_separable`, v and τ cover 95.4% parametric against 86.2%
 nonparametric, the one place the two kinds part company. With 25% of
 channels empty the two agree within 3% on every parameter that is
 determined.
+
+Those three sets were measured before the quantile convention above was
+corrected, on an interval nominally 94.06% rather than 95%. They are
+recorded and not judged, so they were not re-measured; read each
+coverage as about a point low. It does not touch what they are for —
+that coverage at a boundary is bought with width, and that the two
+kinds part company where the split cannot be made.
 
 **Anti-circularity.** The fitter shares its model with what it tests, so
 four things are pinned independently: the constrained fit against a
@@ -333,10 +375,11 @@ the expected sum of squares is the fit to the noiseless mean.
 |---|---|---|
 | 0.1 | 0.1 … 0.9 | −0.00 … −0.01 |
 | 1.0 | 0.1 / 0.3 / 0.9 | −0.19 / −0.55 / −1.55 |
-| 3.0 | 0.1 / 0.3 / 0.9 | −0.30 / −1.09 / −1.67 (on its bound) |
+| 3.0 | 0.1 / 0.3 / 0.9 | −0.30 / −1.09 / (collapsed onto the solver's bound; see below) |
 
 At kT/σ = 0.1 the assumption is free; by kT/σ = 1 it costs more than an
-error bar. **Whether the assumption matters is itself set by the
+error bar. Over the cells the package accepts the cost runs 0.19 to
+1.55 error bars. **Whether the assumption matters is itself set by the
 measurement.** At the strongest case the resolution collapses onto its
 lower bound and the fit reports itself a failure naming the parameter —
 there the success gate, not the number, is what protects a user. With
@@ -380,11 +423,30 @@ nearly antisymmetric in which form is wrong — a kinked model on a
 smooth truth and a smooth model on a kinked truth give −2.068/+2.018,
 −6.584/+6.006 and −17.650/+16.280 meV — so the spread between two fits
 of *one* spectrum stands in for a bias nobody can measure without
-knowing the true DOS. Over six conditions it recovered **63 to 110%** of
-it. Two limits on that claim: it is one model family over one range of
-conditions, and a linear DOS through E_F reaches zero at the window
-edge once its change across the window reaches 1, which capped what
-could be tested at half the slope the scan uses.
+knowing the true DOS — but not uniformly well. Swept over the whole
+domain (kT/σ from 0.1 to 3, DOS change across the window from 0.02 to
+0.9), on the 66 cells where both fits succeed and the bias exceeds
+0.1 meV, **the spread recovers 54 to 103% of the true bias**. The
+recovery falls smoothly with both kT/σ and the DOS slope; its worst
+corner, kT/σ around 2 to 2.5 with a steep DOS, understates the
+systematic by a factor of 1.9. **So the spread is a lower bound on the
+systematic, not an estimate of it.**
+
+An audit found this quoted as 63–110% from six cells that happened to
+skip that corner, which is the "example as population" error this
+project keeps making. Two further limits stand: it is one model family
+over one range of conditions, and a linear DOS through E_F reaches zero
+at the window edge once its change across the window reaches 1, which
+capped what could be tested at half the slope the scan uses.
+
+One number in that earlier six was worse than unrepresentative. At
+kT/σ = 3 with a DOS change of 0.6 or more, the fitted resolution
+saturates at 0.4247 meV — exactly the solver's `fwhm_g` lower bound of
+1 meV over 2.3548 — so the "bias" of −17.650 meV is `σ_true − bound`
+and is *identical* at 0.6, 0.75 and 0.9 while the misspecification
+keeps growing. It was the position of a bound, quoted as a measurement
+of a bias. What is real there is the collapse, and that `success` is
+False with the parameter named; a test now pins both.
 
 ## 9. The scan
 
@@ -407,22 +469,31 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
 
 **Known open, in the order they are likely to matter.**
 
-1. **Bias-corrected intervals.** The percentile interval under-covers by
-   one to two and a half points at an interior point (§7). The cause is
-   consistent with a percentile interval's first-order accuracy, but
-   ruling out anything else needs a BCa interval, which is not
-   implemented. Deferred past v0.3.0.
+1. **Bias-corrected intervals.** Not implemented, and — unlike what an
+   earlier draft of this record said — not needed to explain anything
+   measured here: once the quantile convention is right, the percentile
+   interval covers at nominal at the interior point (§7). A BCa
+   interval would still be the thing to reach for at a boundary or
+   where the split is not separable, which is where the estimator's
+   distribution is skewed and where coverage is currently only
+   recorded. Deferred past v0.3.0.
 2. **`poisson_err` is an additional field, not a replacement.** The
    default `*_err` was left exactly as it was so that no released
    number moves; whether the sandwich should become the default is a
    later decision.
-3. **Lifetime broadening.** A Lorentzian component would add a third
+3. **τ's bound is withheld once and offered twice.** `report.sd_tau` is
+   `None` where the split is `not_separable`, while
+   `report.parameters` still carries the same number with a status on
+   the width scale (§5). Making them agree needs a status value that
+   says "not separable", which is a label change and so not this
+   release.
+4. **Lifetime broadening.** A Lorentzian component would add a third
    width to the same κ₂ and is not modelled. On a clean metal edge it is
    small; this is not checked here.
-4. **Real data.** Everything above is simulation. The bound, the
+5. **Real data.** Everything above is simulation. The bound, the
    sandwich, the coverage and the DOS biases have not been measured
    against a spectrometer whose resolution is independently known.
-5. **The series term count and switch point** (§2) are calibrated on the
+6. **The series term count and switch point** (§2) are calibrated on the
    settings tested, not derived.
 
 **Not in scope, deliberately.** Sweep-level resampling, block bootstraps

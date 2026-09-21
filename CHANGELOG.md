@@ -54,10 +54,12 @@ archived on Zenodo for a citable DOI.
 
   The new argument is not there to be chosen from the data. On
   simulated edges, a DOS running smoothly through E_F biases the fitted
-  resolution low by 0.19 to 1.7 of its own error bar once kT is
+  resolution low by 0.19 to 1.55 of its own error bar once kT is
   comparable with the resolution — and by nothing at all when kT is ten
   times smaller, so whether the assumption matters is itself set by the
-  measurement. `compare_dos_forms` fits a spectrum with each form and
+  measurement. Past that the resolution stops being merely biased: it
+  collapses onto its lower bound and the fit reports itself a failure,
+  naming the parameter. `compare_dos_forms` fits a spectrum with each form and
   returns every fit together with the spread between them. It does not
   average them, pick one, or rank them by goodness of fit: two forms
   that describe the data about equally well can disagree by more than
@@ -65,13 +67,17 @@ archived on Zenodo for a citable DOI.
 
   The spread is a guide to the systematic the DOS-form assumption
   carries, and belongs beside the statistical error, never added to it
-  in quadrature. How far it can be trusted was measured, not assumed:
-  because the bias is nearly antisymmetric in which form is wrong, the
-  spread recovered 63 to 110% of the true bias over six simulated
-  conditions. That is evidence from one model family over one range —
-  window ±0.6 eV in 0.01 eV steps, 2000 counts per channel over a
-  background of 50, kT/sigma of 0.1, 1 and 3, DOS changes across the
-  window up to 0.9 — and not a general result. A linear DOS through E_F
+  in quadrature. How far it can be trusted was measured, not assumed.
+  Swept over the whole domain simulated — window ±0.6 eV in 0.01 eV
+  steps, 2000 counts per channel over a background of 50, kT/sigma from
+  0.1 to 3, DOS change across the window from 0.02 to 0.9 — on the 66
+  cells where both fits succeed and the bias exceeds 0.1 meV **the
+  spread recovers 54 to 103% of the true bias**, falling smoothly with
+  both kT/sigma and the DOS slope; at its worst, around kT/sigma = 2 to
+  2.5 with a steep DOS, it understates the systematic by a factor of
+  1.9. Read it as a lower bound on the systematic rather than an
+  estimate of it. This is one model family over one range of conditions
+  and not a general result. A linear DOS through E_F
   reaches zero at the window edge once its change across the window
   reaches 1, which caps what could be tested at half the slope the
   identifiability scan uses.
@@ -85,9 +91,10 @@ archived on Zenodo for a citable DOI.
   Poisson mean runs from the background to the plateau, a factor of 53
   in the case measured, and E_F's sensitivity sits where the mean is
   above its average. Over 300 simulated realisations at each of three
-  kT/sigma with the temperature fixed, `ef_err` came out 8 to 21%
-  smaller than the actual scatter of E_F while `poisson_err['ef']` was
-  within 12% of it; for the resolution the two agree. The new field is
+  kT/sigma and three seeds with the temperature fixed, `ef_err` came
+  out 9 to 20% smaller than the actual scatter of E_F while
+  `poisson_err['ef']` was within 10% of it; for the resolution the two
+  agree with each other and sit within 25% of the scatter. The new field is
   meaningful only when `intensity` is raw counts, is not a Cramer-Rao
   bound, and describes nothing when the temperature is fitted as well,
   where the estimator is pinned by its bounds. Defaults are unchanged

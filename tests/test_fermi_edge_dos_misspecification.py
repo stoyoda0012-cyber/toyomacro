@@ -277,47 +277,83 @@ def _fit_smooth(counts, sigma, temperature):
 
 
 @pytest.mark.parametrize(
-    "ratio, delta, kinked_on_smooth",                       # meV
-    [(0.1, 0.9, -0.025), (1.0, 0.1, -0.667), (1.0, 0.3, -2.068),
-     (1.0, 0.9, -6.584), (3.0, 0.3, -10.259), (3.0, 0.9, -17.650)])
-def test_refitting_with_both_dos_forms_measures_the_bias(ratio, delta, kinked_on_smooth):
+    "ratio, delta, kinked_on_smooth, recovery",          # meV, and spread / |bias|
+    [(0.1, 0.9, -0.025, 1.100), (1.0, 0.1, -0.667, 0.993), (1.0, 0.3, -2.068, 0.970),
+     (1.0, 0.9, -6.584, 0.910), (2.0, 0.9, -21.187, 0.581), (2.5, 0.6, -19.163, 0.539),
+     (3.0, 0.3, -10.259, 0.632)])
+def test_refitting_with_both_dos_forms_measures_the_bias(ratio, delta, kinked_on_smooth,
+                                                         recovery):
     """Why ``compare_dos_forms`` exists, and how far it can be trusted.
 
-    The bias is nearly antisymmetric in which form is wrong. Fitting the
-    kinked model to a smooth truth gives the values parametrised above;
-    fitting the smooth model to a kinked truth gives +0.030, +0.674,
-    +2.018, +6.006, +6.487 and +16.280 meV -- the same size with the
-    opposite sign in five of the six, and 0.63 of it in the sixth.
+    The bias is antisymmetric in which form is wrong only while the
+    misspecification is mild. Fitting the kinked model to a smooth truth
+    gives the values parametrised above; fitting the smooth model to a
+    kinked truth gives +0.030, +0.674, +2.018, +6.006, +12.327, +10.335
+    and +6.487 meV -- the mirror image in the first four and only half of
+    it in the last three.
 
     So the spread between the two fits of *one* spectrum stands in for a
-    bias nobody can measure without knowing the true DOS: 0.027, 0.663,
-    2.007, 5.993, 6.482 and 16.251 meV, which is 63 to 110% of what it
-    stands for. The 63% is at kT/sigma = 3 with a DOS changing 30% across
-    the window, where the antisymmetry is weakest.
+    bias nobody can measure without knowing the true DOS, but not
+    uniformly well. Swept over the whole stated domain (kT/sigma from
+    0.1 to 3, DOS change across the window from 0.02 to 0.9), on the 66
+    cells where both fits succeed and the bias exceeds 0.1 meV, the
+    recovery runs **0.54 to 1.03**, falling smoothly and monotonically
+    with both kT/sigma and the DOS slope. The worst corner is
+    kT/sigma around 2 to 2.5 with a steep DOS, where the spread
+    understates the systematic by a factor of 1.9. The cells here are
+    the two ends and four points between.
 
-    Both fits succeed in all six cells, so the spread is usable in all
-    six; where one of them fails, ``DosFormComparison.success`` is False
-    and the spread mixes a systematic with a failure."""
+    An audit found the earlier range quoted as 0.63 to 1.10, which was
+    the six cells then tested and not the domain -- those six skipped
+    that corner entirely.
+    """
     sigma, temperature = conditions(ratio)
     smooth = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "both_sides", delta)
     kinked = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", delta)
 
-    on_smooth = pseudo_true(smooth, sigma, temperature).resolution / FWHM - sigma
-    on_kinked = _fit_smooth(kinked, sigma, temperature) - sigma
+    forward = pseudo_true(smooth, sigma, temperature)
+    on_smooth = forward.resolution / FWHM - sigma
+    assert forward.success              # not a collapse onto a solver bound: see below
     assert on_smooth * 1e3 == pytest.approx(kinked_on_smooth, abs=0.01)
-    assert on_smooth < 0.0 < on_kinked
+    assert on_smooth < 0.0 < _fit_smooth(kinked, sigma, temperature) - sigma
 
     comparison = compare_dos_forms(
         ENERGY, kinked, convention="BE", dos="linear", background="constant",
         temperature=temperature, resolution=FWHM * sigma, ef_init=0.0)
     assert comparison.success
     spread = comparison.spread["resolution"] / FWHM
-    assert 0.6 < spread / abs(on_smooth) < 1.2
+    assert spread / abs(on_smooth) == pytest.approx(recovery, abs=0.01)
+    assert 0.5 < spread / abs(on_smooth) < 1.15
+
     # the spread is the difference of the two fits, not something else
     values = comparison.values["resolution"]
     assert comparison.spread["resolution"] == pytest.approx(
         abs(values["occupied"] - values["both_sides"]), rel=1e-12)
     assert comparison.fits["occupied"].resolution == values["occupied"]
+
+
+@pytest.mark.parametrize("delta", [0.6, 0.75, 0.9])
+def test_the_strongest_cells_report_a_solver_bound_and_not_a_bias(delta):
+    """An audit found one of the earlier anchors was not a bias at all.
+
+    At kT/sigma = 3 with a DOS change of 0.6 or more across the window,
+    the fitted resolution saturates at 0.4247 meV -- exactly the
+    ``fwhm_g`` lower bound of 1 meV divided by 2.3548 -- against a true
+    18.075 meV. The number that looked like a bias of -17.650 meV is
+    ``sigma_true - bound``, and it is *identical* at 0.6, 0.75 and 0.9
+    while the misspecification keeps growing. Quoting it as a bias
+    quotes the position of a solver bound.
+
+    What is real there is the collapse itself, and that the fit says so:
+    ``success`` is False and ``message`` names the parameter. That is
+    why the parametrisation above stops short of this corner."""
+    sigma, temperature = conditions(3.0)
+    fit = pseudo_true(truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "both_sides", delta),
+                      sigma, temperature)
+    assert not fit.success
+    assert "bound" in fit.message and "fwhm_g" in fit.message
+    assert fit.resolution / FWHM == pytest.approx(1e-3 / FWHM, rel=1e-9)
+    assert sigma == pytest.approx(0.018075, abs=1e-6)
 
 
 # ---------------------------------------------------------------------------

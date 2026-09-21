@@ -26,7 +26,9 @@ resolution means anything, with
   fitted with the DOS kinked at E_F and continued smoothly through it
   gives two resolutions; the gap between them is a systematic that the
   statistical error bar does not contain, and it is *not* something to
-  resolve by keeping the better fit.
+  resolve by keeping the better fit. On this one spectrum the gap is
+  larger than the error bars; whether it is depends on the counts and
+  on kT/sigma, and the panel is one draw, not a general claim.
 
 Panels (a)-(c) are computed from a model (Poisson Fisher information at
 stated parameters): bounds, not measurements, and not statements about
@@ -222,7 +224,7 @@ def panel_dos_forms(ax, sigma, comparison):
     ax.set_xticklabels(["DOS kinked at E_F\n(the default)", "DOS smooth through E_F"],
                        fontsize=7.5)
     ax.set_xlim(-0.5, len(forms) - 0.1)
-    style(ax, "(d) the DOS assumption moves σ further than the noise does",
+    style(ax, "(d) here the DOS assumption moves σ further than the noise does",
           None, "fitted σ, meV")
     ax.legend(fontsize=7, frameon=False, labelcolor=MUTED, loc="lower left")
 

@@ -38,10 +38,15 @@ parameter off its bound must not lower the deviance. The two are
 separate because the cross-check is at an interior point, where nothing
 is held and the active set has nothing to do.
 
-Any estimator can be bootstrapped, not only this one: ``bootstrap``
-takes the fitting step as a callable, and the Fermi-edge tests pass it
-the package's own least-squares fitter to see whether that estimator's
-sandwich covariance describes its actual spread.
+``bootstrap`` takes the fitting step as a callable, so another
+estimator could be bootstrapped here. Nothing in this repository does:
+every call passes ``poisson_mle_fitter``, and the callable has to
+return an ``MLEResult`` -- ``params``, ``converged`` and ``at_bound``
+-- which the package's least-squares fitter does not, and for which no
+adapter exists. The extension point has one implementation. Where the
+least-squares fitter's spread is checked against its sandwich
+covariance, the draws are taken directly with ``draw_poisson`` and the
+fitter looped over them.
 """
 
 from __future__ import annotations
@@ -241,9 +246,25 @@ class BootstrapResult:
     def covariance(self) -> np.ndarray:
         return np.cov(self.estimates, rowvar=False)
 
-    def quantiles(self, q) -> np.ndarray:
-        """Quantiles of each parameter, shape (len(q), p)."""
-        return np.quantile(self.estimates, np.atleast_1d(q), axis=0)
+    def quantiles(self, q, *, method: str = "weibull") -> np.ndarray:
+        """Quantiles of each parameter, shape (len(q), p).
+
+        The default is **not** numpy's. ``method='linear'`` interpolates
+        at index ``q(B-1)``, which at q = 0.025 and B = 200 draws reads
+        the 5.975-th of 200 order statistics -- whose expected position
+        in the distribution is 5.975/201 = 2.97%, not 2.5%. A two-sided
+        "95%" interval built that way is nominally 94.06% at B = 200 and
+        94.81% at B = 1000, so it under-covers by an amount that shrinks
+        with B and is easily mistaken for a property of the bootstrap.
+        Measured on a nested check, the convention alone was worth about
+        a point of coverage at B = 200.
+
+        ``'weibull'`` places order statistic k at k/(B+1), the plotting
+        position the percentile interval is defined with (Efron &
+        Tibshirani 1993, §13.3), and is nominally 95.00% at any B. Pass
+        ``method='linear'`` for numpy's default if you want it.
+        """
+        return np.quantile(self.estimates, np.atleast_1d(q), axis=0, method=method)
 
 
 def bootstrap(

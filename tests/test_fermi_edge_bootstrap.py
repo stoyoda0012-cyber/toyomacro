@@ -99,7 +99,12 @@ def test_the_bound_is_not_the_spread_at_the_boundary(record_property):
     interval -- coverage bought with width, not with information. tau,
     which takes up what v cannot, covers 83.7% and 88.3%, well under
     nominal. The four parameters away from the boundary cover 91.3 to
-    96.4% either way."""
+    96.4% either way.
+
+    (Those three sets were measured before the quantile convention was
+    corrected, with an interval nominally 94.06% rather than 95% at 200
+    draws. They are recorded and not judged, so they were not
+    re-measured; read each as about a point low.)"""
     edge = fi.FermiEdge(ef=0.0, amplitude=1000.0, sigma=1e-4, temperature=300.0, dos_c1=0.3)
     out, crb, _ = _run(edge, n_draws=300, seed=3)
     i = out.names.index("variance")
@@ -123,7 +128,12 @@ def test_where_the_width_cannot_be_split_the_distribution_is_recorded(record_pro
     either way, but v and tau cover 95.4% parametric against 86.2%
     nonparametric -- the one place measured where the two versions part
     company. Their bootstrap sd is 0.70 to 0.78 of the Monte Carlo sd,
-    and a third to a half of the intervals begin at the bound."""
+    and a third to a half of the intervals begin at the bound.
+
+    (Those three sets were measured before the quantile convention was
+    corrected, with an interval nominally 94.06% rather than 95% at 200
+    draws. They are recorded and not judged, so they were not
+    re-measured; read each as about a point low.)"""
     edge = fi.FermiEdge(ef=0.0, amplitude=1000.0, sigma=2.0 * fi.KB_EV * 300.0,
                         temperature=300.0, dos_c1=0.3)
     report = fi.assess_edge_identifiability(ENERGY, edge, _background())
@@ -187,8 +197,11 @@ def _nested(edge, n_mc, n_boot, *, exposure=1.0, kind="parametric", seed=41, max
                           lower=lower, max_iter=max_iter)
     est = np.where(out.converged.reshape(n_mc, n_boot)[:, :, None],
                    out.params.reshape(n_mc, n_boot, -1), np.nan)
-    lo = np.nanquantile(est, 0.025, axis=1)
-    hi = np.nanquantile(est, 0.975, axis=1)
+    # 'weibull' puts order statistic k at k/(n_boot+1), so the interval is
+    # nominally 95% at any n_boot; numpy's default 'linear' is 94.06% at 200
+    # draws and 94.81% at 1000, which reads as a bootstrap defect and is not.
+    lo = np.nanquantile(est, 0.025, axis=1, method="weibull")
+    hi = np.nanquantile(est, 0.975, axis=1, method="weibull")
     use = first.converged
     ratio = (np.nanstd(est[use], axis=1, ddof=1).mean(axis=0)
              / first.params[use].std(axis=0, ddof=1))
@@ -203,34 +216,31 @@ def test_the_bootstrap_interval_covers_the_truth_at_an_interior_point(kind):
     user would actually quote holds the truth.
 
     Measured at exposure 50 with 200 bootstrap draws, pooled over three
-    independent sets of Monte Carlo trials (400 + 200 + 600 = 1200
-    parametric, 400 + 600 = 1000 nonparametric), which brings the
-    binomial standard error to 0.7-0.8%:
+    independent sets of 200 Monte Carlo trials (600 trials, binomial
+    standard error 0.89%):
 
-        param       parametric        nonparametric
-        E_F         93.58 (-2.0 se)   92.50 (-3.0 se)
-        amplitude   95.08 (+0.1)      94.50 (-0.7)
-        DOS slope   95.08 (+0.1)      93.70 (-1.7)
-        v           93.58 (-2.0)      93.80 (-1.6)
-        tau         93.58 (-2.0)      93.50 (-1.9)
-        background  94.17 (-1.2)      95.00 (+0.0)
+        param       parametric   nonparametric
+        E_F         94.33        94.67
+        amplitude   95.00        94.83
+        DOS slope   95.17        95.67
+        v           96.50        96.00
+        tau         95.83        96.00
+        background  94.50        94.17
 
-    On the stated criterion -- three standard errors -- eleven of the
-    twelve pass and E_F nonparametric sits exactly on the edge at
-    -3.00 se. Ten of the twelve are below 95%, so the deficit of one to
-    two and a half points is a property of the interval, not of which
-    trials were drawn: single runs of 400 and of 200 gave E_F 91.5% and
-    95.5%, four standard errors apart, which is why they are pooled here
-    rather than quoted separately.
+    All twelve within 1.7 standard errors of nominal, six above and six
+    below; the bootstrap sd is 0.97 to 1.06 of the Monte Carlo sd.
 
-    It is not the number of bootstrap draws. Holding one set of 200
-    trials fixed and raising the bootstrap from 200 to 1000 moves every
-    coverage by at most 2 points and none of them down. Nor is it width
-    alone: the bootstrap sd is 0.98 to 1.05 of the Monte Carlo sd, and
-    2% narrow would cost 0.4 points, not 1.5. A percentile interval is
-    first-order accurate, so a deficit of this size is what it is for;
-    separating that from any other cause needs a bias-corrected interval
-    to compare against, which this package does not have.
+    An earlier version of this file reported 92.5 to 95.1% here and
+    blamed a percentile interval's first-order accuracy. An audit found
+    the real cause: ``np.quantile``'s default method interpolates at
+    index ``q(B-1)``, which at q = 0.025 and B = 200 reads the 5.975-th
+    of 200 order statistics, whose expected position is 5.975/201 =
+    2.97%. That interval is nominally 94.06%, not 95%. The experiment
+    meant to rule the draw count out -- holding the trials fixed and
+    raising B to 1000 -- measured the nominal level climbing toward 95%
+    and recorded it as "moves nothing downward"; it could only have
+    failed in one direction. ``_nested`` now uses the (B+1) plotting
+    position, nominally 95% at any B.
 
     What runs here is 20 x 40, where the standard error on a coverage is
     4.9% and a Monte Carlo sd from 20 trials carries 16% of its own, on a
@@ -354,7 +364,9 @@ def test_low_counts_do_not_split_the_two_kinds_where_the_parameter_is_determined
     per channel on the background, 20 on the plateau, 25% of channels
     zero, 200 trials x 200 draws -- the two versions agree to within 3%
     on E_F, the amplitude, the DOS slope and the background, and cover
-    93.2 to 95.5%. They part on v and tau, where the nonparametric sd is
+    93.2 to 95.5% (with the pre-correction quantile convention, about a
+    point low; recorded, not judged). They part on v and tau, where the
+    nonparametric sd is
     12% and 10% below the parametric one; but 98% and 81% of those
     intervals begin at the bound, so there the effect cannot be told
     apart from the truncation. The anticipated under-statement is not
