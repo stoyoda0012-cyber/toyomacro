@@ -32,10 +32,9 @@ import math
 
 import numpy as np
 import pytest
-from scipy.optimize import least_squares
 
 from toyomacro.fitting import fermi_edge_identifiability as fi
-from toyomacro.fitting.fermi_edge import fermi_edge, fit_fermi_edge
+from toyomacro.fitting.fermi_edge import compare_dos_forms, fermi_edge, fit_fermi_edge
 
 KB = fi.KB_EV
 FWHM = 2.0 * math.sqrt(2.0 * math.log(2.0))
@@ -84,11 +83,12 @@ def conditions(ratio):
     return sigma, ratio * sigma / KB
 
 
-def pseudo_true(mean, sigma, temperature, *, dos="linear", free_t=False):
+def pseudo_true(mean, sigma, temperature, *, dos="linear", free_t=False,
+                dos_form="occupied"):
     """The value the estimator converges to: the fit to the noiseless mean."""
     return fit_fermi_edge(ENERGY, mean, convention="BE", dos=dos, background="constant",
                           temperature=temperature, fit_temperature=free_t,
-                          resolution=FWHM * sigma, ef_init=0.0)
+                          resolution=FWHM * sigma, ef_init=0.0, dos_form=dos_form)
 
 
 def sandwich(sigma, temperature, delta, mode, *, dos="linear"):
@@ -271,43 +271,53 @@ def test_a_quadratic_dos_does_not_repair_the_missing_kink():
 
 
 def _fit_smooth(counts, sigma, temperature):
-    """The same estimator ``fit_fermi_edge`` is -- unit-weight least squares,
-    temperature fixed -- with the DOS continued smoothly through E_F instead
-    of kinked there. Returns sigma."""
-    def resid(p):
-        ef, amplitude, s, c1, bg = p
-        d = fi.edge_derivatives(ENERGY, ef, amplitude, max(s, 1e-4) ** 2,
-                                fi.tau_from_temperature(temperature), dos_c1=c1,
-                                convention="BE", dos_form="both_sides")
-        return d.value + bg - counts
-    out = least_squares(resid, np.array([0.0, AMPLITUDE, sigma, 0.5 / HALF, BG]),
-                        method="trf", bounds=([-HALF, 0.0, 1e-4, -10.0, -np.inf],
-                                              [HALF, np.inf, HALF, 10.0, np.inf]))
-    return float(out.x[2])
+    """The shipped smooth-DOS fit: the same estimator as the default, with
+    the DOS continued through E_F instead of kinked there. Returns sigma."""
+    return pseudo_true(counts, sigma, temperature, dos_form="both_sides").resolution / FWHM
 
 
-@pytest.mark.parametrize("ratio, delta", [(1.0, 0.3), (1.0, 0.9), (3.0, 0.9)])
-def test_refitting_with_both_dos_forms_measures_the_bias(ratio, delta):
-    """The bias is nearly antisymmetric in which form is wrong: the kinked
-    model on a smooth truth gives -2.07, -6.58 and -17.65 meV, the smooth
-    model on a kinked truth +2.01, +6.00 and +16.28 meV. So the spread
-    between the two fits of *one* spectrum estimates the systematic
-    without anyone knowing the true DOS: measured -2.00, -5.99 and
-    -16.25 meV against the -2.07, -6.58 and -17.65 meV it is standing in
-    for. That is the case for offering the comparison rather than another
-    option to choose wrongly."""
+@pytest.mark.parametrize(
+    "ratio, delta, kinked_on_smooth",                       # meV
+    [(0.1, 0.9, -0.025), (1.0, 0.1, -0.667), (1.0, 0.3, -2.068),
+     (1.0, 0.9, -6.584), (3.0, 0.3, -10.259), (3.0, 0.9, -17.650)])
+def test_refitting_with_both_dos_forms_measures_the_bias(ratio, delta, kinked_on_smooth):
+    """Why ``compare_dos_forms`` exists, and how far it can be trusted.
+
+    The bias is nearly antisymmetric in which form is wrong. Fitting the
+    kinked model to a smooth truth gives the values parametrised above;
+    fitting the smooth model to a kinked truth gives +0.030, +0.674,
+    +2.018, +6.006, +6.487 and +16.280 meV -- the same size with the
+    opposite sign in five of the six, and 0.63 of it in the sixth.
+
+    So the spread between the two fits of *one* spectrum stands in for a
+    bias nobody can measure without knowing the true DOS: 0.027, 0.663,
+    2.007, 5.993, 6.482 and 16.251 meV, which is 63 to 110% of what it
+    stands for. The 63% is at kT/sigma = 3 with a DOS changing 30% across
+    the window, where the antisymmetry is weakest.
+
+    Both fits succeed in all six cells, so the spread is usable in all
+    six; where one of them fails, ``DosFormComparison.success`` is False
+    and the spread mixes a systematic with a failure."""
     sigma, temperature = conditions(ratio)
     smooth = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "both_sides", delta)
     kinked = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", delta)
 
-    kinked_on_smooth = pseudo_true(smooth, sigma, temperature).resolution / FWHM - sigma
-    smooth_on_kinked = _fit_smooth(kinked, sigma, temperature) - sigma
-    assert kinked_on_smooth < 0.0 < smooth_on_kinked
-    assert 0.8 < -smooth_on_kinked / kinked_on_smooth < 1.3
+    on_smooth = pseudo_true(smooth, sigma, temperature).resolution / FWHM - sigma
+    on_kinked = _fit_smooth(kinked, sigma, temperature) - sigma
+    assert on_smooth * 1e3 == pytest.approx(kinked_on_smooth, abs=0.01)
+    assert on_smooth < 0.0 < on_kinked
 
-    spread = (pseudo_true(kinked, sigma, temperature).resolution / FWHM
-              - _fit_smooth(kinked, sigma, temperature))
-    assert 0.6 < spread / kinked_on_smooth < 1.2
+    comparison = compare_dos_forms(
+        ENERGY, kinked, convention="BE", dos="linear", background="constant",
+        temperature=temperature, resolution=FWHM * sigma, ef_init=0.0)
+    assert comparison.success
+    spread = comparison.spread["resolution"] / FWHM
+    assert 0.6 < spread / abs(on_smooth) < 1.2
+    # the spread is the difference of the two fits, not something else
+    values = comparison.values["resolution"]
+    assert comparison.spread["resolution"] == pytest.approx(
+        abs(values["occupied"] - values["both_sides"]), rel=1e-12)
+    assert comparison.fits["occupied"].resolution == values["occupied"]
 
 
 # ---------------------------------------------------------------------------

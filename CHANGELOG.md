@@ -10,6 +10,38 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`fit_fermi_edge` can put the DOS on both sides of E_F, and
+  `compare_dos_forms` measures what that choice is worth.** The fitted
+  density of states was always flat below E_F and polynomial above it,
+  so its slope changes at E_F. That kink is an assumption about the
+  sample; `dos_form='both_sides'` continues the same polynomial through
+  E_F instead. The default, `'occupied'`, is the previous behaviour and
+  every existing number is bit-identical to what it was.
+
+  The new argument is not there to be chosen from the data. On
+  simulated edges, a DOS running smoothly through E_F biases the fitted
+  resolution low by 0.19 to 1.7 of its own error bar once kT is
+  comparable with the resolution — and by nothing at all when kT is ten
+  times smaller, so whether the assumption matters is itself set by the
+  measurement. `compare_dos_forms` fits a spectrum with each form and
+  returns every fit together with the spread between them. It does not
+  average them, pick one, or rank them by goodness of fit: two forms
+  that describe the data about equally well can disagree by more than
+  either one's error bar.
+
+  The spread is a guide to the systematic the DOS-form assumption
+  carries, and belongs beside the statistical error, never added to it
+  in quadrature. How far it can be trusted was measured, not assumed:
+  because the bias is nearly antisymmetric in which form is wrong, the
+  spread recovered 63 to 110% of the true bias over six simulated
+  conditions. That is evidence from one model family over one range —
+  window ±0.6 eV in 0.01 eV steps, 2000 counts per channel over a
+  background of 50, kT/sigma of 0.1, 1 and 3, DOS changes across the
+  window up to 0.9 — and not a general result. A linear DOS through E_F
+  reaches zero at the window edge once its change across the window
+  reaches 1, which caps what could be tested at half the slope the
+  identifiability scan uses.
+
 - **`fit_fermi_edge` also reports the error bars that raw counts
   deserve.** `FermiEdgeResult.poisson_err` is a dict of 1-sigma values
   from the sandwich covariance of the estimator the function actually
