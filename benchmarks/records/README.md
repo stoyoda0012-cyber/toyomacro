@@ -78,6 +78,17 @@ applications should not be published, set
 `TOYOMACRO_BENCH_REDACT_PROCESSES=1` and the names become
 `process-1`, `process-2`, … with their CPU shares intact.
 
+## Schema versions
+
+Records carry `schema_version`. It is bumped whenever a field changes
+meaning or disappears, and **version 3 changed the quality verdict**:
+it is now the load sample taken *before* the run, where version 2 used
+the trailing one. A version-2 record's `quiet` was computed by a rule
+that no longer exists — on a CPU backend the trailing sample contains
+the benchmark itself, so such a record could condemn an idle host for
+its own work. `summarize_records` warns when it is asked to compare
+across the boundary; re-record rather than reason around it.
+
 ## Quality, and why nothing is refused
 
 Every run writes its record, including runs on a machine that was busy.

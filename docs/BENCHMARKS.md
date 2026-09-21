@@ -169,11 +169,19 @@ Every record written by these benchmarks carries an `environment`
 block. When comparing two numbers, check these before concluding
 anything:
 
-- `cpu` and `mlx_usable` — which machine and which backend.
-- `git_commit` and `git_tracked_dirty` — which tree. A dirty tree means
-  the record does not identify the code that produced it.
-- `input_sha256`, where present — whether two records fitted the same
-  data. The MLX/NumPy pair in §2 does.
+- `schema_version` — whether the two records mean the same thing by
+  their fields. Version 3 moved the quality verdict from the trailing
+  load sample to the one taken before the run; a version-2 verdict was
+  computed by a rule that no longer exists.
+- `cpu` and `backend.backend` — which machine, and which of `metal`,
+  `cuda`, `numpy` actually ran. Not "was MLX importable".
+- `git_commit`, `git_tracked_dirty` and `harness_tracked_at_commit` —
+  which tree, and whether that commit even contains the harness. A
+  dirty tree means the record does not identify the code that produced
+  it; the dirty list says what was modified, which is the difference
+  between an edited README and an edited kernel.
+- `input_sha256` — whether two records fitted the same data. Across
+  platforms they often did not: see §"Measuring a new host".
 - `aggregation`, `warmup`, `repeats` — a median over repetitions after
   discarded warmups is not comparable to a single cold timing. Cold
   first runs absorb MLX compilation and read low.
@@ -183,57 +191,44 @@ repository once compared a cold run against a warm one and reported
 that the pipeline doing more work was faster. Ratios need warmup on
 both arms and a median over repetitions.
 
-### What the record does not capture: machine load
+### Machine load, and what the verdict is worth
 
-The `environment` block identifies the machine, the software and the
-tree. It does not record how busy the machine was, and the amplitude-only
-kernel is sensitive to that at a scale larger than its own reported
-range.
+Schema 3 records load before and after the run, grades the host
+`quiet` / `contended` / `unknown`, and `summarize_records` keeps
+non-`quiet` records out of every headline figure. What follows is why
+that verdict should be read as a prompt to look rather than as a
+measurement.
 
-Measured on M1, and the picture is less tidy than "busy host reads low".
+Measured on M1, on the amplitude-only projection kernel:
 
 | | quality | projection kernel | source |
 |---|---|---|---|
-| load ~12, four invocations | — | **418–431 M** | **no record** — observed once, 2026-09-21, nothing regenerates it |
-| before-load 3.4 / 3.1 / 3.5 | `quiet` | **495.1 M** | `…103644Z…__from-mac.json` |
-| before-load 4.4 / 7.0 / 12.2 | `contended` | **497.4 M** | `…113656Z…__from-mac.json` |
-| — | — | 478 M (453–490, 9 reps) | `figure1_throughput.json` |
+| load ~12, four invocations | — | **418–431 M** | **no record.** Observed once, 2026-09-21; nothing in the repository regenerates it |
+| before-load 5.5 / 4.7 / 5.4 | `contended` | **497.6 M** | `…131732Z…__from-mac.json`, committed |
+| — | — | 478 M (453–490, 9 reps) | `figure1_throughput.json`, committed |
 
-Two things to take from it.
+**Heavy load did move the number.** The 418–431 M set is four
+invocations at load ~12, each internally consistent to about 3%, all
+9–13% below the committed median and none overlapping it. Repetitions
+*within* one invocation share the machine state that biases them, so a
+record's own min–max range understates the uncertainty across sessions.
+That is the case the verdict exists for.
 
-**The 418–431 M set is the real warning.** Four invocations at load ~12,
-each internally consistent to about 3%, all of them 9–13% below the
-committed median and none overlapping it. Within-run repetitions share
-the machine state that biases them, so a record's own range understates
-the uncertainty across sessions.
+**The threshold is not calibrated to it.** The committed record above
+is graded `contended` at a before-load of 5.5 on 16 cores, and reads
+497.6 M — above the 478 M committed median, not below it. Its own
+`top_processes` names the cause: `fileproviderd` at 192.7% of a
+`cpu_percent_others` of 221.6, an iCloud file provider working through
+a post-reboot backlog. Whatever that was competing for, it was not what
+this kernel is bound by.
 
-**But the verdict is a proxy, and here it fired without an effect.** The
-`contended` record above reads *higher* than the `quiet` one. Its load
-came from `fileproviderd`, `cloudd` and `corespotlightd` — iCloud sync
-and Spotlight reindexing after a reboot — which inflate a load average
-through I/O without competing for the GPU. The convention is stated in
-every record as a convention rather than a calibrated threshold, and
-this pair is why: it is a reason to look, not a reason to discard.
-
-Both committed records were taken on a dirty tree; each names what was
-modified, and in neither case was it a measured code path.
-
-So the within-run range printed in a record understates the real
-uncertainty: repetitions inside one invocation share the machine state
-that biases them. Two consequences:
-
-- **A number measured on a loaded machine is not a regression.** Before
-  concluding that throughput has changed, check that the host was quiet
-  — `uptime` and the top CPU consumers, at the time of the run.
-- **Comparing two records across dates compares two unrecorded machine
-  states as well.** Until load is captured in the `environment` block,
-  a cross-date difference under roughly 10% on this kernel is not
-  evidence of anything.
-
-Schema v2 closes this: `load` is now part of every record written by
-`benchmarks.record`, and the cross-platform harness warns when it
-measures a busy host. Records in §2 predate it and carry no load field,
-which is itself worth knowing when comparing them against anything new.
+So `contended` at this threshold does not imply a depressed number, and
+this repository has no measurement establishing where the boundary
+actually falls. The convention — every load average below a quarter of
+the core count — is recorded in each record as a convention for that
+reason. Treat a `contended` verdict as a reason to check
+`top_processes` and `cpu_percent_others`, not as grounds to discard a
+figure unexamined.
 
 ## 6. Measuring a new host
 
