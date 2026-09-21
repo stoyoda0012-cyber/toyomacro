@@ -518,6 +518,7 @@ class TestSi2pGVRTStepC:
         # Noisy should be worse or similar
         assert r_noisy.mean_amp_psnr < r_clean.mean_amp_psnr + 5
 
+    @pytest.mark.perf
     def test_solver_throughput(self):
         """5-state solver handles 10K spectra in reasonable time."""
         r = evaluate_si2p_roundtrip(n_spectra=10000, noise_sigma=0.0, seed=42)

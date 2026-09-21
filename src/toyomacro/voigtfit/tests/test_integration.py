@@ -13,8 +13,7 @@ import tempfile
 import time
 
 import numpy as np
-
-# import pytest  # Optional, for running with pytest
+import pytest
 
 
 class TestSyntheticAccuracy:
@@ -180,6 +179,7 @@ class TestMatlabBridge:
                     os.remove(f)
 
 
+@pytest.mark.perf
 class TestPerformance:
     """Performance benchmarks."""
 

@@ -387,9 +387,18 @@ as data — are written up in
 ```bash
 uv sync --extra dev --extra mlx
 uv run pytest                                    # full suite; inventory in tests/README.md
+uv run pytest -m "not perf"                      # skip the 12 wall-clock gates
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check .                              # lint (what CI runs)
 ```
+
+Twelve tests assert a throughput or an elapsed time. They fail on
+hardware slower than the machine their thresholds were set on, which is
+not a defect in the library, so they carry the `perf` marker and
+`-m "not perf"` drops them. Use it when you are working on a laptop and
+want the other 2,220 tests to mean what they say; do not use it to
+decide that a change is safe, because two of the twelve are the only
+guard on the compression codec's decode path.
 
 CI (GitHub Actions) runs the full suite on Ubuntu, macOS and Windows
 for Python 3.11 / 3.12 on every push. See

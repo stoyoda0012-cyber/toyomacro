@@ -567,6 +567,7 @@ class TestHybridVsPure4Step:
 
 class TestThroughput:
 
+    @pytest.mark.perf
     def test_dictionary_build_time(self, energy, single_peak_config):
         """Dictionary build should be fast (< 1s for default grid)."""
         t0 = time.perf_counter()

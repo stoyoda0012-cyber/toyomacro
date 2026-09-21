@@ -369,6 +369,7 @@ class TestFitResultFields:
                 f"Center {k}: expected {expected:.2f}, got {mean_center:.4f}"
 
 
+@pytest.mark.perf
 @pytest.mark.skipif(IN_CI, reason="speed ratio assertion is sensitive to CI hardware")
 class TestThroughput:
     """Benchmark extended vs standard pipeline throughput."""
