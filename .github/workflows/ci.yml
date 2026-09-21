@@ -72,7 +72,7 @@ jobs:
           cache-suffix: ${{ github.job }}
       - run: uv python install 3.12
       - run: uv sync --extra dev
-      - run: uv run ruff check src/ tests/ examples/
+      - run: uv run ruff check .
 
   build:
     name: build + clean-install smoke + metadata
