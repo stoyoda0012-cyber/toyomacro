@@ -190,19 +190,33 @@ tree. It does not record how busy the machine was, and the amplitude-only
 kernel is sensitive to that at a scale larger than its own reported
 range.
 
-Measured on M1. Two of the three figures below carry a committed
-record; the middle one does not, and this paragraph is the whole of its
-provenance — it is an observation, not a result, and nothing
-regenerates it.
+Measured on M1, and the picture is less tidy than "busy host reads low".
 
-| | source |
-|---|---|
-| **478 M** median, 453–490 over 9 repetitions | `figure1_throughput.json`, committed |
-| **418–431 M** across four invocations at load ~12 | **no record** — observed once, on this machine, 2026-09-21 |
-| **488 M** at load 3.2, same problem | `benchmarks/records/…__from-mac.json`, committed |
+| | quality | projection kernel | source |
+|---|---|---|---|
+| load ~12, four invocations | — | **418–431 M** | **no record** — observed once, 2026-09-21, nothing regenerates it |
+| before-load 3.4 / 3.1 / 3.5 | `quiet` | **495.1 M** | `…103644Z…__from-mac.json` |
+| before-load 4.4 / 7.0 / 12.2 | `contended` | **497.4 M** | `…113656Z…__from-mac.json` |
+| — | — | 478 M (453–490, 9 reps) | `figure1_throughput.json` |
 
-The contended figures were each internally consistent to about 3%, and
-all of them 9–13% below the committed median without overlapping it.
+Two things to take from it.
+
+**The 418–431 M set is the real warning.** Four invocations at load ~12,
+each internally consistent to about 3%, all of them 9–13% below the
+committed median and none overlapping it. Within-run repetitions share
+the machine state that biases them, so a record's own range understates
+the uncertainty across sessions.
+
+**But the verdict is a proxy, and here it fired without an effect.** The
+`contended` record above reads *higher* than the `quiet` one. Its load
+came from `fileproviderd`, `cloudd` and `corespotlightd` — iCloud sync
+and Spotlight reindexing after a reboot — which inflate a load average
+through I/O without competing for the GPU. The convention is stated in
+every record as a convention rather than a calibrated threshold, and
+this pair is why: it is a reason to look, not a reason to discard.
+
+Both committed records were taken on a dirty tree; each names what was
+modified, and in neither case was it a measured code path.
 
 So the within-run range printed in a record understates the real
 uncertainty: repetitions inside one invocation share the machine state
