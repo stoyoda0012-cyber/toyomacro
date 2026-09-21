@@ -152,6 +152,11 @@ exclude = [
 target-version = "py311"
 line-length = 100
 src = ["src", "tests"]
+# Reproductions filed on other projects' issue trackers. They are kept as
+# they were sent -- minimal, and in no house style but the reader's -- so
+# this project's import ordering is not imposed on them. Everything else,
+# `paper/figures/` included, is linted: `ruff check .` and CI now agree.
+extend-exclude = ["docs/upstream-issues"]
 
 [tool.ruff.lint]
 select = [

@@ -388,7 +388,7 @@ as data — are written up in
 uv sync --extra dev --extra mlx
 uv run pytest                                    # full suite; inventory in tests/README.md
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
-uv run ruff check src/ tests/ examples/          # lint (what CI runs)
+uv run ruff check .                              # lint (what CI runs)
 ```
 
 CI (GitHub Actions) runs the full suite on Ubuntu and macOS for

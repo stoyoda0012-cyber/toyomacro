@@ -43,7 +43,7 @@ section of `README.md` is the public statement of that boundary.
 uv sync --extra dev --extra mcp             # what CI installs
 uv sync --extra dev --extra mlx             # + Apple Silicon GPU backend
 uv run pytest                               # collects both test roots
-uv run ruff check src/ tests/ examples/     # what CI lints
+uv run ruff check .                         # what CI lints
 ```
 
 A bare `uv sync` does not install pytest — it lives in the `dev` extra.
