@@ -350,6 +350,7 @@ class TestThreeStepRecovery:
         print(f"  δσ: corr={corr_ds:.4f}, RMSE={rmse_ds:.4f} eV")
 
 
+@pytest.mark.perf
 @pytest.mark.skipif(IN_CI, reason="speed ratio assertion is sensitive to CI hardware")
 class TestThreeStepThroughput:
     """Benchmark 3-step vs 2-step kernel throughput."""

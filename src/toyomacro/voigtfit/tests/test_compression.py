@@ -144,6 +144,7 @@ class TestFitparaCodec:
         # Compressed size should be significantly smaller
         assert compressed.compressed_size < compressed.original_size / 3
 
+    @pytest.mark.perf
     @skip_in_ci
     def test_decode_speed(self):
         """Test that decode speed meets target (not a bottleneck for E2E pipeline)."""
@@ -350,6 +351,7 @@ class TestArrayLZ4Compression:
 
         np.testing.assert_array_equal(otherpara, restored)
 
+    @pytest.mark.perf
     @skip_in_ci
     def test_decode_speed(self):
         """Test decode speed for large arrays."""
@@ -494,6 +496,7 @@ class TestSpecdataUint16:
         assert result.dtype == mx.float32
         assert result.shape == (n_comp, n_spectra)
 
+    @pytest.mark.perf
     def test_mlx_throughput(self, tmp_path):
         """Test MLX throughput with uint16 data."""
         from toyomacro.voigtfit._mlx_support import mlx_usable

@@ -44,6 +44,32 @@ To run only the contract tests (skip the heavy reproductions):
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
 
+## The `perf` marker
+
+Twelve of the tests counted on this page assert a wall-clock rate or an
+elapsed time, so they fail on hardware slower than the machine their
+thresholds were set on rather than on a defect. They carry the `perf`
+marker; `pytest -m "not perf"` drops them and leaves 2,220. Marking
+changes nothing about what is collected, so every count here still
+holds.
+
+Two of the twelve are additionally `@skip_in_ci`: they fail on the
+GitHub runners too, and CI would be red without that. The marker and
+the CI guard answer different questions — "this machine is slow" and
+"this runner is slow" — and neither is a licence to ignore the other
+ten.
+
+Two speed assertions are deliberately **not** marked, because marking
+them would take real coverage with them:
+
+- `tests/test_solver_comparison.py::test_dict2d_recovers_parameters`
+  asserts `throughput_spec_per_s > 1e4` alongside two accuracy bounds.
+  Its threshold is low enough that no machine measured so far has
+  missed it.
+- `tests/test_si2p_suboxide.py::test_full_5state_fit` asserts
+  `fit_time < 10.0`, and also stores the fit that two later tests read.
+  Deselecting it would silently skip them.
+
 ## Library body — `tests/` (1,249)
 
 ### Claim guards — noise model, versions, backends, comparisons (71)
