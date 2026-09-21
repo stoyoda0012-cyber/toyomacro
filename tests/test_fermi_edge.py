@@ -380,41 +380,52 @@ def test_bad_arguments_raise(kw):
 
 def test_the_default_dos_form_changes_nothing():
     """`dos_form` was added after v0.2.0; its default must leave every
-    number exactly where it was. These are values computed before the
-    argument existed, compared bit for bit -- not to a tolerance. They
-    were also checked against the previous commit's code directly, over
-    three parameter sets and all ten scalar fit results.
+    number where it was. Two checks with different reach.
 
-    **If this test fails, do not update the numbers to make it pass.**
-    They pin the behaviour of ``dos_form='occupied'`` as v0.3.0 shipped
-    it, and they are meant to fail whenever the model moves -- including
-    for changes that are entirely legitimate, such as a finer
-    discretisation, a different convolution, or a new default. Replacing
-    them is only correct once the change has been confirmed as
-    deliberate and recorded in CHANGELOG.md with what moved and by how
-    much; the entry for the low-temperature E_F fix is the shape that
-    takes. A failure here without such an entry is a regression, not a
-    stale constant."""
-    model = fermi_edge(BE, ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
-                       dos_c1=1.5, bg_const=50.0)
-    assert np.array_equal(model, fermi_edge(BE, ef=0.02, amplitude=2000.0, fwhm_g=0.1137,
-                                            temperature=560.3, dos_c1=1.5, bg_const=50.0,
-                                            dos_form="occupied"))
+    The first is exact and is the real guard on the default path: the
+    model with the argument omitted must be bit-identical to the model
+    with ``dos_form='occupied'`` given. Both run on one machine through
+    one code path, so anything less than equality means the default
+    stopped being that path.
+
+    The second pins the values themselves against constants taken from
+    the code as it was before the argument existed -- checked at the
+    time against the previous commit directly, over three parameter sets
+    and all ten scalar fit results. Those cannot be compared bit for bit:
+    they were captured on one platform, and the model calls ``exp`` and a
+    Gaussian filter whose last bits differ between libm implementations.
+    An earlier version of this test asserted equality and passed on
+    macOS while failing on Linux CI for that reason alone. The
+    tolerances below -- 1e-9 on the model, 1e-6 on a fitted value, which
+    goes through an iterative solver -- are four to eleven orders of
+    magnitude tighter than any model change worth the name: the
+    low-temperature E_F fix, the last such change, moved this model by
+    3e-5 of the step.
+
+    **If the second check fails, do not update the numbers to make it
+    pass.** They are meant to fail whenever the model moves, including
+    for changes that are entirely legitimate -- a finer discretisation,
+    a different convolution, a new default. Replacing them is correct
+    only once the change has been confirmed as deliberate and recorded
+    in CHANGELOG.md with what moved and by how much; the entry for the
+    low-temperature E_F fix is the shape that takes. A failure here
+    without such an entry is a regression, not a stale constant."""
+    shared = dict(ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
+                  dos_c1=1.5, bg_const=50.0)
+    assert np.array_equal(fermi_edge(BE, **shared),
+                          fermi_edge(BE, dos_form="occupied", **shared))
+
     grid = np.arange(-0.6, 0.6 + 1e-9, 0.01)
     before = np.array([50.00872830450744, 54.333831213484196, 904.1136269069085,
                        2876.712487344952, 3789.964068966334])
-    now = fermi_edge(grid, ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
-                     dos_c1=1.5, bg_const=50.0)[::30]
-    assert np.array_equal(now, before)
+    np.testing.assert_allclose(fermi_edge(grid, **shared)[::30], before, rtol=1e-9)
 
-    counts = np.random.default_rng(3).poisson(
-        fermi_edge(grid, ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
-                   dos_c1=1.5, bg_const=50.0)).astype(float)
+    counts = np.random.default_rng(3).poisson(fermi_edge(grid, **shared)).astype(float)
     fit = fit_fermi_edge(grid, counts, convention="BE", dos="linear", background="constant",
                          temperature=560.3, resolution=0.1137)
-    assert fit.ef == 0.02220324184703952
-    assert fit.resolution == 0.12235167495258374
-    assert fit.reduced_chi2 == 1119.9023959702502
+    assert fit.ef == pytest.approx(0.02220324184703952, rel=1e-6)
+    assert fit.resolution == pytest.approx(0.12235167495258374, rel=1e-6)
+    assert fit.reduced_chi2 == pytest.approx(1119.9023959702502, rel=1e-6)
     assert fit.dos_form == "occupied"
 
 
