@@ -40,13 +40,73 @@ RECORD_DIRS = (REPO / "benchmarks" / "records", REPO / "paper" / "figures" / "re
 #: record names containing a hyphen, which made this gate inert for
 #: exactly the rows it most needed to check.
 _CITATION = re.compile(r"`([^`]*\.json)`")
-#: A figure the row presents as measured: **497.6 M** or **418–431 M**.
-_FIGURE = re.compile(r"\*\*([\d.]+)(?:[–-][\d.]+)?\s*M\*\*")
+#: A figure the row presents as measured. Matches a single value
+#: (``497.6 M``), a range (``418–431 M``) and a list of separate runs
+#: (``9.44 / 9.27 / 17.30 M``), bold or not.
+#:
+#: The first version of this required a single number immediately before
+#: a bold ``M``, which silently matched none of the slash-separated rows
+#: added later — the gate went inert on exactly the rows it was extended
+#: to cover, and a mutation test passed because nothing was checked.
+_FIGURE = re.compile(
+    r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*M\b")
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
-def _doc_rows() -> list[str]:
-    return [ln for ln in DOC.read_text().splitlines()
-            if ln.startswith("|") and ln.count("|") >= 3]
+#: "4 M spectra" is a batch size, not a rate. Only throughputs are
+#: checked against a record's reported rates.
+_NOT_A_RATE = re.compile(r"\bM\s+(?:spectra|fits|px|pixels)\b")
+
+
+def _figures(row: str) -> list[str]:
+    """Every throughput a row presents, as written (to keep precision)."""
+    plain = _NOT_A_RATE.sub("", row.replace("**", ""))
+    out: list[str] = []
+    for span in _FIGURE.findall(plain):
+        out.extend(_NUMBER.findall(span))
+    return out
+
+
+#: A heading that declares its whole section record-free. §3 is exactly
+#: that — "Published numbers without a committed record" — so its rows
+#: are not required to repeat the disclaimer each time.
+_RECORD_FREE_SECTION = "without a committed record"
+
+
+def _doc_rows(skip_record_free_sections: bool = True) -> list[tuple[str, str]]:
+    """``(row, record cited by its heading)`` for every table row.
+
+    §2 names its record in the heading above the table rather than in
+    each row, so a row's attribution is inherited from the nearest
+    preceding heading that names a ``.json`` file.
+    """
+    rows, exempt, heading_records = [], False, ()
+    for line in DOC.read_text().splitlines():
+        if line.startswith("#"):
+            exempt = _RECORD_FREE_SECTION in line.lower()
+            # A heading may name a matched pair, as §2 does for the MLX
+            # and NumPy records; a figure below it may come from either.
+            heading_records = tuple(_CITATION.findall(line))
+            continue
+        if line.startswith("|") and line.count("|") >= 3:
+            if exempt and skip_record_free_sections:
+                continue
+            rows.append((line, heading_records))
+    return rows
+
+
+def _tolerance(figure_text: str) -> float:
+    """The rounding interval of the precision the document actually used.
+
+    `478 M` is rounded to a whole million and must accept 477.5-478.5;
+    `497.6 M` is rounded to a tenth and must accept far less. A single
+    fixed tolerance either rejects honest rounding or waves through a
+    figure that disagrees.
+    """
+    if "." in figure_text:
+        decimals = len(figure_text.split(".")[1])
+        return 0.5 * 10 ** (-decimals) * 1e6
+    return 0.5e6
 
 
 def _resolve(cited: str) -> Path | None:
@@ -57,7 +117,10 @@ def _resolve(cited: str) -> Path | None:
     in order. Dropping the ellipses instead would look for a substring
     that no filename contains.
     """
-    fragments = [f for f in cited.strip("`").split("…") if f]
+    # A citation may carry a directory ("paper/figures/results/x.json");
+    # records are located by filename, so match on the last component.
+    bare = cited.strip("`").rsplit("/", 1)[-1]
+    fragments = [f for f in bare.split("…") if f]
     if not fragments:
         return None
     for directory in RECORD_DIRS:
@@ -80,8 +143,8 @@ def _rates(record: dict) -> list[float]:
     """Every throughput this record reports, in spectra per second."""
     out = []
     for result in record.get("results", []):
-        for key in ("rate_median", "throughput_spec_per_s",
-                    "throughput_spec_per_s_median"):
+        for key in ("rate_median", "rate_min", "rate_max",
+                    "throughput_spec_per_s", "throughput_spec_per_s_median"):
             if result.get(key):
                 out.append(float(result[key]))
     for block in record.values():                 # figure1-style: keyed dict
@@ -90,7 +153,10 @@ def _rates(record: dict) -> list[float]:
     return out
 
 
-CITING_ROWS = [ln for ln in _doc_rows() if _CITATION.search(ln)]
+#: Rows attributed to a record, inline or by heading.
+CITING_ROWS = [(ln, tuple(_CITATION.findall(ln)) or head)
+               for ln, head in _doc_rows()
+               if _CITATION.search(ln) or (head and _figures(ln))]
 
 
 def test_the_document_still_cites_records_at_all():
@@ -102,42 +168,40 @@ def test_the_document_still_cites_records_at_all():
         "inert and must be updated deliberately.")
 
 
-@pytest.mark.parametrize("row", CITING_ROWS, ids=lambda r: r[:48])
-def test_cited_record_exists(row):
-    cited = _CITATION.search(row).group(1)
-    assert _resolve(cited) is not None, (
-        f"{DOC.name} cites `{cited}`, which is not in "
+@pytest.mark.parametrize("row,cited", CITING_ROWS, ids=lambda r: str(r)[:40])
+def test_cited_record_exists(row, cited):
+    missing = [c for c in cited if _resolve(c) is None]
+    assert not missing, (
+        f"{DOC.name} cites {missing}, which are not in "
         f"{[str(d.relative_to(REPO)) for d in RECORD_DIRS]}. A record that "
         "was re-taken or deleted leaves the prose quoting numbers nothing "
         "produces.")
 
 
-@pytest.mark.parametrize("row", CITING_ROWS, ids=lambda r: r[:48])
-def test_cited_figure_is_in_the_cited_record(row):
-    cited = _CITATION.search(row).group(1)
-    path = _resolve(cited)
-    if path is None:
+@pytest.mark.parametrize("row,cited", CITING_ROWS, ids=lambda r: str(r)[:40])
+def test_cited_figure_is_in_the_cited_record(row, cited):
+    paths = [p for p in (_resolve(c) for c in cited) if p is not None]
+    if not paths:
         pytest.skip("covered by test_cited_record_exists")
-    figures = _FIGURE.findall(row)
+    figures = _figures(row)
     if not figures:
         return                       # a row may cite a record without a figure
-    rates = _rates(json.loads(path.read_text()))
-    assert rates, f"{path.name} reports no throughput to check against"
+    rates = [r for path in paths
+             for r in _rates(json.loads(path.read_text()))]
+    assert rates, f"{[p.name for p in paths]} report no throughput to check"
     for figure in figures:
-        want = float(figure) * 1e6
-        # The document rounds to one decimal in millions, so accept the
-        # rounding interval and nothing wider.
-        assert any(abs(rate - want) < 0.05e6 for rate in rates), (
-            f"{DOC.name} quotes {figure} M against `{cited}`, which reports "
-            f"{sorted(round(r / 1e6, 2) for r in rates)} M. The prose and "
-            "the record disagree.")
+        want, tol = float(figure) * 1e6, _tolerance(figure)
+        assert any(abs(rate - want) <= tol for rate in rates), (
+            f"{DOC.name} quotes {figure} M against {list(cited)}, which "
+            f"report {sorted(round(r / 1e6, 2) for r in rates)} M. The prose "
+            "and the record disagree.")
 
 
 def test_rows_without_a_record_say_so():
     """An unattributed measurement is the defect, not a formatting nit."""
     offenders = []
-    for row in _doc_rows():
-        if _CITATION.search(row) or not _FIGURE.search(row):
+    for row, heading_record in _doc_rows():
+        if _CITATION.search(row) or heading_record or not _figures(row):
             continue
         if "no record" in row.lower():
             continue

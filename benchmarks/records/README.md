@@ -42,12 +42,27 @@ hardware, so agreement between them validates the cloud baseline and
 disagreement says the allocation depends on the caller. Either way it is
 a control that most benchmark suites do not have.
 
-**Cloud arms need repetition; local arms do not.** "Cloud" is not a
-machine, it is a draw from a distribution of machines. This repository
-has already watched one container change CPU mid-session — a 2.80GHz
-Xeon became a 2.10GHz one, while the tracked document describing it went
-on saying 2.80GHz. A single run from each origin cannot separate an
-origin effect from the instance lottery.
+**Cloud arms need repetition** — "cloud" is not a machine, it is a draw
+from a distribution of machines. This repository has already watched one
+container change CPU mid-session — a 2.80GHz Xeon became a 2.10GHz one,
+while the tracked document describing it went on saying 2.80GHz. A
+single run from each origin cannot separate an origin effect from the
+instance lottery.
+
+**And so do local arms.** An earlier version of this file said they did
+not. Measured on the Ryzen host: `amp_only_projection` read 9.44, 9.27
+and **17.30 M spec/s** across three runs — same machine, same input
+hash, unchanged solver code, all three graded `quiet`. The run that sat
+1.85x away from the other two reported a within-run spread of **1.03x**,
+which is to say it looked like the most confident of the three.
+
+A record's own `rate_min`/`rate_max` cannot bound this. The repetitions
+inside one invocation share a process, a memory layout and a clock
+state, so whatever moves between invocations is invisible to them. Read
+a single record as one draw, not as a measurement: **`n = 1` here, and
+the harness does not yet repeat runs for you.** Until it does, take
+several records on any host whose number you intend to quote, and
+compare their medians rather than any one record's range.
 
 ## Filenames
 

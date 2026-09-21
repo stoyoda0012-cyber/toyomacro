@@ -7,9 +7,10 @@ which commit, whether a machine-readable record is committed, and how to
 regenerate it.
 
 It records provenance, not results: the results live in the records and
-in the documents that quote them. Where it does cite a measurement of
-its own — §5 has one — it says so and says that nothing regenerates it,
-which is the second of the two paths in "The rule" below.
+in the documents that quote them. Where it cites a measurement that has
+no record here — §5 has several — it says so on the row, which is the
+second of the two paths in "The rule" below and is enforced by
+`tests/test_benchmarks_doc_citations.py`.
 
 ## The rule
 
@@ -224,11 +225,44 @@ this kernel is bound by.
 
 So `contended` at this threshold does not imply a depressed number, and
 this repository has no measurement establishing where the boundary
-actually falls. The convention — every load average below a quarter of
-the core count — is recorded in each record as a convention for that
-reason. Treat a `contended` verdict as a reason to check
+actually falls. The convention — every load average below a
+quarter of the core count — is recorded in each record as a convention
+for that reason. Treat a `contended` verdict as a reason to check
 `top_processes` and `cpu_percent_others`, not as grounds to discard a
 figure unexamined.
+
+### The larger problem: one record is one draw
+
+Load is not the dominant source of disagreement between records, and
+the quality verdict is not the field that most needs reading.
+
+Measured on the Ryzen/WSL2 host across three harness generations — same
+machine, same `input_sha256`, unchanged solver code, every run graded
+`quiet`:
+
+| solver | backend | runs | reported | source |
+|---|---|---|---|---|
+| `amp_only_projection` | cuda | 3 | **9.44 / 9.27 / 17.30 M** | no record in this branch; taken on the Windows host, proposed in PR #27 |
+| `amp_only_projection` | numpy | 2 | **33.4 / 66.0 M** | no record in this branch; same source |
+
+The 17.30 M run reported a **within-run spread of 1.03x** — the
+tightest of the three, and 1.85x away from the other two. One NumPy
+record spread 4.28x inside a single invocation while its median sat
+within the others' range.
+
+So `rate_min` and `rate_max` do not bound what a second run would give.
+The repetitions inside one invocation share a process, a memory layout
+and a clock state; whatever changes between invocations is invisible to
+them by construction. A record that looks confident can be wrong by a
+factor of two, and nothing in the record says so.
+
+**What this does and does not undermine.** It does not undermine the
+cross-backend conclusions: on that host the CUDA and NumPy ranges do
+not overlap on any solver, across every run taken, so "CUDA loses to
+NumPy on three of five solvers" survives. What it undermines is reading
+any single record as *the* number for its machine. The harness does not
+yet repeat runs; until it does, quote a median over several records or
+say plainly that you are quoting one.
 
 ## 6. Measuring a new host
 
