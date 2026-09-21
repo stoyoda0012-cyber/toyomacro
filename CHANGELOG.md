@@ -53,7 +53,10 @@ archived on Zenodo for a citable DOI.
   the peak working set instead. Two tests were Unix-only for unrelated
   reasons and now run anywhere: one read a source file in the platform's
   preferred encoding rather than UTF-8, and one built a temporary
-  filename containing backslashes.
+  filename containing backslashes. Verified at `decc8e2` on Windows 11
+  (Python 3.12.14, clean tree): 1884 passed, 175 skipped, 2 failed —
+  both `test_decode_speed` throughput gates, which this machine misses
+  on hardware, not platform. Windows is still not covered by CI.
 
 - **Peak RSS was misreported on Linux.** `ru_maxrss` is in kibibytes
   there, but `memory.get_rss_gb` converted it at 1000 bytes per
