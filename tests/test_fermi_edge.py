@@ -383,7 +383,18 @@ def test_the_default_dos_form_changes_nothing():
     number exactly where it was. These are values computed before the
     argument existed, compared bit for bit -- not to a tolerance. They
     were also checked against the previous commit's code directly, over
-    three parameter sets and all ten scalar fit results."""
+    three parameter sets and all ten scalar fit results.
+
+    **If this test fails, do not update the numbers to make it pass.**
+    They pin the behaviour of ``dos_form='occupied'`` as v0.3.0 shipped
+    it, and they are meant to fail whenever the model moves -- including
+    for changes that are entirely legitimate, such as a finer
+    discretisation, a different convolution, or a new default. Replacing
+    them is only correct once the change has been confirmed as
+    deliberate and recorded in CHANGELOG.md with what moved and by how
+    much; the entry for the low-temperature E_F fix is the shape that
+    takes. A failure here without such an entry is a regression, not a
+    stale constant."""
     model = fermi_edge(BE, ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
                        dos_c1=1.5, bg_const=50.0)
     assert np.array_equal(model, fermi_edge(BE, ef=0.02, amplitude=2000.0, fwhm_g=0.1137,
