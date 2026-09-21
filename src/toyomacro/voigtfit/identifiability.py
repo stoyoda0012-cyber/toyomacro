@@ -790,7 +790,10 @@ class WidthAssessment:
         peak: Peak index
         fwhm: Olivero-Longbothum total FWHM, the reference scale
         variance_excess: ``sigma**2 - variance_floor``
-        sd_variance: Bound on the standard deviation of the variance
+        sd_variance: Bound on the standard deviation of the excess. With
+            a ``variance_floor_sd``, the floor's own uncertainty is added
+            in quadrature: the floor is measured elsewhere (a Fermi edge,
+            say) and the two estimates are taken as independent
         variance_relative_sd: ``sd_variance / variance_excess`` -- the
             precision of the Gaussian component *relative to itself*.
             Grows without limit as the component vanishes however good
@@ -803,6 +806,7 @@ class WidthAssessment:
             the least determined direction of the pair. Never smaller
             than either parameter's own ``relative_sd``.
         worst_direction: That direction, in the same scaled coordinates
+        variance_floor_sd: The floor's own standard deviation, as given
         status: 'rank_deficient' if either width is; else
             'weakly_identified' if ``worst_relative_sd`` exceeds the
             threshold; else 'identified'
@@ -817,6 +821,7 @@ class WidthAssessment:
     worst_relative_sd: float
     worst_direction: tuple[float, float]
     status: str
+    variance_floor_sd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -830,6 +835,7 @@ class IdentifiabilityReport:
         condition_number: Of the unit-diagonal (correlation) matrix, so
             it does not move with the units of any parameter
         thresholds: The thresholds used
+        variance_floor_sd: The floor's own standard deviation, as given
         variance_floor: The lower limit of the Gaussian variance used
         fisher: The underlying 'var_gamma' ``PoissonFisherResult``
     """
@@ -841,6 +847,7 @@ class IdentifiabilityReport:
     thresholds: IdentifiabilityThresholds
     variance_floor: float
     fisher: PoissonFisherResult = field(repr=False)
+    variance_floor_sd: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """Plain-Python summary (no arrays), for a table row or ``json.dumps``.
@@ -853,6 +860,7 @@ class IdentifiabilityReport:
             "null_space_dim": self.null_space_dim,
             "condition_number": self.condition_number,
             "variance_floor": self.variance_floor,
+            "variance_floor_sd": self.variance_floor_sd,
             "weak_relative_sd": self.thresholds.weak_relative_sd,
             "boundary_sd": self.thresholds.boundary_sd,
             "parameters": [vars(a).copy() for a in self.parameters],
@@ -872,6 +880,7 @@ def assess_identifiability(
     *,
     exposure: float = 1.0,
     variance_floor: float = 0.0,
+    variance_floor_sd: float = 0.0,
     thresholds: IdentifiabilityThresholds | None = None,
 ) -> IdentifiabilityReport:
     """Sort the parameters of a peaks-plus-background model by identifiability.
@@ -935,6 +944,14 @@ def assess_identifiability(
             (eV**2). 0 for the plain Voigt; ``sigma_inst**2`` when the
             instrument width is calibrated and only the excess is in
             question.
+        variance_floor_sd: Standard deviation of that floor (eV**2), when
+            it is itself an estimate -- from a Fermi-edge fit, say. It is
+            added in quadrature to the bound on the excess, which assumes
+            the two are independent (they are, when they come from
+            different spectra). The Fisher matrix does not change; what
+            changes is ``sd_variance``, ``variance_relative_sd``,
+            ``near_boundary`` and the width block's worst direction. The
+            default 0 reproduces the bounds exactly.
         thresholds: Defaults to ``IdentifiabilityThresholds()``
 
     Returns:
@@ -945,6 +962,9 @@ def assess_identifiability(
         raise ValueError(
             f"need 0 <= variance_floor <= sigma**2 for every peak, got {variance_floor}"
         )
+    if not (variance_floor_sd >= 0.0 and math.isfinite(variance_floor_sd)):
+        raise ValueError(f"variance_floor_sd must be finite and >= 0, got {variance_floor_sd}")
+    floor_variance = variance_floor_sd * variance_floor_sd
     fisher = poisson_fisher(energy, peaks, background, exposure=exposure)
     covariance, unbounded, null_dim, condition = _covariance_bound(fisher.fisher)
 
@@ -992,12 +1012,15 @@ def assess_identifiability(
         iv, ig = 4 * k + 2, 4 * k + 3
         excess = p.variance - variance_floor
         if unbounded[iv] or unbounded[ig]:
-            sd_v = np.inf if unbounded[iv] else math.sqrt(max(covariance[iv, iv], 0.0))
+            sd_v = np.inf if unbounded[iv] else math.sqrt(
+                max(covariance[iv, iv], 0.0) + floor_variance)
             worst, direction, status = np.inf, (math.nan, math.nan), "rank_deficient"
         else:
-            sd_v = math.sqrt(max(covariance[iv, iv], 0.0))
+            sd_v = math.sqrt(max(covariance[iv, iv], 0.0) + floor_variance)
             scales = np.array([fwhm[k] ** 2 / _EIGHT_LN2, fwhm[k]])
-            block = covariance[np.ix_([iv, ig], [iv, ig])] / np.outer(scales, scales)
+            block = covariance[np.ix_([iv, ig], [iv, ig])].copy()
+            block[0, 0] += floor_variance  # the floor's own uncertainty, independent
+            block = block / np.outer(scales, scales)
             eigenvalues, eigenvectors = np.linalg.eigh(block)
             worst = math.sqrt(max(eigenvalues[-1], 0.0))
             direction = (float(eigenvectors[0, -1]), float(eigenvectors[1, -1]))
@@ -1007,12 +1030,14 @@ def assess_identifiability(
             variance_relative_sd=float(sd_v / excess) if excess > 0.0 else np.inf,
             near_boundary=bool(excess < thresholds.boundary_sd * sd_v),
             worst_relative_sd=float(worst), worst_direction=direction, status=status,
+            variance_floor_sd=float(variance_floor_sd),
         ))
 
     return IdentifiabilityReport(
         parameters=tuple(parameters), widths=tuple(widths), null_space_dim=null_dim,
         condition_number=condition, thresholds=thresholds,
-        variance_floor=float(variance_floor), fisher=fisher,
+        variance_floor=float(variance_floor), variance_floor_sd=float(variance_floor_sd),
+        fisher=fisher,
     )
 
 

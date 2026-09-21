@@ -19,29 +19,6 @@ archived on Zenodo for a citable DOI.
   a high-water mark since process start, not the instantaneous
   footprint.
 
-- **`examples/08_map_viewer_frontend.py`: a minimal front end on the
-  batch engine.** Click a pixel of a fitted chemical-state map to see its
-  spectrum, the fit and its components. The back end fits the map once
-  and hands the front end parameter maps and one pixel at a time; a
-  pixel's model is rebuilt on demand from its fitted parameters, and no
-  fitted curves are built for the whole map. Everything runs on the main
-  thread (see "Threads" in `docs/API.md`). matplotlib only, no new
-  dependency; `--smoke` runs it without a window, which is how CI runs
-  it. Synthetic data, like example 02's.
-
-### Changed
-
-- **`CITATION.cff` is titled "toyomacro: X-ray photoelectron spectroscopy
-  analysis toolkit".** That is the title of the Zenodo records of v0.1.0
-  and v0.2.0. Both were retitled by hand after archiving, because the
-  file carried the title of the paper in `paper/` — "toyomacro.voigtfit:
-  high-throughput Voigt-profile fitting for X-ray photoelectron
-  spectroscopy" — which describes the fitting engine, not the whole
-  package. Zenodo takes a release's title from this file, so a later
-  release is archived under the package's title without that step. The
-  copies of the file inside the v0.1.0 and v0.2.0 archives keep the
-  previous title; the paper keeps its own.
-
 ### Fixed
 
 - **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`
@@ -64,6 +41,151 @@ archived on Zenodo for a citable DOI.
   `bottleneck_analysis` and `chunk_optimization_benchmark` treated it as
   bytes outright (1024x low). All six call sites now go through
   `get_peak_rss_bytes()`. Figures measured on macOS are unaffected.
+
+## [0.3.0] - 2026-09-21
+
+### Known issues
+
+- **`fermi_edge_identifiability`: tau's bound is withheld in one field
+  and offered in another.** Where the width split is `not_separable`,
+  `EdgeIdentifiabilityReport.sd_tau` is `None` — a number there invites
+  a reader to use it — but `report.parameters` still carries the same
+  bound, with a status computed against the edge's own width, where
+  "tau known to a few percent of kappa_2" can read `identified`.
+  Knowing tau to a fraction of the edge width is not knowing the
+  temperature, and `assess_edge_identifiability`'s docstring says so;
+  the object does not yet. Making the two agree needs a new status
+  value, so it waits for a release that is changing labels. See
+  `docs/design/fermi-edge-identifiability.md` §10.
+
+### Added
+
+- **`fitting.fermi_edge_identifiability` (experimental): whether a Fermi
+  edge can tell the resolution from the temperature at all.** The
+  instrumental variance `v` and the thermal scale `tau = (kT)^2` enter
+  the edge width as `kappa_2 = v + (pi^2/3) tau`, which every count
+  measures, and they are separated only by the fourth cumulant, whose
+  information vanishes as `tau^2`. The module reports the two
+  separately: the total width, and the share of it that is
+  instrumental.
+
+  It gives a Poisson Fisher matrix with the temperature free, fixed, or
+  carrying a normal prior; effective rather than conditional
+  information; the labels `separable` / `not_separable` / `assumed` /
+  `undersampled`, whose thresholds are stated as conventions; and a
+  scan over seven measurement conditions. Two standard deviations are
+  reported for the resolution, each naming its estimator: the
+  Cramér–Rao bound, and the sandwich covariance of the weighted
+  least-squares estimator `fit_fermi_edge` actually is — 1.25 to 2.55
+  times the bound over the conditions measured. `d(sigma)/dT` says how
+  far the resolution moves if an assumed temperature is wrong by a
+  kelvin.
+
+  The headline result is that freeing the temperature multiplies
+  sd(sigma)/sigma by 1.3 to 78 across the scan, worst where the thermal
+  tail is shortest: on most real edges the temperature is not something
+  the spectrum can measure, and fitting it anyway spends the
+  resolution's precision on it.
+
+  Everything is a model bound or a seeded simulation, never a
+  measurement, and near either width boundary the inverse Fisher matrix
+  is not the variance of a constrained estimator. Not exported from
+  `toyomacro.fitting`, not wired to any CLI. Design record in
+  `docs/design/fermi-edge-identifiability.md`; worked through in
+  `examples/09_fermi_edge_identifiability.py`, which CI runs.
+
+- **`fit_fermi_edge` can put the DOS on both sides of E_F, and
+  `compare_dos_forms` measures what that choice is worth.** The fitted
+  density of states was always flat below E_F and polynomial above it,
+  so its slope changes at E_F. That kink is an assumption about the
+  sample; `dos_form='both_sides'` continues the same polynomial through
+  E_F instead. The default, `'occupied'`, is the previous behaviour and
+  every existing number is bit-identical to what it was.
+
+  The new argument is not there to be chosen from the data. On
+  simulated edges, a DOS running smoothly through E_F biases the fitted
+  resolution low by 0.19 to 1.55 of its own error bar once kT is
+  comparable with the resolution — and by nothing at all when kT is ten
+  times smaller, so whether the assumption matters is itself set by the
+  measurement. Past that the resolution stops being merely biased: it
+  collapses onto its lower bound and the fit reports itself a failure,
+  naming the parameter. `compare_dos_forms` fits a spectrum with each form and
+  returns every fit together with the spread between them. It does not
+  average them, pick one, or rank them by goodness of fit: two forms
+  that describe the data about equally well can disagree by more than
+  either one's error bar.
+
+  The spread is a guide to the systematic the DOS-form assumption
+  carries, and belongs beside the statistical error, never added to it
+  in quadrature. How far it can be trusted was measured, not assumed.
+  Swept over the whole domain simulated — window ±0.6 eV in 0.01 eV
+  steps, 2000 counts per channel over a background of 50, kT/sigma from
+  0.1 to 3, DOS change across the window from 0.02 to 0.9 — **the
+  spread recovers 53 to 112% of the true bias**, exceeding 1 only where
+  the bias is a few hundredths of an error bar and running 0.53 to
+  about 1.03 where it matters, falling smoothly with both kT/sigma and
+  the DOS slope; at its worst, around kT/sigma = 2.5 to 2.75 with a
+  steep DOS, it understates the systematic by a factor of 1.9. Read it
+  as a lower bound on the systematic rather than an estimate of it —
+  and note that in that corner the counterfactual fit those figures
+  rest on is one a caller cannot run, so how much of a lower bound is
+  not quantified there. This is one model family over one range of conditions
+  and not a general result. A linear DOS through E_F
+  reaches zero at the window edge once its change across the window
+  reaches 1, which caps what could be tested at half the slope the
+  identifiability scan uses.
+
+- **`fit_fermi_edge` also reports the error bars that raw counts
+  deserve.** `FermiEdgeResult.poisson_err` is a dict of 1-sigma values
+  from the sandwich covariance of the estimator the function actually
+  computes, alongside the unchanged `*_err` fields. The `*_err` fields
+  are the covariance scaled by the reduced chi-squared, which is exact
+  only if every channel had the same variance; on a Fermi edge the
+  Poisson mean runs from the background to the plateau, a factor of 53
+  in the case measured, and E_F's sensitivity sits where the mean is
+  above its average. Over nine runs of 400 simulated realisations —
+  three kT/sigma by three seeds — with the temperature fixed, `ef_err`
+  came out 9 to 20% smaller than the actual scatter of E_F while
+  `poisson_err['ef']` was within 10% of it; for the resolution the two
+  agree with each other and sit within 25% of the scatter. The new field is
+  meaningful only when `intensity` is raw counts, is not a Cramer-Rao
+  bound, and describes nothing when the temperature is fitted as well,
+  where the estimator is pinned by its bounds. Defaults are unchanged
+  and no existing value moves.
+
+- **`examples/08_map_viewer_frontend.py`: a minimal front end on the
+  batch engine.** Click a pixel of a fitted chemical-state map to see its
+  spectrum, the fit and its components. The back end fits the map once
+  and hands the front end parameter maps and one pixel at a time; a
+  pixel's model is rebuilt on demand from its fitted parameters, and no
+  fitted curves are built for the whole map. Everything runs on the main
+  thread (see "Threads" in `docs/API.md`). matplotlib only, no new
+  dependency; `--smoke` runs it without a window, which is how CI runs
+  it. Synthetic data, like example 02's.
+
+### Changed
+
+- **`scan_edge_identifiability`'s sensitivity key is now
+  `temperature_sensitivity_relative`.** It holds the dimensionless
+  `(dsigma/dT)·T/sigma`, while `InstrumentalResolution`'s field of what
+  used to be the same name holds `dsigma/dT` in eV per kelvin — one name
+  for two quantities inside one module, which an audit called a units
+  collision. The report's field keeps its name; only the scan's key
+  moves. Both modules are experimental and neither has shipped in a
+  release.
+
+- **`CITATION.cff` is titled "toyomacro: X-ray photoelectron spectroscopy
+  analysis toolkit".** That is the title of the Zenodo records of v0.1.0
+  and v0.2.0. Both were retitled by hand after archiving, because the
+  file carried the title of the paper in `paper/` — "toyomacro.voigtfit:
+  high-throughput Voigt-profile fitting for X-ray photoelectron
+  spectroscopy" — which describes the fitting engine, not the whole
+  package. Zenodo takes a release's title from this file, so a later
+  release is archived under the package's title without that step. The
+  copies of the file inside the v0.1.0 and v0.2.0 archives keep the
+  previous title; the paper keeps its own.
+
+### Fixed
 
 - **`fitting.fermi_edge`: E_F and T are followed inside a channel when
   kT is below it.** The model sampled the Fermi-Dirac occupation on the
@@ -1276,6 +1398,7 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0

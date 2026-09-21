@@ -1280,3 +1280,45 @@ class TestScan:
         with pytest.raises(ValueError):
             scan_identifiability(ScanGrid(half_widths=(1.0,), background_kind="tougaard"))
 
+
+
+class TestVarianceFloorUncertainty:
+    """``variance_floor_sd``: the floor is itself an estimate."""
+
+    def _report(self, **kw):
+        energy = np.linspace(-6.0, 6.0, 241)
+        peak = [VoigtPeak(amplitude=2.0e4, center=0.0, sigma=0.35, gamma=0.3)]
+        return assess_identifiability(energy, peak, constant_background(energy, 50.0),
+                                      variance_floor=0.05, **kw)
+
+    def test_zero_reproduces_the_bounds_exactly(self):
+        plain = self._report()
+        zero = self._report(variance_floor_sd=0.0)
+        for a, b in zip(plain.widths, zero.widths):
+            assert (a.sd_variance, a.variance_relative_sd, a.near_boundary, a.worst_relative_sd,
+                    a.worst_direction, a.status) == (
+                b.sd_variance, b.variance_relative_sd, b.near_boundary, b.worst_relative_sd,
+                b.worst_direction, b.status)
+
+    def test_the_floors_own_sd_adds_in_quadrature(self):
+        """The excess is a difference of two independent estimates, so its
+        bound is the quadrature sum; the width block's worst direction
+        widens with it."""
+        base = self._report().widths[0]
+        for floor_sd in (0.5 * base.sd_variance, 2.0 * base.sd_variance):
+            got = self._report(variance_floor_sd=floor_sd).widths[0]
+            assert got.sd_variance == pytest.approx(math.hypot(base.sd_variance, floor_sd))
+            assert got.variance_relative_sd == pytest.approx(
+                got.sd_variance / got.variance_excess)
+            assert got.worst_relative_sd > base.worst_relative_sd
+            assert got.variance_floor_sd == floor_sd
+
+    def test_it_can_turn_a_determined_excess_into_a_boundary_case(self):
+        base = self._report().widths[0]
+        assert not base.near_boundary
+        loose = self._report(variance_floor_sd=base.variance_excess).widths[0]
+        assert loose.near_boundary
+
+    def test_a_negative_floor_sd_raises(self):
+        with pytest.raises(ValueError, match="variance_floor_sd"):
+            self._report(variance_floor_sd=-1e-6)

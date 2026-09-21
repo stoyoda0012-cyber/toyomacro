@@ -44,7 +44,26 @@ Validity and limits -- read before trusting a number:
   edges with about 2000 counts per channel at the edge: over 200
   realisations the E_F and FWHM pulls have unit width and zero mean. At
   low counts (~100 per channel) the pulls widen to about 1.25, partly
-  because the weights are taken from the data.
+  because the weights are taken from the data. With the **default unit
+  weights** on counts that span the background and the plateau,
+  ``ef_err`` runs 9 to 20% below the actual scatter of E_F; when
+  ``intensity`` is raw counts, ``poisson_err`` carries the sandwich
+  covariance of the same estimator, which does not make that
+  assumption.
+- **The DOS is flat below E_F and rises above it**, so its slope changes
+  at E_F. That kink is an assumption about the sample, and it is not
+  free: on simulated data whose DOS instead runs smoothly through E_F,
+  the fitted resolution comes out low by 0.19 to 1.55 of its own error
+  bar once kT is comparable with the resolution, and at kT/sigma = 0.1
+  not at all. Past that it stops being merely biased: it collapses onto
+  its lower bound and the fit reports itself a failure, naming the
+  parameter. A DOS with curvature through E_F that ``dos='linear'``
+  cannot hold moved E_F by up to 49 meV -- an energy-axis calibration
+  error, not a resolution one -- which ``dos='quadratic'`` removes.
+  Refit with both and treat the spread as a systematic:
+  :func:`compare_dos_forms` does that for the two ``dos_form`` values,
+  and the same reasoning applies to ``dos`` (see "Compare DOS models on
+  real data" below).
 - **E_F is where the fitted Fermi-Dirac function is 1/2 before
   broadening**; it is not the inflection point of the measured edge,
   which a sloped DOS moves.
@@ -69,7 +88,13 @@ Validity and limits -- read before trusting a number:
   well as the best as a *sensitivity check*: it is neither a bound nor
   an uncertainty -- it can exceed the real error when one model is
   clearly right, and understate it because all three share the
-  Gaussian, no-lifetime assumptions.
+  Gaussian, no-lifetime assumptions. On simulated data where the true
+  DOS is known, the spread between the two ``dos_form`` values recovered
+  54 to 103% of the actual bias of the resolution, worst where the
+  misspecification is strongest. That is the evidence for using a
+  spread this way, and it says to read it as a *lower bound* on the
+  systematic; it is also evidence from one model family over one range
+  of conditions, not a general result.
 
 Origin: a generalisation of ``toyomacro.lineshape.FermiDirac`` (same
 model on a binding-energy axis, :func:`fermi_edge` adds kinetic axes and
@@ -79,7 +104,7 @@ temperature to find the DOS shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
@@ -88,8 +113,11 @@ from scipy.optimize import least_squares
 from scipy.signal import fftconvolve
 
 __all__ = [
+    "DOS_FORMS",
     "KB_EV",
+    "DosFormComparison",
     "FermiEdgeResult",
+    "compare_dos_forms",
     "detect_convention",
     "differential_ef",
     "fermi_edge",
@@ -102,6 +130,11 @@ KB_EV = 8.617333262e-5
 
 _FWHM_TO_SIGMA = 1.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
 _MAX_REFINEMENT = 1000
+
+#: Where the DOS polynomial applies. ``'occupied'`` is the default and
+#: the historical behaviour: flat below E_F, so the slope changes there.
+#: ``'both_sides'`` continues the same polynomial through E_F.
+DOS_FORMS = ("occupied", "both_sides")
 
 
 def _sign_of(convention: str) -> int:
@@ -203,6 +236,7 @@ def fermi_edge(
     bg_slope: float = 0.0,
     convention: str = "BE",
     bg_ref: float | None = None,
+    dos_form: str = "occupied",
 ) -> NDArray[np.float64]:
     """Evaluate the Fermi-edge model, background included.
 
@@ -217,6 +251,13 @@ def fermi_edge(
         bg_const, bg_slope: Background level and slope (per eV).
         convention: ``'BE'`` or ``'KE'``.
         bg_ref: Energy the background slope pivots on; the axis mean if None.
+        dos_form: Where the DOS polynomial applies. ``'occupied'``
+            (default) puts it on the occupied side only, so its slope
+            changes at E_F; ``'both_sides'`` continues the same
+            polynomial smoothly through E_F. The two differ only where
+            the occupation is neither 0 nor 1, i.e. within a few kT of
+            E_F, so they are indistinguishable when kT is far below the
+            resolution and not otherwise.
 
     Returns:
         Model intensity on ``energy``, in its original order.
@@ -236,6 +277,8 @@ def fermi_edge(
     e = np.asarray(energy, dtype=float)
     s = _sign_of(convention)
     t_k = max(float(temperature), 1.0)
+    if dos_form not in DOS_FORMS:
+        raise ValueError(f"unknown dos_form {dos_form!r} (use one of {DOS_FORMS})")
 
     order = np.argsort(e)
     e_sorted = e[order]
@@ -244,7 +287,7 @@ def fermi_edge(
     fine = grid if m == 1 else grid[0] + (float(grid[1] - grid[0]) / m) * np.arange(
         (grid.size - 1) * m + 1)
     u_signed = s * (fine - ef)
-    u = np.maximum(u_signed, 0.0)
+    u = np.maximum(u_signed, 0.0) if dos_form == "occupied" else u_signed
     dos = np.maximum(1.0 + dos_c1 * u + dos_c2 * u * u, 0.0)
     arg = np.clip(-u_signed / (KB_EV * t_k), -700.0, 700.0)
     occupation = 1.0 / (1.0 + np.exp(arg))
@@ -260,6 +303,10 @@ def fermi_edge(
     profile = profile[np.argsort(order)]
     ref = float(np.mean(e)) if bg_ref is None else float(bg_ref)
     return profile + bg_const + bg_slope * (e - ref)
+
+
+#: internal parameter name -> the result field it belongs to
+_PUBLIC_NAME = {"amp": "amplitude", "fwhm_g": "resolution"}
 
 
 @dataclass
@@ -293,7 +340,46 @@ class FermiEdgeResult:
     success: bool
     convention: str
     dos: str
+    dos_form: str = "occupied"
     message: str = ""
+    poisson_err: dict[str, float] = field(default_factory=dict)
+    """1-sigma from the sandwich covariance, **valid only if ``intensity``
+    was raw counts**, keyed by the names above (``'ef'``, ``'resolution'``,
+    ``'temperature'``, ``'amplitude'``, ``'dos_c1'``, ``'dos_c2'``,
+    ``'bg_const'``, ``'bg_slope'``), for the parameters that were fitted.
+    **Empty when ``intensity`` is not non-negative integers**, since
+    nothing else here can tell raw counts from counts per second or from
+    a spectrum that has had a background subtracted, and the sandwich is
+    wrong by sqrt(dwell) on the wrong scale. That check is necessary and
+    not sufficient -- counts scaled by a whole number still pass it, and
+    nothing available here could catch that -- so the condition is
+    yours to meet, not the function's to enforce. Also empty if the
+    covariance was singular.
+
+    The ``*_err`` fields are what a least-squares solver reports: the
+    covariance scaled by the reduced chi-squared, which is the right
+    answer only if every channel had the same variance. Poisson channels
+    do not -- on a Fermi edge the mean runs from the background to the
+    plateau. Over a 53-fold range of it, nine runs of 400 simulated
+    realisations (three kT/sigma x three seeds) with the temperature
+    fixed, ``ef_err`` came out 9 to 20% smaller than the actual scatter
+    of E_F while this field was within 10% of it. For the resolution the
+    two agree with each other and are within 25% of the scatter; the
+    worst of that is at kT/sigma = 3, where a sixth of the fits are
+    rejected and the survivors are a selected subset.
+
+    With the temperature *fitted* neither describes the scatter: the
+    estimator is then pinned by its bounds and the linearisation both
+    rest on does not apply. See
+    ``toyomacro.fitting.fermi_edge_identifiability`` for whether the
+    temperature and the resolution can be separated at all in a given
+    measurement.
+
+    This is *not* a Cramer-Rao bound: this function computes a weighted
+    least-squares estimator, not a maximum-likelihood one, and with the
+    default unit weights its spread is about a third above the bound. The
+    ``*_err`` fields are unchanged; which of the two to quote is the
+    caller's decision."""
 
     def summary(self) -> str:
         """One-line summary for logs."""
@@ -341,6 +427,7 @@ def fit_fermi_edge(
     *,
     convention: str = "auto",
     dos: str = "linear",
+    dos_form: str = "occupied",
     background: str = "linear",
     window: tuple[float, float] | None = None,
     ef_init: float | None = None,
@@ -361,6 +448,11 @@ def fit_fermi_edge(
             of the edge is bright; pass it explicitly when the file says).
         dos: ``'flat'``, ``'linear'`` (default) or ``'quadratic'`` DOS past
             the edge.
+        dos_form: ``'occupied'`` (default, and what earlier versions did)
+            or ``'both_sides'``; see :func:`fermi_edge`. Do not choose
+            between them from the data -- fit both and use
+            :func:`compare_dos_forms`, whose spread is a guide to the
+            systematic the choice carries.
         background: ``'none'``, ``'constant'`` or ``'linear'`` (default),
             fitted inside the window. Remove a wide-range background first.
         window: ``(lo, hi)`` fit window, eV. Leave roughly 1 eV of plateau
@@ -392,6 +484,8 @@ def fit_fermi_edge(
     s = _sign_of(convention)
     if dos not in ("flat", "linear", "quadratic"):
         raise ValueError(f"unknown dos {dos!r} (use 'flat', 'linear' or 'quadratic')")
+    if dos_form not in DOS_FORMS:
+        raise ValueError(f"unknown dos_form {dos_form!r} (use one of {DOS_FORMS})")
     if background not in ("none", "constant", "linear"):
         raise ValueError(f"unknown background {background!r} "
                          "(use 'none', 'constant' or 'linear')")
@@ -423,6 +517,7 @@ def fit_fermi_edge(
         ef_bounds = (ef_init - 1.0, ef_init + 1.0)
 
     # --- parameter vector: ef, amp, [fwhm_g], [T], [c1], [c2], [bg_const], [bg_slope] ---
+    # (internal names; `poisson_err` is keyed by the result's own field names)
     p0 = [float(ef_init), float(amp0)]
     lb = [float(min(ef_bounds)), 0.0]
     ub = [float(max(ef_bounds)), np.inf]
@@ -461,7 +556,8 @@ def fit_fermi_edge(
         }
 
     def model(p, e):
-        return fermi_edge(e, convention=convention, bg_ref=e_ref, **unpack(p))
+        return fermi_edge(e, convention=convention, bg_ref=e_ref, dos_form=dos_form,
+                          **unpack(p))
 
     def residual(p):
         return (model(p, E) - Y) * sqrtW
@@ -514,6 +610,31 @@ def fit_fermi_edge(
     message = "; ".join(problems + [str(result.message)])
 
     fit_curve = model(result.x, E)
+    # A second set of 1-sigma errors, for intensities that are raw counts.
+    # `perr` above is the least-squares covariance scaled by the reduced
+    # chi-squared, which is exact only if every channel had the same
+    # variance; Poisson channels do not, and the difference is not small
+    # (see the module docstring). This is the sandwich covariance of the
+    # same estimator, (G'WG)^-1 G'W diag(mu) WG (G'WG)^-1, with mu the
+    # fitted model. result.jac is G scaled by sqrt(W), so G'WG = J'J and
+    # the middle factor is J' diag(W mu) J.
+    # Only for raw counts. Nothing else here can tell counts from
+    # counts-per-second or from a background-subtracted spectrum, and a
+    # sandwich built on the wrong scale is wrong by sqrt(dwell) -- a larger
+    # error than the one this field exists to remove. Non-integer
+    # intensities leave it empty rather than quietly wrong.
+    poisson_err: dict[str, float] = {}
+    counts_like = bool(np.all(Y >= 0.0) and np.all(Y == np.rint(Y)))
+    try:
+        a_inv = np.linalg.inv(result.jac.T @ result.jac) if counts_like else None
+        if a_inv is not None:
+            middle = result.jac.T @ (result.jac
+                                     * (W * np.maximum(fit_curve, 0.0))[:, np.newaxis])
+            sandwich = np.sqrt(np.clip(np.diag(a_inv @ middle @ a_inv), 0.0, np.inf))
+            poisson_err = {_PUBLIC_NAME.get(n, n): float(v) for n, v in zip(names, sandwich)}
+    except np.linalg.LinAlgError:
+        pass
+
     ss_res = float(np.sum((Y - fit_curve) ** 2))
     ss_tot = float(np.sum((Y - np.mean(Y)) ** 2))
 
@@ -540,8 +661,125 @@ def fit_fermi_edge(
         success=bool(result.success) and not problems,
         convention=convention,
         dos=dos,
+        dos_form=dos_form,
         message=message,
+        poisson_err=poisson_err,
     )
+
+
+#: Scalar fit results :func:`compare_dos_forms` reports across DOS forms.
+_COMPARED = ("ef", "resolution", "temperature", "amplitude", "dos_c1", "dos_c2",
+             "bg_const", "bg_slope", "width_1090")
+
+
+@dataclass
+class DosFormComparison:
+    """One spectrum fitted with several DOS forms, and how far they disagree.
+
+    ``spread`` is **a guide to the systematic carried by the DOS-form
+    assumption**, not a statistical error. Keep it separate from
+    ``*_err`` and ``poisson_err``: do not add the two in quadrature, and
+    do not report one in place of the other.
+
+    Nothing here averages the fits, picks one of them, or ranks them by
+    goodness of fit. Two forms that describe the data about equally well
+    can disagree by more than either one's error bar, and that
+    disagreement is the point.
+
+    Attributes:
+        forms: The DOS forms fitted, in the order given
+        fits: form -> its :class:`FermiEdgeResult`
+        values: parameter -> form -> fitted value
+        spread: parameter -> largest minus smallest across the forms
+        success: True only if every fit succeeded; when it is False the
+            spread mixes a systematic with a failure and means nothing
+
+    How far the spread can be trusted as the systematic was measured on
+    simulated data, and only there. On a window of +-0.6 eV in steps of
+    0.01 eV, 2000 counts per channel on the plateau over a background of
+    50, with v + (pi^2/3)(kT)^2 held at (0.1 eV)^2, swept over kT/sigma
+    from 0.1 to 3 and DOS changes across the window from 0.02 to 0.9:
+    **the spread recovers 53 to 112% of the true bias**. It exceeds 1
+    only where the bias is a few hundredths of an error bar; where the
+    bias is large enough to matter it runs 0.53 to about 1.03. It works
+    because the bias is antisymmetric in which form is wrong, and less
+    well the further that antisymmetry goes -- the recovery falls
+    smoothly with both kT/sigma and the DOS slope, and at its worst
+    corner, kT/sigma around 2.5 to 2.75 with a steep DOS, it understates
+    the systematic by a factor of 1.9. **Read the spread as a lower
+    bound on the systematic, not an estimate of it.**
+
+    Three limits on that. It is one model family over one range of
+    conditions, not a general result. The range that could be tested at
+    all is capped: a linear DOS through E_F reaches zero at the window
+    edge once its change across the window reaches 1, which holds the
+    slope to half of what the identifiability scan uses.
+
+    And the figures above exclude the cells where fitting the *other*
+    truth fails -- the counterfactual in which the true DOS is the one
+    this fit does not assume. **A caller cannot check that**: it needs a
+    spectrum they do not have, and in the nine such cells measured
+    (kT/sigma from 2.5 up, with a steep DOS) ``success`` here was True
+    every time while that counterfactual fit collapsed onto the
+    resolution's lower bound. Those are exactly the conditions where the
+    systematic is largest. So in that corner the spread is a lower bound
+    whose distance from the truth is not quantified here, and nothing in
+    this object says so. Treat a large kT/sigma with a steeply varying
+    DOS as a condition to avoid rather than one to correct for.
+    """
+
+    forms: tuple[str, ...]
+    fits: dict[str, FermiEdgeResult]
+    values: dict[str, dict[str, float]]
+    spread: dict[str, float]
+    success: bool
+
+    def summary(self) -> str:
+        """One line: the spread of E_F and the resolution across the forms."""
+        state = "" if self.success else " [a fit failed: the spread is meaningless]"
+        return (f"DOS forms {', '.join(self.forms)} | E_F spread "
+                f"{self.spread['ef']:.4f} eV | FWHM_G spread "
+                f"{self.spread['resolution']:.4f} eV{state}")
+
+
+def compare_dos_forms(
+    energy: NDArray,
+    intensity: NDArray,
+    *,
+    forms: tuple[str, ...] = DOS_FORMS,
+    **kwargs,
+) -> DosFormComparison:
+    """Fit one spectrum with each DOS form and report how far they disagree.
+
+    The DOS form is an assumption about the sample that the data near
+    E_F constrain weakly, so choosing between the forms by fit quality
+    substitutes a guess for a measurement. Fitting both and reporting
+    the spread does not.
+
+    Args:
+        energy, intensity: One spectrum, as for :func:`fit_fermi_edge`
+        forms: DOS forms to fit; any of :data:`DOS_FORMS`
+        kwargs: Passed unchanged to :func:`fit_fermi_edge` (``dos_form``
+            is not accepted -- ``forms`` sets it)
+
+    Returns:
+        DosFormComparison. Read ``spread`` beside the statistical error,
+        never instead of it or combined with it.
+    """
+    if "dos_form" in kwargs:
+        raise TypeError("compare_dos_forms sets dos_form itself; pass `forms` instead")
+    forms = tuple(forms)
+    if len(forms) < 2 or len(set(forms)) != len(forms) or set(forms) - set(DOS_FORMS):
+        raise ValueError(f"forms must be two or more distinct entries of {DOS_FORMS}, "
+                         f"got {forms}")
+    fits = {form: fit_fermi_edge(energy, intensity, dos_form=form, **kwargs)
+            for form in forms}
+    values = {name: {form: float(getattr(fits[form], name)) for form in forms}
+              for name in _COMPARED}
+    spread = {name: max(v.values()) - min(v.values()) for name, v in values.items()}
+    return DosFormComparison(forms=forms, fits=fits, values=values, spread=spread,
+                             success=all(f.success for f in fits.values()))
+
 
 
 def differential_ef(energy_a, intensity_a, energy_b, intensity_b, **kwargs) -> dict:

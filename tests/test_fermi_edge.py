@@ -14,7 +14,9 @@ import numpy as np
 import pytest
 
 from toyomacro.fitting.fermi_edge import (
+    DOS_FORMS,
     KB_EV,
+    compare_dos_forms,
     detect_convention,
     differential_ef,
     fermi_edge,
@@ -366,7 +368,155 @@ def test_to_binding_energy():
 
 
 @pytest.mark.parametrize("kw", [dict(dos="cubic"), dict(background="shirley"),
-                                dict(convention="XE"), dict(window=(5.0, 5.1))])
+                                dict(convention="XE"), dict(window=(5.0, 5.1)),
+                                dict(dos_form="smooth")])
 def test_bad_arguments_raise(kw):
     with pytest.raises(ValueError):
         fit_fermi_edge(BE, _noisy(9), **kw)
+
+
+# --- the DOS form --------------------------------------------------------
+
+
+def test_the_default_dos_form_changes_nothing():
+    """`dos_form` was added after v0.2.0; its default must leave every
+    number where it was. Two checks with different reach.
+
+    The first is exact and is the real guard on the default path: the
+    model with the argument omitted must be bit-identical to the model
+    with ``dos_form='occupied'`` given. Both run on one machine through
+    one code path, so anything less than equality means the default
+    stopped being that path.
+
+    The second pins the values themselves against constants taken from
+    the code as it was before the argument existed -- checked at the
+    time against the previous commit directly, over three parameter sets
+    and all ten scalar fit results. Those cannot be compared bit for bit:
+    they were captured on one platform, and the model calls ``exp`` and a
+    Gaussian filter whose last bits differ between libm implementations.
+    An earlier version of this test asserted equality and passed on
+    macOS while failing on Linux CI for that reason alone. The
+    tolerances below -- 1e-9 on the model, 1e-6 on a fitted value, which
+    goes through an iterative solver -- are four to eleven orders of
+    magnitude tighter than any model change worth the name: the
+    low-temperature E_F fix, the last such change, moved this model by
+    3e-5 of the step.
+
+    **If the second check fails, do not update the numbers to make it
+    pass.** They are meant to fail whenever the model moves, including
+    for changes that are entirely legitimate -- a finer discretisation,
+    a different convolution, a new default. Replacing them is correct
+    only once the change has been confirmed as deliberate and recorded
+    in CHANGELOG.md with what moved and by how much; the entry for the
+    low-temperature E_F fix is the shape that takes. A failure here
+    without such an entry is a regression, not a stale constant."""
+    shared = dict(ef=0.02, amplitude=2000.0, fwhm_g=0.1137, temperature=560.3,
+                  dos_c1=1.5, bg_const=50.0)
+    assert np.array_equal(fermi_edge(BE, **shared),
+                          fermi_edge(BE, dos_form="occupied", **shared))
+
+    grid = np.arange(-0.6, 0.6 + 1e-9, 0.01)
+    before = np.array([50.00872830450744, 54.333831213484196, 904.1136269069085,
+                       2876.712487344952, 3789.964068966334])
+    np.testing.assert_allclose(fermi_edge(grid, **shared)[::30], before, rtol=1e-9)
+
+    counts = np.random.default_rng(3).poisson(fermi_edge(grid, **shared)).astype(float)
+    fit = fit_fermi_edge(grid, counts, convention="BE", dos="linear", background="constant",
+                         temperature=560.3, resolution=0.1137)
+    assert fit.ef == pytest.approx(0.02220324184703952, rel=1e-6)
+    assert fit.resolution == pytest.approx(0.12235167495258374, rel=1e-6)
+    assert fit.reduced_chi2 == pytest.approx(1119.9023959702502, rel=1e-6)
+    assert fit.dos_form == "occupied"
+
+
+@pytest.mark.parametrize(
+    "fwhm_g, temperature, dos_c1, peak_fraction",
+    [(0.30, 300.0, 0.35, 5.6e-4),        # kT/sigma = 0.2: the forms are nearly the same edge
+     (0.1137, 560.0, 1.5, 1.5e-2)])      # kT/sigma = 1 on a steep DOS: 27 times more
+def test_the_two_dos_forms_differ_only_near_ef(fwhm_g, temperature, dos_c1, peak_fraction):
+    """They put the same polynomial on different domains, so they can only
+    differ where the occupation is neither 0 nor 1. The difference peaks
+    two or three kT below E_F -- 0.06 and 0.08 eV in these two cases --
+    and is 5.6e-4 and 1.5e-2 of the step height there. Ten kT out it is
+    1.8e-4 and 3.5e-5 on the empty side and gone on the occupied one.
+
+    That is also why the choice between them matters only when kT is not
+    far below the resolution: at kT/sigma = 0.2 the whole difference is
+    below a tenth of a percent of the step."""
+    kw = dict(ef=0.0, amplitude=1000.0, fwhm_g=fwhm_g, temperature=temperature,
+              dos_c1=dos_c1)
+    difference = np.abs(fermi_edge(BE, dos_form="both_sides", **kw)
+                        - fermi_edge(BE, dos_form="occupied", **kw))
+    kt = KB_EV * temperature
+    assert -4.0 * kt < BE[np.argmax(difference)] < 0.0
+    assert difference.max() / 1000.0 == pytest.approx(peak_fraction, rel=0.15)
+    far = np.abs(BE) > 10.0 * kt
+    assert np.max(difference[far]) / 1000.0 < 2e-4
+
+
+def test_compare_dos_forms_reports_each_fit_and_their_spread():
+    """The helper fits every form and reports the spread. It does not
+    average them, choose between them, or rank them by fit quality --
+    that is the point of it, since fit quality is what cannot decide
+    this."""
+    counts = _noisy(11)
+    out = compare_dos_forms(BE, counts, convention="BE", dos="linear",
+                            background="linear", temperature=300.0)
+    assert out.forms == DOS_FORMS
+    assert set(out.fits) == set(DOS_FORMS)
+    for form in DOS_FORMS:
+        assert out.fits[form].dos_form == form
+        assert out.values["ef"][form] == out.fits[form].ef
+    assert out.spread["ef"] == abs(out.values["ef"]["occupied"]
+                                   - out.values["ef"]["both_sides"])
+    assert out.spread["resolution"] > 0.0
+    assert out.success is all(f.success for f in out.fits.values())
+    assert "spread" in out.summary()
+
+    # the spread is a systematic, kept apart from the statistical error
+    assert not hasattr(out, "combined")
+    assert not hasattr(out, "best")
+
+
+def test_compare_dos_forms_rejects_a_form_it_cannot_set():
+    with pytest.raises(TypeError, match="sets dos_form itself"):
+        compare_dos_forms(BE, _noisy(12), dos_form="occupied")
+    for bad in [("occupied",), ("occupied", "occupied"), ("occupied", "smooth")]:
+        with pytest.raises(ValueError, match="forms must be"):
+            compare_dos_forms(BE, _noisy(12), forms=bad)
+
+
+def test_a_failed_fit_marks_the_comparison_unusable():
+    """When a fit fails, the spread mixes a systematic with a failure. The
+    flag says so; the fits are still returned so the caller can see which
+    one went wrong and why. Flat noise with no edge in it fails both
+    forms, on E_F and the DOS slope running to their bounds."""
+    flat = np.random.default_rng(13).poisson(np.full(BE.size, 300.0)).astype(float)
+    out = compare_dos_forms(BE, flat, convention="BE", dos="linear",
+                            background="linear", temperature=300.0)
+    assert not out.success
+    assert all(not f.success for f in out.fits.values())
+    assert all("bound" in f.message for f in out.fits.values())
+    assert set(out.spread) == set(out.values)
+
+
+def test_the_poisson_error_is_only_offered_for_counts():
+    """The sandwich it carries assumes the intensities are raw Poisson
+    counts. Nothing in a float array distinguishes counts from counts per
+    second or from a background-subtracted spectrum, and on the wrong
+    scale the field is wrong by sqrt(dwell) -- a larger error than the
+    9 to 20% it exists to remove. So it is offered only when every
+    intensity is a non-negative integer, and is empty otherwise. The
+    `*_err` fields, which make no such assumption, are unaffected.
+
+    The check is necessary, not sufficient: an audit noted that counts
+    scaled by an integer factor still pass it. Nothing available here
+    can tell those apart, which is why the docstring states the
+    condition rather than promising to enforce it."""
+    counts = _noisy(21)
+    assert _fit(counts).poisson_err                       # integers: offered
+    assert _fit(counts / 3.0).poisson_err == {}           # counts per second: withheld
+    assert _fit(counts - counts.min()).poisson_err        # still integers
+    shifted = counts - 0.5                                # background-subtracted
+    assert _fit(shifted).poisson_err == {}
+    assert not np.isnan(_fit(shifted).ef_err)             # the usual errors still come back
