@@ -578,7 +578,9 @@ class TestSpecdataUint16:
         median_time = np.median(times)
         rate = n_spectra / median_time / 1e6
 
-        # Should exceed 28M target significantly
+        # NOTE: this gate is MLX-only and unmeasured here. The "28M target"
+        # it used to cite has no provenance (see FitparaCodec in h5io.py);
+        # the 50M bound below is likewise unverified and outlives that claim.
         assert rate > 50, f"uint16→MLX rate {rate:.1f}M spec/s < 50M"
 
     def test_reject_out_of_range(self, tmp_path):

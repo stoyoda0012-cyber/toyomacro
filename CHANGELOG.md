@@ -21,6 +21,20 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **`FitparaCodec` no longer advertises a decode rate it cannot
+  reproduce.** The class docstring claimed "Decode speed: 30M spec/s
+  (exceeds 28M target)" for a 1M x 3-component workload, and
+  `FitparaCodecConfig` claimed "30M+ spec/s". Measured on that exact
+  workload, a 4-vCPU Xeon @2.80GHz reaches 5.2M spec/s -- 5.8x below the
+  claim -- and no run recorded anywhere in this repository has reached
+  30M. Neither the figure nor the "28M target" has provenance; both
+  trace only to the squashed import commit. The size and accuracy
+  figures in the same block are deterministic and do reproduce
+  (108.0 MB, 17.6 MB, 6.15x, 0.130% against a stated 0.14% bound), so
+  they are kept and re-verified; the decode rate is removed rather than
+  restated, because it is machine-dependent and no machine was ever
+  recorded for it. No behaviour changes.
+
 - **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`
   and five modules under `voigtfit/benchmarks/` imported the Unix-only
   `resource` module at module scope, so on Windows `import

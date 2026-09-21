@@ -719,7 +719,8 @@ class FitparaCodecConfig:
     Compression strategy:
     - Column-wise storage: group same-type data for better compression
     - int16 quantization: 50% size reduction with <0.15% precision loss
-    - LZ4 compression: fast decompression (30M+ spec/s)
+    - LZ4 compression: decode is the cheaper direction, but its rate is
+      machine-dependent; see FitparaCodec for what is established
 
     Precision guarantees:
     - amplitude: 0.15% relative error
@@ -760,11 +761,23 @@ class FitparaCodec:
     2. Column-wise reordering (improves LZ4 compression)
     3. LZ4 compression
 
-    Benchmark results (1M spectra, 3 components):
+    Measured on 1M spectra x 3 components. These three are deterministic
+    properties of the codec, and reproduce exactly (re-verified
+    2026-09-21: 108.0 MB, 17.6 MB, 6.15x, 0.130%):
+
     - Raw: 108 MB
     - Compressed: 17.7 MB (6.1x compression)
-    - Decode speed: 30M spec/s (exceeds 28M target)
-    - Max relative error: 0.14% (amplitude)
+    - Max relative error: 0.14% (amplitude) -- a bound, not a typical value
+
+    No decode rate is quoted, because it is machine-dependent and this
+    docstring had no recorded machine for the one it used to quote.
+    "30M spec/s (exceeds 28M target)" does not reproduce: a 4-vCPU Xeon
+    @2.80GHz measures 5.2M spec/s on this exact workload, and no run
+    recorded anywhere in this repository has reached 30M. Neither that
+    figure nor the "28M target" has provenance -- both trace only to the
+    squashed import commit. For what is established across hosts, and
+    why an absolute rate is not calibratable for this codec, see
+    docs/CUDA_BACKEND_POC.md.
     """
 
     # Column indices for fitpara format
