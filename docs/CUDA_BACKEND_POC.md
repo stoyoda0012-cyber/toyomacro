@@ -247,16 +247,18 @@ Step 1 probe returned `Device(gpu, 0)` / `mlx_usable: True` **unchanged**
 | test | measured | target |
 |---|---|---|
 | `test_compression.py::TestFitparaCodec::test_decode_speed` | 3.4M spec/s | 20M |
-| `test_compression.py::TestArrayLZ4Compression::test_decode_speed` | 8.5M spec/s | — |
+| `test_compression.py::TestArrayLZ4Compression::test_decode_speed` | 8.5M spec/s | 50M |
 | `test_compression.py::TestSpecdataUint16::test_mlx_throughput` | 27.3M spec/s | 50M |
 | `test_gvrt_multipeak_1b.py::TestThroughput::test_fit_throughput_target` | 0.07 M/s | 0.5 M/s |
 
 The two `test_decode_speed` failures are **not CUDA-related** — they fail
 identically on the Step 0 NumPy baseline. They are pure-CPU codec paths;
 `skip_in_ci` hides them on CI runners, and this machine is likewise below
-the dev-hardware threshold. Worth a separate look (a Ryzen 9 8940HX
+the dev-hardware threshold. Worth a separate look (~~a Ryzen 9 8940HX
 should not be 6× under a 20M target — suspect WSL2 CPU allocation or
-laptop power policy), but not a CUDA signal.
+laptop power policy~~ — that hypothesis is refuted; see
+[Second data point](#second-data-point-2026-09-21--gpu-less-x86-control)),
+but not a CUDA signal.
 
 `test_fit_throughput_target` at 0.07 M/s vs 0.5 M/s confirms this
 document's own prediction: the streaming kernel is bandwidth-bound and
@@ -433,7 +435,14 @@ dictionaries are constant across the batch loop.
    `tests/test_mlx_support.py` now pins the messages against a
    regression. Detection behavior is unchanged.
 3. Fold the header install + `CUDA_HOME` into the setup recipe above.
-4. Investigate the NumPy-baseline `decode_speed` gap on this machine.
+4. ~~Investigate the NumPy-baseline `decode_speed` gap on this machine.~~
+   — **answered 2026-09-21: not machine-specific.** A GPU-less x86
+   control reproduces both shortfalls while running *faster* than this
+   box, and the assertions additionally flip with pytest's collection
+   scope; see
+   [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
+   What is left is a decision — give the two targets recorded
+   provenance, or move them to `benchmarks/`.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
 6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
    side, order 1→4→3→2, all four accepted by the tracker:
@@ -474,3 +483,67 @@ dictionaries are constant across the batch loop.
    search exists but misses the `nvidia/cu13` layout) → draft 4.
 7. Chunk `solve_alternating_projection` batches to ≤ 65,535 on the CUDA path
    (existing chunked infrastructure applies).
+
+## Second data point (2026-09-21) — GPU-less x86 control
+
+Follow-up 4 asked whether the NumPy-baseline `decode_speed` gap was
+specific to the RTX 5070 box. It is not. The same assertions were run on
+an unrelated cloud container with **no GPU at all** — a control for the
+pure-CPU codec paths, not a CUDA run. Nothing here bears on the CUDA
+verdict above.
+
+### Environment
+
+| | |
+|---|---|
+| CPU | Intel Xeon @ 2.80GHz, 4 vCPU |
+| RAM | 15 GB |
+| Host | Linux 6.18.44-fc-v37; no NVIDIA device (`nvidia-smi`, `nvcc`, `libcuda` all absent) |
+| Python / NumPy / SciPy | 3.12.3 / 2.3.5 / 1.17.0 |
+| BLAS | scipy-openblas 0.3.30 |
+| lz4 | 4.4.5 |
+| toyomacro | 0.2.0 |
+
+### Measured
+
+| test | RTX 5070 box | this control | target |
+|---|---|---|---|
+| `TestFitparaCodec::test_decode_speed` | 3.4M spec/s | 3.9–4.0M spec/s | 20M |
+| `TestArrayLZ4Compression::test_decode_speed` | 8.5M spec/s | 16.1–17.0M spec/s | 50M |
+
+Ranges are the min and max of five consecutive runs of the two tests in
+isolation; the spread within that set is under 6%. The other two
+speed entries in the Step 2 table are MLX-gated and skip cleanly with no
+GPU, so this control says nothing about them.
+
+**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
+Xeon is *faster* than the Ryzen 9 8940HX on both codecs — roughly 2× on
+the LZ4 array path — and still lands 5× under the 20M target and 3×
+under the 50M one. Two unrelated hosts failing the same way points at
+the thresholds, not at either machine. `git log -S "rate > 20"` traces
+the assertion only to the squashed import commit, so neither target has
+recorded provenance, nor a machine where it was ever met.
+
+### The assertions also depend on pytest's collection scope
+
+`TestArrayLZ4Compression::test_decode_speed` **fails at ~16.7M** under
+`pytest src/toyomacro/voigtfit/tests` (the Step 2 command) but **passes
+— clearing 50M** under a bare `pytest`, which also collects the
+top-level `tests/` root. Both outcomes reproduce. `TestFitparaCodec`
+measured 3.8M and 6.0M on two bare-`pytest` runs against 3.9–4.0M
+isolated, i.e. a wider spread under the larger collection.
+
+Allocator or page-cache state is the obvious suspect, and the cause was
+not chased further. The point stands without it: an assertion whose
+verdict flips with the set of *other* tests collected alongside it is
+not measuring the codec, and a green result from it is not evidence.
+
+### Consequence
+
+These two assertions currently certify the host, not the code, and
+`skip_in_ci` means nothing re-derives their thresholds. Decide either a
+target with recorded provenance, or move them to
+`src/toyomacro/voigtfit/benchmarks/` where a number without a pass/fail
+gate is the expected artifact. Until then, treat a `decode_speed`
+failure on a new machine as uninformative — as the Step 2 criteria
+already do.
