@@ -886,3 +886,55 @@ def test_scan_grid_inputs_are_checked():
                dict(background_kind="shirley"), dict(prior_fraction=0.0)):
         with pytest.raises(ValueError):
             fi.EdgeScanGrid(**kw)
+
+
+def test_freeing_the_temperature_inflates_the_resolution_across_the_scan(scan):
+    """The module's most practical output, pinned as a population rather
+    than at one cell. Over every (kT/sigma, window, background) of the
+    default scan at a DOS rising 30% per edge width, freeing the
+    temperature multiplies sd(sigma)/sigma by 1.3 to 78; with the
+    temperature fixed that quantity itself runs 1.6% to 107%. The
+    largest inflation is at kT/sigma = 0.1, where the thermal tail is
+    too short to measure a temperature with and fitting one anyway
+    spends the resolution's precision on it."""
+    grid, out = scan
+    modes = list(grid.temperature_modes)
+    islope = list(grid.slopes).index(0.3)
+    iform = list(grid.dos_forms).index("occupied")
+    free = out["sd_sigma"][:, :, 0, islope, :, modes.index("free"), iform]
+    fixed = out["sd_sigma"][:, :, 0, islope, :, modes.index("fixed_temperature"), iform]
+    usable = np.isfinite(free) & np.isfinite(fixed) & (fixed > 0.0)
+    assert usable.sum() >= 30
+    inflation = free[usable] / fixed[usable]
+    assert inflation.min() == pytest.approx(1.3, abs=0.2)
+    assert inflation.max() == pytest.approx(78.0, rel=0.15)
+    assert np.all(inflation > 1.0)                      # freeing never helps
+    assert fixed[usable].min() == pytest.approx(0.016, abs=0.004)
+    assert fixed[usable].max() == pytest.approx(1.07, rel=0.15)
+    # the worst inflation is the shortest thermal tail
+    worst = np.unravel_index(np.argmax(np.where(usable, free / fixed, -1.0)), free.shape)
+    assert grid.ratios[worst[0]] == min(grid.ratios)
+
+
+@pytest.mark.parametrize(
+    "fwhm, temperature, ratio",
+    [(0.30, 300.0, 1.37), (0.10, 300.0, 1.30), (0.050, 300.0, 1.25),
+     (0.030, 30.0, 1.32), (0.010, 10.0, 2.55)])
+def test_the_unit_weight_estimator_stays_above_the_bound(fwhm, temperature, ratio):
+    """What §6 of the design record quotes. The package's own fitter uses
+    unit weights by default, so its sandwich standard deviation is 1.25
+    to 2.55 times the Cramer-Rao bound over these conditions -- a 2 eV
+    window in 10 meV steps, 2000 counts per channel over a background of
+    50, temperature fixed. Pairing that estimate with the bound would
+    understate its error by a quarter to a factor of 2.5."""
+    energy = np.arange(-1.0, 1.0 + 1e-9, 0.01)
+    sigma = fwhm / (2.0 * math.sqrt(2.0 * math.log(2.0)))
+    edge = fi.FermiEdge(ef=0.0, amplitude=2000.0, sigma=sigma, temperature=temperature,
+                        dos_c1=0.3)
+    report = fi.assess_edge_identifiability(
+        energy, edge, fi.constant_background(energy, 50.0),
+        temperature_mode="fixed_temperature", estimator_weights="unit")
+    resolution = report.resolution
+    sandwich = resolution.sd_estimator / (2.0 * sigma)
+    assert sandwich / resolution.sd_sigma_bound == pytest.approx(ratio, abs=0.05)
+    assert "unit" in resolution.estimator

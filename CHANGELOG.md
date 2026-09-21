@@ -10,6 +10,40 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`fitting.fermi_edge_identifiability` (experimental): whether a Fermi
+  edge can tell the resolution from the temperature at all.** The
+  instrumental variance `v` and the thermal scale `tau = (kT)^2` enter
+  the edge width as `kappa_2 = v + (pi^2/3) tau`, which every count
+  measures, and they are separated only by the fourth cumulant, whose
+  information vanishes as `tau^2`. The module reports the two
+  separately: the total width, and the share of it that is
+  instrumental.
+
+  It gives a Poisson Fisher matrix with the temperature free, fixed, or
+  carrying a normal prior; effective rather than conditional
+  information; the labels `separable` / `not_separable` / `assumed` /
+  `undersampled`, whose thresholds are stated as conventions; and a
+  scan over seven measurement conditions. Two standard deviations are
+  reported for the resolution, each naming its estimator: the
+  Cramér–Rao bound, and the sandwich covariance of the weighted
+  least-squares estimator `fit_fermi_edge` actually is — 1.25 to 2.55
+  times the bound over the conditions measured. `d(sigma)/dT` says how
+  far the resolution moves if an assumed temperature is wrong by a
+  kelvin.
+
+  The headline result is that freeing the temperature multiplies
+  sd(sigma)/sigma by 1.3 to 78 across the scan, worst where the thermal
+  tail is shortest: on most real edges the temperature is not something
+  the spectrum can measure, and fitting it anyway spends the
+  resolution's precision on it.
+
+  Everything is a model bound or a seeded simulation, never a
+  measurement, and near either width boundary the inverse Fisher matrix
+  is not the variance of a constrained estimator. Not exported from
+  `toyomacro.fitting`, not wired to any CLI. Design record in
+  `docs/design/fermi-edge-identifiability.md`; worked through in
+  `examples/09_fermi_edge_identifiability.py`, which CI runs.
+
 - **`fit_fermi_edge` can put the DOS on both sides of E_F, and
   `compare_dos_forms` measures what that choice is worth.** The fitted
   density of states was always flat below E_F and polynomial above it,

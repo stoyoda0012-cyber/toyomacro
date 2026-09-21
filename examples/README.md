@@ -15,6 +15,7 @@ python examples/05_fit_map_from_file.py           # or: ... my_map.h5 --state ..
 python examples/06_fermi_edge_calibration.py      # or: ... data.vms --vb-region 2 ...
 python examples/07_width_identifiability_map.py
 python examples/08_map_viewer_frontend.py          # opens a window; --smoke to skip it
+python examples/09_fermi_edge_identifiability.py
 ```
 
 | Script | What it shows | Key API |
@@ -27,6 +28,7 @@ python examples/08_map_viewer_frontend.py          # opens a window; --smoke to 
 | `06_fermi_edge_calibration.py` | Energy-axis calibration on a metal Fermi edge: E_F and resolution for three DOS models (their spread is a sensitivity check on the model choice, not an uncertainty), axis shifted to E_F = 0, Au 4f7/2 read on the calibrated axis. Synthetic by default, with a known offset recovered; takes a file with a VB and an Au 4f region | `fermi_edge.fit_fermi_edge`, `to_binding_energy` |
 | `07_width_identifiability_map.py` | How well a spectrum can tell the Gaussian from the Lorentzian width, mapped over window, shape and background — separating the degenerate σ coordinate from real loss of information. Model bounds, not a fit — details in [`docs/design/voigt-width-identifiability.md`](../docs/design/voigt-width-identifiability.md) | `scan_identifiability`, `ScanGrid` (experimental) |
 | `08_map_viewer_frontend.py` | A minimal front end on the batch engine: click a pixel of a fitted map to see its spectrum and fit. The back end fits the map once and hands over parameter maps and one pixel at a time, never fitted curves for the whole map; everything runs on one thread (see "Threads" in [`docs/API.md`](../docs/API.md#threads)). The pattern for a viewer or GUI of your own | `FastVoigtFitter`, `voigt_profile` |
+| `09_fermi_edge_identifiability.py` | Whether a Fermi edge can tell the instrumental resolution from the temperature at all: the edge width is one number and its split into an instrumental and a thermal half is a separate question, fitting the temperature multiplies the resolution's uncertainty by up to 78, the Cramér–Rao bound is not the shipped fitter's error bar, and the DOS assumption moves σ further than the noise does. Model bounds plus one simulated spectrum — details in [`docs/design/fermi-edge-identifiability.md`](../docs/design/fermi-edge-identifiability.md) | `assess_edge_identifiability`, `scan_edge_identifiability`, `compare_dos_forms` (experimental) |
 
 All examples run on the pure-numpy backend. Installing the `mlx` extra
 (`pip install -e ".[mlx]"` from a clone) moves the batch fit in example 02 onto the
