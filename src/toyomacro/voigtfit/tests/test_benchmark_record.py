@@ -328,11 +328,13 @@ class TestQualityCoversTheMeasurementWindow:
         env = record.environment(origin="t", load_before=before)
         assert env["load"]["looks_quiet"] is False
         assert env["quality"]["verdict"] == "contended"
-        assert env["load"]["sampled"] == "before and after the measurements"
+        assert "before" in env["load"]["sampled"]
 
     def test_says_so_when_only_the_end_was_sampled(self):
+        """Without a before-sample the verdict may include our own load."""
         env = record.environment(origin="t")
-        assert env["load"]["sampled"] == "after the measurements only"
+        sampled = env["load"]["sampled"]
+        assert "after" in sampled and "own load" in sampled
 
 
 class TestGitStateProvenance:
@@ -351,3 +353,48 @@ class TestGitStateProvenance:
         for line in record.git_state()["git_dirty_files"] or []:
             assert len(line) > 3, line
             assert line[2] == " ", f"status column mangled: {line!r}"
+
+
+class TestVerdictUsesTheBeforeSample:
+    """Found on a 32-core Windows host: a CPU run condemned by its own load.
+
+    The trailing load average necessarily contains the benchmark that
+    just ran. Judging on it labelled a NumPy run on an idle machine
+    `contended` (load 8.4, zero other processes) while a GPU run on a
+    machine with other applications open passed as `quiet` — in a
+    harness whose whole purpose is comparing backends.
+    """
+
+    IDLE_BEFORE = {"load_average": [0.7, 0.24, 0.08], "looks_quiet": True,
+                   "cpu_percent": 2.0, "top_processes": []}
+
+    def test_our_own_load_does_not_condemn_the_record(self):
+        env = record.environment(origin="windows", load_before=self.IDLE_BEFORE)
+        assert env["load"]["looks_quiet"] is True
+        assert env["quality"]["verdict"] == "quiet"
+
+    def test_a_busy_start_still_condemns(self):
+        busy = {"load_average": [12.0, 12.0, 12.0], "looks_quiet": False,
+                "cpu_percent": 90.0, "top_processes": []}
+        env = record.environment(origin="windows", load_before=busy)
+        assert env["quality"]["verdict"] == "contended"
+        assert any("before the run" in r for r in env["quality"]["reasons"])
+
+    def test_the_trailing_verdict_is_kept_for_the_reader(self):
+        env = record.environment(origin="windows", load_before=self.IDLE_BEFORE)
+        assert "looks_quiet_after_incl_self" in env["load"]
+        assert "BEFORE sample" in env["load"]["sampled"]
+
+    def test_other_processes_appearing_mid_run_still_count(self):
+        load = {"looks_quiet": True, "load_average_before": [0.5, 0.5, 0.5],
+                "logical_cores": 4, "others_busy_after": True,
+                "cpu_percent_others": 300.0}
+        q = record.assess_quality(load, None, None)
+        assert q["verdict"] == "contended"
+        assert any("other processes" in r for r in q["reasons"])
+
+    def test_a_sample_can_exclude_our_own_process(self):
+        snap = record.load_snapshot(interval=0.05, top_n=5, exclude_self=True)
+        assert "cpu_percent_others" in snap
+        names = [r["name"] for r in snap["top_processes"] or []]
+        assert not any("pytest" in n for n in names), names

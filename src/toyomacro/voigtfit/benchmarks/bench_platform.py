@@ -373,7 +373,7 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
     taken afterwards would cover the wrong window.
     """
     jiffies_before = cpu_jiffies()
-    load_before = load_snapshot()
+    load_before = load_snapshot(exclude_self=True)
     results: list[dict] = []
     est: dict = {}
 

@@ -77,6 +77,24 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
     print(f"{len(records)} record(s) across {len(groups)} distinct machine(s).")
     print("Grouped by observed hardware, not by any supplied label.\n")
 
+    # Records only compare if they fitted the same numbers. They may not:
+    # the spectra go through scipy.special.wofz, whose last bits depend on
+    # the build, so two platforms at the same (n_batch, seed) can differ.
+    hashes: dict[str, list[str]] = defaultdict(list)
+    for rec in records:
+        h = rec.get("problem", {}).get("input_sha256")
+        if h:
+            hashes[h].append(rec["_file"])
+    if len(hashes) > 1:
+        print(f"!! {len(hashes)} DIFFERENT input hashes across these records. "
+              "Throughput still compares; accuracy (mae_*) does NOT -- these "
+              "hosts fitted different numbers.")
+        for h, files in sorted(hashes.items()):
+            print(f"   {h[:16]}…  {len(files)} record(s): "
+                  f"{', '.join(f[:34] for f in files[:3])}"
+                  + (" …" if len(files) > 3 else ""))
+        print()
+
     for (host, backend), recs in sorted(groups.items()):
         env0 = recs[0].get("environment", {})
         origins = sorted({r.get("environment", {}).get("origin") or "unknown"

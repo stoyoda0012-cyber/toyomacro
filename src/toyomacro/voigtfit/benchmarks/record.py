@@ -117,7 +117,20 @@ def _memory_gb() -> float | None:
         return None
 
 
-def load_snapshot(interval: float = 0.2, top_n: int = 5) -> dict:
+def _self_pids() -> set[int]:
+    """This process and its children, so a sample can exclude our own work."""
+    pids = {os.getpid()}
+    try:
+        import psutil
+        me = psutil.Process()
+        pids.update(c.pid for c in me.children(recursive=True))
+    except Exception:
+        pass
+    return pids
+
+
+def load_snapshot(interval: float = 0.2, top_n: int = 5,
+                  exclude_self: bool = False) -> dict:
     """What else the machine is doing, sampled over ``interval`` seconds.
 
     ``load_average`` is the 1/5/15-minute POSIX triple, or ``None`` on
@@ -152,15 +165,23 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5) -> dict:
             except Exception:
                 pass
         snap["cpu_percent"] = psutil.cpu_percent(interval=interval)
-        rows = []
+        skip = _self_pids() if exclude_self else set()
+        rows, rows_pid = [], []
         for p in procs:
             try:
                 pct = p.cpu_percent()
                 if pct > 0:
                     rows.append((pct, p.info.get("name") or "?"))
+                    rows_pid.append((pct, p.info.get("name") or "?", p.pid))
             except Exception:
                 continue
         rows.sort(reverse=True)
+        # A sample taken after the benchmark contains the benchmark. Only
+        # the processes that are NOT us say whether the host was shared.
+        others = [(v, n) for v, n, pid in rows_pid if pid not in skip]
+        snap["cpu_percent_others"] = round(sum(v for v, _ in others), 1)
+        if exclude_self:
+            rows = others
         # These records are committed to a public repository, so the
         # process list discloses which applications the machine runs.
         # The names are what makes a contended record diagnosable -- an
@@ -174,6 +195,7 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5) -> dict:
             for i, (v, n) in enumerate(rows[:top_n])]
     except Exception:
         snap["cpu_percent"] = None
+        snap["cpu_percent_others"] = None
         snap["top_processes"] = None
 
     la = snap.get("load_average")
@@ -282,10 +304,21 @@ def assess_quality(load: dict, steal: float | None,
     """
     reasons: list[str] = []
     if load.get("looks_quiet") is False:
-        la = (load.get("load_average") or [None])[0]
+        # Cite the sample that actually decided. When a before-sample is
+        # present it is the judge, so quoting the trailing load average
+        # would name a number that did not determine the verdict.
+        before = load.get("load_average_before")
+        la = (before or load.get("load_average") or [None])[0]
+        which = "before the run" if before else "after the run"
+        if la is not None:
+            reasons.append(f"load average {la:.1f} {which} on "
+                           f"{load.get('logical_cores')} cores")
+        else:
+            reasons.append("host reported busy")
+    if load.get("others_busy_after"):
         reasons.append(
-            f"load average {la:.1f} on {load.get('logical_cores')} cores"
-            if la is not None else "host reported busy")
+            f"other processes took {load['cpu_percent_others']:.0f}% "
+            "CPU during the run")
     if steal is not None and steal >= 2.0:
         reasons.append(f"hypervisor steal {steal:.1f}%")
     if thermal and thermal.get("throttled"):
@@ -488,19 +521,34 @@ def environment(command: str | None = None, origin: str | None = None,
         command = sanitize_command(sys.argv)
     load = load_snapshot()
     if load_before is not None:
-        # The verdict must cover the window the work ran in. Sampled only
-        # here, it describes the machine after every solver has finished
-        # -- which on a minutes-long run is a different machine.
+        # **The BEFORE sample decides.** A load average taken afterwards
+        # necessarily contains the benchmark that just ran, so on a CPU
+        # backend it measures our own work: a NumPy run on an idle
+        # 32-core host recorded load 8.4 with zero other processes and
+        # graded itself contended, while a GPU run on a machine with
+        # other applications open graded itself quiet. Judging on the
+        # trailing sample would systematically label CPU records
+        # incomparable -- in a harness whose purpose is comparing
+        # backends.
         load["load_average_before"] = load_before.get("load_average")
         load["cpu_percent_before"] = load_before.get("cpu_percent")
         load["top_processes_before"] = load_before.get("top_processes")
-        if load_before.get("looks_quiet") is False:
-            load["looks_quiet"] = False
-        elif load.get("looks_quiet") is None:
-            load["looks_quiet"] = load_before.get("looks_quiet")
-        load["sampled"] = "before and after the measurements"
+        load["looks_quiet_after_incl_self"] = load.get("looks_quiet")
+        load["looks_quiet"] = load_before.get("looks_quiet")
+        # The after sample still earns a say, but only through processes
+        # that are not ours: that is work which appeared mid-run.
+        others = load.get("cpu_percent_others")
+        cores = load.get("logical_cores")
+        if others is not None and cores:
+            load["others_busy_after"] = others > 25.0 * cores
+            if load["others_busy_after"] and load["looks_quiet"]:
+                load["looks_quiet"] = False
+        load["sampled"] = (
+            "before and after; the verdict is the BEFORE sample, because "
+            "the after sample contains this benchmark")
     else:
-        load["sampled"] = "after the measurements only"
+        load["sampled"] = "after the measurements only - the verdict may " \
+                          "reflect this benchmark's own load"
     thermal = thermal_state()
     return {
         "schema_version": SCHEMA_VERSION,

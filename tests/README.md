@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,283 automated tests** across **85 files**, in two
+This suite has **2,288 automated tests** across **85 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 47 | 1,249 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,034 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,039 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,851 tests, 81%) — guarantee the library
+- **Contract / regression** (1,856 tests, 81%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -121,7 +121,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,034)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,039)
 
 ### Solvers & fitting core (297)
 | Tests | File | Guards |
@@ -167,11 +167,11 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 15 | `test_error_stats.py` | Error-statistics computation |
 | 2 | `test_bench_rank_model_selection.py` | Rank/model-selection benchmark stays runnable |
 
-### Infrastructure — compression, memory, I/O (141)
+### Infrastructure — compression, memory, I/O (146)
 | Tests | File | Guards |
 |--:|---|---|
 | 34 | `test_memory.py` | Memory detection, optimal chunk size, dict3d cache size |
-| 53 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
+| 58 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
 | 22 | `test_compression.py` | `fitpara` compression codec |
 | 14 | `test_streaming_write.py` | Streaming HDF5 write |
 | 11 | `test_compression_integration.py` | Pipeline I/O compression |

@@ -141,9 +141,19 @@ def _environment() -> dict:
 def make_problem(n_spectra: int, seed: int = 0):
     """Generate ground truth + noisy spectra for `n_spectra` pixels.
 
-    Fully deterministic: one seeded Generator drives both the
-    parameter draws and the Poisson noise, so the same (n_spectra,
-    seed) regenerates bit-identical spectra.
+    Deterministic on a given platform: one seeded Generator drives both
+    the parameter draws and the Poisson noise, so the same (n_spectra,
+    seed) regenerates bit-identical spectra on the same host.
+
+    **Not bit-identical across platforms.** The draws are, because NumPy
+    guarantees its generators, but the profile goes through
+    ``scipy.special.wofz`` -- a compiled special function whose last
+    bits depend on the build. Measured: an M3 Max and a Ryzen under WSL2
+    produced spectra hashing to 53b9dda5... and 212b959b... from the
+    same (200000, 0). Throughput comparisons across hosts survive that;
+    accuracy comparisons do not, because the two hosts fitted different
+    numbers. ``input_sha256`` exists so the difference is visible rather
+    than assumed away.
     """
     rng = np.random.default_rng(seed)
     energy = np.linspace(-3, 3, N_ENERGY).astype(np.float64)
