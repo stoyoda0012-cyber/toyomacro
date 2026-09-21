@@ -19,6 +19,17 @@ archived on Zenodo for a citable DOI.
   a high-water mark since process start, not the instantaneous
   footprint.
 
+- **Windows is a tested platform.** CI runs the full suite on
+  `windows-latest` for Python 3.11 and 3.12, alongside Ubuntu and macOS,
+  so the import-time platform work above is now covered by a regression
+  gate rather than by one developer's machine. Every `run:` step in that
+  job is pinned to `bash`: Windows runners default to pwsh, where a
+  multi-line step reports only the last command's exit code, and the
+  examples smoke would have passed with a failure in the middle of it.
+  This changes what is tested, not what is supported — the accelerated
+  MLX path remains Apple-Silicon only, and all three CI platforms
+  exercise the NumPy backend.
+
 ### Fixed
 
 - **`FitparaCodec` no longer advertises a decode rate it cannot
