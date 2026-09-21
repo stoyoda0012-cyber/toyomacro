@@ -139,8 +139,15 @@ def test_hybrid_pipeline():
     print("  HybridPipeline tests passed")
 
 
-def test_performance():
-    """Run Stage 1 pipeline throughput benchmark."""
+def run_performance_benchmark():
+    """Run Stage 1 pipeline throughput benchmark.
+
+    Not named ``test_*``: it asserts nothing, so collecting it only spent
+    a 100k-spectra benchmark's worth of time on a check that could not
+    fail. ``main()`` below still runs it, which is the mode it was
+    written for; the numbers it prints belong to
+    ``benchmarks/benchmark_stage1_pipeline.py``, which it calls.
+    """
     print("\nPerformance Benchmark...")
 
     from toyomacro.voigtfit.benchmarks.benchmark_stage1_pipeline import run_benchmark
@@ -186,7 +193,7 @@ def main():
     # Run performance benchmark if all tests pass
     if failed == 0:
         try:
-            test_performance()
+            run_performance_benchmark()
         except Exception as e:
             print(f"Performance benchmark failed: {e}")
 
