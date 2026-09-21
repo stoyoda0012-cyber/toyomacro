@@ -817,6 +817,7 @@ class TestNPeakRobustness:
         frac_negative = np.mean(result.amplitudes < 0)
         assert frac_negative < 0.2, f"{frac_negative:.1%} of amplitudes are negative"
 
+    @pytest.mark.perf
     def test_performance_5state(self):
         """5-state solver throughput is reasonable."""
         Y, _ = generate_si2p_spectra(n_spectra=5000, noise_sigma=0.001)

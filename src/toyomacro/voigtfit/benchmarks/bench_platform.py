@@ -63,6 +63,7 @@ from toyomacro.voigtfit.benchmarks.record import (
     backend_info,
     cpu_jiffies,
     environment,
+    load_snapshot,
     measure_projection_kernel,
     steal_percent,
     summarize,
@@ -310,7 +311,17 @@ def parity_check(n: int, accel_est: dict, tmpdir: Path, energy, Y, truth) -> dic
                    check=True, env=env)
     z = np.load(path)
     in_path.unlink(missing_ok=True)
-    out = {"n_spectra": n, "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess"}
+    out = {
+        "n_spectra": n,
+        "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
+        "repeats": 1, "warmup": 0, "aggregation": "single timing",
+        "rate_caveat": (
+            "numpy_rate_spec_per_s is ONE cold timing of n_spectra, not a "
+            "warmed median of the full batch, and n_spectra is near the "
+            "NumPy path's throughput peak. It is a parity artefact, not a "
+            "throughput figure -- do not compare it with rate_median above "
+            "or with a record taken at a different batch size."),
+    }
     for key, pre in (("dict2d_parabola", "d"), ("taylor_4step", "t")):
         a_m, e_m, s_m = accel_est[key]
         da = np.abs(a_m[:n] - z[f"{pre}_amp"])
@@ -362,6 +373,7 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
     taken afterwards would cover the wrong window.
     """
     jiffies_before = cpu_jiffies()
+    load_before = load_snapshot(exclude_self=True)
     results: list[dict] = []
     est: dict = {}
 
@@ -407,7 +419,9 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
             q = parity[k]
             print(f"  {k}: |dAmp| med {q['abs_diff_amp']['median']:.2e} "
                   f"max {q['abs_diff_amp']['max']:.2e}; "
-                  f"numpy {q['numpy_rate_spec_per_s']:,.0f} spec/s", flush=True)
+                  f"numpy {q['numpy_rate_spec_per_s']:,.0f} spec/s "
+                  "(one cold timing at the parity size - not a throughput "
+                  "figure)", flush=True)
     elif do_parity:
         print("backend parity skipped: this host has no accelerated backend "
               "to compare against", flush=True)
@@ -427,7 +441,7 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
         "results": results,
         "numpy_parity": parity,
         "environment": environment(
-            origin=origin, host=host,
+            origin=origin, host=host, load_before=load_before,
             steal=steal_percent(jiffies_before, cpu_jiffies())),
     }
 

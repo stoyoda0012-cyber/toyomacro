@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,270 automated tests** across **85 files**, in two
+This suite has **2,289 automated tests** across **85 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 47 | 1,249 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,021 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,040 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,11 +21,11 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,838 tests, 81%) — guarantee the library
+- **Contract / regression** (1,857 tests, 81%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 20%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 19%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -43,6 +43,32 @@ To run only the contract tests (skip the heavy reproductions):
 ```bash
 pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi_image and not ncomp"
 ```
+
+## The `perf` marker
+
+Twelve of the tests counted on this page assert a wall-clock rate or an
+elapsed time, so they fail on hardware slower than the machine their
+thresholds were set on rather than on a defect. They carry the `perf`
+marker; `pytest -m "not perf"` drops them and leaves 2,219. Marking
+changes nothing about what is collected, so every count here still
+holds.
+
+Two of the twelve are additionally `@skip_in_ci`: they fail on the
+GitHub runners too, and CI would be red without that. The marker and
+the CI guard answer different questions — "this machine is slow" and
+"this runner is slow" — and neither is a licence to ignore the other
+ten.
+
+Two speed assertions are deliberately **not** marked, because marking
+them would take real coverage with them:
+
+- `tests/test_solver_comparison.py::test_dict2d_recovers_parameters`
+  asserts `throughput_spec_per_s > 1e4` alongside two accuracy bounds.
+  Its threshold is low enough that no machine measured so far has
+  missed it.
+- `tests/test_si2p_suboxide.py::test_full_5state_fit` asserts
+  `fit_time < 10.0`, and also stores the fit that two later tests read.
+  Deselecting it would silently skip them.
 
 ## Library body — `tests/` (1,249)
 
@@ -121,9 +147,9 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,021)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,040)
 
-### Solvers & fitting core (297)
+### Solvers & fitting core (296)
 | Tests | File | Guards |
 |--:|---|---|
 | 68 | `test_dictionary_solver.py` | δE / δE×δσ dictionary solver (single & two-peak) |
@@ -136,7 +162,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 17 | `test_ds_basis.py` | Doniach-Sunjic basis generation (amplitude-only) |
 | 15 | `test_gp_lm.py` | GP Levenberg-Marquardt acceptance rules and background designs |
 | 5 | `test_integration.py` | Synthetic accuracy + MATLAB bridge + performance |
-| 3 | `test_voigtfit.py` | Top-level smoke |
+| 2 | `test_voigtfit.py` | Top-level smoke |
 | 1 | `test_pipeline_mlx.py` | MLX pipeline smoke |
 
 ### GVRT & encoders — paper reproduction (225)
@@ -167,11 +193,11 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 | 15 | `test_error_stats.py` | Error-statistics computation |
 | 2 | `test_bench_rank_model_selection.py` | Rank/model-selection benchmark stays runnable |
 
-### Infrastructure — compression, memory, I/O (128)
+### Infrastructure — compression, memory, I/O (148)
 | Tests | File | Guards |
 |--:|---|---|
-| 34 | `test_memory.py` | Memory detection, optimal chunk size, dict3d cache size |
-| 40 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
+| 36 | `test_memory.py` | Memory detection, optimal chunk size, dict3d cache size |
+| 58 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
 | 22 | `test_compression.py` | `fitpara` compression codec |
 | 14 | `test_streaming_write.py` | Streaming HDF5 write |
 | 11 | `test_compression_integration.py` | Pipeline I/O compression |

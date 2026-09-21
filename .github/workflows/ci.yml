@@ -13,8 +13,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-26.04, macos-latest]
+        os: [ubuntu-26.04, macos-latest, windows-latest]
         python-version: ["3.11", "3.12"]
+    defaults:
+      run:
+        # Windows runners default to pwsh, where a multi-line `run:` reports
+        # only the last command's exit code — the examples step would pass
+        # with a failure in the middle of it. bash ships on all three
+        # runners and makes every step behave the same everywhere.
+        shell: bash
     env:
       # .python-version pins 3.12 for development, and uv follows it unless
       # told otherwise: without this, `uv python install 3.11` installed an

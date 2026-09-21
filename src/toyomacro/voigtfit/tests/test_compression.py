@@ -3,16 +3,11 @@
 Tests the int16 + column-wise + LZ4 compression pipeline.
 """
 
-import os
-import sys
+import time
 
 import numpy as np
 import pytest
 from scipy.ndimage import gaussian_filter
-
-# CI runners are far slower than dev hardware; skip speed assertions there.
-IN_CI = os.environ.get("CI") == "true"
-skip_in_ci = pytest.mark.skipif(IN_CI, reason="speed assertion is sensitive to CI hardware")
 
 from toyomacro.voigtfit.h5io import (
     HAS_LZ4,
@@ -30,6 +25,56 @@ from toyomacro.voigtfit.h5io import (
 
 # Skip all tests if LZ4 not available
 pytestmark = pytest.mark.skipif(not HAS_LZ4, reason="lz4 not installed")
+
+
+def _median_time(fn, repeats=5, warmup=3):
+    """Median wall time of ``fn`` over ``repeats`` runs, after warm-up."""
+    for _ in range(warmup):
+        fn()
+    times = []
+    for _ in range(repeats):
+        t0 = time.perf_counter()
+        fn()
+        times.append(time.perf_counter() - t0)
+    return float(np.median(times))
+
+
+# Gate decode against a copy of the array it produces, rather than against
+# an absolute spec/s. An absolute rate is not calibratable here: on one
+# 4-vCPU Xeon the array codec measures 16.1-17.0M spec/s with the two
+# tests run in isolation and over 50M under a bare pytest -- the harness
+# moves it further than the hardware does. See the table in
+# docs/CUDA_BACKEND_POC.md, which carries the command beside every figure.
+#
+# The two sides are NOT symmetric, and the bound has to be read with that
+# in mind. A copy is bandwidth-bound; decode is not. Decomposed on the
+# array codec (40 MB payload, 4-vCPU Xeon @2.80GHz):
+#
+#     lz4.frame.decompress   27.8 ms   73.5% of decode   1.44 GB/s out
+#     frombuffer().copy()     5.4 ms   14.3% of decode
+#     bare ndarray.copy()     5.3 ms                    15.0 GB/s (r+w)
+#
+# Counting traffic rather than writes: decode moves ~120 MB (LZ4 writes
+# 40, then frombuffer().copy() reads 40 and writes 40) against the copy's
+# 80 MB, so a bandwidth-only floor is ~1.5. The measured ratio is ~7-8
+# because the LZ4 token loop runs an order of magnitude below memcpy per
+# byte. For the fitpara codec the int16 -> float32 dequantise dominates
+# instead. The ratio is therefore (scalar, branchy) / (streaming copy),
+# and those track each other only loosely across microarchitectures --
+# the bound is deliberately far above anything measured, not tight.
+#
+# Measured ratios across three sessions on 4-vCPU virtualised Xeons
+# (@2.80GHz and @2.10GHz), hypervisor steal 0.00-0.01%: 8.4-13.3
+# (fitpara), 6.9-8.7 (array). Read those as session extrema of a noisy
+# statistic, not a settled range -- the denominator alone (t_copy) has
+# varied 13-22 ms between rounds, and each new session has widened them.
+# They are also one host
+# class, not a cross-machine span. A regression must be roughly 3.7x
+# (fitpara) or 4.9x (array) before the bound fires, so this catches a
+# kernel that stopped being vectorised, not a 20% slowdown. Nothing is
+# established on other hardware: the CI matrix (ubuntu + macOS +
+# Windows x 3.11/3.12) passes, but records no value.
+MAX_DECODE_OVER_COPY = 40
 
 
 def generate_realistic_fitpara(n_spectra: int, n_comp: int = 3) -> np.ndarray:
@@ -144,33 +189,47 @@ class TestFitparaCodec:
         # Compressed size should be significantly smaller
         assert compressed.compressed_size < compressed.original_size / 3
 
-    @skip_in_ci
+    @pytest.mark.perf
     def test_decode_speed(self):
-        """Test that decode speed meets target (not a bottleneck for E2E pipeline)."""
-        import time
+        """Decode stays within a fixed multiple of copying its output.
 
+        The claim this guards is that decode does not bottleneck the E2E
+        pipeline, which is a statement about cost relative to the data,
+        not an absolute rate -- so the assertion is a ratio against a
+        plain copy of the array decode produces.
+
+        An absolute target was not calibratable. Published figures for
+        *this* workload span 3.4M to 20.8M spec/s -- 4.7-6.7M across two
+        4-vCPU Xeons, 3.4M and 4.9M on one Ryzen 9 8940HX under WSL2 and
+        natively, and 20.1-20.8M on a contended Apple M3 Max, which is
+        the only host that has met the 20M target. The command matters as
+        much as the machine: that M3 Max gives 16.4M under `pytest` and
+        20.1-20.8M by direct call. See the table in
+        docs/CUDA_BACKEND_POC.md, which carries the command beside every
+        figure. (The sibling array codec spans wider still, 8.5M to over
+        50M; do not read its numbers onto this one.)
+
+        Validity limit: this is not a bandwidth-vs-bandwidth comparison.
+        Decode here is dominated by the int16 -> float32 dequantise loop,
+        the copy by memcpy, so the ratio is compute over bandwidth and is
+        only loosely stable across microarchitectures. See
+        MAX_DECODE_OVER_COPY for the decomposition and the measured
+        range; the bound is set far above it rather than tight.
+        """
         fitpara = generate_realistic_fitpara(1000000, n_comp=3)
-        n_spectra = fitpara.shape[0]
-
         codec = FitparaCodec()
         compressed = codec.encode(fitpara)
+        decoded = codec.decode(compressed)
 
-        # Warmup
-        for _ in range(3):
-            _ = codec.decode(compressed)
+        t_decode = _median_time(lambda: codec.decode(compressed))
+        t_copy = _median_time(decoded.copy)
 
-        # Benchmark
-        times = []
-        for _ in range(5):
-            t0 = time.perf_counter()
-            _ = codec.decode(compressed)
-            times.append(time.perf_counter() - t0)
-
-        median_time = np.median(times)
-        rate = n_spectra / median_time / 1e6
-
-        # Target: 20M spec/s minimum (decode should not bottleneck E2E pipeline)
-        assert rate > 20, f"Decode rate {rate:.1f}M spec/s < 20M target"
+        ratio = t_decode / t_copy
+        rate = fitpara.shape[0] / t_decode / 1e6
+        assert ratio < MAX_DECODE_OVER_COPY, (
+            f"decode costs {ratio:.1f}x a copy of the same array "
+            f"({rate:.1f}M spec/s), over the {MAX_DECODE_OVER_COPY}x bound"
+        )
 
     def test_disabled_compression(self):
         """Test codec with compression disabled."""
@@ -350,11 +409,25 @@ class TestArrayLZ4Compression:
 
         np.testing.assert_array_equal(otherpara, restored)
 
-    @skip_in_ci
+    @pytest.mark.perf
     def test_decode_speed(self):
-        """Test decode speed for large arrays."""
-        import time
+        """Decode of a large array stays within a fixed multiple of a copy.
 
+        A ratio for the same reason as `TestFitparaCodec.test_decode_speed`.
+        Two things worth knowing about this one:
+
+        Encode is not the baseline because decode is *slower* than encode
+        here -- a nearly constant payload compresses almost for free,
+        while decompression writes 80 MB (40 MB out of LZ4, then 40 MB
+        again through `np.frombuffer(...).copy()`).
+
+        That second copy is literally the operation this test compares
+        against, so the ratio has a structural floor near 1, and the
+        headroom above it is the LZ4 token loop -- 71.8-73.5% of decode
+        at 1.3-1.5 GB/s against 15.0-17.2 GB/s for memcpy on the Xeons
+        measured. The same decomposition on an Apple M3 Max gives 83.1%
+        and 10.7-14.7 GB/s, so the shape holds where the speed does not.
+        """
         n_spectra = 1_000_000
 
         # Typical otherpara
@@ -363,23 +436,17 @@ class TestArrayLZ4Compression:
         otherpara[1] = 528.5
 
         compressed = compress_array_lz4(otherpara)
+        decoded = decompress_array_lz4(compressed)
 
-        # Warmup
-        for _ in range(3):
-            _ = decompress_array_lz4(compressed)
+        t_decode = _median_time(lambda: decompress_array_lz4(compressed))
+        t_copy = _median_time(decoded.copy)
 
-        # Benchmark
-        times = []
-        for _ in range(5):
-            t0 = time.perf_counter()
-            _ = decompress_array_lz4(compressed)
-            times.append(time.perf_counter() - t0)
-
-        median_time = np.median(times)
-        rate = n_spectra / median_time / 1e6
-
-        # Should be very fast (>100M spec/s for constant data)
-        assert rate > 50, f"Decode rate {rate:.1f}M spec/s"
+        ratio = t_decode / t_copy
+        rate = n_spectra / t_decode / 1e6
+        assert ratio < MAX_DECODE_OVER_COPY, (
+            f"decode costs {ratio:.1f}x a copy of the same array "
+            f"({rate:.1f}M spec/s), over the {MAX_DECODE_OVER_COPY}x bound"
+        )
 
 
 class TestSpecdataUint16:
@@ -494,6 +561,7 @@ class TestSpecdataUint16:
         assert result.dtype == mx.float32
         assert result.shape == (n_comp, n_spectra)
 
+    @pytest.mark.perf
     def test_mlx_throughput(self, tmp_path):
         """Test MLX throughput with uint16 data."""
         from toyomacro.voigtfit._mlx_support import mlx_usable
@@ -529,7 +597,12 @@ class TestSpecdataUint16:
         median_time = np.median(times)
         rate = n_spectra / median_time / 1e6
 
-        # Should exceed 28M target significantly
+        # NOTE: this gate is MLX-only and unmeasured here. The "28M target"
+        # it used to cite is the E2E roundtrip rate recorded on an Apple
+        # M3 Max (see voigtfit/__init__.py and FitparaCodec in h5io.py).
+        # The 50M bound below has one recorded measurement against it --
+        # 27.3M on the RTX 5070 box, i.e. failing by 1.8x -- and is left
+        # alone here because it is presumably Metal-calibrated.
         assert rate > 50, f"uint16→MLX rate {rate:.1f}M spec/s < 50M"
 
     def test_reject_out_of_range(self, tmp_path):

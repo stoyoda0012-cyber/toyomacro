@@ -11,6 +11,7 @@ neither it nor the errors it feeds may claim that Metal is the only
 backend MLX can run on.
 """
 
+import os
 import subprocess
 import sys
 
@@ -149,10 +150,13 @@ class TestImportWithMlxDisabled:
             'assert abs(float(np.asarray(A)[0, 0]) - 7.0) < 1e-2\n'
             'print("fallback-ok")\n'
         )
+        # Inherit the environment rather than building a bare one: on
+        # Windows an interpreter started without USERPROFILE/SYSTEMROOT
+        # cannot resolve a home directory, and the import aborts before
+        # the fallback under test ever runs.
         out = subprocess.run(
             [sys.executable, '-c', code],
             capture_output=True, text=True,
-            env={'TOYOMACRO_DISABLE_MLX': '1',
-                 'PATH': '/usr/bin:/bin'},
+            env={**os.environ, 'TOYOMACRO_DISABLE_MLX': '1'},
         )
         assert 'fallback-ok' in out.stdout, out.stderr

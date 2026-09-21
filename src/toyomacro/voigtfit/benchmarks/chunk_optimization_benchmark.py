@@ -16,12 +16,13 @@ Usage:
 """
 
 import gc
-import resource
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+
+from toyomacro.voigtfit.memory import get_peak_rss_bytes
 
 
 @dataclass
@@ -46,9 +47,8 @@ class ChunkBenchmarkResult:
 
 
 def _get_peak_rss_mb() -> float:
-    """Get peak RSS in MB."""
-    ru = resource.getrusage(resource.RUSAGE_SELF)
-    return ru.ru_maxrss / (1024 * 1024)  # macOS reports in bytes
+    """Get peak RSS in MiB."""
+    return get_peak_rss_bytes() / (1024 * 1024)
 
 
 def _make_synthetic_gif(width: int, height: int, n_frames: int = 100

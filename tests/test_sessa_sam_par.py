@@ -73,7 +73,9 @@ wrap onto a second line.
 
 def write(tmp_path, name, text):
     path = tmp_path / name
-    path.write_text(text)
+    # The reader decodes as UTF-8, so the fixtures must be written that
+    # way regardless of the platform's preferred encoding.
+    path.write_text(text, encoding="utf-8")
     return path
 
 
@@ -163,7 +165,10 @@ def test_the_unit_is_read_from_the_header(sam_par):
                                       "Angstrom", "angstrom"])
 def test_every_spelling_of_angstrom_is_accepted(tmp_path, declared):
     """Both Unicode angstroms included -- they are different code points."""
-    path = write(tmp_path, f"sam_par_{declared.encode('unicode_escape')}.txt",
+    # tmp_path is already unique per parametrization, so the declared
+    # spelling stays out of the filename: its escaped form contains
+    # backslashes, which are path separators on Windows.
+    path = write(tmp_path, "sam_par.txt",
                  NO_OPTIONAL_COLUMNS.replace("IMFP [A]", f"IMFP [{declared}]")
                  .replace("TRMFP [A]", f"TRMFP [{declared}]"))
     (row,) = read_sam_par(path)

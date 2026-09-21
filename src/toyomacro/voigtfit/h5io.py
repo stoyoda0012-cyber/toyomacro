@@ -719,7 +719,8 @@ class FitparaCodecConfig:
     Compression strategy:
     - Column-wise storage: group same-type data for better compression
     - int16 quantization: 50% size reduction with <0.15% precision loss
-    - LZ4 compression: fast decompression (30M+ spec/s)
+    - LZ4 compression: decode is the cheaper direction, but its rate is
+      machine-dependent; see FitparaCodec for what is established
 
     Precision guarantees:
     - amplitude: 0.15% relative error
@@ -760,11 +761,35 @@ class FitparaCodec:
     2. Column-wise reordering (improves LZ4 compression)
     3. LZ4 compression
 
-    Benchmark results (1M spectra, 3 components):
-    - Raw: 108 MB
-    - Compressed: 17.7 MB (6.1x compression)
-    - Decode speed: 30M spec/s (exceeds 28M target)
-    - Max relative error: 0.14% (amplitude)
+    Measured on 1M spectra x 3 components, re-verified 2026-09-21. These
+    are deterministic properties of the codec and reproduce run to run:
+
+    - Raw: 108.0 MB
+    - Compressed: 17.6 MB (6.15x compression)
+    - Max relative error: 0.130% (amplitude, the worst of the nine
+      parameters) against a 0.14% bound -- a bound, not a typical value
+
+    Decode speed is machine-bound, and the figure this docstring used to
+    quote -- "30M spec/s (exceeds 28M target)" -- most likely came from
+    an Apple M3 Max and lost its attribution. What is recorded, rather
+    than inferred: the package header states "Performance (8K image =
+    33M spectra; recorded on Apple M3 Max) ... Roundtrip E2E: 28M
+    spec/s" (toyomacro/voigtfit/__init__.py), so the "28M target" is
+    that pipeline's end-to-end rate on that host, and the gate in
+    test_compression.py says the same thing in words -- decode must not
+    bottleneck the E2E pipeline. That the decode figure came from the
+    same work is an inference: no record names a machine for it, and no
+    measurement has reproduced 30M anywhere.
+
+    It is removed rather than restated because it has not been
+    re-derived on a quiet machine. Measured on this exact workload: a
+    contended M3 Max (1-minute load ~11 of 16 cores) gives 20.1-20.8M
+    spec/s by direct call and 16.4M under pytest -- a lower bound, at
+    least 31% short of 30M, and the only host to have met the 20M gate. Two
+    4-vCPU virtualised Xeons give 4.7-6.7M, and a Ryzen 9 8940HX 3.4M
+    under WSL2 and 4.9M natively. A figure from one of those would be
+    just as unportable as the one it replaced. For the measured range
+    with the command beside every entry, see docs/CUDA_BACKEND_POC.md.
     """
 
     # Column indices for fitpara format

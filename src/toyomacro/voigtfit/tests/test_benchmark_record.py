@@ -64,9 +64,14 @@ class TestEnvironmentBlock:
         assert "deppro" not in versions
 
     def test_git_state_has_no_repository_path(self):
+        """The point is the absence of a path, not an exact key set."""
         state = record.git_state()
-        assert set(state) == {"git_commit", "git_tracked_dirty", "git_dirty_files"}
         assert "repo" not in state
+        assert {"git_commit", "git_tracked_dirty", "git_dirty_files"} <= set(state)
+        blob = json.dumps(state)
+        assert os.path.expanduser("~") not in blob
+        for marker in ("/Users/", "/home/", "\\Users\\"):
+            assert marker not in blob
 
     def test_os_description_is_not_macos_specific(self):
         """The old helper said '(macOS )' on every non-Apple host."""
@@ -279,3 +284,117 @@ class TestWriteRecord:
         assert os.path.expanduser("~") not in blob
         for marker in ("/Users/", "/home/", "site-packages"):
             assert marker not in blob
+
+
+class TestSanitiserGapsFoundInAudit:
+    """Forms the first sanitiser leaked. All must reduce to bare names."""
+
+    @pytest.mark.parametrize("argv", [
+        ["bench.py", "--out", "/Users/someone/a=b/rec.json"],
+        ["/Users/someone/my=proj/bench.py", "--flag"],
+        ["bench.py", "--records-dir", "/Users/someone/runs/"],
+        ["bench.py", "--out=/home/someone/a=b/rec.json"],
+        ["/home/someone/x=y/z=w/bench.py"],
+    ])
+    def test_no_home_directory_survives(self, argv):
+        got = record.sanitize_command(argv)
+        for marker in ("/Users/", "/home/", "someone"):
+            assert marker not in got, f"{argv} leaked: {got!r}"
+
+    def test_trailing_separator_keeps_the_argument(self):
+        """Basenaming a trailing slash to '' deleted the argument."""
+        got = record.sanitize_command(["bench.py", "--records-dir", "/a/b/runs/"])
+        assert got == "bench.py --records-dir runs"
+
+    def test_root_is_named_not_emptied(self):
+        assert record.sanitize_command(["bench.py", "--out", "/"]) == \
+            "bench.py --out <root>"
+
+
+class TestQualityCoversTheMeasurementWindow:
+    def test_all_three_load_averages_must_be_low(self):
+        """Grading on the 1-minute figure alone let a busy host pass."""
+        load = {"looks_quiet": None, "load_average": [3.2, 5.1, 9.7],
+                "logical_cores": 16}
+        # 3.2 < 4.0 but 5.1 and 9.7 are not: this host is not quiet.
+        snap = dict(load)
+        snap["looks_quiet"] = all(v < 0.25 * 16 for v in snap["load_average"])
+        assert snap["looks_quiet"] is False
+
+    def test_a_busy_start_condemns_a_quiet_finish(self):
+        """environment() must not grade only the moment after the work."""
+        before = {"load_average": [12.0, 12.0, 12.0], "looks_quiet": False,
+                  "cpu_percent": 90.0, "top_processes": []}
+        env = record.environment(origin="t", load_before=before)
+        assert env["load"]["looks_quiet"] is False
+        assert env["quality"]["verdict"] == "contended"
+        assert "before" in env["load"]["sampled"]
+
+    def test_says_so_when_only_the_end_was_sampled(self):
+        """Without a before-sample the verdict may include our own load."""
+        env = record.environment(origin="t")
+        sampled = env["load"]["sampled"]
+        assert "after" in sampled and "own load" in sampled
+
+
+class TestGitStateProvenance:
+    def test_says_whether_the_commit_contains_the_harness(self):
+        """A commit that lacks bench_platform.py cannot reproduce the run."""
+        state = record.git_state()
+        assert "harness_tracked_at_commit" in state
+        assert state["harness_tracked_at_commit"] in (True, False, None)
+
+    def test_reports_untracked_files_separately(self):
+        state = record.git_state()
+        assert "untracked_files_present" in state
+
+    def test_porcelain_status_columns_survive(self):
+        """stdout.strip() ate the leading space of the first entry."""
+        for line in record.git_state()["git_dirty_files"] or []:
+            assert len(line) > 3, line
+            assert line[2] == " ", f"status column mangled: {line!r}"
+
+
+class TestVerdictUsesTheBeforeSample:
+    """Found on a 32-core Windows host: a CPU run condemned by its own load.
+
+    The trailing load average necessarily contains the benchmark that
+    just ran. Judging on it labelled a NumPy run on an idle machine
+    `contended` (load 8.4, zero other processes) while a GPU run on a
+    machine with other applications open passed as `quiet` — in a
+    harness whose whole purpose is comparing backends.
+    """
+
+    IDLE_BEFORE = {"load_average": [0.7, 0.24, 0.08], "looks_quiet": True,
+                   "cpu_percent": 2.0, "top_processes": []}
+
+    def test_our_own_load_does_not_condemn_the_record(self):
+        env = record.environment(origin="windows", load_before=self.IDLE_BEFORE)
+        assert env["load"]["looks_quiet"] is True
+        assert env["quality"]["verdict"] == "quiet"
+
+    def test_a_busy_start_still_condemns(self):
+        busy = {"load_average": [12.0, 12.0, 12.0], "looks_quiet": False,
+                "cpu_percent": 90.0, "top_processes": []}
+        env = record.environment(origin="windows", load_before=busy)
+        assert env["quality"]["verdict"] == "contended"
+        assert any("before the run" in r for r in env["quality"]["reasons"])
+
+    def test_the_trailing_verdict_is_kept_for_the_reader(self):
+        env = record.environment(origin="windows", load_before=self.IDLE_BEFORE)
+        assert "looks_quiet_after_incl_self" in env["load"]
+        assert "BEFORE sample" in env["load"]["sampled"]
+
+    def test_other_processes_appearing_mid_run_still_count(self):
+        load = {"looks_quiet": True, "load_average_before": [0.5, 0.5, 0.5],
+                "logical_cores": 4, "others_busy_after": True,
+                "cpu_percent_others": 300.0}
+        q = record.assess_quality(load, None, None)
+        assert q["verdict"] == "contended"
+        assert any("other processes" in r for r in q["reasons"])
+
+    def test_a_sample_can_exclude_our_own_process(self):
+        snap = record.load_snapshot(interval=0.05, top_n=5, exclude_self=True)
+        assert "cpu_percent_others" in snap
+        names = [r["name"] for r in snap["top_processes"] or []]
+        assert not any("pytest" in n for n in names), names
