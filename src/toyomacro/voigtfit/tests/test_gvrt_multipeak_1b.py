@@ -353,6 +353,7 @@ class TestEndToEndPSNR:
 
 @pytest.mark.skipif(IN_CI or not HAS_MLX,
                     reason="MLX throughput target not meaningful on CI or CPU fallback")
+@pytest.mark.perf
 class TestThroughput:
     """Tests for throughput targets."""
 

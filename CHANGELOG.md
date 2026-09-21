@@ -44,6 +44,68 @@ archived on Zenodo for a citable DOI.
   committed (two of thirteen are), and which figures no bundled
   benchmark regenerates at all. It changes no published number.
 
+- **`voigtfit.memory.get_peak_rss_bytes()`: this process's peak RSS, in
+  bytes, on every platform the package runs on.** macOS and Linux keep
+  reading `ru_maxrss` from `resource.getrusage`; Windows, which has no
+  `resource` module, reads the peak working set through psutil (already
+  a required dependency). `get_rss_gb()` is now a thin wrapper over it
+  and is unchanged on macOS. Both docstrings now say what the number is:
+  a high-water mark since process start, not the instantaneous
+  footprint.
+
+- **Windows is a tested platform.** CI runs the full suite on
+  `windows-latest` for Python 3.11 and 3.12, alongside Ubuntu and macOS,
+  so the import-time platform work above is now covered by a regression
+  gate rather than by one developer's machine. Every `run:` step in that
+  job is pinned to `bash`: Windows runners default to pwsh, where a
+  multi-line step reports only the last command's exit code, and the
+  examples smoke would have passed with a failure in the middle of it.
+  This changes what is tested, not what is supported — the accelerated
+  MLX path remains Apple-Silicon only, and all three CI platforms
+  exercise the NumPy backend.
+
+### Fixed
+
+- **`FitparaCodec` no longer advertises an unattributed decode rate.**
+  The class docstring claimed "Decode speed: 30M spec/s (exceeds 28M
+  target)" for a 1M x 3-component workload, and `FitparaCodecConfig`
+  claimed "30M+ spec/s", with no machine named. The "28M target" is the
+  E2E roundtrip rate the package header records for an Apple M3 Max
+  (`voigtfit/__init__.py`). That the decode figure came from the same
+  work is an inference, not a record: no machine is named for it
+  anywhere, and no measurement has reproduced 30M. Measured on that exact workload,
+  a contended M3 Max gives 20.1-20.8M spec/s by direct call and 16.4M
+  under pytest; two 4-vCPU virtualised Xeons give 4.7-6.7M and a
+  Ryzen 9 8940HX 3.4M under WSL2, 4.9M natively -- a span of six times
+  across hosts, and about a quarter again within one host depending on
+  the command. The rate is therefore removed rather than restated on
+  any one of them, and the docstring now says which machine the claim
+  came from and what has since been measured where. The size and
+  accuracy figures in the same block are deterministic, reproduce, and
+  are kept (108.0 MB, 17.6 MB, 6.15x, and 0.130% on amplitude -- the
+  worst of the nine parameters -- against a stated 0.14%
+  bound). No behaviour changes.
+
+- **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`
+  and five modules under `voigtfit/benchmarks/` imported the Unix-only
+  `resource` module at module scope, so on Windows `import
+  toyomacro.voigtfit.memory` raised `ModuleNotFoundError` — and with it
+  every caller, including the Dict3D cache auto-sizing in
+  `dictionary_solver_3d`. The import is now optional and Windows reads
+  the peak working set instead. Two tests were Unix-only for unrelated
+  reasons and now run anywhere: one read a source file in the platform's
+  preferred encoding rather than UTF-8, and one built a temporary
+  filename containing backslashes. Verified at `decc8e2` on Windows 11
+  (Python 3.12.14, clean tree): 1884 passed, 175 skipped, 2 failed —
+  both `test_decode_speed` throughput gates, which this machine misses
+  on hardware, not platform. Windows is still not covered by CI.
+
+- **Peak RSS was misreported on Linux.** `ru_maxrss` is in kibibytes
+  there, but `memory.get_rss_gb` converted it at 1000 bytes per
+  kilobyte (2.4% low), and `bench_gvrt_1b`, `benchmark_mlx_pipeline`,
+  `bottleneck_analysis` and `chunk_optimization_benchmark` treated it as
+  bytes outright (1024x low). All six call sites now go through
+  `get_peak_rss_bytes()`. Figures measured on macOS are unaffected.
 
 ## [0.3.0] - 2026-09-21
 

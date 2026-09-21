@@ -34,9 +34,13 @@ lambda=1e-8) matches the law's assumptions, which is why it reproduces the law
 at production precision; production solvers with different regularizers (e.g.
 an L1 penalty) are only directionally described.
 
-Deterministic (seed=42). Output: examples/output/04_projection_law_* and a
-tracked copy of the figure in docs/figures/.
+Deterministic (seed=42). Output: examples/output/04_projection_law_*. The
+tracked copy in docs/figures/, which docs/projection_law_validation.md
+embeds, is refreshed only with --update-docs-figure: matplotlib's PNG
+bytes differ across platforms and versions even when the numbers do not,
+so an ordinary run would dirty the working tree with a re-render.
 """
+import argparse
 import json
 import shutil
 from pathlib import Path
@@ -56,7 +60,6 @@ HERE = Path(__file__).resolve().parent
 OUT_DIR = HERE / 'output'
 OUT_DIR.mkdir(exist_ok=True)
 DOCS_FIGS = HERE.parent / 'docs' / 'figures'
-DOCS_FIGS.mkdir(parents=True, exist_ok=True)
 STEM = '04_projection_law_validation'
 
 SEED = 42
@@ -156,7 +159,7 @@ def _panel_label(ax, lab, x=-0.14):
 
 
 # ======================================================================
-def main():
+def main(update_docs_figure: bool = False):
     rng = np.random.default_rng(SEED)
     out = {'seed': SEED, 'alpha': ALPHA, 'grid': dict(m=M, e_min=-8.0, e_max=8.0),
            'peak': dict(t0=T0, sigma=SIG, gamma=GAM, a0=A0)}
@@ -329,10 +332,10 @@ def main():
     assert 0.98 < sl3 < 1.02 and r23 > 0.999, f'level 3 off: {sl3}, {r23}'
 
     (OUT_DIR / f'{STEM}.json').write_text(json.dumps(out, indent=1))
-    plot(out)
+    plot(out, update_docs_figure=update_docs_figure)
 
 
-def plot(out):
+def plot(out, update_docs_figure: bool = False):
     fig, ax = plt.subplots(1, 3, figsize=(15, 4.4))
 
     # (a) delta-response
@@ -395,9 +398,20 @@ def plot(out):
     fig.savefig(OUT_DIR / f'{STEM}.png', dpi=220)
     fig.savefig(OUT_DIR / f'{STEM}.pdf')
     plt.close(fig)
-    shutil.copy(OUT_DIR / f'{STEM}.png', DOCS_FIGS / f'{STEM}.png')
-    print(f"saved -> {OUT_DIR / (STEM + '.png')} (+ docs/figures copy)")
+    if update_docs_figure:
+        DOCS_FIGS.mkdir(parents=True, exist_ok=True)
+        shutil.copy(OUT_DIR / f'{STEM}.png', DOCS_FIGS / f'{STEM}.png')
+        print(f"saved -> {OUT_DIR / (STEM + '.png')} (+ docs/figures copy)")
+    else:
+        print(f"saved -> {OUT_DIR / (STEM + '.png')} "
+              "(docs/figures untouched; pass --update-docs-figure to refresh it)")
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '--update-docs-figure', action='store_true',
+        help='also overwrite the tracked copy in docs/figures/, which '
+             'docs/projection_law_validation.md embeds',
+    )
+    main(update_docs_figure=parser.parse_args().update_docs_figure)

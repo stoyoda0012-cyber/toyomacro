@@ -1,23 +1,21 @@
 # CUDA backend proof-of-concept (MLX on Linux / WSL2)
 
-**Status:** **PASSED** — first run 2026-07-17 (RTX 5070 Laptop). See
-[Results](#results-2026-07-17--rtx-5070-laptop) below. Two setup fixes were
-required that this recipe did not anticipate (CUDA headers, TF32).
+**Status:** **PASSED** — first run 2026-07-17 on `3aedcf3`, re-verified
+2026-09-21 on `3a13de5`, both on the same RTX 5070 Laptop. See
+[Results](#results-2026-07-17--rtx-5070-laptop) and
+[Re-verification](#re-verification-2026-09-21--rtx-5070-laptop) below.
+Two setup fixes were required that this recipe did not anticipate
+(CUDA headers, TF32); both still apply.
 **Scope:** correctness validation only. Performance work and any public
 CUDA support claim come later, if the PoC passes.
-**A re-verification is owed** — the validated tree predates v0.2.0 and
-the MLX dispatch changes since, and no CUDA run has covered them. The
-form to fill in is
-[Re-verification frame](#re-verification-frame-prepared-2026-09-21--not-yet-run)
-at the end of this document.
 
 ## Purpose
 
 `toyomacro.voigtfit` currently has two verified backends:
 
 1. **MLX (Metal)** on Apple Silicon — the accelerated path.
-2. **NumPy** everywhere else — CI-tested on Ubuntu and macOS; selected
-   automatically when MLX is absent or unusable, or forced with
+2. **NumPy** everywhere else — CI-tested on Ubuntu, macOS and Windows;
+   selected automatically when MLX is absent or unusable, or forced with
    `TOYOMACRO_DISABLE_MLX=1`.
 
 MLX itself now ships an official CUDA backend for Linux
@@ -167,6 +165,11 @@ tolerances. Every remaining failure is a speed assertion, which the
 pass/fail criteria explicitly exclude. No missing-op was hit, so no
 `stream=mx.cpu` workaround was needed.
 
+**Tree:** `3aedcf3`. The run itself recorded no SHA — this is
+reconstructed, and the reasoning is in
+[Correction](#correction-the-2026-07-17-poc-tree-is-3aedcf3-and-it-is-in-this-history)
+at the end of this document. Record the SHA at the time from now on.
+
 ### Environment
 
 | | |
@@ -261,11 +264,14 @@ Step 1 probe returned `Device(gpu, 0)` / `mlx_usable: True` **unchanged**
 
 The two `test_decode_speed` failures are **not CUDA-related** — they fail
 identically on the Step 0 NumPy baseline. They are pure-CPU codec paths;
-`skip_in_ci` hides them on CI runners, and this machine is likewise below
-the dev-hardware threshold. Worth a separate look (~~a Ryzen 9 8940HX
+`skip_in_ci` hid them on CI runners at the time of this run, and this
+machine was likewise below what was then taken for a dev-hardware
+threshold. (Both statements are historical: PR #22 removed that guard
+and retired the threshold.) Worth a separate look (~~a Ryzen 9 8940HX
 should not be 6× under a 20M target — suspect WSL2 CPU allocation or
-laptop power policy~~ — that hypothesis is refuted; see
-[Second data point](#second-data-point-2026-09-21--gpu-less-x86-control)),
+laptop power policy~~ — superseded; the figures it rests on are not
+comparable across hosts, see
+[Third data point](#third-data-point-2026-09-21--every-figure-with-its-command)),
 but not a CUDA signal.
 
 `test_fit_throughput_target` at 0.07 M/s vs 0.5 M/s confirms this
@@ -449,8 +455,9 @@ dictionaries are constant across the batch loop.
    box, and the assertions additionally flip with pytest's collection
    scope; see
    [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-   What is left is a decision — give the two targets recorded
-   provenance, or move them to `benchmarks/`.
+   ~~What is left is a decision — give the two targets recorded
+   provenance, or move them to `benchmarks/`.~~ **Closed 2026-09-21:**
+   both are ratio gates now, and `skip_in_ci` is gone.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
 6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
    side, order 1→4→3→2, all four accepted by the tracker:
@@ -524,13 +531,24 @@ isolation; the spread within that set is under 6%. The other two
 speed entries in the Step 2 table are MLX-gated and skip cleanly with no
 GPU, so this control says nothing about them.
 
-**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
+~~**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
 Xeon is *faster* than the Ryzen 9 8940HX on both codecs — roughly 2× on
 the LZ4 array path — and still lands 5× under the 20M target and 3×
 under the 50M one. Two unrelated hosts failing the same way points at
-the thresholds, not at either machine. `git log -S "rate > 20"` traces
-the assertion only to the squashed import commit, so neither target has
-recorded provenance, nor a machine where it was ever met.
+the thresholds, not at either machine.~~ **Struck 2026-09-21 — wrong on
+a fact, and too broad.** See
+[Third data point](#third-data-point-2026-09-21--every-figure-with-its-command)
+below: the comparison above was against the Ryzen *under WSL2* and
+under a different pytest command, so it reads as a claim about the
+silicon that its figures cannot support. What can be said without
+crossing commands is narrower: the Ryzen's 35.8M is a bare-`pytest`
+figure and this Xeon's direct-call figures are 19.8–33.3M, so they are
+not comparable; under a bare `pytest` the Xeon cleared 50M, which is
+the only like-for-like pair available and does not put it behind.
+`git log -S "rate > 20"`
+traces the assertion only to the squashed import commit, so neither
+target has recorded provenance, nor a machine where it was ever met —
+that part stands.
 
 ### The assertions also depend on pytest's collection scope
 
@@ -548,118 +566,294 @@ not measuring the codec, and a green result from it is not evidence.
 
 ### Consequence
 
-These two assertions currently certify the host, not the code, and
+~~These two assertions currently certify the host, not the code, and
 `skip_in_ci` means nothing re-derives their thresholds. Decide either a
 target with recorded provenance, or move them to
 `src/toyomacro/voigtfit/benchmarks/` where a number without a pass/fail
-gate is the expected artifact. Until then, treat a `decode_speed`
-failure on a new machine as uninformative — as the Step 2 criteria
-already do.
+gate is the expected artifact.~~ **Settled 2026-09-21** — both are now
+ratio gates; see the next section.
 
-## Re-verification frame (prepared 2026-09-21 — NOT YET RUN)
+## Third data point (2026-09-21) — every figure with its command
 
-**Nothing in this section is a result.** It is the form a second CUDA run
-fills in, prepared so that the run itself is mechanical rather than a
-re-derivation. When it has been run, retitle this section
-`## Re-verification (<date>) — <machine>` and delete this notice.
+PR #15 measured both codecs on Windows 11 natively. **Provenance
+caveat:** that host is believed to be the same Ryzen 9 8940HX as the
+RTX 5070 box above, but no CPU is recorded for it anywhere — PR #15's
+body and the CHANGELOG entry at `800f439` both say only "Windows 11
+(Python 3.12.14)". The identification comes from the maintainer, not
+from the repository. Nothing below depends on it; an earlier draft of
+this section did, and was wrong to.
 
-### Why a second run is owed
+Every published figure for these two gates, with the command that
+produced it — because the command turns out to matter more than the
+hardware:
 
-The 2026-07-17 PoC validated a tree that no longer exists. Since the
-earliest commit in this repository's visible history (`97f444d`,
-2026-07-18 — one day *after* the PoC), `src/toyomacro/voigtfit/` has
-changed by 81 files, +7,832 / −4,265 lines across 23 commits. Most of
-that is the `identifiability` work, which never reaches an MLX kernel.
-Three changes do land on what the PoC certified:
+| host | command | fitpara | array |
+|---|---|---|---|
+| Ryzen 9 8940HX, WSL2 | `pytest src/toyomacro/voigtfit/tests` | 3.4M spec/s | 8.5M spec/s |
+| Ryzen 9 8940HX, native Win11 | bare `pytest` (both roots) | 4.9M spec/s | 35.8M spec/s |
+| Xeon @2.80GHz, 4 vCPU | two tests in isolation, ×5 | 3.9–4.0M spec/s | 16.1–17.0M spec/s |
+| Xeon @2.80GHz, 4 vCPU | bare `pytest` (both roots) | 3.8M, 6.0M | > 50M (passed) |
+| Xeon @2.80GHz, 4 vCPU | direct call, ×5 | 5.2–6.7M spec/s | 22.7–33.3M spec/s |
+| Xeon @2.10GHz, 4 vCPU | direct call, ×8 | 4.7–5.7M spec/s | 19.8–23.4M spec/s |
+| Apple M3 Max, load ≈11 | `pytest` | 16.4M spec/s | — |
+| Apple M3 Max, load ≈11 | direct call, ×7 | 20.1–20.8M spec/s | — |
+| target | | 20M | 50M |
 
-| change | what the PoC used it for |
-|---|---|
-| `d989712 fix(multipeak): honor FastFitConfig.use_mlx on the multi-component path` | `test_multipeak_solver.py` — alternating projection, `requires_mlx` parity; also the path carrying the batch > 65,535 crash |
-| `pipeline.py` (+41 / −8) | `test_pipeline_mlx.py` — Stage-1 weight-matrix pipeline, the matmul kernel |
-| `_mlx_support.py` (+25 / −13) | Step 1, the capability probe itself |
+Two of those Xeon rows are not the same machine: the container was
+re-provisioned mid-session from a 2.80GHz part to a 2.10GHz one, which
+is why its figures drop. Both are 4-vCPU virtualised instances with
+hypervisor steal measured at 0.00–0.01% over the measurement windows,
+so contention is not what separates them. The M3 Max rows were taken
+under a 1-minute load average of about 11 on 16 cores and are therefore
+lower bounds on that host, not clean figures.
 
-Not one of those has executed a parity assertion on CUDA. CI is headless,
-so the `requires_mlx` blocks skip there, and the macOS job covers Metal
-only. **CUDA has had no coverage since 2026-07-17**, and v0.2.0 shipped
-in between.
+**No WSL2 cost can be read off this table.** An earlier draft asserted
+1.44× and 4.21× from the first two rows; those rows differ in the
+command as well as the environment, and the section above already
+records that the command alone moves the array figure from ~16.7M to
+over 50M on one host. The difference-of-differences is not attributable.
 
-The Windows portability work (`fix(memory)`, PR #15) is *not* a reason to
-re-run. It touches no kernel and no numerical path; its whole risk
-surface is import-time platform behaviour, which CI covers without a GPU.
-It also invalidates no number recorded here: this document records no
-RSS-derived value, `get_rss_gb` feeds only `MemoryProfiler`, and
-`optimal_dict3d_cache_size` sizes from total physical memory, not RSS.
-Merging it first only avoids verifying a tree that is about to move.
+What survives:
 
-### Setup
+- **Only an Apple host has met the 20M target.** A contended M3 Max
+  reaches 20.1–20.8M by direct call; the best x86 figure on any host,
+  command or clock is 6.7M, 3.0× under. An earlier draft called 6.0M
+  the best and computed 3.3× from it, while a row of this same table
+  recorded 6.7M — the superlative was updated without being re-derived
+  against the data added beside it.
+- **The 50M target has been met once**, by this Xeon under a bare
+  `pytest` (> 50M, passed). Comparing like with like is only possible
+  within a command: by direct call the Ryzen has no figure, the two
+  Xeons give 19.8–33.3M, and under a bare `pytest` the Ryzen gives
+  35.8M against the Xeon's > 50M. An earlier draft compared the Ryzen's
+  bare-`pytest` figure to a Xeon direct call and read "rough parity"
+  off it; that is a cross-command comparison, the thing this section
+  exists to stop.
+- **The spread is dominated by measurement context, not by silicon.**
+  On one Xeon the array figure spans 16.1M to over 50M on collection
+  scope alone, and the same pattern appears on Apple hardware: 16.4M
+  under `pytest` against 20.1–20.8M by direct call. That is the finding
+  this table is for, and it is the one that holds across every host.
 
-Unchanged — follow [Reproducing](#reproducing) above. The two
-load-bearing items are still `CUDA_HOME` (the `[cuda13]` extra ships 13
-headers, not the 93 NVRTC needs) and `NVIDIA_TF32_OVERRIDE=0`, or
-`MLX_ENABLE_TF32=0`, measured equivalent.
+### What was done about it
 
-**Unfixed before you start:** follow-up 7 — batches above 65,535 crash
-`solve_alternating_projection` on CUDA
-([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). The chunking
-was never implemented, so keep batches at or below that.
+Neither target survives as an absolute rate, for a reason the table
+above makes sharper than the earlier argument did: **one machine, one
+build, one codec, one command apart — 16.1M to over 50M.** An earlier
+draft put the headline at "4.2× apart" from the WSL2/native pair, but
+that computation is retracted above and those two differ in build and
+command as well. The collection-scope spread needs no such caveat, and
+it is larger. No absolute spec/s can be right on both sides of it, and
+picking either turns the gate into a statement about where the suite
+happens to run.
 
-### To record
+Both assertions are now ratios against a plain copy of the array decode
+produces. **The two sides are not symmetric, and an earlier draft of
+this section was wrong to say they were.** A copy is bandwidth-bound;
+decode is not. Decomposed on the array codec here, 73.5% of decode is
+`lz4.frame.decompress` running at 1.44 GB/s out, against 15.0 GB/s for
+memcpy — an order of magnitude below it per byte. Counting traffic
+rather than writes, decode moves ~120 MB (LZ4 writes 40, then
+`frombuffer().copy()` reads 40 and writes 40) against the copy's 80 MB,
+so a bandwidth-only floor is ~1.5 and the measured ratio is ~7–8. For
+the fitpara codec the int16 → float32 dequantise dominates instead.
+
+So the ratio is compute over bandwidth, and the two track each other
+only loosely across microarchitectures. What it does buy is immunity to
+the measurement-context spread above, which is what made an absolute
+rate uncalibratable. The bound is 40× a copy against ratios measured at
+8.4–13.3 (fitpara) and 6.9–8.7 (array) on 4-vCPU Xeons — session
+extrema of a noisy statistic rather than a settled range, and one host
+class rather than a cross-machine span. It is set far above them rather
+than tight, precisely because the ratio's stability across hardware is
+an argument and not yet a measurement. A regression has to be roughly
+3.7× (fitpara) or 4.9× (array) before the gate fires: this catches a
+kernel that stopped being vectorised, not a 20% slowdown.
+
+`skip_in_ci` is gone with them, and the helper it needed. Both gates now
+run everywhere, including CI, and the pytest-collection-scope
+sensitivity in the section above no longer flips a verdict: it moves a
+ratio whose bound is nowhere near either value. Encode was considered as
+the baseline and rejected — for the array codec decode is *slower* than
+encode (a near-constant payload compresses almost for free but still
+writes 80 MB on the way out — 40 MB out of LZ4, then 40 MB again through
+`np.frombuffer(...).copy()`), so the comparison would have been
+backwards. That second copy is the very operation the gate compares
+against, which is what puts a structural floor near 1 under the ratio.
+
+A `decode_speed` failure on a new machine now says something narrower
+than a rate did, and something broader: decode has moved relative to a
+memcpy on the same host. That is not by itself proof of a regression —
+the ratio is compute over bandwidth and is only loosely stable across
+microarchitectures — but it is no longer a statement about how fast the
+machine is.
+
+## Re-verification (2026-09-21) — RTX 5070 Laptop
+
+**Verdict: PASS.** The parity suite passes on CUDA within existing
+tolerances once TF32 is disabled. Every remaining failure is a speed
+assertion, which the pass/fail criteria explicitly exclude. No
+missing-op failure appeared, so no `stream=mx.cpu` workaround was
+needed — the same outcome as 2026-07-17, reached on a tree, a driver
+and a CUDA stack that have all moved since.
+
+### Environment
 
 | | |
 |---|---|
-| Commit SHA verified | |
-| GPU / driver | |
-| CPU / host / WSL2 kernel | |
-| Python / NumPy / SciPy | |
-| MLX version | |
-| CUDA wheels | |
-| TF32 disabled via | |
+| **Commit SHA verified** | **`3a13de5ee56b5f5e084dee2772081d5955eec87d`** (clean tree) |
+| GPU | NVIDIA GeForce RTX 5070 Laptop (Blackwell, `sm_120`), 8151 MiB |
+| Driver | 610.71 (was 596.13 in 2026-07) |
+| CPU / host | AMD Ryzen 9 8940HX — Windows 11 + WSL2, Ubuntu 24.04, kernel 6.18.33.2-microsoft-standard-WSL2 |
+| Python / NumPy / SciPy | 3.12.3 / 2.3.5 / 1.17.0 |
+| MLX | 0.32.2 (`mlx-cuda-13` 0.32.2), default device `Device(gpu, 0)` |
+| CUDA wheels | cublas 13.8.0.4, nvrtc 13.4.92, cuda-runtime 13.4.92, cuda-cccl 13.3.4.3.1, cudnn 9.26.0.51, cufft 12.4.0.43 |
+| `CUDA_HOME` | `.venv/lib/python3.12/site-packages/nvidia/cu13` — 93 headers present |
+| TF32 disabled via | `NVIDIA_TF32_OVERRIDE=0` |
+
+`src/` is unchanged between the verified `3a13de5` and `02095d8`, main
+at the time of writing: the seven files that differ are CI config,
+`README.md`, `AGENTS.md`, `CHANGELOG.md`, `CITATION.cff`,
+`pyproject.toml` and `uv.lock`. This run therefore covers main's engine
+code as it stands, not only the commit named above.
+
+### Counts
+
+Whole suite, `pytest src/toyomacro/voigtfit/tests -q -rs`; 981 tests
+collected in every run.
 
 | run | passed | failed | skipped | wall |
-|---|---|---|---|---|
-| Step 0 — NumPy baseline (`TOYOMACRO_DISABLE_MLX=1`) | | | | |
-| Step 2 — CUDA, TF32 on (default) | | | | |
-| Step 2 — CUDA, TF32 disabled | | | | |
+|---|--:|--:|--:|--:|
+| Step 0 — NumPy baseline (`TOYOMACRO_DISABLE_MLX=1`) | 920 | 2 | 59 | 177 s |
+| Step 2 — CUDA, TF32 on (default) | 973 | 8 | 0 | 559 s |
+| Step 2 — CUDA, TF32 disabled | 976 | 5 | 0 | 481 s |
 
-### Read these — do not just check that they are green
+Step 1 probe: `Device(gpu, 0)`, `mlx_installed: True`, `mlx_usable:
+True`. The capability probe is one of the changed files and is
+unchanged in behaviour on CUDA.
 
-**1. Did the skips collapse?** The load-bearing number. If the
-`requires_mlx` blocks did not execute, a green Step 2 asserts nothing.
-Measured on a GPU-less machine 2026-09-21 with
-`pytest src/toyomacro/voigtfit/tests` (80 skipped in total):
+### 1. The skips collapsed — completely
 
-| skip reason | count |
-|---|---|
-| `MLX not available` | 67 |
+All 59 skips in the NumPy baseline are MLX-gated, and all 59 executed
+on CUDA. The 2026-07 collapse was 81 → 1; this one is 59 → 0.
+
+| skip reason (Step 0) | count |
+|---|--:|
+| `MLX not available` | 50 |
+| `mx.compile not available` | 2 |
 | `MLX unavailable` | 2 |
 | `MLX not usable (not installed, or the default device failed the probe)` | 2 |
 | `tolerance calibrated for the MLX path (fails on the NumPy backend)` | 1 |
 | `compares the MLX exact-Voigt path against scipy` | 1 |
 | `MLX throughput target not meaningful on CI or CPU fallback` | 1 |
-| **MLX-gated total** | **74** |
+| **total** | **59** |
 
-Those 74 must disappear on a live CUDA device; the other 6 are gated on
-something else. The equivalent collapse in 2026-07 was 81 → 1.
+A green Step 2 therefore asserts something: 53 more tests ran with TF32
+on than in the baseline, and 56 more with it off.
 
-**2. The four TF32 canaries.** These failed with TF32 on and passed with
-it off in 2026-07. They are the near-tie-sensitive paths, and the first
-place a kernel change shows up:
+### 2. The four TF32 canaries behaved exactly as in 2026-07
+
+With TF32 on, these four fail and nothing else correctness-related
+does. With TF32 disabled, all four pass:
 
 - `test_dictionary_solver.py::TestSortedSolver::test_sorted_matches_hybrid`
 - `test_memory.py::TestChunkedParabola::test_chunked_matches_full`
 - `test_gvrt_multipeak_1b.py::TestEndToEndPSNR::test_psnr_targets_met`
 - `test_split_encoder_e2e.py::TestSeparationSweep::test_wide_separation_high_psnr`
 
-**3. `decode_speed` is not a signal here.** Both assertions fail on every
-host measured so far and are pure-CPU codec paths — see
+The canary set is neither larger nor smaller than it was, across a
+driver bump, an MLX bump and 193 commits. That is the finding.
+
+### 3. Every remaining failure is a speed assertion
+
+With TF32 disabled, five fail:
+
+| test | file | asserts |
+|---|---|---|
+| `TestFitparaCodec::test_decode_speed` | `test_compression.py` | ≥ 20M spec/s |
+| `TestArrayLZ4Compression::test_decode_speed` | `test_compression.py` | ≥ 50M spec/s |
+| `TestSpecdataUint16::test_mlx_throughput` | `test_compression.py` | throughput target |
+| `TestThroughput::test_extended_throughput` | `test_extended_svd.py` | extended pipeline within 3× of standard |
+| `TestThroughput::test_fit_throughput_target` | `test_gvrt_multipeak_1b.py` | fit throughput target |
+
+The two `decode_speed` assertions are pure-CPU codec paths that fail on
+every host measured so far — see
 [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-Ignore them.
+`test_extended_throughput` failed only in the TF32-off run and passed
+with TF32 on; it compares two timings against a 3× ratio, so it moves
+with scheduling noise and a slower GEMM. None of the five asserts a
+numerical result.
 
-### Verdict
+**Superseded for the two `decode_speed` rows by PR #22**, which is not in
+`3a13de5`: both became ratio gates against a copy of the array decode
+produces, so they no longer carry an absolute rate and are expected green
+here. The record above stands as measured on the tree that was run.
 
-Same criterion as the first run: the PoC passes when the parity suite
-passes within existing tolerances, or every failure is a documented
-missing op with a working `stream=mx.cpu` workaround. Performance is
-explicitly not a criterion. A parity test that passed in 2026-07 and
-fails now is a finding about the three changes listed above, not about
-CUDA.
+### Performance, which is not a criterion
+
+The CUDA suite took 559 s (TF32 on) and 481 s (off) against 177 s for
+the NumPy baseline on the same host — 2.7× to 3.2× slower in wall
+clock. The `sm_120` GEMM shortfall recorded in 2026-07 is not fixed by
+driver 610.71 or MLX 0.32.2.
+
+### Follow-up 7 is untested by this run
+
+The suite completed without hitting the batch > 65,535 crash
+([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)), but only
+because its batches stay at or below that size. The chunking is still
+unimplemented and this run is **not** evidence that the upstream bug is
+fixed.
+
+### Two traps that cost 40 minutes here
+
+Both produce a run that looks fine and is not.
+
+- **`$VAR` in a `wsl.exe -- bash -lc '...'` string is expanded by the
+  Windows shell first.** `CUDA_HOME="$PWD/..."` silently became a
+  Windows path that does not exist, i.e. `CUDA_HOME` unset. Most of the
+  suite still passed, and the failure that did appear was in
+  `test_extended_svd.py`, which is exactly where a missing NVRTC header
+  would show up — so the artefact imitated a real finding. Write the
+  script to a file with a quoted heredoc instead, and assert
+  `[ -d "$CUDA_HOME/include" ]` before running anything.
+- **WSL2's `/tmp` did not survive between invocations here.** Logs
+  written there were gone when the run finished. Keep run logs under
+  `$HOME`.
+
+### Correction: the 2026-07-17 PoC tree is `3aedcf3`, and it is in this history
+
+The frame this section replaces asserted that the PoC "validated a tree
+that no longer exists", and measured the delta from `97f444d`
+(2026-07-18) as the earliest visible commit. Both are wrong; they came
+from a shallow clone. The history runs back to `fe2e7ef`
+(2026-07-07) and held 187 commits when this run started.
+
+The tree the PoC ran on is **`3aedcf3`** (2026-07-16,
+`feat(cli): restrict public command surface to import/convert`):
+
+- `0bb1d14`, which recorded the PoC results, is dated 2026-07-17 11:15
+  JST and changes five files, all under `docs/` — no code. Its parent
+  is `3aedcf3`.
+- The WSL2 machine that ran the PoC still has its checkout parked on
+  `main` at `3aedcf3` with a clean tree, alongside the 3.0 GB venv
+  holding mlx 0.32.0 and the 2026-07 CUDA wheels.
+
+Correcting the base changes the numbers, and the conclusion partly. The
+real delta `3aedcf3..3a13de5` is **90 files, +11,807 / −4,264 across
+193 commits** — the frame's figure missed 17 commits and 3,909 lines.
+Those 17 add `exact_k.py`, `model_selection.py`, `rank_diagnostics.py`,
+their tests and a benchmark; every one is a new file and none touches
+an MLX path, so the frame's judgement that they do not matter here
+holds. But the corrected base lists **five** files on the certified
+path, not three:
+
+| file | change since `3aedcf3` |
+|---|--:|
+| `pipeline.py` | 49 |
+| `_mlx_support.py` | 38 |
+| `multipeak_solver.py` (incl. `d989712`) | 21 |
+| `weight_cache.py` | 6 |
+| `dictionary_solver.py` | 2 |
+
+`weight_cache.py` and `dictionary_solver.py` were invisible from the
+wrong base. All five are covered by the runs above.

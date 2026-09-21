@@ -12,9 +12,14 @@ Key functions:
 """
 
 import os
-import resource
+import sys
 import time
 from dataclasses import dataclass, field
+
+try:
+    import resource
+except ImportError:  # Windows has no resource module
+    resource = None
 
 
 def get_available_memory_gb() -> float:
@@ -52,15 +57,33 @@ def get_total_memory_gb() -> float:
         return 16.0
 
 
+def get_peak_rss_bytes() -> float:
+    """Return this process's peak RSS (Resident Set Size) in bytes.
+
+    This is the high-water mark since the process started, not the
+    instantaneous footprint: it never decreases within a run.
+
+    macOS and Linux read ``ru_maxrss`` from :func:`resource.getrusage`,
+    which is in bytes on macOS and kilobytes on Linux.  Windows has no
+    ``resource`` module, so the peak working set reported by psutil is
+    used instead — the closest equivalent Windows maintains.
+    """
+    if resource is not None:
+        ru = resource.getrusage(resource.RUSAGE_SELF)
+        if sys.platform == 'darwin':
+            return float(ru.ru_maxrss)
+        return float(ru.ru_maxrss) * 1024.0
+    import psutil
+    return float(psutil.Process().memory_info().peak_wset)
+
+
 def get_rss_gb() -> float:
-    """Return current RSS (Resident Set Size) in GB."""
-    ru = resource.getrusage(resource.RUSAGE_SELF)
-    # macOS: ru_maxrss is in bytes; Linux: in kilobytes
-    import sys
-    if sys.platform == 'darwin':
-        return ru.ru_maxrss / 1e9
-    else:
-        return ru.ru_maxrss * 1e3 / 1e9
+    """Return this process's peak RSS in GB.
+
+    Thin wrapper over :func:`get_peak_rss_bytes` — see there for what
+    "peak" means and how each platform measures it.
+    """
+    return get_peak_rss_bytes() / 1e9
 
 
 def optimal_chunk_size(
@@ -218,13 +241,8 @@ class MemoryProfiler:
 
     @staticmethod
     def _current_rss() -> float:
-        """Get current process RSS in GB."""
-        ru = resource.getrusage(resource.RUSAGE_SELF)
-        import sys
-        if sys.platform == 'darwin':
-            return ru.ru_maxrss / 1e9
-        else:
-            return ru.ru_maxrss * 1e3 / 1e9
+        """Get this process's peak RSS in GB."""
+        return get_rss_gb()
 
 
 # ---------------------------------------------------------------------------

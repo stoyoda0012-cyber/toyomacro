@@ -78,7 +78,7 @@ def test_G3_every_candidate_has_exactly_k_components(report_separated):
 
 
 def test_G3_no_max_peaks_semantics_in_orchestrator_source():
-    source = Path(exact_k_module.__file__).read_text()
+    source = Path(exact_k_module.__file__).read_text(encoding="utf-8")
     assert "max_peaks" not in source.replace("``max_peaks``", "")
 
 
