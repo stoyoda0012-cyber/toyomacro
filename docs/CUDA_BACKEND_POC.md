@@ -449,8 +449,9 @@ dictionaries are constant across the batch loop.
    box, and the assertions additionally flip with pytest's collection
    scope; see
    [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-   What is left is a decision — give the two targets recorded
-   provenance, or move them to `benchmarks/`.
+   ~~What is left is a decision — give the two targets recorded
+   provenance, or move them to `benchmarks/`.~~ **Closed 2026-09-21:**
+   both are ratio gates now, and `skip_in_ci` is gone.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
 6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
    side, order 1→4→3→2, all four accepted by the tracker:
@@ -524,13 +525,19 @@ isolation; the spread within that set is under 6%. The other two
 speed entries in the Step 2 table are MLX-gated and skip cleanly with no
 GPU, so this control says nothing about them.
 
-**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
+~~**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
 Xeon is *faster* than the Ryzen 9 8940HX on both codecs — roughly 2× on
 the LZ4 array path — and still lands 5× under the 20M target and 3×
 under the 50M one. Two unrelated hosts failing the same way points at
-the thresholds, not at either machine. `git log -S "rate > 20"` traces
-the assertion only to the squashed import commit, so neither target has
-recorded provenance, nor a machine where it was ever met.
+the thresholds, not at either machine.~~ **Struck 2026-09-21 — wrong on
+a fact, and too broad.** See
+[Third data point](#third-data-point-2026-09-21--the-same-machine-without-wsl2)
+below: the comparison above was against the Ryzen *under WSL2*, and
+reads as a claim about the silicon. Natively the Ryzen is 2.1× faster
+than the Xeon on the array codec, not 2× slower. `git log -S "rate > 20"`
+traces the assertion only to the squashed import commit, so neither
+target has recorded provenance, nor a machine where it was ever met —
+that part stands.
 
 ### The assertions also depend on pytest's collection scope
 
@@ -548,13 +555,63 @@ not measuring the codec, and a green result from it is not evidence.
 
 ### Consequence
 
-These two assertions currently certify the host, not the code, and
+~~These two assertions currently certify the host, not the code, and
 `skip_in_ci` means nothing re-derives their thresholds. Decide either a
 target with recorded provenance, or move them to
 `src/toyomacro/voigtfit/benchmarks/` where a number without a pass/fail
-gate is the expected artifact. Until then, treat a `decode_speed`
-failure on a new machine as uninformative — as the Step 2 criteria
-already do.
+gate is the expected artifact.~~ **Settled 2026-09-21** — both are now
+ratio gates; see the next section.
+
+## Third data point (2026-09-21) — the same machine, without WSL2
+
+PR #15 measured both codecs on Windows 11 natively. The host is the
+**same Ryzen 9 8940HX** as the RTX 5070 box above, so its WSL2 and
+native numbers differ only in execution environment, on one piece of
+silicon:
+
+| test | Ryzen, WSL2 | Ryzen, native | Xeon, 4 vCPU | target |
+|---|---|---|---|---|
+| `TestFitparaCodec::test_decode_speed` | 3.4M spec/s | 4.9M spec/s | 3.9–4.0M spec/s | 20M |
+| `TestArrayLZ4Compression::test_decode_speed` | 8.5M spec/s | 35.8M spec/s | 16.1–17.0M spec/s | 50M |
+
+**WSL2 costs 1.44× on the fitpara codec and 4.21× on the array codec.**
+That is the fact the struck paragraph above missed, and it splits the
+two gates apart rather than confirming them together:
+
+- **The 20M target is unreachable.** The best number any environment
+  produced is 4.9M, still 4.1× under. WSL2 accounts for 1.44× of that
+  and nothing accounts for the rest. The earlier conclusion holds here.
+- **The 50M target is not obviously wrong.** Natively the same laptop
+  CPU reaches 35.8M, within 1.4×; a desktop or server part plausibly
+  clears it. The WSL2 figure was dominated by the environment, not the
+  codec, so "two unrelated hosts failing the same way" was never true
+  of this gate.
+
+### What was done about it
+
+Neither target survives as an absolute rate, for a reason the split
+makes sharper than the earlier argument did: **one machine, one build,
+one codec, 4.2× apart.** No absolute spec/s can be right on both sides
+of that, and picking either turns the gate into a statement about where
+the suite happens to run.
+
+Both assertions are now ratios against a plain copy of the array decode
+produces. Decompression and a copy are both memory-bandwidth bound, so
+the baseline scales with the host and the comparison survives hardware
+the suite has never seen. The bound is 40× a copy; measured 8.6–10.9
+(fitpara) and 6.3–7.3 (array) on the Xeon, so it absorbs drift in the
+ratio rather than differences in machine speed.
+
+`skip_in_ci` is gone with them, and the helper it needed. Both gates now
+run everywhere, including CI, and the pytest-collection-scope
+sensitivity in the section above no longer flips a verdict: it moves a
+ratio whose bound is nowhere near either value. Encode was considered as
+the baseline and rejected — for the array codec decode is *slower* than
+encode (a near-constant payload compresses almost for free but still
+writes 40 MB on the way out), so the comparison would have been backwards.
+
+A `decode_speed` failure on a new machine is now informative: it means
+decode has stopped being bandwidth-bound, not that the machine is slow.
 
 ## Re-verification frame (prepared 2026-09-21 — NOT YET RUN)
 
@@ -650,10 +707,13 @@ place a kernel change shows up:
 - `test_gvrt_multipeak_1b.py::TestEndToEndPSNR::test_psnr_targets_met`
 - `test_split_encoder_e2e.py::TestSeparationSweep::test_wide_separation_high_psnr`
 
-**3. `decode_speed` is not a signal here.** Both assertions fail on every
-host measured so far and are pure-CPU codec paths — see
-[Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-Ignore them.
+**3. `decode_speed` should simply pass now.** Both assertions became
+ratio gates on 2026-09-21 and no longer carry an absolute rate, so
+unlike every earlier run in this document they are expected green on the
+CUDA box too — see
+[Third data point](#third-data-point-2026-09-21--the-same-machine-without-wsl2).
+They are pure-CPU codec paths either way, so a failure there is not a
+CUDA signal; it would mean decode has stopped being bandwidth-bound.
 
 ### Verdict
 

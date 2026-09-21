@@ -3,16 +3,11 @@
 Tests the int16 + column-wise + LZ4 compression pipeline.
 """
 
-import os
-import sys
+import time
 
 import numpy as np
 import pytest
 from scipy.ndimage import gaussian_filter
-
-# CI runners are far slower than dev hardware; skip speed assertions there.
-IN_CI = os.environ.get("CI") == "true"
-skip_in_ci = pytest.mark.skipif(IN_CI, reason="speed assertion is sensitive to CI hardware")
 
 from toyomacro.voigtfit.h5io import (
     HAS_LZ4,
@@ -30,6 +25,26 @@ from toyomacro.voigtfit.h5io import (
 
 # Skip all tests if LZ4 not available
 pytestmark = pytest.mark.skipif(not HAS_LZ4, reason="lz4 not installed")
+
+
+def _median_time(fn, repeats=5, warmup=3):
+    """Median wall time of ``fn`` over ``repeats`` runs, after warm-up."""
+    for _ in range(warmup):
+        fn()
+    times = []
+    for _ in range(repeats):
+        t0 = time.perf_counter()
+        fn()
+        times.append(time.perf_counter() - t0)
+    return float(np.median(times))
+
+
+# Decoding and copying the same array are both memory-bandwidth bound, so
+# a decode/copy ratio moves with the machine where an absolute rate does
+# not. This bound therefore has to absorb drift in that ratio, not
+# differences in hardware speed. Measured on a 4-vCPU cloud Xeon:
+# 8.6-10.9 for the fitpara codec, 6.3-7.3 for the array codec.
+MAX_DECODE_OVER_COPY = 40
 
 
 def generate_realistic_fitpara(n_spectra: int, n_comp: int = 3) -> np.ndarray:
@@ -144,33 +159,36 @@ class TestFitparaCodec:
         # Compressed size should be significantly smaller
         assert compressed.compressed_size < compressed.original_size / 3
 
-    @skip_in_ci
     def test_decode_speed(self):
-        """Test that decode speed meets target (not a bottleneck for E2E pipeline)."""
-        import time
+        """Decoding costs the same order as touching the data once.
 
+        The claim this guards is that decode does not bottleneck the E2E
+        pipeline, which is a statement about cost relative to the data,
+        not an absolute rate -- so the assertion is a ratio against a
+        plain copy of the array decode produces.
+
+        An absolute target cannot be calibrated here. The same
+        Ryzen 9 8940HX measures 8.5M spec/s on the sibling array codec
+        under WSL2 and 35.8M natively: a 4.2x spread from the execution
+        environment alone, on one piece of silicon. A decode/copy ratio
+        moves with the machine instead, because both operations are
+        memory-bandwidth bound. See the decode_speed history in
+        docs/CUDA_BACKEND_POC.md.
+        """
         fitpara = generate_realistic_fitpara(1000000, n_comp=3)
-        n_spectra = fitpara.shape[0]
-
         codec = FitparaCodec()
         compressed = codec.encode(fitpara)
+        decoded = codec.decode(compressed)
 
-        # Warmup
-        for _ in range(3):
-            _ = codec.decode(compressed)
+        t_decode = _median_time(lambda: codec.decode(compressed))
+        t_copy = _median_time(decoded.copy)
 
-        # Benchmark
-        times = []
-        for _ in range(5):
-            t0 = time.perf_counter()
-            _ = codec.decode(compressed)
-            times.append(time.perf_counter() - t0)
-
-        median_time = np.median(times)
-        rate = n_spectra / median_time / 1e6
-
-        # Target: 20M spec/s minimum (decode should not bottleneck E2E pipeline)
-        assert rate > 20, f"Decode rate {rate:.1f}M spec/s < 20M target"
+        ratio = t_decode / t_copy
+        rate = fitpara.shape[0] / t_decode / 1e6
+        assert ratio < MAX_DECODE_OVER_COPY, (
+            f"decode costs {ratio:.1f}x a copy of the same array "
+            f"({rate:.1f}M spec/s), over the {MAX_DECODE_OVER_COPY}x bound"
+        )
 
     def test_disabled_compression(self):
         """Test codec with compression disabled."""
@@ -350,11 +368,16 @@ class TestArrayLZ4Compression:
 
         np.testing.assert_array_equal(otherpara, restored)
 
-    @skip_in_ci
     def test_decode_speed(self):
-        """Test decode speed for large arrays."""
-        import time
+        """Decoding a large array costs the same order as copying it.
 
+        A ratio for the same reason as `TestFitparaCodec.test_decode_speed`:
+        this is the codec whose absolute rate moves 4.2x between WSL2 and
+        native Windows on one machine. Note that decode is *slower* than
+        encode here -- the payload is nearly constant, so compression is
+        almost free while decompression still writes 40 MB -- which is
+        why encode is not the baseline.
+        """
         n_spectra = 1_000_000
 
         # Typical otherpara
@@ -363,23 +386,17 @@ class TestArrayLZ4Compression:
         otherpara[1] = 528.5
 
         compressed = compress_array_lz4(otherpara)
+        decoded = decompress_array_lz4(compressed)
 
-        # Warmup
-        for _ in range(3):
-            _ = decompress_array_lz4(compressed)
+        t_decode = _median_time(lambda: decompress_array_lz4(compressed))
+        t_copy = _median_time(decoded.copy)
 
-        # Benchmark
-        times = []
-        for _ in range(5):
-            t0 = time.perf_counter()
-            _ = decompress_array_lz4(compressed)
-            times.append(time.perf_counter() - t0)
-
-        median_time = np.median(times)
-        rate = n_spectra / median_time / 1e6
-
-        # Should be very fast (>100M spec/s for constant data)
-        assert rate > 50, f"Decode rate {rate:.1f}M spec/s"
+        ratio = t_decode / t_copy
+        rate = n_spectra / t_decode / 1e6
+        assert ratio < MAX_DECODE_OVER_COPY, (
+            f"decode costs {ratio:.1f}x a copy of the same array "
+            f"({rate:.1f}M spec/s), over the {MAX_DECODE_OVER_COPY}x bound"
+        )
 
 
 class TestSpecdataUint16:
