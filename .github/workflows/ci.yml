@@ -60,6 +60,7 @@ jobs:
           uv run python examples/06_fermi_edge_calibration.py
           uv run python examples/07_width_identifiability_map.py
           uv run python examples/08_map_viewer_frontend.py --smoke
+          uv run python examples/09_fermi_edge_identifiability.py
 
   lint:
     name: ruff
