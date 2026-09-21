@@ -264,11 +264,14 @@ Step 1 probe returned `Device(gpu, 0)` / `mlx_usable: True` **unchanged**
 
 The two `test_decode_speed` failures are **not CUDA-related** — they fail
 identically on the Step 0 NumPy baseline. They are pure-CPU codec paths;
-`skip_in_ci` hides them on CI runners, and this machine is likewise below
-the dev-hardware threshold. Worth a separate look (~~a Ryzen 9 8940HX
+`skip_in_ci` hid them on CI runners at the time of this run, and this
+machine was likewise below what was then taken for a dev-hardware
+threshold. (Both statements are historical: PR #22 removed that guard
+and retired the threshold.) Worth a separate look (~~a Ryzen 9 8940HX
 should not be 6× under a 20M target — suspect WSL2 CPU allocation or
-laptop power policy~~ — that hypothesis is refuted; see
-[Second data point](#second-data-point-2026-09-21--gpu-less-x86-control)),
+laptop power policy~~ — superseded; the figures it rests on are not
+comparable across hosts, see
+[Third data point](#third-data-point-2026-09-21--every-figure-with-its-command)),
 but not a CUDA signal.
 
 `test_fit_throughput_target` at 0.07 M/s vs 0.5 M/s confirms this
@@ -452,8 +455,9 @@ dictionaries are constant across the batch loop.
    box, and the assertions additionally flip with pytest's collection
    scope; see
    [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-   What is left is a decision — give the two targets recorded
-   provenance, or move them to `benchmarks/`.
+   ~~What is left is a decision — give the two targets recorded
+   provenance, or move them to `benchmarks/`.~~ **Closed 2026-09-21:**
+   both are ratio gates now, and `skip_in_ci` is gone.
 5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
 6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
    side, order 1→4→3→2, all four accepted by the tracker:
@@ -527,13 +531,24 @@ isolation; the spread within that set is under 6%. The other two
 speed entries in the Step 2 table are MLX-gated and skip cleanly with no
 GPU, so this control says nothing about them.
 
-**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
+~~**The WSL2/power-policy hypothesis is refuted.** A stock 4-vCPU cloud
 Xeon is *faster* than the Ryzen 9 8940HX on both codecs — roughly 2× on
 the LZ4 array path — and still lands 5× under the 20M target and 3×
 under the 50M one. Two unrelated hosts failing the same way points at
-the thresholds, not at either machine. `git log -S "rate > 20"` traces
-the assertion only to the squashed import commit, so neither target has
-recorded provenance, nor a machine where it was ever met.
+the thresholds, not at either machine.~~ **Struck 2026-09-21 — wrong on
+a fact, and too broad.** See
+[Third data point](#third-data-point-2026-09-21--every-figure-with-its-command)
+below: the comparison above was against the Ryzen *under WSL2* and
+under a different pytest command, so it reads as a claim about the
+silicon that its figures cannot support. What can be said without
+crossing commands is narrower: the Ryzen's 35.8M is a bare-`pytest`
+figure and this Xeon's direct-call figures are 19.8–33.3M, so they are
+not comparable; under a bare `pytest` the Xeon cleared 50M, which is
+the only like-for-like pair available and does not put it behind.
+`git log -S "rate > 20"`
+traces the assertion only to the squashed import commit, so neither
+target has recorded provenance, nor a machine where it was ever met —
+that part stands.
 
 ### The assertions also depend on pytest's collection scope
 
@@ -551,13 +566,127 @@ not measuring the codec, and a green result from it is not evidence.
 
 ### Consequence
 
-These two assertions currently certify the host, not the code, and
+~~These two assertions currently certify the host, not the code, and
 `skip_in_ci` means nothing re-derives their thresholds. Decide either a
 target with recorded provenance, or move them to
 `src/toyomacro/voigtfit/benchmarks/` where a number without a pass/fail
-gate is the expected artifact. Until then, treat a `decode_speed`
-failure on a new machine as uninformative — as the Step 2 criteria
-already do.
+gate is the expected artifact.~~ **Settled 2026-09-21** — both are now
+ratio gates; see the next section.
+
+## Third data point (2026-09-21) — every figure with its command
+
+PR #15 measured both codecs on Windows 11 natively. **Provenance
+caveat:** that host is believed to be the same Ryzen 9 8940HX as the
+RTX 5070 box above, but no CPU is recorded for it anywhere — PR #15's
+body and the CHANGELOG entry at `800f439` both say only "Windows 11
+(Python 3.12.14)". The identification comes from the maintainer, not
+from the repository. Nothing below depends on it; an earlier draft of
+this section did, and was wrong to.
+
+Every published figure for these two gates, with the command that
+produced it — because the command turns out to matter more than the
+hardware:
+
+| host | command | fitpara | array |
+|---|---|---|---|
+| Ryzen 9 8940HX, WSL2 | `pytest src/toyomacro/voigtfit/tests` | 3.4M spec/s | 8.5M spec/s |
+| Ryzen 9 8940HX, native Win11 | bare `pytest` (both roots) | 4.9M spec/s | 35.8M spec/s |
+| Xeon @2.80GHz, 4 vCPU | two tests in isolation, ×5 | 3.9–4.0M spec/s | 16.1–17.0M spec/s |
+| Xeon @2.80GHz, 4 vCPU | bare `pytest` (both roots) | 3.8M, 6.0M | > 50M (passed) |
+| Xeon @2.80GHz, 4 vCPU | direct call, ×5 | 5.2–6.7M spec/s | 22.7–33.3M spec/s |
+| Xeon @2.10GHz, 4 vCPU | direct call, ×8 | 4.7–5.7M spec/s | 19.8–23.4M spec/s |
+| Apple M3 Max, load ≈11 | `pytest` | 16.4M spec/s | — |
+| Apple M3 Max, load ≈11 | direct call, ×7 | 20.1–20.8M spec/s | — |
+| target | | 20M | 50M |
+
+Two of those Xeon rows are not the same machine: the container was
+re-provisioned mid-session from a 2.80GHz part to a 2.10GHz one, which
+is why its figures drop. Both are 4-vCPU virtualised instances with
+hypervisor steal measured at 0.00–0.01% over the measurement windows,
+so contention is not what separates them. The M3 Max rows were taken
+under a 1-minute load average of about 11 on 16 cores and are therefore
+lower bounds on that host, not clean figures.
+
+**No WSL2 cost can be read off this table.** An earlier draft asserted
+1.44× and 4.21× from the first two rows; those rows differ in the
+command as well as the environment, and the section above already
+records that the command alone moves the array figure from ~16.7M to
+over 50M on one host. The difference-of-differences is not attributable.
+
+What survives:
+
+- **Only an Apple host has met the 20M target.** A contended M3 Max
+  reaches 20.1–20.8M by direct call; the best x86 figure on any host,
+  command or clock is 6.7M, 3.0× under. An earlier draft called 6.0M
+  the best and computed 3.3× from it, while a row of this same table
+  recorded 6.7M — the superlative was updated without being re-derived
+  against the data added beside it.
+- **The 50M target has been met once**, by this Xeon under a bare
+  `pytest` (> 50M, passed). Comparing like with like is only possible
+  within a command: by direct call the Ryzen has no figure, the two
+  Xeons give 19.8–33.3M, and under a bare `pytest` the Ryzen gives
+  35.8M against the Xeon's > 50M. An earlier draft compared the Ryzen's
+  bare-`pytest` figure to a Xeon direct call and read "rough parity"
+  off it; that is a cross-command comparison, the thing this section
+  exists to stop.
+- **The spread is dominated by measurement context, not by silicon.**
+  On one Xeon the array figure spans 16.1M to over 50M on collection
+  scope alone, and the same pattern appears on Apple hardware: 16.4M
+  under `pytest` against 20.1–20.8M by direct call. That is the finding
+  this table is for, and it is the one that holds across every host.
+
+### What was done about it
+
+Neither target survives as an absolute rate, for a reason the table
+above makes sharper than the earlier argument did: **one machine, one
+build, one codec, one command apart — 16.1M to over 50M.** An earlier
+draft put the headline at "4.2× apart" from the WSL2/native pair, but
+that computation is retracted above and those two differ in build and
+command as well. The collection-scope spread needs no such caveat, and
+it is larger. No absolute spec/s can be right on both sides of it, and
+picking either turns the gate into a statement about where the suite
+happens to run.
+
+Both assertions are now ratios against a plain copy of the array decode
+produces. **The two sides are not symmetric, and an earlier draft of
+this section was wrong to say they were.** A copy is bandwidth-bound;
+decode is not. Decomposed on the array codec here, 73.5% of decode is
+`lz4.frame.decompress` running at 1.44 GB/s out, against 15.0 GB/s for
+memcpy — an order of magnitude below it per byte. Counting traffic
+rather than writes, decode moves ~120 MB (LZ4 writes 40, then
+`frombuffer().copy()` reads 40 and writes 40) against the copy's 80 MB,
+so a bandwidth-only floor is ~1.5 and the measured ratio is ~7–8. For
+the fitpara codec the int16 → float32 dequantise dominates instead.
+
+So the ratio is compute over bandwidth, and the two track each other
+only loosely across microarchitectures. What it does buy is immunity to
+the measurement-context spread above, which is what made an absolute
+rate uncalibratable. The bound is 40× a copy against ratios measured at
+8.4–13.3 (fitpara) and 6.9–8.7 (array) on 4-vCPU Xeons — session
+extrema of a noisy statistic rather than a settled range, and one host
+class rather than a cross-machine span. It is set far above them rather
+than tight, precisely because the ratio's stability across hardware is
+an argument and not yet a measurement. A regression has to be roughly
+3.7× (fitpara) or 4.9× (array) before the gate fires: this catches a
+kernel that stopped being vectorised, not a 20% slowdown.
+
+`skip_in_ci` is gone with them, and the helper it needed. Both gates now
+run everywhere, including CI, and the pytest-collection-scope
+sensitivity in the section above no longer flips a verdict: it moves a
+ratio whose bound is nowhere near either value. Encode was considered as
+the baseline and rejected — for the array codec decode is *slower* than
+encode (a near-constant payload compresses almost for free but still
+writes 80 MB on the way out — 40 MB out of LZ4, then 40 MB again through
+`np.frombuffer(...).copy()`), so the comparison would have been
+backwards. That second copy is the very operation the gate compares
+against, which is what puts a structural floor near 1 under the ratio.
+
+A `decode_speed` failure on a new machine now says something narrower
+than a rate did, and something broader: decode has moved relative to a
+memcpy on the same host. That is not by itself proof of a regression —
+the ratio is compute over bandwidth and is only loosely stable across
+microarchitectures — but it is no longer a statement about how fast the
+machine is.
 
 ## Re-verification (2026-09-21) — RTX 5070 Laptop
 
@@ -654,6 +783,11 @@ every host measured so far — see
 with TF32 on; it compares two timings against a 3× ratio, so it moves
 with scheduling noise and a slower GEMM. None of the five asserts a
 numerical result.
+
+**Superseded for the two `decode_speed` rows by PR #22**, which is not in
+`3a13de5`: both became ratio gates against a copy of the array decode
+produces, so they no longer carry an absolute rate and are expected green
+here. The record above stands as measured on the tree that was run.
 
 ### Performance, which is not a criterion
 
