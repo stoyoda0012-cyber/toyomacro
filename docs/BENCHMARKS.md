@@ -33,7 +33,7 @@ published value, however old it is.
 | **M1** | Apple M3 Max, 128 GB, macOS | MLX (Metal) | The published-benchmark machine. Every number in §2 and §3 is from here. | Metal is not; the macOS job runs MLX force-disabled |
 | **M2** | RTX 5070 Laptop / Ryzen 9 8940HX, Windows 11 + WSL2 | MLX (CUDA) | Correctness validation of the CUDA backend. **No published performance claim.** | No |
 | **M3** | Intel Xeon @ 2.80 GHz, 4 vCPU, no GPU, Linux | NumPy | A control, used once to refute a host-specific hypothesis about two codec speed assertions. | No |
-| — | GitHub Actions: `ubuntu-26.04`, `macos-latest`, Python 3.11/3.12 | NumPy | Correctness only. **Runs no benchmarks**; speed assertions skip when `CI=true` (`skip_in_ci` in `test_compression.py`, `skipif(IN_CI, …)` elsewhere). | — |
+| — | GitHub Actions: `ubuntu-26.04`, `macos-latest`, `windows-latest`, Python 3.11/3.12 | NumPy | Correctness only. **Runs no benchmarks**; speed assertions skip when `CI=true` (`skip_in_ci` in `test_compression.py`, `skipif(IN_CI, …)` elsewhere). | — |
 
 M2 and M3 measurements are recorded as prose in
 [`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md), not as JSON records —
@@ -149,18 +149,14 @@ about M2. They do not — a second, unrelated host missed the same
 thresholds, which points at the thresholds. No performance claim
 anywhere derives from M3.
 
-**A Linux-only measurement bug, still open on this branch.**
-`ru_maxrss` is in kibibytes on Linux; `memory.get_rss_gb` converts it at
-1000 bytes per kilobyte (`memory.py:63`), and five benchmark modules
-treat it as bytes outright: `bottleneck_analysis`,
-`chunk_optimization_benchmark`, `bench_gvrt_1b`, `benchmark_mlx_pipeline`
-and `bench_gvrt_multipeak_1b`. Peak-RSS figures measured on M2 or M3 are
-therefore wrong by 1000x or 1024x depending on the call site.
-
-No published number is affected: the figures come from M1, where
-`ru_maxrss` is already in bytes, and `CUDA_BACKEND_POC.md` records no
-RSS-derived value. A fix exists on `main` and is not in this branch's
-base; nothing here depends on it.
+**A Linux-only measurement bug, fixed.** `ru_maxrss` is in kibibytes on
+Linux; `memory.get_rss_gb` converted it at 1000 bytes per kilobyte, and
+five benchmark modules treated it as bytes outright, so peak-RSS figures
+measured on M2 or M3 were wrong by 1000x or 1024x depending on the call
+site. All six call sites now go through `memory.get_peak_rss_bytes()`,
+which converts at 1024 and reads the peak working set through psutil on
+Windows. No published number was affected — the figures come from M1,
+where `ru_maxrss` is already in bytes.
 
 ## 5. Reading a record
 
