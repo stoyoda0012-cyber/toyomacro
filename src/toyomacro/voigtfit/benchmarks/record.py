@@ -124,6 +124,27 @@ def _memory_gb() -> float | None:
         return None
 
 
+#: Processes whose CPU time is not work anyone is doing. Windows reports
+#: idle time as a process ("System Idle Process", PID 0) which psutil
+#: dutifully returns at close to 100% per core; counting it as foreign
+#: load condemned every record taken on an idle Windows host. PID 0 is
+#: the scheduler on Linux too and is never real work there either.
+_IDLE_PROCESS_NAMES = frozenset({"system idle process", "idle"})
+
+
+def _idle_pids(procs) -> set[int]:
+    """PIDs that report time nobody spent."""
+    pids = {0}
+    for p in procs:
+        try:
+            name = (p.info.get("name") or "").strip().lower()
+            if name in _IDLE_PROCESS_NAMES:
+                pids.add(p.pid)
+        except Exception:
+            continue
+    return pids
+
+
 def _self_pids() -> set[int]:
     """This process and its children, so a sample can exclude our own work."""
     pids = {os.getpid()}
@@ -177,7 +198,11 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
             except Exception:
                 pass
         snap["cpu_percent"] = psutil.cpu_percent(interval=interval)
-        skip = _self_pids() if exclude_self else set()
+        # The idle process is excluded unconditionally: it is not our work
+        # and it is not anyone else's either.
+        skip = _idle_pids(procs)
+        if exclude_self:
+            skip |= _self_pids()
         rows, rows_pid = [], []
         for p in procs:
             try:
@@ -190,7 +215,9 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
         rows.sort(reverse=True)
         # A sample taken after the benchmark contains the benchmark. Only
         # the processes that are NOT us say whether the host was shared.
-        others = [(v, n) for v, n, pid in rows_pid if pid not in skip]
+        others = [(v, n) for v, n, pid in rows_pid
+                  if pid not in skip
+                  and (n or "").strip().lower() not in _IDLE_PROCESS_NAMES]
         others.sort(reverse=True)
         snap["cpu_percent_others"] = round(sum(v for v, _ in others), 1)
         if exclude_self:

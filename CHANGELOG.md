@@ -66,6 +66,16 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **The load verdict no longer condemns an idle Windows host.** Windows
+  reports idle time as a process — "System Idle Process", PID 0 — which
+  psutil returns at close to 100% per core. It was counted as foreign
+  load, so `others_busy_after` fired on a completely idle machine and
+  every record taken there graded `contended`. PID 0, and any process
+  naming itself idle, are excluded from `cpu_percent_others`
+  unconditionally: that time is neither ours nor anyone else's. Found
+  by running the harness on native Windows, where it failed a test that
+  passes on macOS and Linux.
+
 - **`FitparaCodec` no longer advertises an unattributed decode rate.**
   The class docstring claimed "Decode speed: 30M spec/s (exceeds 28M
   target)" for a 1M x 3-component workload, and `FitparaCodecConfig`

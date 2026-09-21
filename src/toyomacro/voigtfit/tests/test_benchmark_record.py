@@ -450,3 +450,93 @@ class TestRoundTwoAuditFindings:
         env = record.environment(origin="t", load_before=before)
         if env["load"].get("others_busy_after") is not None:
             assert "others_busy_convention" in env["load"]
+
+
+class TestWindowsIdleProcess:
+    """Found on native Windows: every record condemned by idle time.
+
+    Windows reports idle time as a process — "System Idle Process",
+    PID 0 — which psutil returns at close to 100% per core. Counted as
+    foreign load, it tripped `others_busy_after` on a completely idle
+    host, so `test_our_own_load_does_not_condemn_the_record` failed
+    there and PR #26's Windows job went red.
+    """
+
+    class _FakeProc:
+        def __init__(self, pid, name, pct):
+            self.pid, self.info, self._pct = pid, {"name": name}, pct
+
+        def cpu_percent(self):
+            return self._pct
+
+    def test_pid_zero_is_always_idle(self):
+        assert 0 in record._idle_pids([])
+
+    def test_the_windows_idle_process_is_named_as_idle(self):
+        procs = [self._FakeProc(0, "System Idle Process", 1500.0),
+                 self._FakeProc(4, "System", 2.0),
+                 self._FakeProc(9, "python.exe", 100.0)]
+        idle = record._idle_pids(procs)
+        assert 0 in idle
+        assert 4 not in idle, "the Windows kernel does real work"
+        assert 9 not in idle
+
+    def test_idle_time_is_not_foreign_load(self, monkeypatch):
+        """The whole bug: 1500% of idle counted as somebody else's work."""
+        procs = [self._FakeProc(0, "System Idle Process", 1500.0),
+                 self._FakeProc(9999, "other.exe", 5.0)]
+
+        class _FakePsutil:
+            @staticmethod
+            def process_iter(_fields):
+                return procs
+
+            @staticmethod
+            def cpu_percent(interval=0.0):
+                return 3.0
+
+            class Process:
+                def __init__(self, *a):
+                    pass
+
+                def children(self, recursive=False):
+                    return []
+
+        monkeypatch.setitem(__import__("sys").modules, "psutil", _FakePsutil)
+        snap = record.load_snapshot(interval=0.0, top_n=5, exclude_self=True)
+        assert snap["cpu_percent_others"] == 5.0, snap["cpu_percent_others"]
+        names = [p["name"] for p in snap["top_processes"]]
+        assert "System Idle Process" not in names
+
+    def test_an_idle_windows_host_is_not_condemned(self, monkeypatch):
+        """End to end: the assertion that failed on Windows."""
+        procs = [self._FakeProc(0, "System Idle Process", 1580.0)]
+
+        class _FakePsutil:
+            @staticmethod
+            def process_iter(_fields):
+                return procs
+
+            @staticmethod
+            def cpu_percent(interval=0.0):
+                return 1.0
+
+            @staticmethod
+            def virtual_memory():
+                class _M:
+                    total = 32 * 2**30
+                return _M()
+
+            class Process:
+                def __init__(self, *a):
+                    pass
+
+                def children(self, recursive=False):
+                    return []
+
+        monkeypatch.setitem(__import__("sys").modules, "psutil", _FakePsutil)
+        before = {"load_average": [0.7, 0.24, 0.08], "looks_quiet": True,
+                  "cpu_percent": 1.0, "top_processes": []}
+        env = record.environment(origin="windows", load_before=before)
+        assert env["load"].get("others_busy_after") is not True
+        assert env["quality"]["verdict"] == "quiet", env["quality"]["reasons"]
