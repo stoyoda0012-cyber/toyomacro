@@ -8,6 +8,40 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`voigtfit.memory.get_peak_rss_bytes()`: this process's peak RSS, in
+  bytes, on every platform the package runs on.** macOS and Linux keep
+  reading `ru_maxrss` from `resource.getrusage`; Windows, which has no
+  `resource` module, reads the peak working set through psutil (already
+  a required dependency). `get_rss_gb()` is now a thin wrapper over it
+  and is unchanged on macOS. Both docstrings now say what the number is:
+  a high-water mark since process start, not the instantaneous
+  footprint.
+
+### Fixed
+
+- **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`
+  and five modules under `voigtfit/benchmarks/` imported the Unix-only
+  `resource` module at module scope, so on Windows `import
+  toyomacro.voigtfit.memory` raised `ModuleNotFoundError` — and with it
+  every caller, including the Dict3D cache auto-sizing in
+  `dictionary_solver_3d`. The import is now optional and Windows reads
+  the peak working set instead. Two tests were Unix-only for unrelated
+  reasons and now run anywhere: one read a source file in the platform's
+  preferred encoding rather than UTF-8, and one built a temporary
+  filename containing backslashes. Verified at `decc8e2` on Windows 11
+  (Python 3.12.14, clean tree): 1884 passed, 175 skipped, 2 failed —
+  both `test_decode_speed` throughput gates, which this machine misses
+  on hardware, not platform. Windows is still not covered by CI.
+
+- **Peak RSS was misreported on Linux.** `ru_maxrss` is in kibibytes
+  there, but `memory.get_rss_gb` converted it at 1000 bytes per
+  kilobyte (2.4% low), and `bench_gvrt_1b`, `benchmark_mlx_pipeline`,
+  `bottleneck_analysis` and `chunk_optimization_benchmark` treated it as
+  bytes outright (1024x low). All six call sites now go through
+  `get_peak_rss_bytes()`. Figures measured on macOS are unaffected.
+
 ## [0.3.0] - 2026-09-21
 
 Archived on Zenodo:

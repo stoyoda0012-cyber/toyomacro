@@ -28,7 +28,6 @@ Usage:
 
 import argparse
 import gc
-import resource
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -45,6 +44,7 @@ except ImportError:
     HAS_MLX = False
 
 from toyomacro.voigtfit.dictionary_solver import build_dictionary, solve_dict2d_parabola
+from toyomacro.voigtfit.memory import get_peak_rss_bytes
 from toyomacro.voigtfit.param_encoder import (
     C1S_SINGLE_PRESET,
     FWHM_TO_SIGMA,
@@ -73,9 +73,8 @@ DEFAULT_NOISE_LEVEL = 1000.0  # SNR ≈ 10
 # ============================================================================
 
 def _get_rss_gb() -> float:
-    """Current RSS in GB (macOS/Linux)."""
-    ru = resource.getrusage(resource.RUSAGE_SELF)
-    return ru.ru_maxrss / (1024 ** 3)  # macOS: bytes
+    """Peak RSS in GiB."""
+    return get_peak_rss_bytes() / (1024 ** 3)
 
 
 def _psnr(gt: np.ndarray, rec: np.ndarray) -> float:

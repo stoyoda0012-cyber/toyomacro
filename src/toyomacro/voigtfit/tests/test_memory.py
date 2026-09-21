@@ -20,6 +20,8 @@ import pytest
 from toyomacro.voigtfit.memory import (
     MemoryProfiler,
     get_available_memory_gb,
+    get_peak_rss_bytes,
+    get_rss_gb,
     get_total_memory_gb,
     optimal_chunk_size,
     optimal_dict3d_cache_size,
@@ -44,6 +46,22 @@ class TestMemoryDetection:
         total = get_total_memory_gb()
         assert total > 0.0
         assert total >= get_available_memory_gb()
+
+    def test_peak_rss_is_plausible_on_this_platform(self):
+        """Peak RSS must be readable without a `resource` module (Windows).
+
+        The interpreter plus numpy always occupies more than 1 MiB and
+        less than total physical memory, so any value outside that range
+        means the platform branch reported the wrong unit or quantity.
+        """
+        peak = get_peak_rss_bytes()
+        assert isinstance(peak, float)
+        assert 1024 ** 2 < peak < get_total_memory_gb() * 1e9
+
+    def test_peak_rss_gb_matches_bytes(self):
+        """get_rss_gb is get_peak_rss_bytes in GB, and never decreases."""
+        before = get_peak_rss_bytes()
+        assert get_rss_gb() >= before / 1e9
 
 
 class TestOptimalChunkSize:
