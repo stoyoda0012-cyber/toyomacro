@@ -264,8 +264,10 @@ Step 1 probe returned `Device(gpu, 0)` / `mlx_usable: True` **unchanged**
 
 The two `test_decode_speed` failures are **not CUDA-related** — they fail
 identically on the Step 0 NumPy baseline. They are pure-CPU codec paths;
-`skip_in_ci` hides them on CI runners, and this machine is likewise below
-the dev-hardware threshold. Worth a separate look (~~a Ryzen 9 8940HX
+`skip_in_ci` hid them on CI runners at the time of this run, and this
+machine was likewise below what was then taken for a dev-hardware
+threshold. (Both statements are historical: PR #22 removed that guard
+and retired the threshold.) Worth a separate look (~~a Ryzen 9 8940HX
 should not be 6× under a 20M target — suspect WSL2 CPU allocation or
 laptop power policy~~ — superseded; the figures it rests on are not
 comparable across hosts, see
@@ -538,9 +540,12 @@ a fact, and too broad.** See
 [Third data point](#third-data-point-2026-09-21--every-figure-with-its-command)
 below: the comparison above was against the Ryzen *under WSL2* and
 under a different pytest command, so it reads as a claim about the
-silicon that its figures cannot support. Measured standalone, this Xeon
-reaches 22.7–33.3M on the array codec — rough parity with the native
-Ryzen's 35.8M, in neither direction by 2×. `git log -S "rate > 20"`
+silicon that its figures cannot support. What can be said without
+crossing commands is narrower: the Ryzen's 35.8M is a bare-`pytest`
+figure and this Xeon's direct-call figures are 19.8–33.3M, so they are
+not comparable; under a bare `pytest` the Xeon cleared 50M, which is
+the only like-for-like pair available and does not put it behind.
+`git log -S "rate > 20"`
 traces the assertion only to the squashed import commit, so neither
 target has recorded provenance, nor a machine where it was ever met —
 that part stands.
@@ -632,29 +637,38 @@ What survives:
 
 ### What was done about it
 
-Neither target survives as an absolute rate, for a reason the split
-makes sharper than the earlier argument did: **one machine, one build,
-one codec, 4.2× apart.** No absolute spec/s can be right on both sides
-of that, and picking either turns the gate into a statement about where
-the suite happens to run.
+Neither target survives as an absolute rate, for a reason the table
+above makes sharper than the earlier argument did: **one machine, one
+build, one codec, one command apart — 16.1M to over 50M.** An earlier
+draft put the headline at "4.2× apart" from the WSL2/native pair, but
+that computation is retracted above and those two differ in build and
+command as well. The collection-scope spread needs no such caveat, and
+it is larger. No absolute spec/s can be right on both sides of it, and
+picking either turns the gate into a statement about where the suite
+happens to run.
 
 Both assertions are now ratios against a plain copy of the array decode
 produces. **The two sides are not symmetric, and an earlier draft of
 this section was wrong to say they were.** A copy is bandwidth-bound;
 decode is not. Decomposed on the array codec here, 73.5% of decode is
 `lz4.frame.decompress` running at 1.44 GB/s out, against 15.0 GB/s for
-memcpy — an order of magnitude below it per byte. Both operations move
-80 MB, so a bandwidth-only floor would be 1.0 and the measured ratio is
-~7. For the fitpara codec the int16 → float32 dequantise dominates
-instead.
+memcpy — an order of magnitude below it per byte. Counting traffic
+rather than writes, decode moves ~120 MB (LZ4 writes 40, then
+`frombuffer().copy()` reads 40 and writes 40) against the copy's 80 MB,
+so a bandwidth-only floor is ~1.5 and the measured ratio is ~7–8. For
+the fitpara codec the int16 → float32 dequantise dominates instead.
 
 So the ratio is compute over bandwidth, and the two track each other
 only loosely across microarchitectures. What it does buy is immunity to
 the measurement-context spread above, which is what made an absolute
-rate uncalibratable. The bound is 40× a copy against measured ratios of
-10.3–13.2 (fitpara) and 6.7–7.4 (array) on the Xeon — set far above
-them rather than tight, precisely because the ratio's stability across
-hardware is an argument and not yet a measurement.
+rate uncalibratable. The bound is 40× a copy against ratios measured at
+8.4–13.3 (fitpara) and 6.9–8.7 (array) on 4-vCPU Xeons — session
+extrema of a noisy statistic rather than a settled range, and one host
+class rather than a cross-machine span. It is set far above them rather
+than tight, precisely because the ratio's stability across hardware is
+an argument and not yet a measurement. A regression has to be roughly
+3.7× (fitpara) or 4.9× (array) before the gate fires: this catches a
+kernel that stopped being vectorised, not a 20% slowdown.
 
 `skip_in_ci` is gone with them, and the helper it needed. Both gates now
 run everywhere, including CI, and the pytest-collection-scope

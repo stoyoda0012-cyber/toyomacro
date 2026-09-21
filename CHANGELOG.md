@@ -37,8 +37,9 @@ archived on Zenodo for a citable DOI.
   target)" for a 1M x 3-component workload, and `FitparaCodecConfig`
   claimed "30M+ spec/s", with no machine named. The "28M target" is the
   E2E roundtrip rate the package header records for an Apple M3 Max
-  (`voigtfit/__init__.py`), and the decode figure comes from the same
-  block; only it lost the attribution. Measured on that exact workload,
+  (`voigtfit/__init__.py`). That the decode figure came from the same
+  work is an inference, not a record: no machine is named for it
+  anywhere, and no measurement has reproduced 30M. Measured on that exact workload,
   a contended M3 Max gives 20.1-20.8M spec/s by direct call and 16.4M
   under pytest; two 4-vCPU virtualised Xeons give 4.7-6.7M and a
   Ryzen 9 8940HX 3.4M under WSL2, 4.9M natively -- a span of six times
@@ -47,7 +48,8 @@ archived on Zenodo for a citable DOI.
   any one of them, and the docstring now says which machine the claim
   came from and what has since been measured where. The size and
   accuracy figures in the same block are deterministic, reproduce, and
-  are kept (108.0 MB, 17.6 MB, 6.15x, 0.130% against a stated 0.14%
+  are kept (108.0 MB, 17.6 MB, 6.15x, and 0.130% on amplitude -- the
+  worst of the nine parameters -- against a stated 0.14%
   bound). No behaviour changes.
 
 - **`toyomacro.voigtfit` is importable on Windows.** `voigtfit.memory`

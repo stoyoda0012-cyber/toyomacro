@@ -63,14 +63,17 @@ def _median_time(fn, repeats=5, warmup=3):
 # and those track each other only loosely across microarchitectures --
 # the bound is deliberately far above anything measured, not tight.
 #
-# Measured ratios, 14 rounds of median-of-5 across two sessions on
-# 4-vCPU virtualised Xeons (@2.80GHz and @2.10GHz), hypervisor steal
-# 0.00-0.01%: 9.4-12.2 (fitpara), 6.9-8.4 (array). Those are one host
-# class in two sessions, not a cross-machine range -- an earlier draft
-# recorded 10.3-13.2 and 6.7-7.4 from a single session and presented
-# them as the range; the array figure has since been observed at 8.4.
-# Nothing is established on other hardware: the CI matrix (ubuntu +
-# macOS + Windows x 3.11/3.12) passes, but records no value.
+# Measured ratios across three sessions on 4-vCPU virtualised Xeons
+# (@2.80GHz and @2.10GHz), hypervisor steal 0.00-0.01%: 8.4-13.3
+# (fitpara), 6.9-8.7 (array). Read those as session extrema of a noisy
+# statistic, not a settled range -- the denominator alone (t_copy) has
+# varied 13-22 ms between rounds, and each new session has widened them.
+# They are also one host
+# class, not a cross-machine span. A regression must be roughly 3.7x
+# (fitpara) or 4.9x (array) before the bound fires, so this catches a
+# kernel that stopped being vectorised, not a 20% slowdown. Nothing is
+# established on other hardware: the CI matrix (ubuntu + macOS +
+# Windows x 3.11/3.12) passes, but records no value.
 MAX_DECODE_OVER_COPY = 40
 
 
