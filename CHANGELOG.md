@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.3.0] - 2026-09-21
 
+Archived on Zenodo:
+[10.5281/zenodo.22867148](https://doi.org/10.5281/zenodo.22867148).
+
 ### Known issues
 
 - **`fermi_edge_identifiability`: tau's bound is withheld in one field
