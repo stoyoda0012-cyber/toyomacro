@@ -31,12 +31,13 @@ Usage:
 """
 
 import gc
-import resource
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+
+from toyomacro.voigtfit.memory import get_peak_rss_bytes
 
 try:
     import mlx.core as mx
@@ -96,8 +97,7 @@ class DetailedTimings:
 
 
 def _get_rss_mb() -> float:
-    ru = resource.getrusage(resource.RUSAGE_SELF)
-    return ru.ru_maxrss / (1024 * 1024)
+    return get_peak_rss_bytes() / (1024 * 1024)
 
 
 def run_bottleneck_analysis(

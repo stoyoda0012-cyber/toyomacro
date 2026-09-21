@@ -43,8 +43,6 @@ Usage:
 
 import argparse
 import gc
-import resource
-import sys
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +60,7 @@ except ImportError:
     HAS_MLX = False
 
 from toyomacro.voigtfit.fisher_hilbert_encoder import TwoPeakSplitEncoder
+from toyomacro.voigtfit.memory import get_peak_rss_bytes
 from toyomacro.voigtfit.multipeak_config import ComponentConfig, MultiPeakConfig
 from toyomacro.voigtfit.multipeak_solver import (
     build_multipeak_dictionaries,
@@ -94,11 +93,8 @@ REC_PATH = OUTPUT_DIR / "rec_params.npy"    # (N, 6) float32 memmap
 
 
 def _get_rss_gb() -> float:
-    """Current RSS in GB (macOS/Linux)."""
-    ru = resource.getrusage(resource.RUSAGE_SELF)
-    if sys.platform == 'darwin':
-        return ru.ru_maxrss / (1024 ** 3)
-    return ru.ru_maxrss * 1024 / (1024 ** 3)
+    """Peak RSS in GiB."""
+    return get_peak_rss_bytes() / (1024 ** 3)
 
 
 def _psnr(gt: np.ndarray, rec: np.ndarray) -> float:
