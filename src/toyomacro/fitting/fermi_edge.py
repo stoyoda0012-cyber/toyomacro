@@ -350,7 +350,10 @@ class FermiEdgeResult:
     **Empty when ``intensity`` is not non-negative integers**, since
     nothing else here can tell raw counts from counts per second or from
     a spectrum that has had a background subtracted, and the sandwich is
-    wrong by sqrt(dwell) on the wrong scale. Also empty if the
+    wrong by sqrt(dwell) on the wrong scale. That check is necessary and
+    not sufficient -- counts scaled by a whole number still pass it, and
+    nothing available here could catch that -- so the condition is
+    yours to meet, not the function's to enforce. Also empty if the
     covariance was singular.
 
     The ``*_err`` fields are what a least-squares solver reports: the
@@ -623,12 +626,12 @@ def fit_fermi_edge(
     poisson_err: dict[str, float] = {}
     counts_like = bool(np.all(Y >= 0.0) and np.all(Y == np.rint(Y)))
     try:
-        if not counts_like:
-            raise np.linalg.LinAlgError
-        a_inv = np.linalg.inv(result.jac.T @ result.jac)
-        middle = result.jac.T @ (result.jac * (W * np.maximum(fit_curve, 0.0))[:, np.newaxis])
-        sandwich = np.sqrt(np.clip(np.diag(a_inv @ middle @ a_inv), 0.0, np.inf))
-        poisson_err = {_PUBLIC_NAME.get(n, n): float(v) for n, v in zip(names, sandwich)}
+        a_inv = np.linalg.inv(result.jac.T @ result.jac) if counts_like else None
+        if a_inv is not None:
+            middle = result.jac.T @ (result.jac
+                                     * (W * np.maximum(fit_curve, 0.0))[:, np.newaxis])
+            sandwich = np.sqrt(np.clip(np.diag(a_inv @ middle @ a_inv), 0.0, np.inf))
+            poisson_err = {_PUBLIC_NAME.get(n, n): float(v) for n, v in zip(names, sandwich)}
     except np.linalg.LinAlgError:
         pass
 
@@ -696,20 +699,33 @@ class DosFormComparison:
     0.01 eV, 2000 counts per channel on the plateau over a background of
     50, with v + (pi^2/3)(kT)^2 held at (0.1 eV)^2, swept over kT/sigma
     from 0.1 to 3 and DOS changes across the window from 0.02 to 0.9:
-    over the 66 cells where both fits succeed and the bias exceeds
-    0.1 meV, **the spread recovers 54 to 103% of the true bias**. It
-    works because the bias is antisymmetric in which form is wrong, and
-    it works less well the further that antisymmetry goes -- the
-    recovery falls smoothly with both kT/sigma and the DOS slope, and at
-    its worst corner, kT/sigma around 2 to 2.5 with a steep DOS, it
-    understates the systematic by a factor of 1.9. **Read the spread as
-    a lower bound on the systematic, not an estimate of it.**
+    **the spread recovers 53 to 112% of the true bias**. It exceeds 1
+    only where the bias is a few hundredths of an error bar; where the
+    bias is large enough to matter it runs 0.53 to about 1.03. It works
+    because the bias is antisymmetric in which form is wrong, and less
+    well the further that antisymmetry goes -- the recovery falls
+    smoothly with both kT/sigma and the DOS slope, and at its worst
+    corner, kT/sigma around 2.5 to 2.75 with a steep DOS, it understates
+    the systematic by a factor of 1.9. **Read the spread as a lower
+    bound on the systematic, not an estimate of it.**
 
-    Two limits on that. It is one model family over one range of
-    conditions, not a general result. And the range that could be tested
-    at all is capped: a linear DOS through E_F reaches zero at the
-    window edge once its change across the window reaches 1, which holds
-    the slope to half of what the identifiability scan uses.
+    Three limits on that. It is one model family over one range of
+    conditions, not a general result. The range that could be tested at
+    all is capped: a linear DOS through E_F reaches zero at the window
+    edge once its change across the window reaches 1, which holds the
+    slope to half of what the identifiability scan uses.
+
+    And the figures above exclude the cells where fitting the *other*
+    truth fails -- the counterfactual in which the true DOS is the one
+    this fit does not assume. **A caller cannot check that**: it needs a
+    spectrum they do not have, and in the nine such cells measured
+    (kT/sigma from 2.5 up, with a steep DOS) ``success`` here was True
+    every time while that counterfactual fit collapsed onto the
+    resolution's lower bound. Those are exactly the conditions where the
+    systematic is largest. So in that corner the spread is a lower bound
+    whose distance from the truth is not quantified here, and nothing in
+    this object says so. Treat a large kT/sigma with a steeply varying
+    DOS as a condition to avoid rather than one to correct for.
     """
 
     forms: tuple[str, ...]

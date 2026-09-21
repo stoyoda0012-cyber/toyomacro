@@ -970,3 +970,31 @@ def test_a_fixed_temperature_report_says_where_its_width_block_came_from():
     assert prior.width.temperature_mode == "temperature_prior"
     assert prior.separation in ("separable", "not_separable")
     assert prior.width.sd_share < free.width.sd_share
+
+
+def test_the_scan_says_which_of_its_arrays_depend_on_the_temperature_mode(scan):
+    """Five of the scan's arrays are identical for 'free' and
+    'fixed_temperature' -- they all come from ``report.width``, which
+    under ``assumed`` is the free matrix's (see
+    ``assess_edge_identifiability``). Plotted against the mode, two
+    curves lie on top of each other by construction. The docstring names
+    both lists; an audit found it naming four of the five that differ, so
+    both lists are pinned here."""
+    _, out = scan
+    modes = list(out["temperature_modes"])
+    free, fixed = modes.index("free"), modes.index("fixed_temperature")
+    same = ("sd_kappa2", "sd_share", "alignment", "soft_over_stiff",
+            "temperature_sensitivity_relative", "null_space_dim", "n_energy",
+            "total_counts")
+    differ = ("sd_sigma", "separation", "variance_status", "near_boundary_v",
+              "condition_number")
+    for name in same:
+        a, b = out[name][:, :, :, :, :, free, :], out[name][:, :, :, :, :, fixed, :]
+        np.testing.assert_array_equal(np.nan_to_num(a, nan=-999.0),
+                                      np.nan_to_num(b, nan=-999.0), err_msg=name)
+    for name in differ:
+        a, b = out[name][:, :, :, :, :, free, :], out[name][:, :, :, :, :, fixed, :]
+        assert not np.array_equal(np.nan_to_num(a, nan=-999.0),
+                                  np.nan_to_num(b, nan=-999.0)), name
+    assert set(same) | set(differ) == {
+        k for k, v in out.items() if getattr(v, "ndim", 0) == 7}

@@ -70,13 +70,16 @@ archived on Zenodo for a citable DOI.
   in quadrature. How far it can be trusted was measured, not assumed.
   Swept over the whole domain simulated — window ±0.6 eV in 0.01 eV
   steps, 2000 counts per channel over a background of 50, kT/sigma from
-  0.1 to 3, DOS change across the window from 0.02 to 0.9 — on the 66
-  cells where both fits succeed and the bias exceeds 0.1 meV **the
-  spread recovers 54 to 103% of the true bias**, falling smoothly with
-  both kT/sigma and the DOS slope; at its worst, around kT/sigma = 2 to
-  2.5 with a steep DOS, it understates the systematic by a factor of
-  1.9. Read it as a lower bound on the systematic rather than an
-  estimate of it. This is one model family over one range of conditions
+  0.1 to 3, DOS change across the window from 0.02 to 0.9 — **the
+  spread recovers 53 to 112% of the true bias**, exceeding 1 only where
+  the bias is a few hundredths of an error bar and running 0.53 to
+  about 1.03 where it matters, falling smoothly with both kT/sigma and
+  the DOS slope; at its worst, around kT/sigma = 2.5 to 2.75 with a
+  steep DOS, it understates the systematic by a factor of 1.9. Read it
+  as a lower bound on the systematic rather than an estimate of it —
+  and note that in that corner the counterfactual fit those figures
+  rest on is one a caller cannot run, so how much of a lower bound is
+  not quantified there. This is one model family over one range of conditions
   and not a general result. A linear DOS through E_F
   reaches zero at the window edge once its change across the window
   reaches 1, which caps what could be tested at half the slope the
@@ -90,9 +93,9 @@ archived on Zenodo for a citable DOI.
   only if every channel had the same variance; on a Fermi edge the
   Poisson mean runs from the background to the plateau, a factor of 53
   in the case measured, and E_F's sensitivity sits where the mean is
-  above its average. Over 300 simulated realisations at each of three
-  kT/sigma and three seeds with the temperature fixed, `ef_err` came
-  out 9 to 20% smaller than the actual scatter of E_F while
+  above its average. Over nine runs of 400 simulated realisations —
+  three kT/sigma by three seeds — with the temperature fixed, `ef_err`
+  came out 9 to 20% smaller than the actual scatter of E_F while
   `poisson_err['ef']` was within 10% of it; for the resolution the two
   agree with each other and sit within 25% of the scatter. The new field is
   meaningful only when `intensity` is raw counts, is not a Cramer-Rao
@@ -111,6 +114,15 @@ archived on Zenodo for a citable DOI.
   it. Synthetic data, like example 02's.
 
 ### Changed
+
+- **`scan_edge_identifiability`'s sensitivity key is now
+  `temperature_sensitivity_relative`.** It holds the dimensionless
+  `(dsigma/dT)·T/sigma`, while `InstrumentalResolution`'s field of what
+  used to be the same name holds `dsigma/dT` in eV per kelvin — one name
+  for two quantities inside one module, which an audit called a units
+  collision. The report's field keeps its name; only the scan's key
+  moves. Both modules are experimental and neither has shipped in a
+  release.
 
 - **`CITATION.cff` is titled "toyomacro: X-ray photoelectron spectroscopy
   analysis toolkit".** That is the title of the Zenodo records of v0.1.0

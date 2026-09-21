@@ -249,11 +249,12 @@ per channel:
 | 50 meV | 300 K | 1.22 | 1.87 | 2.34 | −303 µeV/K | 14% |
 | 30 meV | 30 K | 0.20 | 0.41 | 0.55 | −57 µeV/K | 4.5% |
 
-(standard deviations in meV). Only the last row is labelled
-`undersampled` on this 10 meV grid: √κ₂ is 13.6 meV there, below two
-channels. The 30 meV row above it is not — at 300 K the thermal width
-alone keeps √κ₂ at 51 meV. (An audit caught this sentence claiming two
-rows.)
+(standard deviations in meV). Only the last row — 30 meV at 30 K — is
+labelled `undersampled` on this 10 meV grid: √κ₂ is 13.6 meV there,
+below two channels. The 50 meV row above it is not, because at 300 K
+the thermal width alone keeps √κ₂ at 51.5 meV. (Two audits caught this
+sentence: the first claiming two rows were undersampled, the second
+naming the wrong row as the one above.)
 
 ## 7. Resampling: a Monte Carlo and a bootstrap are the same machinery
 
@@ -290,9 +291,13 @@ draws each (600 trials, binomial standard error 0.89% at the null):
 | parametric | 94.33 | 95.00 | 95.17 | 96.50 | 95.83 | 94.50 |
 | nonparametric | 94.67 | 94.83 | 95.67 | 96.00 | 96.00 | 94.17 |
 
-All twelve are within 1.7 standard errors of nominal, six above and six
-below. The bootstrap standard deviation is 0.97 to 1.06 of the Monte
-Carlo one. There is no deficit here to explain.
+All twelve are within two standard errors of nominal, six above, five
+below and one exactly at 95.00; the bootstrap standard deviation is
+0.97 to 1.06 of the Monte Carlo one. An independent re-measurement on
+its own seeds and its own harness got 94.50 to 96.67, three of twelve
+below 95%. There is no deficit here to explain. (How far inside two
+standard errors any one run lands is itself a property of the seed, so
+that is a description of these runs and not a bound.)
 
 **There appeared to be one, and it was ours.** The first version of this
 section reported 92.5–95.1% and argued that the shortfall was a
@@ -301,7 +306,7 @@ interval needed to establish it. An audit found the cause instead:
 numpy's default quantile method interpolates at index `q(B−1)`, which
 at q = 0.025 and B = 200 draws reads the 5.975-th of 200 order
 statistics — whose expected position in the distribution is 5.975/201 =
-2.97%, not 2.5%. A "95%" interval built that way is **nominally 94.06%
+2.97%, not 2.5%. A "95%" interval built that way is **nominally 94.05%
 at B = 200** and 94.81% at B = 1000. The measured shortfall was the
 convention, not the bootstrap.
 
@@ -309,7 +314,7 @@ Two things went wrong at once, and the second is the instructive one.
 The experiment that was supposed to rule the draw count out — holding
 the trials fixed and raising B from 200 to 1000 — measured a rise of
 about 0.8 points and recorded it as "moves nothing downward", when it
-was the nominal level climbing from 94.06% toward 95% exactly as the
+was the nominal level climbing from 94.05% toward 95% exactly as the
 convention predicts. **A test that can only fail one way cannot rule
 anything out.** The prediction was available in closed form and was
 never computed.
@@ -327,7 +332,7 @@ channels empty the two agree within 3% on every parameter that is
 determined.
 
 Those three sets were measured before the quantile convention above was
-corrected, on an interval nominally 94.06% rather than 95%. They are
+corrected, on an interval nominally 94.05% rather than 95%. They are
 recorded and not judged, so they were not re-measured; read each
 coverage as about a point low. It does not touch what they are for —
 that coverage at a boundary is bought with width, and that the two
@@ -425,12 +430,17 @@ smooth truth and a smooth model on a kinked truth give −2.068/+2.018,
 of *one* spectrum stands in for a bias nobody can measure without
 knowing the true DOS — but not uniformly well. Swept over the whole
 domain (kT/σ from 0.1 to 3, DOS change across the window from 0.02 to
-0.9), on the 66 cells where both fits succeed and the bias exceeds
-0.1 meV, **the spread recovers 54 to 103% of the true bias**. The
-recovery falls smoothly with both kT/σ and the DOS slope; its worst
-corner, kT/σ around 2 to 2.5 with a steep DOS, understates the
-systematic by a factor of 1.9. **So the spread is a lower bound on the
-systematic, not an estimate of it.**
+0.9), **the spread recovers 53 to 112% of the true bias**. It exceeds 1
+only where the bias is a few hundredths of an error bar and the ratio
+is two small numbers; where the bias is large enough to matter it runs
+0.53 to about 1.03. The recovery falls smoothly with both kT/σ and the
+DOS slope, and its worst corner — kT/σ around 2.5 to 2.75 with a steep
+DOS — understates the systematic by a factor of 1.9. **So the spread is
+a lower bound on the systematic, not an estimate of it.**
+
+Two audits' sweeps agree on the shape and differ at the third digit
+depending on where their grids land; the lower end is 0.529 on the
+finer of the two.
 
 An audit found this quoted as 63–110% from six cells that happened to
 skip that corner, which is the "example as population" error this
@@ -457,10 +467,17 @@ different edge. Its outputs are unit-free by construction and a test
 asserts that describing the same spectrum in eV or meV changes nothing.
 
 Two things the scan is not. It is not a recommendation: no cell is
-labelled good. And its `temperature_sensitivity` is the dimensionless
-`(dσ/dT)·T/σ`, while the report's field of the same name is dσ/dT in
-eV/K — the same quantity in two conventions, which is a wart worth
-knowing about.
+labelled good. And its sensitivity key is the dimensionless
+`(dσ/dT)·T/σ`, while the report's field is dσ/dT in eV/K — the same
+quantity in two conventions. They used to share the name
+`temperature_sensitivity`, which an audit called a units collision
+inside one module; the scan's is now
+`temperature_sensitivity_relative`.
+
+Five of the scan's arrays do not depend on `temperature_mode` at all
+(§5: under `assumed` the width block is the free matrix's), and its
+docstring names both lists so that two identical curves on a plot are
+recognisable as identical by construction.
 
 ## 10. Scope, and what is open
 

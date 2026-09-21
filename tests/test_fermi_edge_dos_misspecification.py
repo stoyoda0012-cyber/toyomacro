@@ -332,28 +332,54 @@ def test_refitting_with_both_dos_forms_measures_the_bias(ratio, delta, kinked_on
     assert comparison.fits["occupied"].resolution == values["occupied"]
 
 
-@pytest.mark.parametrize("delta", [0.6, 0.75, 0.9])
-def test_the_strongest_cells_report_a_solver_bound_and_not_a_bias(delta):
+@pytest.mark.parametrize(
+    "ratio, delta", [(2.5, 0.75), (2.5, 0.9), (2.75, 0.6), (2.75, 0.9),
+                     (3.0, 0.6), (3.0, 0.75), (3.0, 0.9)])
+def test_the_strongest_cells_report_a_solver_bound_and_not_a_bias(ratio, delta):
     """An audit found one of the earlier anchors was not a bias at all.
 
-    At kT/sigma = 3 with a DOS change of 0.6 or more across the window,
-    the fitted resolution saturates at 0.4247 meV -- exactly the
-    ``fwhm_g`` lower bound of 1 meV divided by 2.3548 -- against a true
-    18.075 meV. The number that looked like a bias of -17.650 meV is
+    Past a corner of the domain the fitted resolution saturates at
+    0.4247 meV -- exactly the ``fwhm_g`` lower bound of 1 meV divided by
+    2.3548 -- however large the misspecification gets. At kT/sigma = 3
+    the number that looked like a bias of -17.650 meV is
     ``sigma_true - bound``, and it is *identical* at 0.6, 0.75 and 0.9
-    while the misspecification keeps growing. Quoting it as a bias
-    quotes the position of a solver bound.
+    while the DOS keeps steepening. Quoting it as a bias quotes the
+    position of a solver bound.
 
     What is real there is the collapse itself, and that the fit says so:
-    ``success`` is False and ``message`` names the parameter. That is
-    why the parametrisation above stops short of this corner."""
-    sigma, temperature = conditions(3.0)
+    ``success`` is False and ``message`` names the parameter. A second
+    audit found the corner wider than the one cell first tested, so it
+    is parametrised over it here."""
+    sigma, temperature = conditions(ratio)
     fit = pseudo_true(truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "both_sides", delta),
                       sigma, temperature)
     assert not fit.success
     assert "bound" in fit.message and "fwhm_g" in fit.message
-    assert fit.resolution / FWHM == pytest.approx(1e-3 / FWHM, rel=1e-9)
-    assert sigma == pytest.approx(0.018075, abs=1e-6)
+    assert fit.resolution == pytest.approx(1e-3, rel=1e-9)
+
+
+def test_the_comparison_cannot_warn_in_the_corner_where_it_is_weakest():
+    """The limit a caller cannot see, and the reason the docstring tells
+    them to avoid the corner rather than correct for it.
+
+    The recovery figures rest on a *counterfactual*: fitting the kinked
+    model to a truth that is smooth. A caller has one spectrum and fits
+    it both ways; both of those succeed. In the nine cells where the
+    counterfactual fails -- kT/sigma from 2.5 up with a steep DOS, where
+    the systematic is largest -- ``DosFormComparison.success`` is True
+    every time and a spread is handed over with no warning attached."""
+    for ratio, delta in ((2.5, 0.9), (2.75, 0.75), (3.0, 0.6)):
+        sigma, temperature = conditions(ratio)
+        counterfactual = pseudo_true(
+            truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "both_sides", delta),
+            sigma, temperature)
+        comparison = compare_dos_forms(
+            ENERGY, truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", delta),
+            convention="BE", dos="linear", background="constant",
+            temperature=temperature, resolution=FWHM * sigma, ef_init=0.0)
+        assert not counterfactual.success          # the fit whose bias is being stood in for
+        assert comparison.success                  # the fit the caller actually runs
+        assert comparison.spread["resolution"] > 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -373,8 +399,10 @@ def test_the_sandwich_is_the_right_scale_and_the_reported_ef_error_is_not():
     specified cells of 200 realisations (three kT/sigma x three DOS
     slopes, temperature fixed) the E_F pull sd runs 1.15 to 1.29 -- the
     reported error is 13 to 22% smaller than the scatter it describes --
-    while the sandwich gives 0.93 to 1.08. For sigma the reported error is
-    within 20% either way (pull sd 0.76 to 1.06). The mechanism is pinned
+    while the sandwich gives 0.93 to 1.08. For sigma the reported error
+    is within 25% either way (pull sd 0.76 to 1.06 over these nine
+    cells, and down to 0.81 on a run an audit took at kT/sigma = 3,
+    where a sixth of the fits are rejected). The mechanism is pinned
     separately, below."""
     sigma, temperature = conditions(1.0)
     mean = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", 0.3)
@@ -426,11 +454,13 @@ def test_why_the_reported_ef_error_is_small(ratio):
 @pytest.mark.parametrize("ratio", [0.1, 1.0, 3.0])
 def test_the_poisson_error_field_describes_the_scatter(ratio):
     """``FermiEdgeResult.poisson_err`` against 150 realisations, temperature
-    fixed. Over 300 realisations at each of the three kT/sigma the scatter
-    is 1.27, 1.22 and 1.09 times ``ef_err`` -- the reported error is 8 to
-    21% small -- and 1.04, 1.00 and 0.88 times ``poisson_err['ef']``. For
-    the resolution the two are within 20% of the scatter and of each
-    other. Fewer realisations here, so the band is wider."""
+    fixed. Over nine runs of 400 realisations (three kT/sigma by three
+    seeds) the scatter is 1.10 to 1.26 times ``ef_err`` -- the reported
+    error is 9 to 20% small -- and within 10% of ``poisson_err['ef']``. For the
+    resolution the two are within 25% of the scatter and of each other,
+    the worst of it at kT/sigma = 3 where a sixth of the fits are
+    rejected and the survivors are a selected subset. Fewer realisations
+    here, so the band is wider."""
     sigma, temperature = conditions(ratio)
     mean = truth(ENERGY, 0.0, AMPLITUDE, sigma, temperature, "occupied", 0.3)
     rng = np.random.default_rng(23)

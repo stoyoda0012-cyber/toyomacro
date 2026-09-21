@@ -1248,9 +1248,10 @@ def scan_edge_identifiability(grid: EdgeScanGrid) -> dict[str, np.ndarray]:
     from the matrix that estimates both widths (see
     ``assess_edge_identifiability``). Plot them against the temperature
     mode and two of the curves will lie on top of each other, by
-    construction and not by accident. Only ``sd_sigma``, ``separation``,
-    ``condition_number`` and ``near_boundary_v`` differ between those two
-    modes.
+    construction and not by accident. The five that do differ between
+    those two modes are ``sd_sigma``, ``separation``,
+    ``variance_status``, ``near_boundary_v`` and ``condition_number``;
+    a test pins both lists.
 
     Returns a dict of arrays of shape ``(len(ratios), len(half_widths),
     len(levels), len(slopes), len(backgrounds), len(temperature_modes),

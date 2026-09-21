@@ -494,9 +494,14 @@ def test_the_poisson_error_is_only_offered_for_counts():
     counts. Nothing in a float array distinguishes counts from counts per
     second or from a background-subtracted spectrum, and on the wrong
     scale the field is wrong by sqrt(dwell) -- a larger error than the
-    8 to 21% it exists to remove. So it is offered only when every
+    9 to 20% it exists to remove. So it is offered only when every
     intensity is a non-negative integer, and is empty otherwise. The
-    `*_err` fields, which make no such assumption, are unaffected."""
+    `*_err` fields, which make no such assumption, are unaffected.
+
+    The check is necessary, not sufficient: an audit noted that counts
+    scaled by an integer factor still pass it. Nothing available here
+    can tell those apart, which is why the docstring states the
+    condition rather than promising to enforce it."""
     counts = _noisy(21)
     assert _fit(counts).poisson_err                       # integers: offered
     assert _fit(counts / 3.0).poisson_err == {}           # counts per second: withheld

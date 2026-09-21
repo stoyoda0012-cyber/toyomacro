@@ -253,7 +253,7 @@ class BootstrapResult:
         at index ``q(B-1)``, which at q = 0.025 and B = 200 draws reads
         the 5.975-th of 200 order statistics -- whose expected position
         in the distribution is 5.975/201 = 2.97%, not 2.5%. A two-sided
-        "95%" interval built that way is nominally 94.06% at B = 200 and
+        "95%" interval built that way is nominally 94.05% at B = 200 and
         94.81% at B = 1000, so it under-covers by an amount that shrinks
         with B and is easily mistaken for a property of the bootstrap.
         Measured on a nested check, the convention alone was worth about

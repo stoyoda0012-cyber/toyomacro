@@ -102,7 +102,7 @@ def test_the_bound_is_not_the_spread_at_the_boundary(record_property):
     96.4% either way.
 
     (Those three sets were measured before the quantile convention was
-    corrected, with an interval nominally 94.06% rather than 95% at 200
+    corrected, with an interval nominally 94.05% rather than 95% at 200
     draws. They are recorded and not judged, so they were not
     re-measured; read each as about a point low.)"""
     edge = fi.FermiEdge(ef=0.0, amplitude=1000.0, sigma=1e-4, temperature=300.0, dos_c1=0.3)
@@ -131,7 +131,7 @@ def test_where_the_width_cannot_be_split_the_distribution_is_recorded(record_pro
     and a third to a half of the intervals begin at the bound.
 
     (Those three sets were measured before the quantile convention was
-    corrected, with an interval nominally 94.06% rather than 95% at 200
+    corrected, with an interval nominally 94.05% rather than 95% at 200
     draws. They are recorded and not judged, so they were not
     re-measured; read each as about a point low.)"""
     edge = fi.FermiEdge(ef=0.0, amplitude=1000.0, sigma=2.0 * fi.KB_EV * 300.0,
@@ -198,7 +198,7 @@ def _nested(edge, n_mc, n_boot, *, exposure=1.0, kind="parametric", seed=41, max
     est = np.where(out.converged.reshape(n_mc, n_boot)[:, :, None],
                    out.params.reshape(n_mc, n_boot, -1), np.nan)
     # 'weibull' puts order statistic k at k/(n_boot+1), so the interval is
-    # nominally 95% at any n_boot; numpy's default 'linear' is 94.06% at 200
+    # nominally 95% at any n_boot; numpy's default 'linear' is 94.05% at 200
     # draws and 94.81% at 1000, which reads as a bootstrap defect and is not.
     lo = np.nanquantile(est, 0.025, axis=1, method="weibull")
     hi = np.nanquantile(est, 0.975, axis=1, method="weibull")
@@ -235,7 +235,7 @@ def test_the_bootstrap_interval_covers_the_truth_at_an_interior_point(kind):
     the real cause: ``np.quantile``'s default method interpolates at
     index ``q(B-1)``, which at q = 0.025 and B = 200 reads the 5.975-th
     of 200 order statistics, whose expected position is 5.975/201 =
-    2.97%. That interval is nominally 94.06%, not 95%. The experiment
+    2.97%. That interval is nominally 94.05%, not 95%. The experiment
     meant to rule the draw count out -- holding the trials fixed and
     raising B to 1000 -- measured the nominal level climbing toward 95%
     and recorded it as "moves nothing downward"; it could only have
