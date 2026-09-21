@@ -1,15 +1,13 @@
 # CUDA backend proof-of-concept (MLX on Linux / WSL2)
 
-**Status:** **PASSED** — first run 2026-07-17 (RTX 5070 Laptop). See
-[Results](#results-2026-07-17--rtx-5070-laptop) below. Two setup fixes were
-required that this recipe did not anticipate (CUDA headers, TF32).
+**Status:** **PASSED** — first run 2026-07-17 on `3aedcf3`, re-verified
+2026-09-21 on `3a13de5`, both on the same RTX 5070 Laptop. See
+[Results](#results-2026-07-17--rtx-5070-laptop) and
+[Re-verification](#re-verification-2026-09-21--rtx-5070-laptop) below.
+Two setup fixes were required that this recipe did not anticipate
+(CUDA headers, TF32); both still apply.
 **Scope:** correctness validation only. Performance work and any public
 CUDA support claim come later, if the PoC passes.
-**A re-verification is owed** — the validated tree predates v0.2.0 and
-the MLX dispatch changes since, and no CUDA run has covered them. The
-form to fill in is
-[Re-verification frame](#re-verification-frame-prepared-2026-09-21--not-yet-run)
-at the end of this document.
 
 ## Purpose
 
@@ -166,6 +164,11 @@ committed record.
 tolerances. Every remaining failure is a speed assertion, which the
 pass/fail criteria explicitly exclude. No missing-op was hit, so no
 `stream=mx.cpu` workaround was needed.
+
+**Tree:** `3aedcf3`. The run itself recorded no SHA — this is
+reconstructed, and the reasoning is in
+[Correction](#correction-the-2026-07-17-poc-tree-is-3aedcf3-and-it-is-in-this-history)
+at the end of this document. Record the SHA at the time from now on.
 
 ### Environment
 
@@ -556,110 +559,167 @@ gate is the expected artifact. Until then, treat a `decode_speed`
 failure on a new machine as uninformative — as the Step 2 criteria
 already do.
 
-## Re-verification frame (prepared 2026-09-21 — NOT YET RUN)
+## Re-verification (2026-09-21) — RTX 5070 Laptop
 
-**Nothing in this section is a result.** It is the form a second CUDA run
-fills in, prepared so that the run itself is mechanical rather than a
-re-derivation. When it has been run, retitle this section
-`## Re-verification (<date>) — <machine>` and delete this notice.
+**Verdict: PASS.** The parity suite passes on CUDA within existing
+tolerances once TF32 is disabled. Every remaining failure is a speed
+assertion, which the pass/fail criteria explicitly exclude. No
+missing-op failure appeared, so no `stream=mx.cpu` workaround was
+needed — the same outcome as 2026-07-17, reached on a tree, a driver
+and a CUDA stack that have all moved since.
 
-### Why a second run is owed
-
-The 2026-07-17 PoC validated a tree that no longer exists. Since the
-earliest commit in this repository's visible history (`97f444d`,
-2026-07-18 — one day *after* the PoC), `src/toyomacro/voigtfit/` has
-changed by 81 files, +7,832 / −4,265 lines across 23 commits. Most of
-that is the `identifiability` work, which never reaches an MLX kernel.
-Three changes do land on what the PoC certified:
-
-| change | what the PoC used it for |
-|---|---|
-| `d989712 fix(multipeak): honor FastFitConfig.use_mlx on the multi-component path` | `test_multipeak_solver.py` — alternating projection, `requires_mlx` parity; also the path carrying the batch > 65,535 crash |
-| `pipeline.py` (+41 / −8) | `test_pipeline_mlx.py` — Stage-1 weight-matrix pipeline, the matmul kernel |
-| `_mlx_support.py` (+25 / −13) | Step 1, the capability probe itself |
-
-Not one of those has executed a parity assertion on CUDA. CI is headless,
-so the `requires_mlx` blocks skip there, and the macOS job covers Metal
-only. **CUDA has had no coverage since 2026-07-17**, and v0.2.0 shipped
-in between.
-
-The Windows portability work (`fix(memory)`, PR #15) is *not* a reason to
-re-run. It touches no kernel and no numerical path; its whole risk
-surface is import-time platform behaviour, which CI covers without a GPU.
-It also invalidates no number recorded here: this document records no
-RSS-derived value, `get_rss_gb` feeds only `MemoryProfiler`, and
-`optimal_dict3d_cache_size` sizes from total physical memory, not RSS.
-Merging it first only avoids verifying a tree that is about to move.
-
-### Setup
-
-Unchanged — follow [Reproducing](#reproducing) above. The two
-load-bearing items are still `CUDA_HOME` (the `[cuda13]` extra ships 13
-headers, not the 93 NVRTC needs) and `NVIDIA_TF32_OVERRIDE=0`, or
-`MLX_ENABLE_TF32=0`, measured equivalent.
-
-**Unfixed before you start:** follow-up 7 — batches above 65,535 crash
-`solve_alternating_projection` on CUDA
-([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). The chunking
-was never implemented, so keep batches at or below that.
-
-### To record
+### Environment
 
 | | |
 |---|---|
-| Commit SHA verified | |
-| GPU / driver | |
-| CPU / host / WSL2 kernel | |
-| Python / NumPy / SciPy | |
-| MLX version | |
-| CUDA wheels | |
-| TF32 disabled via | |
+| **Commit SHA verified** | **`3a13de5ee56b5f5e084dee2772081d5955eec87d`** (clean tree) |
+| GPU | NVIDIA GeForce RTX 5070 Laptop (Blackwell, `sm_120`), 8151 MiB |
+| Driver | 610.71 (was 596.13 in 2026-07) |
+| CPU / host | AMD Ryzen 9 8940HX — Windows 11 + WSL2, Ubuntu 24.04, kernel 6.18.33.2-microsoft-standard-WSL2 |
+| Python / NumPy / SciPy | 3.12.3 / 2.3.5 / 1.17.0 |
+| MLX | 0.32.2 (`mlx-cuda-13` 0.32.2), default device `Device(gpu, 0)` |
+| CUDA wheels | cublas 13.8.0.4, nvrtc 13.4.92, cuda-runtime 13.4.92, cuda-cccl 13.3.4.3.1, cudnn 9.26.0.51, cufft 12.4.0.43 |
+| `CUDA_HOME` | `.venv/lib/python3.12/site-packages/nvidia/cu13` — 93 headers present |
+| TF32 disabled via | `NVIDIA_TF32_OVERRIDE=0` |
+
+`src/` is unchanged between the verified `3a13de5` and `02095d8`, main
+at the time of writing: the seven files that differ are CI config,
+`README.md`, `AGENTS.md`, `CHANGELOG.md`, `CITATION.cff`,
+`pyproject.toml` and `uv.lock`. This run therefore covers main's engine
+code as it stands, not only the commit named above.
+
+### Counts
+
+Whole suite, `pytest src/toyomacro/voigtfit/tests -q -rs`; 981 tests
+collected in every run.
 
 | run | passed | failed | skipped | wall |
-|---|---|---|---|---|
-| Step 0 — NumPy baseline (`TOYOMACRO_DISABLE_MLX=1`) | | | | |
-| Step 2 — CUDA, TF32 on (default) | | | | |
-| Step 2 — CUDA, TF32 disabled | | | | |
+|---|--:|--:|--:|--:|
+| Step 0 — NumPy baseline (`TOYOMACRO_DISABLE_MLX=1`) | 920 | 2 | 59 | 177 s |
+| Step 2 — CUDA, TF32 on (default) | 973 | 8 | 0 | 559 s |
+| Step 2 — CUDA, TF32 disabled | 976 | 5 | 0 | 481 s |
 
-### Read these — do not just check that they are green
+Step 1 probe: `Device(gpu, 0)`, `mlx_installed: True`, `mlx_usable:
+True`. The capability probe is one of the changed files and is
+unchanged in behaviour on CUDA.
 
-**1. Did the skips collapse?** The load-bearing number. If the
-`requires_mlx` blocks did not execute, a green Step 2 asserts nothing.
-Measured on a GPU-less machine 2026-09-21 with
-`pytest src/toyomacro/voigtfit/tests` (80 skipped in total):
+### 1. The skips collapsed — completely
 
-| skip reason | count |
-|---|---|
-| `MLX not available` | 67 |
+All 59 skips in the NumPy baseline are MLX-gated, and all 59 executed
+on CUDA. The 2026-07 collapse was 81 → 1; this one is 59 → 0.
+
+| skip reason (Step 0) | count |
+|---|--:|
+| `MLX not available` | 50 |
+| `mx.compile not available` | 2 |
 | `MLX unavailable` | 2 |
 | `MLX not usable (not installed, or the default device failed the probe)` | 2 |
 | `tolerance calibrated for the MLX path (fails on the NumPy backend)` | 1 |
 | `compares the MLX exact-Voigt path against scipy` | 1 |
 | `MLX throughput target not meaningful on CI or CPU fallback` | 1 |
-| **MLX-gated total** | **74** |
+| **total** | **59** |
 
-Those 74 must disappear on a live CUDA device; the other 6 are gated on
-something else. The equivalent collapse in 2026-07 was 81 → 1.
+A green Step 2 therefore asserts something: 53 more tests ran with TF32
+on than in the baseline, and 56 more with it off.
 
-**2. The four TF32 canaries.** These failed with TF32 on and passed with
-it off in 2026-07. They are the near-tie-sensitive paths, and the first
-place a kernel change shows up:
+### 2. The four TF32 canaries behaved exactly as in 2026-07
+
+With TF32 on, these four fail and nothing else correctness-related
+does. With TF32 disabled, all four pass:
 
 - `test_dictionary_solver.py::TestSortedSolver::test_sorted_matches_hybrid`
 - `test_memory.py::TestChunkedParabola::test_chunked_matches_full`
 - `test_gvrt_multipeak_1b.py::TestEndToEndPSNR::test_psnr_targets_met`
 - `test_split_encoder_e2e.py::TestSeparationSweep::test_wide_separation_high_psnr`
 
-**3. `decode_speed` is not a signal here.** Both assertions fail on every
-host measured so far and are pure-CPU codec paths — see
+The canary set is neither larger nor smaller than it was, across a
+driver bump, an MLX bump and 193 commits. That is the finding.
+
+### 3. Every remaining failure is a speed assertion
+
+With TF32 disabled, five fail:
+
+| test | file | asserts |
+|---|---|---|
+| `TestFitparaCodec::test_decode_speed` | `test_compression.py` | ≥ 20M spec/s |
+| `TestArrayLZ4Compression::test_decode_speed` | `test_compression.py` | ≥ 50M spec/s |
+| `TestSpecdataUint16::test_mlx_throughput` | `test_compression.py` | throughput target |
+| `TestThroughput::test_extended_throughput` | `test_extended_svd.py` | extended pipeline within 3× of standard |
+| `TestThroughput::test_fit_throughput_target` | `test_gvrt_multipeak_1b.py` | fit throughput target |
+
+The two `decode_speed` assertions are pure-CPU codec paths that fail on
+every host measured so far — see
 [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-Ignore them.
+`test_extended_throughput` failed only in the TF32-off run and passed
+with TF32 on; it compares two timings against a 3× ratio, so it moves
+with scheduling noise and a slower GEMM. None of the five asserts a
+numerical result.
 
-### Verdict
+### Performance, which is not a criterion
 
-Same criterion as the first run: the PoC passes when the parity suite
-passes within existing tolerances, or every failure is a documented
-missing op with a working `stream=mx.cpu` workaround. Performance is
-explicitly not a criterion. A parity test that passed in 2026-07 and
-fails now is a finding about the three changes listed above, not about
-CUDA.
+The CUDA suite took 559 s (TF32 on) and 481 s (off) against 177 s for
+the NumPy baseline on the same host — 2.7× to 3.2× slower in wall
+clock. The `sm_120` GEMM shortfall recorded in 2026-07 is not fixed by
+driver 610.71 or MLX 0.32.2.
+
+### Follow-up 7 is untested by this run
+
+The suite completed without hitting the batch > 65,535 crash
+([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)), but only
+because its batches stay at or below that size. The chunking is still
+unimplemented and this run is **not** evidence that the upstream bug is
+fixed.
+
+### Two traps that cost 40 minutes here
+
+Both produce a run that looks fine and is not.
+
+- **`$VAR` in a `wsl.exe -- bash -lc '...'` string is expanded by the
+  Windows shell first.** `CUDA_HOME="$PWD/..."` silently became a
+  Windows path that does not exist, i.e. `CUDA_HOME` unset. Most of the
+  suite still passed, and the failure that did appear was in
+  `test_extended_svd.py`, which is exactly where a missing NVRTC header
+  would show up — so the artefact imitated a real finding. Write the
+  script to a file with a quoted heredoc instead, and assert
+  `[ -d "$CUDA_HOME/include" ]` before running anything.
+- **WSL2's `/tmp` did not survive between invocations here.** Logs
+  written there were gone when the run finished. Keep run logs under
+  `$HOME`.
+
+### Correction: the 2026-07-17 PoC tree is `3aedcf3`, and it is in this history
+
+The frame this section replaces asserted that the PoC "validated a tree
+that no longer exists", and measured the delta from `97f444d`
+(2026-07-18) as the earliest visible commit. Both are wrong; they came
+from a shallow clone. The history runs back to `fe2e7ef`
+(2026-07-07) and held 187 commits when this run started.
+
+The tree the PoC ran on is **`3aedcf3`** (2026-07-16,
+`feat(cli): restrict public command surface to import/convert`):
+
+- `0bb1d14`, which recorded the PoC results, is dated 2026-07-17 11:15
+  JST and changes five files, all under `docs/` — no code. Its parent
+  is `3aedcf3`.
+- The WSL2 machine that ran the PoC still has its checkout parked on
+  `main` at `3aedcf3` with a clean tree, alongside the 3.0 GB venv
+  holding mlx 0.32.0 and the 2026-07 CUDA wheels.
+
+Correcting the base changes the numbers, and the conclusion partly. The
+real delta `3aedcf3..3a13de5` is **90 files, +11,807 / −4,264 across
+193 commits** — the frame's figure missed 17 commits and 3,909 lines.
+Those 17 add `exact_k.py`, `model_selection.py`, `rank_diagnostics.py`,
+their tests and a benchmark; every one is a new file and none touches
+an MLX path, so the frame's judgement that they do not matter here
+holds. But the corrected base lists **five** files on the certified
+path, not three:
+
+| file | change since `3aedcf3` |
+|---|--:|
+| `pipeline.py` | 49 |
+| `_mlx_support.py` | 38 |
+| `multipeak_solver.py` (incl. `d989712`) | 21 |
+| `weight_cache.py` | 6 |
+| `dictionary_solver.py` | 2 |
+
+`weight_cache.py` and `dictionary_solver.py` were invisible from the
+wrong base. All five are covered by the runs above.
