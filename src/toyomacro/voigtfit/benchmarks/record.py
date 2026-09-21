@@ -13,9 +13,10 @@ What every record carries
 - **What else the machine was doing.** Load is not noise you can average
   away: a contended host can read well below its own quiet figure while
   the repetitions *within* one invocation still agree closely, because
-  they share the machine state that biases them. ``docs/BENCHMARKS.md``
-  §5 gives the observation this rests on, and says plainly that the
-  contended half of it carries no committed record.
+  they share the machine state that biases them. It can also read the
+  same, or higher, when the load is not competing for the same
+  resource. ``docs/BENCHMARKS.md`` §5 has both cases and says which of
+  them carries a committed record.
 - **The tree**, as a commit and a dirty flag.
 
 What no record carries
@@ -49,7 +50,13 @@ import numpy as np
 
 #: Bumped when a field changes meaning or disappears. Readers should
 #: check it before comparing two records.
-SCHEMA_VERSION = 2
+#:
+#: 3 — the load block gained ``looks_quiet_before``, ``cpu_percent_others``
+#: and ``others_busy_after``, and ``looks_quiet`` changed meaning: it is
+#: now the BEFORE sample's verdict, where in 2 it was the trailing one.
+#: A version-2 record's verdict was computed by a rule that no longer
+#: exists and is not comparable with a version-3 one.
+SCHEMA_VERSION = 3
 
 #: Versions worth recording. Deliberately limited to this package and
 #: its published dependencies -- a record must not disclose what else
@@ -135,7 +142,12 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
 
     ``load_average`` is the 1/5/15-minute POSIX triple, or ``None`` on
     Windows, which has no equivalent. ``cpu_percent`` is whole-machine
-    utilisation over the sampling window. ``top_processes`` names the
+    utilisation over the sampling window: 0-100, and it includes us.
+    ``cpu_percent_others`` is a different quantity on a different scale
+    -- the per-process sum over everything that is *not* this process
+    tree, where 100 means one core, so it can exceed 100 on a
+    multi-core host. The two are not comparable; the second is the one
+    the quality verdict uses. ``top_processes`` names the
     heaviest consumers **by process name only** -- never by path, since
     these records are committed.
 

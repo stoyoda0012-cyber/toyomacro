@@ -518,7 +518,10 @@ def main(argv: list[str] | None = None) -> None:
                  origin=args.origin, host=args.host_label, chunk=args.chunk)
 
     load = report["environment"]["load"]
-    if load.get("looks_quiet") is False:
+    # Gate on the load verdict, not the composite: `looks_quiet` is also
+    # set False by foreign CPU mid-run, and printing a load average as the
+    # evidence for that made the console contradict the record.
+    if load.get("looks_quiet_before", load.get("looks_quiet")) is False:
         # Quote the sample that decided, not the trailing one -- printing a
         # different number from the verdict is how a reader learns to
         # distrust both.

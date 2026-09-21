@@ -80,6 +80,13 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
     # Records only compare if they fitted the same numbers. They may not:
     # the spectra go through scipy.special.wofz, whose last bits depend on
     # the build, so two platforms at the same (n_batch, seed) can differ.
+    schemas = {rec.get("schema_version") for rec in records}
+    if len(schemas) > 1:
+        print(f"!! MIXED SCHEMA VERSIONS {sorted(s for s in schemas if s)}. "
+              "Field meanings differ between them — in particular a v2 "
+              "record's quality verdict was computed by a rule v3 replaced. "
+              "Re-record rather than compare across the boundary.\n")
+
     hashes: dict[str, list[str]] = defaultdict(list)
     for rec in records:
         h = rec.get("problem", {}).get("input_sha256")
