@@ -1,0 +1,340 @@
+{
+ "schema_version": 2,
+ "description": "Cross-platform peak-fitting throughput: one problem, one schema, every backend.",
+ "problem": {
+  "n_energy": 151,
+  "center": 0.0,
+  "sigma": 0.5,
+  "gamma": 0.2,
+  "dE_range_sigma": 0.3,
+  "dsigma_range_sigma": 0.1,
+  "noise_level": 1000.0,
+  "peak_snr": 10.0,
+  "seed": 0,
+  "n_batch": 200000,
+  "n_common_accuracy_subset": 500,
+  "input_sha256": "53b9dda5b901e7daf33eb1bbbeeaa47070e5bb2b476315b3c9e0fcf7a37ee026",
+  "dtype": "float32 spectra",
+  "multipeak_chunk_size": 65535
+ },
+ "results": [
+  {
+   "solver": "projection_kernel",
+   "description": "amplitude-only projection kernel (A = Y @ W, chi2 on a 0.01% sample)",
+   "problem": "random float32 data, 151 channels x 3 components; no parameter recovery",
+   "dtype": "float32",
+   "n_energy": 151,
+   "n_comp": 3,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 4000000,
+   "timings_s": [
+    0.008245,
+    0.008368,
+    0.008201,
+    0.008191,
+    0.008173,
+    0.00815,
+    0.008147,
+    0.008179,
+    0.008988
+   ],
+   "time_median_s": 0.008190792000050351,
+   "rate_median": 488353263.02699554,
+   "rate_min": 445056396.9943717,
+   "rate_max": 490973272.2718587,
+   "aggregation": "median"
+  },
+  {
+   "solver": "amp_only_projection",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amplitude only at nominal (center, sigma)",
+   "setup_s": 0.0021404579999853013,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.000479,
+    0.000473,
+    0.000475,
+    0.000478,
+    0.000454,
+    0.000516,
+    0.00047,
+    0.000452,
+    0.000555
+   ],
+   "time_median_s": 0.0004747909999878175,
+   "rate_median": 421237976.2993227,
+   "rate_min": 360225357.0330483,
+   "rate_max": 442845280.8357425,
+   "aggregation": "median",
+   "mae_amp": 0.029441089055651473,
+   "mae_dE": null,
+   "mae_dsigma": null
+  },
+  {
+   "solver": "taylor_4step",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amp + dE + dsigma via 4-step Taylor residual projection (first-order lineshape expansion; pre-dictionary path)",
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.018168,
+    0.018202,
+    0.018757,
+    0.019014,
+    0.0183,
+    0.018551,
+    0.018491,
+    0.015524,
+    0.015833
+   ],
+   "time_median_s": 0.018300416999863955,
+   "rate_median": 10928712.717392549,
+   "rate_min": 10518657.653008688,
+   "rate_max": 12883312.361339532,
+   "aggregation": "median",
+   "mae_amp": 0.021891158557531223,
+   "mae_dE": 0.013760101054702585,
+   "mae_dsigma": 0.013913019855365524
+  },
+  {
+   "solver": "dict2d_parabola",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amp + dE + dsigma; 2-D dictionary 13x7 (|dE|<=0.3sigma, |dsigma|<=0.1sigma) + parabola refine",
+   "setup_s": 0.004811875000086729,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.024232,
+    0.025689,
+    0.023907,
+    0.024703,
+    0.024696,
+    0.023838,
+    0.024601,
+    0.023476,
+    0.026967
+   ],
+   "time_median_s": 0.024600999999847772,
+   "rate_median": 8129750.823187577,
+   "rate_min": 7416563.8422149075,
+   "rate_max": 8519187.937377265,
+   "aggregation": "median",
+   "mae_amp": 0.022231290140590915,
+   "mae_dE": 0.013351191621674953,
+   "mae_dsigma": 0.01283407997807907
+  },
+  {
+   "solver": "multipeak_2comp",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "2 Voigt components 4 sigma apart, per-component amp + dE + dsigma; alternating projection x3 + parabola, 13x7 grids",
+   "input_sha256": "a14e6a08b733fff627e2a32758a4fd25801b3e6c42e51ea9daa10b0a46eaaed0",
+   "setup_s": 0.008942291999801455,
+   "chunk_size": 65535,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.057876,
+    0.054274,
+    0.054662,
+    0.054491,
+    0.054877,
+    0.054513,
+    0.054938,
+    0.054616,
+    0.054626
+   ],
+   "time_median_s": 0.05462624999995569,
+   "rate_median": 3661243.4498096104,
+   "rate_min": 3455673.8042960316,
+   "rate_max": 3685014.198817936,
+   "aggregation": "median",
+   "mae_amp": 0.028988386614238287,
+   "mae_dE": 0.019581564980794573,
+   "mae_dsigma": 0.01737454821305016
+  },
+  {
+   "solver": "scipy_curve_fit",
+   "problem": "amplitude + dE + dsigma (gamma fixed)",
+   "backend": "scipy curve_fit, bounded trust-region reflective (TRF), single-thread CPU per-spectrum loop",
+   "n_spectra": 500,
+   "setup_s": 0.0,
+   "repeats": 3,
+   "timings_s": [
+    0.634,
+    0.628,
+    0.619
+   ],
+   "aggregation": "median",
+   "throughput_spec_per_s": 796.5645242649977,
+   "mae_amp": 0.021946428478387483,
+   "mae_dE": 0.01308599968456347,
+   "mae_dsigma": 0.012530243647359886
+  },
+  {
+   "solver": "lmfit",
+   "problem": "amplitude + dE + dsigma (gamma fixed)",
+   "backend": "lmfit Model.fit (leastsq with bounds), single-thread CPU per-spectrum loop",
+   "n_spectra": 500,
+   "setup_s": 0.0,
+   "repeats": 3,
+   "timings_s": [
+    0.627,
+    0.641,
+    0.644
+   ],
+   "aggregation": "median",
+   "throughput_spec_per_s": 780.0233924959635,
+   "mae_amp": 0.021946305106439398,
+   "mae_dE": 0.013085977925327284,
+   "mae_dsigma": 0.012530236958096382
+  }
+ ],
+ "numpy_parity": {
+  "n_spectra": 50000,
+  "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
+  "dict2d_parabola": {
+   "note": "the NumPy backend falls back to the dictionary-only solver (no parabola sub-grid refinement), so grid-quantised dE/dsigma differences are expected",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 2.384185791015625e-07,
+    "max": 0.020322084426879883
+   },
+   "abs_diff_dE_eV": {
+    "median": 0.005488263443112373,
+    "p99": 0.01235878374427557,
+    "max": 0.025000005960464478
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 0.002841543173417449,
+    "p99": 0.008222878910601139,
+    "max": 0.01666666567325592
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.17738,
+   "fraction_amp_diff_gt_1e-3": 0.00022,
+   "numpy_rate_spec_per_s": 1832100.2504645905
+  },
+  "taylor_4step": {
+   "note": "same algorithm on both backends",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 3.5762786865234375e-07,
+    "max": 7.152557373046875e-07
+   },
+   "abs_diff_dE_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 2.9802322387695312e-08,
+    "max": 7.450580596923828e-08
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 7.171183824539185e-08,
+    "max": 1.2293457984924316e-07
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.0,
+   "fraction_amp_diff_gt_1e-3": 0.0,
+   "numpy_rate_spec_per_s": 1316824.7404987516
+  }
+ },
+ "environment": {
+  "schema_version": 2,
+  "timestamp_utc": "2026-09-21T09:57:09+00:00",
+  "timestamp_local": "2026-09-21T18:57:09+09:00",
+  "host_label": "darwin-apple-m3-max-16c",
+  "origin": "mac",
+  "os": "Darwin 25.6.0 (macOS 26.6.2)",
+  "machine": "arm64",
+  "cpu": "Apple M3 Max",
+  "logical_cores": 16,
+  "memory_gb": 128.0,
+  "python": "3.12.11",
+  "command": "bench_platform.py --origin mac --records-dir records",
+  "versions": {
+   "toyomacro": "0.2.0",
+   "mlx": "0.31.2",
+   "numpy": "2.3.5",
+   "scipy": "1.17.0",
+   "h5py": "3.15.1",
+   "lmfit": "1.3.4",
+   "numba": null,
+   "psutil": "7.2.2",
+   "hdf5_library": "1.14.6"
+  },
+  "backend": {
+   "backend": "metal",
+   "device_name": "Apple M3 Max",
+   "mlx_version": "0.31.2",
+   "mlx_default_device": "Device(gpu, 0)",
+   "tf32_enabled": null,
+   "TOYOMACRO_DISABLE_MLX": null
+  },
+  "load": {
+   "sampled_over_s": 0.2,
+   "load_average": [
+    3.23095703125,
+    5.07470703125,
+    9.67724609375
+   ],
+   "logical_cores": 16,
+   "cpu_percent": 8.1,
+   "processes_redacted": false,
+   "top_processes": [
+    {
+     "name": "Codex (Service)",
+     "cpu_percent": 8.2
+    },
+    {
+     "name": "python3.12",
+     "cpu_percent": 4.8
+    },
+    {
+     "name": "Claude Helper",
+     "cpu_percent": 4.8
+    },
+    {
+     "name": "Codex (Renderer)",
+     "cpu_percent": 2.9
+    },
+    {
+     "name": "Claude Helper (Renderer)",
+     "cpu_percent": 2.9
+    }
+   ],
+   "looks_quiet": true,
+   "quiet_convention": "load_average[0] < 0.25 * logical_cores"
+  },
+  "steal_percent": null,
+  "thermal": {
+   "raw_lines": [
+    "Note: No thermal warning level has been recorded",
+    "Note: No performance warning level has been recorded",
+    "Note: No CPU power status has been recorded"
+   ],
+   "cpu_speed_limit": null,
+   "throttled": false
+  },
+  "quality": {
+   "verdict": "quiet",
+   "reasons": [],
+   "comparable": true,
+   "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+  },
+  "git": {
+   "git_commit": "02095d8d93cd8843a42ef0a7d06ebf42f7f261c3",
+   "git_tracked_dirty": true,
+   "git_dirty_files": [
+    "M src/toyomacro/voigtfit/benchmarks/README.md",
+    " M tests/README.md"
+   ]
+  }
+ }
+}
