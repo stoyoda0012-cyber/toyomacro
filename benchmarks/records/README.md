@@ -65,8 +65,9 @@ four machines pushing to one repository never conflict.
 
 No filesystem path, no interpreter location, no repository location, no
 sibling project's version. Paths in the recorded command line are
-reduced to bare filenames. `tests/test_benchmark_record.py` asserts
-this; treat a failure there as a repository-wide problem rather than a
+reduced to bare filenames.
+`src/toyomacro/voigtfit/tests/test_benchmark_record.py` asserts this;
+treat a failure there as a repository-wide problem rather than a
 benchmark one.
 
 Process names in the load snapshot **are** recorded, because they are

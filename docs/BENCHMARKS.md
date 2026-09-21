@@ -236,7 +236,7 @@ Records are committed, so the schema deliberately carries no filesystem
 path, no interpreter location, no repository path and no sibling
 project's version; process names in the load snapshot are bare names.
 `record.py` states this as its contract and
-`tests/test_benchmark_record.py` asserts it.
+`src/toyomacro/voigtfit/tests/test_benchmark_record.py` asserts it.
 
 ### When a record disagrees with a published number
 
