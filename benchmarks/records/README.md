@@ -45,9 +45,9 @@ a control that most benchmark suites do not have.
 **Cloud arms need repetition; local arms do not.** "Cloud" is not a
 machine, it is a draw from a distribution of machines. This repository
 has already watched one container change CPU mid-session — a 2.80GHz
-Xeon became a 2.10GHz one, while three tracked files went on saying
-2.80GHz. A single run from each origin cannot separate an origin effect
-from the instance lottery.
+Xeon became a 2.10GHz one, while the tracked document describing it went
+on saying 2.80GHz. A single run from each origin cannot separate an
+origin effect from the instance lottery.
 
 ## Filenames
 

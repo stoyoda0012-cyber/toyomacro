@@ -11,10 +11,11 @@ What every record carries
   "MLX was importable". These are different compute paths with different
   numerical behaviour, and on CUDA the TF32 setting changes the answer.
 - **What else the machine was doing.** Load is not noise you can average
-  away: on a contended host the same kernel reads 9-13% low while the
-  repetitions *within* one invocation still agree to 3%, because they
-  share the machine state that biases them. See
-  ``docs/BENCHMARKS.md`` §5.
+  away: a contended host can read well below its own quiet figure while
+  the repetitions *within* one invocation still agree closely, because
+  they share the machine state that biases them. ``docs/BENCHMARKS.md``
+  §5 gives the observation this rests on, and says plainly that the
+  contended half of it carries no committed record.
 - **The tree**, as a commit and a dirty flag.
 
 What no record carries
@@ -60,9 +61,21 @@ _TRACKED_DISTRIBUTIONS = (
 
 def _run(cmd: list[str], cwd: Path | None = None, timeout: float = 10) -> str:
     """Run a command for its stdout, returning '' for any failure."""
+    return _run_raw(cmd, cwd, timeout).strip()
+
+
+def _run_raw(cmd: list[str], cwd: Path | None = None,
+             timeout: float = 10) -> str:
+    """As ``_run`` but without stripping.
+
+    ``git status --porcelain`` puts the status in two fixed columns, so an
+    unstaged modification begins with a space. Stripping the whole stdout
+    eats it on the first line only, turning " M file" into "M  file" --
+    which reads as a *staged* change, and shifts the filename.
+    """
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout, cwd=cwd).stdout.strip()
+                              timeout=timeout, cwd=cwd).stdout
     except Exception:
         return ""
 
@@ -113,10 +126,11 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5) -> dict:
     heaviest consumers **by process name only** -- never by path, since
     these records are committed.
 
-    ``looks_quiet`` applies one stated convention: the 1-minute load
-    average is below a quarter of the logical core count. It is a hint
-    for the reader, not a gate; a benchmark that wants to refuse a noisy
-    host should say so itself.
+    ``looks_quiet`` applies one stated convention: **every** load average
+    -- 1, 5 and 15 minute -- is below a quarter of the logical core
+    count. The convention is asserted, not calibrated: nothing in this
+    repository establishes that a host under it keeps a kernel inside
+    its own reported range. It is a hint for the reader, not a gate.
     """
     snap: dict = {"sampled_over_s": interval}
     try:
@@ -164,8 +178,14 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5) -> dict:
 
     la = snap.get("load_average")
     if la and cores:
-        snap["looks_quiet"] = la[0] < 0.25 * cores
-        snap["quiet_convention"] = "load_average[0] < 0.25 * logical_cores"
+        # All three averages, not just the 1-minute one. A benchmark that
+        # runs for minutes is covered better by the 5- and 15-minute
+        # figures, and grading on the shortest window let a host whose
+        # 15-minute load was 60% of the machine record itself as quiet.
+        snap["looks_quiet"] = all(v < 0.25 * cores for v in la)
+        snap["quiet_convention"] = (
+            "every load average (1/5/15 min) < 0.25 * logical_cores; "
+            "a convention, not a calibrated threshold")
     else:
         snap["looks_quiet"] = None
         snap["quiet_convention"] = None
@@ -350,19 +370,33 @@ def git_state() -> dict:
     than run out of a checkout.
     """
     state: dict = {"git_commit": None, "git_tracked_dirty": None,
-                   "git_dirty_files": None}
+                   "git_dirty_files": None, "harness_tracked_at_commit": None,
+                   "untracked_files_present": None}
     try:
         here = Path(__file__).resolve()
         inside = _run(["git", "rev-parse", "--is-inside-work-tree"], here.parent)
         if inside != "true":
             return state
         state["git_commit"] = _run(["git", "rev-parse", "HEAD"], here.parent) or None
-        dirty = _run(["git", "status", "--porcelain", "--untracked-files=no"],
-                     here.parent)
-        state["git_tracked_dirty"] = bool(dirty)
+        # -uno would hide the harness itself when it is not yet committed,
+        # so the dirty list would say "only two READMEs changed" about a
+        # tree carrying three new modules. Ask for untracked files too.
+        dirty = _run_raw(["git", "status", "--porcelain"], here.parent)
+        lines = [ln for ln in dirty.splitlines() if ln.strip()]
+        tracked = [ln for ln in lines if not ln.lstrip().startswith("??")]
+        state["git_tracked_dirty"] = bool(tracked)
+        state["untracked_files_present"] = any(
+            ln.lstrip().startswith("??") for ln in lines)
         # Names only, and capped: a dirty list is a hint about what the
-        # number means, not a diff.
-        state["git_dirty_files"] = dirty.splitlines()[:20] if dirty else []
+        # number means, not a diff. Porcelain status codes are two columns
+        # wide, so the leading space of an unstaged change must survive.
+        state["git_dirty_files"] = lines[:20]
+        # Does the commit actually contain the module that produced this
+        # record? If not, checking it out will not reproduce the run.
+        rel = "src/toyomacro/voigtfit/benchmarks/bench_platform.py"
+        listed = _run(["git", "ls-tree", "--full-tree", "HEAD", "--name-only",
+                       rel], here.parent)
+        state["harness_tracked_at_commit"] = bool(listed)
     except Exception:
         pass
     return state
@@ -406,23 +440,36 @@ def sanitize_command(argv: list[str]) -> str:
     depend on where that happens.
     """
     def basename(text: str) -> str:
-        return text.replace("\\", "/").rsplit("/", 1)[-1]
+        """Last path component; '<dir>' for a token that ends in a separator.
+
+        A trailing separator would otherwise basename to the empty string
+        and delete the argument, leaving a command that cannot be read.
+        """
+        stripped = text.replace("\\", "/").rstrip("/")
+        if not stripped:
+            return "<root>"
+        return stripped.rsplit("/", 1)[-1] or "<dir>"
 
     out = []
     for token in argv:
-        key, sep, value = token.partition("=")
-        if sep and ("/" in value or "\\" in value):
-            out.append(f"{key}={basename(value)}")
-        elif "/" in token or "\\" in token:
-            out.append(basename(token))
+        # Reduce any token carrying a separator FIRST. Splitting on "="
+        # before that leaked the key half of "--out=/a/b" forms whose
+        # directory itself contained "=", e.g. "/home/me/a=b/rec.json".
+        if "/" in token or "\\" in token:
+            key, sep, value = token.partition("=")
+            if sep and ("/" in value or "\\" in value) and not (
+                    "/" in key or "\\" in key):
+                out.append(f"{key}={basename(value)}")
+            else:
+                out.append(basename(token))
         else:
             out.append(token)
     return " ".join(out)
 
 
 def environment(command: str | None = None, origin: str | None = None,
-                host: str | None = None,
-                steal: float | None = None) -> dict:
+                host: str | None = None, steal: float | None = None,
+                load_before: dict | None = None) -> dict:
     """The full environment block: machine, OS, backend, versions, tree.
 
     ``command`` should be how the run was invoked. If omitted it is
@@ -440,6 +487,20 @@ def environment(command: str | None = None, origin: str | None = None,
     if command is None:
         command = sanitize_command(sys.argv)
     load = load_snapshot()
+    if load_before is not None:
+        # The verdict must cover the window the work ran in. Sampled only
+        # here, it describes the machine after every solver has finished
+        # -- which on a minutes-long run is a different machine.
+        load["load_average_before"] = load_before.get("load_average")
+        load["cpu_percent_before"] = load_before.get("cpu_percent")
+        load["top_processes_before"] = load_before.get("top_processes")
+        if load_before.get("looks_quiet") is False:
+            load["looks_quiet"] = False
+        elif load.get("looks_quiet") is None:
+            load["looks_quiet"] = load_before.get("looks_quiet")
+        load["sampled"] = "before and after the measurements"
+    else:
+        load["sampled"] = "after the measurements only"
     thermal = thermal_state()
     return {
         "schema_version": SCHEMA_VERSION,

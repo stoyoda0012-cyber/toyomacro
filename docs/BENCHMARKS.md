@@ -6,9 +6,10 @@ tree. This file is the index: for each published number, which machine,
 which commit, whether a machine-readable record is committed, and how to
 regenerate it.
 
-It records provenance only. It does not introduce a number that is not
-already published elsewhere, and it is not a results document — the
-results live in the records and in the documents that quote them.
+It records provenance, not results: the results live in the records and
+in the documents that quote them. Where it does cite a measurement of
+its own — §5 has one — it says so and says that nothing regenerates it,
+which is the second of the two paths in "The rule" below.
 
 ## The rule
 
@@ -40,9 +41,11 @@ see §4 for what that means when reading them.
 
 ## 2. Published numbers with a committed record
 
-Both records were produced on **M1** and carry a full `environment`
-block (timestamp, OS, CPU, Python/NumPy/SciPy/MLX versions, the exact
-command, the git commit, and whether the tree was dirty).
+Both records were produced on **M1** and carry an `environment` block:
+timestamp, OS, CPU, the exact command, the git commit, and whether the
+tree was dirty. The library versions recorded differ between them —
+`solver_comparison.json` names SciPy and lmfit, `figure1_throughput.json`
+does not, because its kernel uses neither.
 
 ### `paper/figures/results/figure1_throughput.json`
 
@@ -80,8 +83,10 @@ the harness, not `534d709` exactly.
 
 **One row in these records is not what its name suggests.** The
 amplitude-only projection entry is BLAS-on-CPU in *both* files — that
-kernel is not routed through MLX in this benchmark — so its two columns
-differ only by run-to-run noise. The MLX headline for that kernel is
+kernel is not routed through MLX in this benchmark — so the backend
+label does not distinguish them. The two columns still read 93.4 M and
+110.1 M, an 18% gap on one host; same code path, and the difference is
+not attributed here. The MLX headline for that kernel is
 `figure1_throughput.json`, above. `README.md` carries this warning
 inline; `docs/API.md` does not.
 
@@ -95,7 +100,7 @@ the two marked below.
 | Number | Quoted by | Regenerate with |
 |---|---|---|
 | 4-step Taylor ~1.5 M spec/s | `README.md` per-solver table; `API.md` `fast` (~10⁶) | `benchmarks.bench_ncomp_scaling` (4-step row, 100 K spectra) |
-| `parabola` ~5 M spec/s | `README.md` per-solver table; `API.md` `balanced` (~5×10⁶) | `benchmarks.bench_dict2d`; `bench_ncomp_scaling` (dict2d row) |
+| `parabola` ~5 M spec/s | `README.md` per-solver table; `API.md` `balanced` (~5×10⁶) | `benchmarks.bench_ncomp_scaling` (dict2d row). **Not** `bench_dict2d`, which measures `solve_dict2d_amp_only` / `solve_hybrid_sorted` and never calls the parabola solver. |
 | `multipeak` 2-component ~3 M, 10-component ~40 K spec/s | `README.md` per-solver table | `benchmarks.bench_ncomp_scaling` (`N_COMP_LIST = [1, 2, 3, 5, 10]`) |
 | `precise` ~4×10⁵ spec/s | `API.md` mode table | `benchmarks.bench_dict2d_adaptive_fused` (`precise` maps to the adaptive solver) |
 | `gamma_calibrated` ~2 M spec/s | `README.md` per-solver table | **No throughput benchmark.** Traces to a module docstring (`fitting/fast_voigt.py:9`). `bench_dict3d_psnr` and `bench_gamma_perturbation` exercise this solver but are accuracy studies. |
@@ -144,14 +149,18 @@ about M2. They do not — a second, unrelated host missed the same
 thresholds, which points at the thresholds. No performance claim
 anywhere derives from M3.
 
-**A Linux-only measurement bug closed in 2026-09.** `ru_maxrss` is in
-kibibytes on Linux; `memory.get_rss_gb` converted it at 1000 bytes per
-kilobyte, and four benchmark modules treated it as bytes outright.
-Peak-RSS figures measured on M2 or M3 before that fix are wrong by
-1000× or 1024× depending on the call site. No published number is
-affected — the figures come from M1 (macOS, where `ru_maxrss` is
-already in bytes), and `CUDA_BACKEND_POC.md` records no RSS-derived
-value. See the `[Unreleased]` section of `CHANGELOG.md`.
+**A Linux-only measurement bug, still open on this branch.**
+`ru_maxrss` is in kibibytes on Linux; `memory.get_rss_gb` converts it at
+1000 bytes per kilobyte (`memory.py:63`), and five benchmark modules
+treat it as bytes outright: `bottleneck_analysis`,
+`chunk_optimization_benchmark`, `bench_gvrt_1b`, `benchmark_mlx_pipeline`
+and `bench_gvrt_multipeak_1b`. Peak-RSS figures measured on M2 or M3 are
+therefore wrong by 1000x or 1024x depending on the call site.
+
+No published number is affected: the figures come from M1, where
+`ru_maxrss` is already in bytes, and `CUDA_BACKEND_POC.md` records no
+RSS-derived value. A fix exists on `main` and is not in this branch's
+base; nothing here depends on it.
 
 ## 5. Reading a record
 
@@ -180,12 +189,19 @@ tree. It does not record how busy the machine was, and the amplitude-only
 kernel is sensitive to that at a scale larger than its own reported
 range.
 
-Measured on M1: with the machine otherwise idle the committed record
-gives **478 M spec/s** (range 453–490 over 9 repetitions). Re-running
-the identical command while unrelated CPU-bound work saturated the
-machine (load average ~12) gave **418–431 M** across four independent
-invocations — each internally consistent to about 3%, all of them
-9–13% below the committed median, and none of them overlapping it.
+Measured on M1. Two of the three figures below carry a committed
+record; the middle one does not, and this paragraph is the whole of its
+provenance — it is an observation, not a result, and nothing
+regenerates it.
+
+| | source |
+|---|---|
+| **478 M** median, 453–490 over 9 repetitions | `figure1_throughput.json`, committed |
+| **418–431 M** across four invocations at load ~12 | **no record** — observed once, on this machine, 2026-09-21 |
+| **488 M** at load 3.2, same problem | `benchmarks/records/…__from-mac.json`, committed |
+
+The contended figures were each internally consistent to about 3%, and
+all of them 9–13% below the committed median without overlapping it.
 
 So the within-run range printed in a record understates the real
 uncertainty: repetitions inside one invocation share the machine state
@@ -227,8 +243,11 @@ fixes rather than leaves to the operator:
   from the default device rather than from whether MLX imported.
 - **TF32 off on CUDA.** The harness refuses to write a CUDA record with
   TF32 enabled unless explicitly overridden.
-- **Batches within the CUDA `gridDim` limit**, chunked automatically
-  there and left alone on Metal.
+- **Alternating projection chunked at the CUDA `gridDim` limit on
+  *every* backend**, Metal included. Metal has no such limit, but a
+  Metal run that processed 200 K in one call and a CUDA run that
+  processed it in four would not be the same measurement. The chunk
+  size is an argument and is recorded.
 - **The machine's load**, captured at measurement time, with a warning
   when the host was busy.
 

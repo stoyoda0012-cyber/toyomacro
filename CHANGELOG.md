@@ -8,6 +8,43 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **One benchmark record schema, and a harness that runs on every
+  supported host.** `voigtfit.benchmarks.bench_platform` measures the
+  same seeded problem on Metal, CUDA and NumPy and writes a record in
+  one shape; `voigtfit.benchmarks.summarize_records` reads the
+  collection back. Records live in `benchmarks/records/`, one file per
+  run so that several machines writing to the repository never
+  conflict, and are grouped for comparison by the hardware observed
+  rather than by any label an operator supplied.
+
+  Each record names the backend that actually ran, the batch size, the
+  input hash, and what else the machine was doing — load before and
+  after the measurements, hypervisor steal, thermal throttling — and
+  grades itself `quiet` / `contended` / `unknown` with reasons. Every
+  run writes a record, including runs on a busy machine; the summary
+  excludes non-quiet records from its figures and says which. The
+  quiet convention is stated in the record and is a convention, not a
+  calibrated threshold.
+
+  On CUDA the harness refuses to record a run with TF32 left enabled,
+  and alternating projection is chunked at the CUDA `gridDim` limit on
+  every backend, Metal included, so one command measures the same work
+  everywhere.
+
+  Records are committed, so the schema carries no filesystem path, no
+  interpreter location, no repository path and no sibling project's
+  version. Process names in the load snapshot are kept, because they
+  are what makes a contended record diagnosable, and can be replaced
+  with `TOYOMACRO_BENCH_REDACT_PROCESSES=1`.
+
+- **`docs/BENCHMARKS.md`: where each published figure came from.**
+  Which machine, which commit, whether a machine-readable record is
+  committed (two of thirteen are), and which figures no bundled
+  benchmark regenerates at all. It changes no published number.
+
+
 ## [0.3.0] - 2026-09-21
 
 Archived on Zenodo:

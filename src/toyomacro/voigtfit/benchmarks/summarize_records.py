@@ -6,9 +6,10 @@ The rule this tool exists to enforce: **group by the hardware that was
 observed, never by the label somebody typed.** "cloud" is not a machine,
 it is a draw from a distribution of machines -- this repository has
 already seen one cloud container change CPU mid-session, from a 2.80GHz
-Xeon to a 2.10GHz one, while three tracked files went on saying 2.80GHz.
-A summary that groups by the word "cloud" would have averaged those two
-together and reported the mean of two different computers.
+Xeon to a 2.10GHz one, while the tracked document describing it went on
+saying 2.80GHz. A summary that groups by the word "cloud" would have
+averaged those two together and reported the mean of two different
+computers.
 
 So records are grouped by ``host_label``, which is derived from the CPU
 and core count rather than supplied by the operator, and ``origin`` --
@@ -93,11 +94,14 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
             print(f"   !! mixed batch sizes {batches} - these rows are NOT "
                   "comparable with each other")
 
-        usable = quiet or recs
+        # Only quiet records feed the table. Falling back to contended
+        # ones and then printing "excluded" in the footer would make the
+        # summary state the opposite of what it did.
         if not quiet:
-            print("   !! no quiet run; figures below are from contended hosts")
+            print("   !! no quiet run on this machine - no headline figures. "
+                  f"{len(recs)} contended record(s) listed below.")
         for solver in solvers:
-            rates = [v for v in (solver_rate(r, solver) for r in usable)
+            rates = [v for v in (solver_rate(r, solver) for r in quiet)
                      if v is not None]
             if not rates:
                 continue
@@ -118,11 +122,14 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
     contended = [r for r in records
                  if r.get("environment", {}).get("quality", {}).get("verdict") != "quiet"]
     if contended:
-        print(f"{len(contended)} record(s) excluded from headline figures:")
+        print(f"{len(contended)} record(s) excluded from every headline figure "
+              "above, and from the spreads:")
         for r in contended:
             q = r.get("environment", {}).get("quality", {})
+            rate = solver_rate(r, "projection_kernel")
             print(f"  {r['_file']}: {q.get('verdict')} "
-                  f"({'; '.join(q.get('reasons') or []) or 'no reason recorded'})")
+                  f"({'; '.join(q.get('reasons') or []) or 'no reason recorded'})"
+                  + (f"  [projection_kernel {_fmt(rate)}]" if rate else ""))
 
 
 def main(argv: list[str] | None = None) -> None:
