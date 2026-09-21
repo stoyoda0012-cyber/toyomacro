@@ -209,6 +209,7 @@ testpaths = ["tests", "src/toyomacro/voigtfit/tests"]
 addopts = "-v --tb=short"
 markers = [
     "gui: requires a desktop GUI environment; skipped in headless CI",
+    "perf: asserts a wall-clock rate or time, so it fails on hardware slower than the reference rather than on a defect; deselect with -m 'not perf'",
 ]
 
 [tool.coverage.run]
