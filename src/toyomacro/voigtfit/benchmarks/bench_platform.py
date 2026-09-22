@@ -540,7 +540,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.records_dir:
         print(f"wrote {write_record(report, args.records_dir)}", flush=True)
     if out_path:
-        out_path.write_text(json.dumps(report, indent=1, default=float) + "\n")
+        out_path.write_text(json.dumps(report, indent=1, default=float) + "\n",
+                            encoding="utf-8")
         print(f"wrote {out_path}", flush=True)
 
 

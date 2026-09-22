@@ -368,10 +368,41 @@ class TestVerdictUsesTheBeforeSample:
     IDLE_BEFORE = {"load_average": [0.7, 0.24, 0.08], "looks_quiet": True,
                    "cpu_percent": 2.0, "top_processes": []}
 
-    def test_our_own_load_does_not_condemn_the_record(self):
+    @pytest.fixture
+    def quiet_after(self, monkeypatch):
+        """Pin the after-sample too.
+
+        `environment()` takes its own trailing sample, so asserting a
+        verdict while only controlling the before-sample asserts
+        something about whatever else the test machine happens to be
+        running. This test failed on a busy macOS host for exactly that
+        reason after passing on a quiet one — the assertion was true by
+        circumstance, not by the behaviour it names.
+        """
+        monkeypatch.setattr(
+            record, "load_snapshot",
+            lambda *a, **k: {"load_average": [0.5, 0.5, 0.5],
+                             "logical_cores": 32, "cpu_percent": 1.0,
+                             "cpu_percent_others": 0.0, "top_processes": [],
+                             "looks_quiet": True, "processes_redacted": False})
+
+    def test_our_own_load_does_not_condemn_the_record(self, quiet_after):
         env = record.environment(origin="windows", load_before=self.IDLE_BEFORE)
         assert env["load"]["looks_quiet"] is True
         assert env["quality"]["verdict"] == "quiet"
+
+    def test_foreign_load_after_the_start_still_condemns(self, monkeypatch):
+        """The other half: the after-sample keeps its say over non-self work."""
+        monkeypatch.setattr(
+            record, "load_snapshot",
+            lambda *a, **k: {"load_average": [0.5, 0.5, 0.5],
+                             "logical_cores": 4, "cpu_percent": 90.0,
+                             "cpu_percent_others": 350.0, "top_processes": [],
+                             "looks_quiet": True, "processes_redacted": False})
+        env = record.environment(origin="t", load_before=self.IDLE_BEFORE)
+        assert env["quality"]["verdict"] == "contended"
+        assert any("other processes" in r
+                   for r in env["quality"]["reasons"])
 
     def test_a_busy_start_still_condemns(self):
         busy = {"load_average": [12.0, 12.0, 12.0], "looks_quiet": False,

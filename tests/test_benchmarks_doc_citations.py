@@ -81,7 +81,7 @@ def _doc_rows(skip_record_free_sections: bool = True) -> list[tuple[str, str]]:
     preceding heading that names a ``.json`` file.
     """
     rows, exempt, heading_records = [], False, ()
-    for line in DOC.read_text().splitlines():
+    for line in DOC.read_text(encoding="utf-8").splitlines():
         if line.startswith("#"):
             exempt = _RECORD_FREE_SECTION in line.lower()
             # A heading may name a matched pair, as §2 does for the MLX
@@ -187,7 +187,7 @@ def test_cited_figure_is_in_the_cited_record(row, cited):
     if not figures:
         return                       # a row may cite a record without a figure
     rates = [r for path in paths
-             for r in _rates(json.loads(path.read_text()))]
+             for r in _rates(json.loads(path.read_text(encoding="utf-8")))]
     assert rates, f"{[p.name for p in paths]} report no throughput to check"
     for figure in figures:
         want, tol = float(figure) * 1e6, _tolerance(figure)
@@ -216,9 +216,63 @@ def test_every_committed_record_is_readable_and_self_describing():
     records = sorted(directory.glob("*.json"))
     assert records, f"no records under {directory.relative_to(REPO)}"
     for path in records:
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         env = record.get("environment", {})
         assert record.get("schema_version"), f"{path.name}: no schema_version"
         assert env.get("quality", {}).get("verdict") in {
             "quiet", "contended", "unknown"}, f"{path.name}: no verdict"
         assert env.get("host_label"), f"{path.name}: no host_label"
+
+
+class TestTextIOIsEncodingIndependent:
+    """The gate itself broke Windows CI by reading the doc in the locale
+    encoding. `docs/BENCHMARKS.md` contains em dashes and ellipses, so on
+    a cp1252 host `read_text()` raised `UnicodeDecodeError` at *import*
+    time and the whole module errored out of collection.
+
+    `CHANGELOG.md` already records this class of bug against a different
+    file — "one read a source file in the platform's preferred encoding
+    rather than UTF-8". Enforcing it with ruff needs preview mode, which
+    turns on 479 other findings, so it is enforced here instead for the
+    files that write and read committed records.
+    """
+
+    #: The modules that read or write records, plus this gate.
+    GUARDED = (
+        REPO / "src/toyomacro/voigtfit/benchmarks/record.py",
+        REPO / "src/toyomacro/voigtfit/benchmarks/bench_platform.py",
+        REPO / "src/toyomacro/voigtfit/benchmarks/summarize_records.py",
+        Path(__file__),
+    )
+
+    _TEXT_IO = re.compile(r"(?:\.read_text|\.write_text|(?<![\w.])open)\(")
+
+    def test_the_encoding_actually_matters_here(self):
+        """If the doc were pure ASCII this guard would prove nothing."""
+        raw = DOC.read_bytes()
+        assert any(b > 127 for b in raw), (
+            f"{DOC.name} is pure ASCII; this test no longer demonstrates "
+            "anything and the encoding argument is untested.")
+        with pytest.raises(UnicodeDecodeError):
+            raw.decode("cp1252")
+
+    def test_the_gate_read_the_document_at_import(self):
+        """Collection succeeding is the assertion; this makes it explicit."""
+        assert CITING_ROWS, "the document was not read, or cites nothing"
+
+    @pytest.mark.parametrize("path", GUARDED, ids=lambda p: p.name)
+    def test_every_text_io_names_its_encoding(self, path):
+        offenders = []
+        source = path.read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(source, 1):
+            if not self._TEXT_IO.search(line):
+                continue
+            # The call may wrap; look at the next two lines for the kwarg.
+            window = " ".join(source[number - 1:number + 2])
+            if "encoding=" in window or '"rb"' in window or "'rb'" in window:
+                continue
+            offenders.append(f"{path.name}:{number}: {line.strip()}")
+        assert not offenders, (
+            "Text I/O without an explicit encoding reads in the platform's "
+            "locale encoding, which is cp1252 on Windows and raises on any "
+            "non-ASCII byte:\n  " + "\n  ".join(offenders))
