@@ -123,6 +123,27 @@ the benchmark itself, so such a record could condemn an idle host for
 its own work. `summarize_records` warns when it is asked to compare
 across the boundary; re-record rather than reason around it.
 
+### The Ryzen/WSL2 records, generation by generation
+
+Seven records from one host were taken while the harness itself was
+being repaired, and they are kept rather than replaced: they are the
+primary source for [§5 of `docs/BENCHMARKS.md`](../../docs/BENCHMARKS.md),
+which argues from the disagreement between them. `schema_version`
+separates generation 3 from the rest; it does not separate 1 from 2,
+because the bump came later than the fix that divides them. Hence this
+table.
+
+| gen | commit | schema | verdict logic | how to read it |
+|---|---|---|---|---|
+| 1 | `a9e99d0` | 2 | trailing sample | Distrust the verdict; the rates are valid. `…101303Z…` is graded `contended` on its own CPU load, with `cpu_percent 0.0` and an empty process list. |
+| 2 | `b698bf6` | 2 | before-sample, pre-audit | Distrust the verdict; the rates are valid. Holds the widest within-run spread measured here, 4.28x in `…113035Z…`. |
+| 3 | `aa6556c` | 3 | before-sample, current | Verdict and rates both valid. |
+
+Generations 1 and 2 are the evidence that the verdict changed, so
+deleting them would leave §5 asserting something with nothing behind
+it. They are not a baseline: quote a rate from them only alongside the
+generation-3 run of the same backend.
+
 ## Quality, and why nothing is refused
 
 Every run writes its record, including runs on a machine that was busy.

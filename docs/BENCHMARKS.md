@@ -237,18 +237,24 @@ Load is not the dominant source of disagreement between records, and
 the quality verdict is not the field that most needs reading.
 
 Measured on the Ryzen/WSL2 host across three harness generations — same
-machine, same `input_sha256`, unchanged solver code, every run graded
-`quiet`:
+machine, same `input_sha256`, unchanged solver code. Seven of the eight
+runs are graded `quiet`; the exception is `…101303Z…from-windows.json`,
+condemned by the generation-1 rule for its own CPU load.
 
-| solver | backend | runs | reported | source |
+| solver | backend | runs | reported | records |
 |---|---|---|---|---|
-| `amp_only_projection` | cuda | 3 | **9.44 / 9.27 / 17.30 M** | no record in this branch; taken on the Windows host, proposed in PR #27 |
-| `amp_only_projection` | numpy | 2 | **33.4 / 66.0 M** | no record in this branch; same source |
+| `amp_only_projection` | cuda | 3 | **9.27 / 9.44 / 18.65 M** | `…112904Z…from-windows.json`, `…101134Z…from-windows.json`, `…011702Z…from-windows.json` |
+| `amp_only_projection` | numpy | 5 | **33.42 / 42.33 / 62.81 / 65.99 / 88.95 M** | `…113035Z…from-windows.json`, `…101303Z…from-windows.json`, `…102748Z…from-windows.json`, `…113459Z…from-windows.json`, `…012329Z…from-windows.json` |
 
-The 17.30 M run reported a **within-run spread of 1.03x** — the
-tightest of the three, and 1.85x away from the other two. One NumPy
-record spread 4.28x inside a single invocation while its median sat
-within the others' range.
+The 18.65 M run reported a **within-run spread of 1.03x** — the
+tightest of the three, and 2.01x away from the lowest. One NumPy
+record, `…113035Z…from-windows.json`, spread 4.28x inside a single
+invocation while its median sat within the others' range.
+
+The instability is not confined to one solver or one backend.
+`projection_kernel` on CUDA spans 4.68–9.67 M across the same three
+runs, a 2.07x ratio, while on NumPy it holds to 1.07x over five. The
+two solvers that move are the bandwidth-bound ones.
 
 So `rate_min` and `rate_max` do not bound what a second run would give.
 The repetitions inside one invocation share a process, a memory layout

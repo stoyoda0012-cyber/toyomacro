@@ -403,6 +403,49 @@ at ~3 % of the hardware. If upstream MLX ships `sm_120`-tuned kernels
 (or routes matmul to cuBLASLt properly), a further order of magnitude is
 on the table without touching voigtfit code.
 
+### The same machine re-measured (2026-09-21/22, records committed)
+
+The table above is 2026-07, read off a prose report. The one below is
+the committed harness at `n_batch=200,000`, single-peak, on the same
+laptop, pooled over eight runs — three CUDA and five NumPy, spanning
+three harness generations. **It is a different workload, not a
+correction of the table above**: the 2026-07 rows measure `n_comp=4` at
+65 k and Stage-1 streaming at 100 k/1 M. Both stay.
+
+Ranges are min–max of `rate_median` across runs, not one run's own
+spread. Records are in `benchmarks/records/`, filenames beginning
+`20260921T1011`, `…T1129`, `…T1134` and `20260922T0117`, `…T0123`.
+
+| solver | CUDA TF32off | NumPy (same host) | verdict |
+|---|---|---|---|
+| `projection_kernel` | 4.68–9.67 M/s | **18.76–20.11 M/s** | CPU wins ~2–4× |
+| `amp_only_projection` | 9.27–18.65 M/s | **33.42–88.95 M/s** | CPU wins ~2–7× |
+| `multipeak_2comp` | 31.7–40.6 k/s | **111.7–117.8 k/s** | CPU wins ~3.5× |
+| `dict2d_parabola` | **1.37–1.48 M/s** | 0.63–0.74 M/s | GPU wins ~2× |
+| `taylor_4step` | **0.43–0.50 M/s** | 0.35–0.40 M/s | GPU wins, narrowly |
+
+No solver's ranges overlap, so the direction of each row holds across
+every run taken. `taylor_4step` is the one with little margin — 0.43
+against 0.40 — and nothing more than "it does not overlap today"
+should be read into it. Whether that margin survives the dispersion is
+answerable by `--runs N`, which reports `understates_by` per solver:
+
+```bash
+NVIDIA_TF32_OVERRIDE=0 python -m toyomacro.voigtfit.benchmarks.bench_platform \
+    --origin windows --runs 3 --records-dir benchmarks/records
+```
+
+**The GPU's one decisive 2026-07 win is the row it loses here.** That
+table has dictionary AP 4–6× ahead on the GPU at `n_comp=4, 65k`;
+`multipeak_2comp` at 200 k puts the CPU 3.5× ahead. The CUDA side
+barely moved — 36.2 k/s then, 31.7–40.6 k/s now — and the NumPy side
+went from 8.9 k/s to 111.7–117.8 k/s. Component count, batch size and
+five months of solver work all differ between the two, so this is not
+one number contradicting another; it is a caution that "compute-dense
+wins on the GPU" was established at one operating point and does not
+survive being moved off it. The upside stated above — a GEMM engine at
+~3 % of the hardware — is unchanged either way.
+
 ### Operating guidance for this machine (RTX 5070 Laptop, WSL2)
 
 - Always: `MLX_ENABLE_TF32=0` (MLX-native; measured equivalent to the
