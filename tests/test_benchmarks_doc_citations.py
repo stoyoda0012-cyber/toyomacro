@@ -237,11 +237,16 @@ class TestTextIOIsEncodingIndependent:
     files that write and read committed records.
     """
 
-    #: The modules that read or write records, plus this gate.
+    #: Everything that reads or writes a record, plus this gate.
+    #:
+    #: `test_benchmark_record.py` was missing from this list, and a run
+    #: on a Japanese-locale Windows host found two unguarded reads there
+    #: that cp932 would break. A guard is only worth what it covers.
     GUARDED = (
         REPO / "src/toyomacro/voigtfit/benchmarks/record.py",
         REPO / "src/toyomacro/voigtfit/benchmarks/bench_platform.py",
         REPO / "src/toyomacro/voigtfit/benchmarks/summarize_records.py",
+        REPO / "src/toyomacro/voigtfit/tests/test_benchmark_record.py",
         Path(__file__),
     )
 

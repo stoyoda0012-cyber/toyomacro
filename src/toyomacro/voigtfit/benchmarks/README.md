@@ -30,6 +30,13 @@ the comparison is meaningless. On CUDA the harness refuses to record a
 run with TF32 left enabled, and chunks alternating projection below the
 65,535 `gridDim` limit.
 
+`--runs N` repeats the whole measurement in **separate processes** and
+reports `understates_by` per solver — the across-run spread over the
+typical within-run spread. Above 1 means one record's own
+`rate_min`/`rate_max` is optimistic by that factor. It is a lower
+bound: back-to-back runs still share a thermal and clock state, so runs
+separated by hours can differ by more.
+
 Every record carries the machine's **load** at measurement time. A
 throughput number from a busy host reads low by more than its own
 reported range suggests, and the harness warns when it sees one. What a
