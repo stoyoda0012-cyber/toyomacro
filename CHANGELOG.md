@@ -15,8 +15,9 @@ archived on Zenodo for a citable DOI.
   spread.** A record's `rate_min`/`rate_max` covers repetitions that
   shared a process, a memory layout and a clock state, so it cannot see
   what changes when those change. On one host `amp_only_projection`
-  moved 1.85x across three runs while the run furthest from the others
-  reported the *tightest* within-run spread of the three, 1.03x.
+  moved 2.01x across three separate records while the record furthest
+  from the others reported the *tightest* within-run spread of the
+  three, 1.03x.
 
   Each run is a separate process, deliberately: repeating inside one
   would share the state that makes within-run repetitions agree and
@@ -30,9 +31,10 @@ archived on Zenodo for a citable DOI.
   batch, `understates_by` came out 0.88-1.03x over two independent
   three-run experiments, and 0.83-1.00x at the default 200,000 batch in
   the first committed `--runs` record — on that host the within-run
-  range did bound the across-run spread, on every solver. The 1.85x came from runs separated by hours and by
-  code generations. Both readings are real and they measure different
-  things.
+  range did bound the across-run spread, on every solver. The 2.01x
+  above came from separate records taken hours and code generations
+  apart, which is not what `--runs` varies. Both readings are real and
+  they measure different things.
 
 - **One benchmark record schema, and a harness that runs on every
   supported host.** `voigtfit.benchmarks.bench_platform` measures the

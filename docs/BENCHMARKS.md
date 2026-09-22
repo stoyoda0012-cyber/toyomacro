@@ -292,16 +292,19 @@ Same `input_sha256` across all three, default 200,000 batch.
 | `multipeak_2comp` | **3.7 M** | 0.93x | 3.7 / 3.8 / 3.7 M |
 
 **On Metal the within-run range did bound the across-run spread** —
-every solver at or below 1.00x. That is the opposite of the Ryzen host
-above, where `projection_kernel` spans 2.07x across runs, and it is the
-reason the ratio is reported per host rather than assumed: the same
-harness, the same solvers, and one machine has the problem while the
-other does not. Neither reading generalises to the other.
+every solver at or below 1.00x.
 
-It is still a lower bound. Back-to-back runs share a thermal state, a
-GPU clock state and a warm page cache; runs separated by hours or by
-code generations — which is what the Ryzen table above is made of — can
-differ by more.
+**That is not a statement about the machine.** The Ryzen table above is
+built from records taken hours and code generations apart; this one
+from three runs in a single sitting. The two differ in *when* the
+measurements were taken at least as much as in *where*, so the
+comparison does not attribute the 2.07x to the host.
+
+What `--runs` varies is what changes between processes, and that is a
+strict subset of what changes between sittings. A low `understates_by`
+therefore says the back-to-back component is small and says nothing
+about the rest — it is a lower bound by construction, since the runs
+still share a thermal state, a GPU clock state and a warm page cache.
 
 Until a host has a `--runs` record, quote a median over several records
 or say plainly that you are quoting one.

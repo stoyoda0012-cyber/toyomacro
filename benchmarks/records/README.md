@@ -50,11 +50,12 @@ single run from each origin cannot separate an origin effect from the
 instance lottery.
 
 **And so do local arms.** An earlier version of this file said they did
-not. Measured on the Ryzen host: `amp_only_projection` read 9.44, 9.27
-and **17.30 M spec/s** across three runs — same machine, same input
-hash, unchanged solver code, all three graded `quiet`. The run that sat
-1.85x away from the other two reported a within-run spread of **1.03x**,
-which is to say it looked like the most confident of the three.
+not. Measured on the Ryzen host: `amp_only_projection` read 9.27, 9.44
+and **18.65 M spec/s** across three separate records — same machine,
+same input hash, unchanged solver code, all three graded `quiet`. The
+record that sat 2.01x away from the other two reported a within-run
+spread of **1.03x**, which is to say it looked like the most confident
+of the three.
 
 A record's own `rate_min`/`rate_max` cannot bound this. The repetitions
 inside one invocation share a process, a memory layout and a clock
@@ -77,10 +78,10 @@ record's own range is optimistic by that factor.
 a thermal state, a GPU clock state and a warm page cache. Measured on
 the M3 Max, back to back at a 20k batch, `understates_by` came out
 **0.88-1.03x** across two independent three-run experiments — the
-within-run range did bound the across-run spread there. The 1.85x above
-came from runs separated by hours and by code generations. Both
-readings are real; they measure different things, and neither
-substitutes for the other. For a figure you intend to publish, take
+within-run range did bound the across-run spread there. The 2.01x above
+came from separate records taken hours and code generations apart,
+which is not what `--runs` varies. Both readings are real; they measure
+different things, and neither substitutes for the other. For a figure you intend to publish, take
 records on separate occasions as well as separate processes.
 
 ## Filenames
