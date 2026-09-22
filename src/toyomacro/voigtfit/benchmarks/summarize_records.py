@@ -112,7 +112,21 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
         print(f"   cpu      {env0.get('cpu')}  |  {env0.get('logical_cores')} cores"
               f"  |  {env0.get('memory_gb')} GB  |  {env0.get('os')}")
         print(f"   launched from: {', '.join(origins)}")
-        print(f"   {len(recs)} run(s), {len(quiet)} of them quiet")
+        print(f"   {len(recs)} record(s), {len(quiet)} of them quiet")
+        repeated = [r for r in recs if r.get("kind") == "repeated"]
+        if repeated:
+            print(f"   {len(repeated)} of them aggregate several runs "
+                  f"({', '.join(str(r.get('runs')) for r in repeated)} runs "
+                  "each, separate processes)")
+            worst = max(
+                (res.get("understates_by") or 0
+                 for r in repeated for res in r.get("results", [])),
+                default=0)
+            if worst > 1.5:
+                print(f"   !! a single run's own range understates the "
+                      f"across-run spread by up to {worst:.2f}x here - do "
+                      "not quote one record's rate_min/rate_max as the "
+                      "uncertainty")
 
         batches = sorted({r.get("problem", {}).get("n_batch") for r in recs})
         if len(batches) > 1:

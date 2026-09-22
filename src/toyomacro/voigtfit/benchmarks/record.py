@@ -94,7 +94,8 @@ def cpu_name() -> str | None:
         return _run(["sysctl", "-n", "machdep.cpu.brand_string"]) or None
     if system == "Linux":
         try:
-            for line in Path("/proc/cpuinfo").read_text().splitlines():
+            for line in Path("/proc/cpuinfo").read_text(
+                    encoding="utf-8", errors="replace").splitlines():
                 if line.startswith("model name"):
                     return line.split(":", 1)[1].strip()
         except Exception:
@@ -264,7 +265,7 @@ def cpu_jiffies() -> tuple[int, ...] | None:
     Fields are user nice system idle iowait irq softirq steal ...
     """
     try:
-        with open("/proc/stat") as fh:
+        with open("/proc/stat", encoding="utf-8") as fh:
             for line in fh:
                 if line.startswith("cpu "):
                     return tuple(int(v) for v in line.split()[1:])
@@ -649,9 +650,6 @@ def write_record(report: dict, directory: str | Path) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / record_filename(report.get("environment", {}))
-    # Explicit UTF-8 both ways: these files are committed and read on
-    # every platform, and Python's text default is the locale's encoding,
-    # which is cp932 on a Japanese Windows install.
     path.write_text(json.dumps(report, indent=1, default=float) + "\n",
                     encoding="utf-8")
     return path

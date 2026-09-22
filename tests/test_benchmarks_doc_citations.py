@@ -222,3 +222,62 @@ def test_every_committed_record_is_readable_and_self_describing():
         assert env.get("quality", {}).get("verdict") in {
             "quiet", "contended", "unknown"}, f"{path.name}: no verdict"
         assert env.get("host_label"), f"{path.name}: no host_label"
+
+
+class TestTextIOIsEncodingIndependent:
+    """The gate itself broke Windows CI by reading the doc in the locale
+    encoding. `docs/BENCHMARKS.md` contains em dashes and ellipses, so on
+    a cp1252 host `read_text()` raised `UnicodeDecodeError` at *import*
+    time and the whole module errored out of collection.
+
+    `CHANGELOG.md` already records this class of bug against a different
+    file — "one read a source file in the platform's preferred encoding
+    rather than UTF-8". Enforcing it with ruff needs preview mode, which
+    turns on 479 other findings, so it is enforced here instead for the
+    files that write and read committed records.
+    """
+
+    #: Everything that reads or writes a record, plus this gate.
+    #:
+    #: `test_benchmark_record.py` was missing from this list, and a run
+    #: on a Japanese-locale Windows host found two unguarded reads there
+    #: that cp932 would break. A guard is only worth what it covers.
+    GUARDED = (
+        REPO / "src/toyomacro/voigtfit/benchmarks/record.py",
+        REPO / "src/toyomacro/voigtfit/benchmarks/bench_platform.py",
+        REPO / "src/toyomacro/voigtfit/benchmarks/summarize_records.py",
+        REPO / "src/toyomacro/voigtfit/tests/test_benchmark_record.py",
+        Path(__file__),
+    )
+
+    _TEXT_IO = re.compile(r"(?:\.read_text|\.write_text|(?<![\w.])open)\(")
+
+    def test_the_encoding_actually_matters_here(self):
+        """If the doc were pure ASCII this guard would prove nothing."""
+        raw = DOC.read_bytes()
+        assert any(b > 127 for b in raw), (
+            f"{DOC.name} is pure ASCII; this test no longer demonstrates "
+            "anything and the encoding argument is untested.")
+        with pytest.raises(UnicodeDecodeError):
+            raw.decode("cp1252")
+
+    def test_the_gate_read_the_document_at_import(self):
+        """Collection succeeding is the assertion; this makes it explicit."""
+        assert CITING_ROWS, "the document was not read, or cites nothing"
+
+    @pytest.mark.parametrize("path", GUARDED, ids=lambda p: p.name)
+    def test_every_text_io_names_its_encoding(self, path):
+        offenders = []
+        source = path.read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(source, 1):
+            if not self._TEXT_IO.search(line):
+                continue
+            # The call may wrap; look at the next two lines for the kwarg.
+            window = " ".join(source[number - 1:number + 2])
+            if "encoding=" in window or '"rb"' in window or "'rb'" in window:
+                continue
+            offenders.append(f"{path.name}:{number}: {line.strip()}")
+        assert not offenders, (
+            "Text I/O without an explicit encoding reads in the platform's "
+            "locale encoding, which is cp1252 on Windows and raises on any "
+            "non-ASCII byte:\n  " + "\n  ".join(offenders))

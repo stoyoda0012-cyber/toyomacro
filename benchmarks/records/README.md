@@ -58,11 +58,30 @@ which is to say it looked like the most confident of the three.
 
 A record's own `rate_min`/`rate_max` cannot bound this. The repetitions
 inside one invocation share a process, a memory layout and a clock
-state, so whatever moves between invocations is invisible to them. Read
-a single record as one draw, not as a measurement: **`n = 1` here, and
-the harness does not yet repeat runs for you.** Until it does, take
-several records on any host whose number you intend to quote, and
-compare their medians rather than any one record's range.
+state, so whatever moves between invocations is invisible to them.
+
+`--runs N` measures this directly:
+
+```bash
+python -m toyomacro.voigtfit.benchmarks.bench_platform \
+    --origin mac --runs 3 --records-dir benchmarks/records
+```
+
+Each run is a **separate process** — repeating inside one would share
+the very state that makes within-run repetitions agree. The aggregate
+record reports `understates_by` per solver: the across-run spread
+divided by the typical within-run spread. Above 1 means a single
+record's own range is optimistic by that factor.
+
+**It is a lower bound.** The runs go back to back, so they still share
+a thermal state, a GPU clock state and a warm page cache. Measured on
+the M3 Max, back to back at a 20k batch, `understates_by` came out
+**0.88-1.03x** across two independent three-run experiments — the
+within-run range did bound the across-run spread there. The 1.85x above
+came from runs separated by hours and by code generations. Both
+readings are real; they measure different things, and neither
+substitutes for the other. For a figure you intend to publish, take
+records on separate occasions as well as separate processes.
 
 ## Filenames
 

@@ -10,6 +10,29 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`bench_platform --runs N`: repeat the measurement in separate
+  processes, and report how much one run's own range understates the
+  spread.** A record's `rate_min`/`rate_max` covers repetitions that
+  shared a process, a memory layout and a clock state, so it cannot see
+  what changes when those change. On one host `amp_only_projection`
+  moved 1.85x across three runs while the run furthest from the others
+  reported the *tightest* within-run spread of the three, 1.03x.
+
+  Each run is a separate process, deliberately: repeating inside one
+  would share the state that makes within-run repetitions agree and
+  would reproduce the blind spot. The aggregate record reports
+  `understates_by` per solver — across-run spread over typical
+  within-run spread — and is graded only as clean as its dirtiest run.
+  `summarize_records` flags a collection where that ratio exceeds 1.5.
+
+  It is a lower bound: back-to-back runs still share a thermal state, a
+  GPU clock state and a warm page cache. Measured on an M3 Max at a 20k
+  batch, `understates_by` came out 0.88-1.03x over two independent
+  three-run experiments — there the within-run range did bound the
+  across-run spread. The 1.85x came from runs separated by hours and by
+  code generations. Both readings are real and they measure different
+  things.
+
 - **One benchmark record schema, and a harness that runs on every
   supported host.** `voigtfit.benchmarks.bench_platform` measures the
   same seeded problem on Metal, CUDA and NumPy and writes a record in
@@ -65,6 +88,19 @@ archived on Zenodo for a citable DOI.
   exercise the NumPy backend.
 
 ### Fixed
+
+- **Text I/O in the benchmark record modules names its encoding.**
+  `Path.read_text`, `Path.write_text` and `open` without `encoding=`
+  read and write in the platform's locale encoding, which is cp1252 on
+  Windows. `docs/BENCHMARKS.md` contains em dashes and ellipses, so the
+  new documentation gate raised `UnicodeDecodeError` at import time and
+  errored out of collection on both Windows CI jobs; `write_text`
+  would have failed the same way writing a record whose process names
+  were not ASCII. Ten call sites across `record`, `bench_platform`,
+  `summarize_records` and the gate now specify UTF-8, and a test
+  asserts they continue to. Enforcing it with ruff needs preview mode,
+  which surfaces 479 unrelated findings, so the guard lives in the test
+  suite instead.
 
 - **The load verdict no longer condemns an idle Windows host.** Windows
   reports idle time as a process — "System Idle Process", PID 0 — which
