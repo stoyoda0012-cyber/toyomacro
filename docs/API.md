@@ -167,7 +167,10 @@ a validation result, not a support claim. Before relying on it, read
 - **TF32 must be disabled.** MLX's CUDA backend runs float32 matmul in
   TF32 by default, silently: ~1000× the matmul error of true fp32,
   costing ~9.4 dB PSNR and 3× the δσ RMSE end to end, and flipping
-  near-tie dictionary argmax indices. Set `MLX_ENABLE_TF32=0`.
+  near-tie dictionary argmax indices. Set `MLX_ENABLE_TF32=0`, or the
+  driver-level `NVIDIA_TF32_OVERRIDE=0` that the PoC's recipes use —
+  the two are measured equivalent, and that document's §"Where
+  `MLX_ENABLE_TF32` lives" says which to reach for when.
 - **Batches above 65,535 crash the multipeak alternating-projection
   solver** (upstream MLX batched-GEMV grid-dimension limit,
   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Chunk to
