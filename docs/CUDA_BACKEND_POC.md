@@ -57,8 +57,9 @@ Notes:
 - The capability probe (`toyomacro.voigtfit._mlx_support.mlx_usable`)
   runs a tiny kernel on the **default device** and is device-agnostic:
   it is expected to return True on CUDA unchanged. (Its error messages
-  said "Apple Silicon only" when this recipe was written; they were
-  reworded after the run below — see follow-up 2.)
+  said "Apple Silicon only" when this recipe was written; they no
+  longer do — `_mlx_support` describes the probe as running on MLX's
+  default device, and `tests/test_mlx_support.py` pins that.)
 
 ## Step 0 — NumPy baseline (should already pass)
 
@@ -431,78 +432,59 @@ least a zero-copy host view). Still 12–29× ahead. The dictionary-
 resident variant maps naturally onto the dict2d/AP solvers, whose
 dictionaries are constant across the batch loop.
 
-### Suggested follow-ups
+### Upstream MLX issues filed from this PoC
 
-1. **Decide the TF32 policy.** `NVIDIA_TF32_OVERRIDE=0` is a blunt
-   process-wide env var and an easy thing to forget — a silent 1000×
-   precision loss is a bad default for a fitting engine. Prefer setting
-   it in-process at CUDA-backend init, or gate the argmax paths, and
-   measure what TF32 actually buys before trading accuracy for it.
-2. ~~Reword the `_mlx_support` "Apple Silicon only" messages.~~ —
-   **DONE.** `_mlx_support` now describes the probe as running on MLX's
-   default device, and neither `require_mlx()` message claims MLX is
-   Apple-only or that the probe looks for a Metal device. The same
-   correction was applied to the 33 `HAS_MLX = _mlx_usable()` comments
-   that repeated the claim, to the `test_compression.py` skip messages,
-   and to the `solver_comparison_benchmark` provenance label, which had
-   hardcoded `"mlx (Apple Silicon GPU)"` for any accelerated run.
-   `tests/test_mlx_support.py` now pins the messages against a
-   regression. Detection behavior is unchanged.
-3. Fold the header install + `CUDA_HOME` into the setup recipe above.
-4. ~~Investigate the NumPy-baseline `decode_speed` gap on this machine.~~
-   — **answered 2026-09-21: not machine-specific.** A GPU-less x86
-   control reproduces both shortfalls while running *faster* than this
-   box, and the assertions additionally flip with pytest's collection
-   scope; see
-   [Second data point](#second-data-point-2026-09-21--gpu-less-x86-control).
-   ~~What is left is a decision — give the two targets recorded
-   provenance, or move them to `benchmarks/`.~~ **Closed 2026-09-21:**
-   both are ratio gates now, and `skip_in_ci` is gone.
-5. ~~Benchmark medians not yet recorded~~ — done; see the baseline section above.
-6. ~~**File upstream MLX issues**~~ — **FILED 2026-07-17** from the Mac
-   side, order 1→4→3→2, all four accepted by the tracker:
-   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) (batched-GEMV
-   batch>65,535 crash), [mlx#3859](https://github.com/ml-explore/mlx/issues/3859)
-   (`[cuda13]` missing headers), [mlx#3860](https://github.com/ml-explore/mlx/issues/3860)
-   (TF32 default, undocumented), [mlx#3861](https://github.com/ml-explore/mlx/issues/3861)
-   (`sm_120` GEMM 36×). Cross-referenced (#3860 ↔ #3861). **Watch GitHub
-   notifications for maintainer follow-ups** — verification requests run
-   on the CUDA box. Original draft/dedup record below:
+Four, all accepted by the tracker; the drafts and repro scripts are in
+`docs/upstream-issues/`.
 
-   Drafts in `docs/upstream-issues/`:
-   (1) batched-GEMV batch>65,535 crash (one-line repro); (2) `sm_120` matmul
-   ~36× under cuBLAS; (3) TF32-by-default, undocumented; (4) `[cuda13]`
-   extra missing runtime/CCCL headers. Deduped against the tracker 2026-07-17
-   (related closed: mlx#2267, #3659, #2724).
+| issue | subject |
+|---|---|
+| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 |
+| [mlx#3859](https://github.com/ml-explore/mlx/issues/3859) | the `[cuda13]` extra is missing runtime/CCCL headers |
+| [mlx#3860](https://github.com/ml-explore/mlx/issues/3860) | TF32 on by default, undocumented |
+| [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) | `sm_120` GEMM ~36× under cuBLAS |
 
-   **Second dedup pass (2026-07-17, Mac side, tracker + source):** MLX
-   *does* have a native opt-out — `MLX_ENABLE_TF32` (`mlx/utils.h`,
-   default `1`) gates `CUBLAS_COMPUTE_32F_FAST_TF32` vs
-   `CUBLAS_COMPUTE_32F` in `cublas_gemm.cpp`. It is undocumented (only
-   `utils.h` + `mlx_tests.py`), which is why we missed it; draft 3 was
-   rewritten around "undocumented bad default", its original "no
-   opt-out API" claim was wrong. Because the flag is read lazily on
-   first use, setting `os.environ["MLX_ENABLE_TF32"]="0"` at
-   backend-init time works in-process — follow-up 1 is implementable
-   without the process-wide driver var. ~~Re-measure the precision
-   table with `MLX_ENABLE_TF32=0` before filing draft 3~~ — **done
-   (2026-07-17, CUDA box):** `MLX_ENABLE_TF32=0` measures 2.08e-07
-   (identical to the driver override), GEMM perf 421 ms vs 420 ms
-   (identical — the 36× gap is not an artifact of the disable method),
-   the in-process `os.environ` set works (2.08e-07), and the four
-   formerly TF32-failing tests pass with the MLX flag alone. Drafts 2
-   and 3 updated with the measured numbers; all four are ready to file.
-   Also folded into the drafts: #3666 (same gridDim class, fixed for
-   binary/copy/unary but not batched GEMV) → draft 1; #3056 (consumer
-   Blackwell graph limits) → draft 2; #2906/#2842/#2357/#2382 (header
-   search exists but misses the `nvidia/cu13` layout) → draft 4.
-7. Chunk `solve_alternating_projection` batches to ≤ 65,535 on the CUDA path
-   (existing chunked infrastructure applies).
+### Where `MLX_ENABLE_TF32` lives
+
+The operating guidance above prefers MLX's own flag to the driver
+variable. It is easy to miss: `MLX_ENABLE_TF32` is declared in
+`mlx/utils.h` with default `1`, and selects `CUBLAS_COMPUTE_32F` over
+`CUBLAS_COMPUTE_32F_FAST_TF32` in `cublas_gemm.cpp`. Nothing outside
+`utils.h` and `mlx_tests.py` mentions it, which is why the earlier
+recipes in this document reach for `NVIDIA_TF32_OVERRIDE=0` instead —
+and why mlx#3860 is filed as "undocumented bad default" rather than
+"no opt-out API".
+
+MLX reads the flag lazily, on first use, so setting
+`os.environ["MLX_ENABLE_TF32"] = "0"` before the first kernel call
+takes effect in-process; the driver variable is process-wide and has to
+be exported before Python starts.
+
+Measured against the driver override on this machine: the MLX flag
+reproduces the 2.08e-07 that the precision table above records for
+`NVIDIA_TF32_OVERRIDE=0`, and the four tests that fail under TF32 pass
+with the MLX flag alone. GEMM time is 421 ms with the MLX flag against
+420 ms with the driver override — which also rules out one reading of
+the `sm_120` result above: the 36× gap is not an artifact of how TF32
+was disabled.
+
+### What this PoC did not wire into the package
+
+Stated as limits, not plans — none of these is scheduled here.
+
+- `toyomacro` does not set `MLX_ENABLE_TF32` at CUDA-backend init.
+  Anyone on this path sets one of the two variables themselves, and
+  a run that forgets loses about three decimal digits silently.
+- `solve_alternating_projection` is not chunked against the 65,535
+  batch limit on the CUDA path, so on CUDA it has to be called below
+  that bound. The chunking the other solvers use would apply.
+- The `[cuda13]` header install and `CUDA_HOME` are manual, as the
+  setup recipe above spells out; the package does neither.
 
 ## Second data point (2026-09-21) — GPU-less x86 control
 
-Follow-up 4 asked whether the NumPy-baseline `decode_speed` gap was
-specific to the RTX 5070 box. It is not. The same assertions were run on
+The 2026-07 run left open whether the NumPy-baseline `decode_speed`
+gap was specific to the RTX 5070 box. It is not. The same assertions were run on
 an unrelated cloud container with **no GPU at all** — a control for the
 pure-CPU codec paths, not a CUDA run. Nothing here bears on the CUDA
 verdict above.
@@ -796,7 +778,7 @@ the NumPy baseline on the same host — 2.7× to 3.2× slower in wall
 clock. The `sm_120` GEMM shortfall recorded in 2026-07 is not fixed by
 driver 610.71 or MLX 0.32.2.
 
-### Follow-up 7 is untested by this run
+### The batch > 65,535 limit is untested by this run
 
 The suite completed without hitting the batch > 65,535 crash
 ([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)), but only
