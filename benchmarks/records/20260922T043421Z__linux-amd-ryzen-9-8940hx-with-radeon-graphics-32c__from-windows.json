@@ -1,0 +1,532 @@
+{
+ "schema_version": 3,
+ "kind": "repeated",
+ "description": "Cross-platform peak-fitting throughput, repeated in separate processes.",
+ "runs": 3,
+ "runs_note": "Each run is a separate process. Repeating inside one process would share the memory layout and clock state that make within-run repetitions agree, and would reproduce the blind spot this exists to measure.",
+ "problem": {
+  "n_energy": 151,
+  "center": 0.0,
+  "sigma": 0.5,
+  "gamma": 0.2,
+  "dE_range_sigma": 0.3,
+  "dsigma_range_sigma": 0.1,
+  "noise_level": 1000.0,
+  "peak_snr": 10.0,
+  "seed": 0,
+  "n_batch": 200000,
+  "n_common_accuracy_subset": 500,
+  "input_sha256": "212b959b22568c16662ad51506e2b356ebbc4038457748eab4b09866eaeef091",
+  "dtype": "float32 spectra",
+  "multipeak_chunk_size": 65535
+ },
+ "problem_identical_across_runs": true,
+ "results": [
+  {
+   "solver": "projection_kernel",
+   "backend": null,
+   "problem": "random float32 data, 151 channels x 3 components; no parameter recovery",
+   "runs": 3,
+   "rate_median": 9530859.591417857,
+   "rate_min": 9488004.010546166,
+   "rate_max": 9536184.835217666,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    9536184.835217666,
+    9488004.010546166,
+    9530859.591417857
+   ],
+   "across_run_spread": 1.0050780780254673,
+   "within_run_spread_typical": 1.0066005588492473,
+   "understates_by": 0.9984875025049456,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": null
+  },
+  {
+   "solver": "amp_only_projection",
+   "backend": "cuda",
+   "problem": "amplitude only at nominal (center, sigma)",
+   "runs": 3,
+   "rate_median": 18248844.52878745,
+   "rate_min": 18237227.854090843,
+   "rate_max": 18255349.068430707,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    18255349.068430707,
+    18237227.854090843,
+    18248844.52878745
+   ],
+   "across_run_spread": 1.000993638643156,
+   "within_run_spread_typical": 1.0526834115687513,
+   "understates_by": 0.9508971335944534,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.029441094598883437
+  },
+  {
+   "solver": "taylor_4step",
+   "backend": "cuda",
+   "problem": "amp + dE + dsigma via 4-step Taylor residual projection (first-order lineshape expansion; pre-dictionary path)",
+   "runs": 3,
+   "rate_median": 581456.1701664563,
+   "rate_min": 507694.09254938405,
+   "rate_max": 674803.4170279833,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    507694.09254938405,
+    674803.4170279833,
+    581456.1701664563
+   ],
+   "across_run_spread": 1.3291535728522277,
+   "within_run_spread_typical": 2.216456458231865,
+   "understates_by": 0.5996750208720699,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.021891153550741064
+  },
+  {
+   "solver": "dict2d_parabola",
+   "backend": "cuda",
+   "problem": "amp + dE + dsigma; 2-D dictionary 13x7 (|dE|<=0.3sigma, |dsigma|<=0.1sigma) + parabola refine",
+   "runs": 3,
+   "rate_median": 1469150.6821557032,
+   "rate_min": 1390568.2027841753,
+   "rate_max": 1470002.6554126237,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    1470002.6554126237,
+    1390568.2027841753,
+    1469150.6821557032
+   ],
+   "across_run_spread": 1.0571237372387818,
+   "within_run_spread_typical": 1.1036595011437864,
+   "understates_by": 0.9578350353013979,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.02223129842563654
+  },
+  {
+   "solver": "multipeak_2comp",
+   "backend": "cuda",
+   "problem": "2 Voigt components 4 sigma apart, per-component amp + dE + dsigma; alternating projection x3 + parabola, 13x7 grids",
+   "runs": 3,
+   "rate_median": 35400.92059605542,
+   "rate_min": 30959.21443198925,
+   "rate_max": 40278.046565211116,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    35400.92059605542,
+    30959.21443198925,
+    40278.046565211116
+   ],
+   "across_run_spread": 1.3010035074918758,
+   "within_run_spread_typical": 2.5411686790367307,
+   "understates_by": 0.5119705426186196,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.02896153203955796
+  }
+ ],
+ "numpy_parity": {
+  "n_spectra": 50000,
+  "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
+  "repeats": 1,
+  "warmup": 0,
+  "aggregation": "single timing",
+  "rate_caveat": "numpy_rate_spec_per_s is ONE cold timing of n_spectra, not a warmed median of the full batch, and n_spectra is near the NumPy path's throughput peak. It is a parity artefact, not a throughput figure -- do not compare it with rate_median above or with a record taken at a different batch size.",
+  "dict2d_parabola": {
+   "note": "the NumPy backend falls back to the dictionary-only solver (no parabola sub-grid refinement), so grid-quantised dE/dsigma differences are expected",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 2.384185791015625e-07,
+    "max": 4.76837158203125e-07
+   },
+   "abs_diff_dE_eV": {
+    "median": 0.005487858317792416,
+    "p99": 0.012357497587800026,
+    "max": 0.012500002980232239
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 0.0028406623750925064,
+    "p99": 0.008222652599215508,
+    "max": 0.00833333283662796
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.17738,
+   "fraction_amp_diff_gt_1e-3": 0.0,
+   "numpy_rate_spec_per_s": 393120.19530464074
+  },
+  "taylor_4step": {
+   "note": "same algorithm on both backends",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 3.5762786865234375e-07,
+    "max": 7.152557373046875e-07
+   },
+   "abs_diff_dE_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 2.9802322387695312e-08,
+    "max": 7.450580596923828e-08
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 7.450580596923828e-09,
+    "p99": 7.82310962677002e-08,
+    "max": 1.471489667892456e-07
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.0,
+   "fraction_amp_diff_gt_1e-3": 0.0,
+   "numpy_rate_spec_per_s": 226713.8446691383
+  }
+ },
+ "run_quality_verdicts": [
+  "quiet",
+  "quiet",
+  "quiet"
+ ],
+ "all_runs_quiet": true,
+ "environment": {
+  "schema_version": 3,
+  "timestamp_utc": "2026-09-22T04:34:21+00:00",
+  "timestamp_local": "2026-09-22T13:34:21+09:00",
+  "host_label": "linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c",
+  "origin": "windows",
+  "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
+  "machine": "x86_64",
+  "cpu": "AMD Ryzen 9 8940HX with Radeon Graphics",
+  "logical_cores": 32,
+  "memory_gb": 15.2,
+  "python": "3.12.3",
+  "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin windows --runs 1 --out _run0.json",
+  "versions": {
+   "toyomacro": "0.3.0",
+   "mlx": "0.32.2",
+   "numpy": "2.3.5",
+   "scipy": "1.17.0",
+   "h5py": "3.15.1",
+   "lmfit": "1.3.4",
+   "numba": null,
+   "psutil": "7.2.2",
+   "hdf5_library": "1.14.6"
+  },
+  "backend": {
+   "backend": "cuda",
+   "device_name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+   "mlx_version": "0.32.2",
+   "mlx_default_device": "Device(gpu, 0)",
+   "tf32_enabled": false,
+   "TOYOMACRO_DISABLE_MLX": null
+  },
+  "load": {
+   "sampled_over_s": 0.2,
+   "load_average": [
+    2.82470703125,
+    2.87939453125,
+    3.20654296875
+   ],
+   "logical_cores": 32,
+   "cpu_percent": 6.6,
+   "cpu_percent_others": 97.1,
+   "processes_redacted": false,
+   "top_processes": [
+    {
+     "name": "python3",
+     "cpu_percent": 97.1
+    }
+   ],
+   "looks_quiet": true,
+   "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+   "load_average_before": [
+    0.4287109375,
+    2.7685546875,
+    3.24462890625
+   ],
+   "cpu_percent_before": 6.3,
+   "top_processes_before": [
+    {
+     "name": "python3",
+     "cpu_percent": 101.1
+    }
+   ],
+   "looks_quiet_after_incl_self": true,
+   "looks_quiet_before": true,
+   "others_busy_after": false,
+   "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+   "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+  },
+  "steal_percent": 0.0,
+  "thermal": null,
+  "quality": {
+   "verdict": "quiet",
+   "reasons": [],
+   "comparable": true,
+   "note": "the verdict of the worst of the runs; per-run verdicts are in run_quality_verdicts and each run's own load is in run_environments"
+  },
+  "git": {
+   "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+   "git_tracked_dirty": false,
+   "git_dirty_files": [
+    "?? benchmarks/records/20260922T042448Z__linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c__from-windows.json"
+   ],
+   "harness_tracked_at_commit": true,
+   "untracked_files_present": true
+  }
+ },
+ "run_environments": [
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:34:21+00:00",
+   "timestamp_local": "2026-09-22T13:34:21+09:00",
+   "host_label": "linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c",
+   "origin": "windows",
+   "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
+   "machine": "x86_64",
+   "cpu": "AMD Ryzen 9 8940HX with Radeon Graphics",
+   "logical_cores": 32,
+   "memory_gb": 15.2,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin windows --runs 1 --out _run0.json",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": "0.32.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "cuda",
+    "device_name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "mlx_version": "0.32.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": false,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     2.82470703125,
+     2.87939453125,
+     3.20654296875
+    ],
+    "logical_cores": 32,
+    "cpu_percent": 6.6,
+    "cpu_percent_others": 97.1,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "python3",
+      "cpu_percent": 97.1
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     0.4287109375,
+     2.7685546875,
+     3.24462890625
+    ],
+    "cpu_percent_before": 6.3,
+    "top_processes_before": [
+     {
+      "name": "python3",
+      "cpu_percent": 101.1
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.0,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [
+     "?? benchmarks/records/20260922T042448Z__linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c__from-windows.json"
+    ],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": true
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:36:32+00:00",
+   "timestamp_local": "2026-09-22T13:36:32+09:00",
+   "host_label": "linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c",
+   "origin": "windows",
+   "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
+   "machine": "x86_64",
+   "cpu": "AMD Ryzen 9 8940HX with Radeon Graphics",
+   "logical_cores": 32,
+   "memory_gb": 15.2,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin windows --runs 1 --out _run1.json --no-parity",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": "0.32.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "cuda",
+    "device_name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "mlx_version": "0.32.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": false,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     2.96142578125,
+     2.9150390625,
+     3.16943359375
+    ],
+    "logical_cores": 32,
+    "cpu_percent": 6.3,
+    "cpu_percent_others": 96.4,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "python3",
+      "cpu_percent": 96.4
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     2.75830078125,
+     2.86474609375,
+     3.19970703125
+    ],
+    "cpu_percent_before": 6.3,
+    "top_processes_before": [
+     {
+      "name": "python3",
+      "cpu_percent": 96.3
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.0,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [
+     "?? benchmarks/records/20260922T042448Z__linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c__from-windows.json"
+    ],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": true
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:38:35+00:00",
+   "timestamp_local": "2026-09-22T13:38:35+09:00",
+   "host_label": "linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c",
+   "origin": "windows",
+   "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
+   "machine": "x86_64",
+   "cpu": "AMD Ryzen 9 8940HX with Radeon Graphics",
+   "logical_cores": 32,
+   "memory_gb": 15.2,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin windows --runs 1 --out _run2.json --no-parity",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": "0.32.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "cuda",
+    "device_name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "mlx_version": "0.32.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": false,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     3.01904296875,
+     2.94287109375,
+     3.13916015625
+    ],
+    "logical_cores": 32,
+    "cpu_percent": 6.1,
+    "cpu_percent_others": 101.2,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "python3",
+      "cpu_percent": 101.2
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     2.88427734375,
+     2.8994140625,
+     3.1630859375
+    ],
+    "cpu_percent_before": 6.3,
+    "top_processes_before": [
+     {
+      "name": "python3",
+      "cpu_percent": 96.5
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.0,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [
+     "?? benchmarks/records/20260922T042448Z__linux-amd-ryzen-9-8940hx-with-radeon-graphics-32c__from-windows.json"
+    ],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": true
+   }
+  }
+ ]
+}
