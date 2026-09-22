@@ -262,14 +262,18 @@ and a clock state; whatever changes between invocations is invisible to
 them by construction. A record that looks confident can be wrong by a
 factor of two.
 
-**On this host the cause is now known, and the record did say so.**
-The 2.07x is the GPU's PCIe link stepping between `gen4 x8` and
-`gen3 x8` — exactly a factor two per lane, width unchanged — measured
-2026-09-22 by sampling from the Windows side while timing each
-repetition. `summarize` stores every repetition in `timings_s`, and one
-of these records holds a single `gen3` repetition inside an otherwise
-`gen4` run. The step was in the committed JSON before anyone looked
-for it; the summary line that hid it was the median. See
+**On this host the likely cause is now known, and the record did show
+it.** The 2.07x matches the GPU's PCIe link stepping between `gen4 x8`
+and `gen3 x8` — exactly a factor two per lane, width unchanged. That
+step was observed directly on 2026-09-22, in a separate probe run
+sampled from the Windows side while each repetition was timed: the rate
+halved at the moment the link dropped a generation. The committed
+records were not sampled, so for them the generation is inferred from
+bandwidth, not observed. But `summarize` stores every repetition in
+`timings_s`, and one of these records holds a single repetition at
+about half the rate of its plateau. The step was in the committed JSON
+before anyone looked for it; the summary line that hid it was the
+median. See
 [`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md) §"The link generation moves
 mid-run".
 

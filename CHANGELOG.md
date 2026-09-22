@@ -111,15 +111,18 @@ archived on Zenodo for a citable DOI.
   is what makes a Metal record and a CUDA record the same measurement,
   and it keeps an older MLX safe.
 
-- **The Ryzen host's 2.07x CUDA spread was the PCIe link, and the
-  records already contained the evidence.** `docs/BENCHMARKS.md` said a
-  record "can be wrong by a factor of two, and nothing in the record
-  says so". The second half was false. `summarize` stores every
-  repetition in `timings_s`; one committed record holds a single slow
-  repetition inside an otherwise fast run, and sampling from the
-  Windows side while timing each repetition shows the link stepping
-  `gen4 x8` to `gen3 x8` at that point — exactly a factor two per lane,
-  width unchanged, efficiency 40.6% and 41.6% either side.
+- **The Ryzen host's 2.07x CUDA spread matches the PCIe link stepping
+  generation, and the records already contained the evidence.**
+  `docs/BENCHMARKS.md` said a record "can be wrong by a factor of two,
+  and nothing in the record says so". The second half was false.
+  `summarize` stores every repetition in `timings_s`, and one committed
+  record holds a single repetition at about half the rate of the rest.
+  In a separate probe run, sampling from the Windows side while timing
+  each repetition caught the link stepping `gen4 x8` to `gen3 x8` at
+  the moment the rate halved — exactly a factor two per lane, width
+  unchanged, 40.6% and 41.6% of line rate either side. The committed
+  records were not sampled; for them the generation is inferred from
+  bandwidth, not observed.
 
   `nvidia-smi` **inside WSL2 cannot see this**: it returns `gen.max`
   for `pcie.link.gen.current`, so a sampling run driven from WSL2

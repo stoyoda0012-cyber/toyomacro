@@ -513,15 +513,28 @@ of the step, 40.6% of `gen4 x8`'s 15.75 GB/s and 41.6% of `gen3 x8`'s
 the line rate halves under it. Across the window the box visited
 `gen1`, `gen2`, `gen3` and `gen4`, all at `x8`.
 
-**This was already in the committed records.** `summarize` stores every
+**The same step is in the committed records.** `summarize` stores every
 repetition in `timings_s`. Converted to bandwidth,
 `…011702…from-windows.json` reads:
 
     5.11  3.19  5.87  5.84  5.87  5.87  5.84  5.87  5.84   GB/s
 
-One repetition at `gen3` inside a run that is otherwise `gen4`. The two
-low-mode records sit at 2.80–2.92 GB/s across all nine. Nothing had to
-be added to the schema to see this — it had to be read.
+Seven repetitions sit at 5.84–5.87 GB/s, one drops to 3.19, and the
+first reads 5.11. The two low-mode records hold eight of their nine
+repetitions at 2.80–2.92 GB/s; their first repetitions read 3.53 and
+3.50.
+
+**Nobody sampled the link during those runs**, so the generation each
+repetition ran at is inferred, not observed. The inference: the two
+plateaus are a factor two apart, which is the `gen4`/`gen3` per-lane
+ratio, and each sits at about the same fraction of its line rate (~37%),
+as the probe's two did. The harness runs a few points less efficiently
+than the probe, which is why its absolute values sit below the probe's.
+That is strong circumstantial support. The only run in which generation
+and rate were recorded together is the probe above.
+
+Nothing had to be added to the schema to see the step — it had to be
+read.
 
 **`nvidia-smi` inside WSL2 cannot see it.** It returns `gen.max` for
 `pcie.link.gen.current`: `4`, always, idle or loaded. Only the
