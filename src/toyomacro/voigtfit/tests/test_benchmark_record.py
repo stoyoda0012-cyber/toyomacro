@@ -276,11 +276,13 @@ class TestWriteRecord:
         path = record.write_record(report, tmp_path)
         assert path.parent == tmp_path
         assert path.name.endswith("__from-test-origin.json")
-        assert json.loads(path.read_text())["environment"]["origin"] == "test-origin"
+        assert json.loads(path.read_text(encoding="utf-8"))[
+            "environment"]["origin"] == "test-origin"
 
     def test_written_record_leaks_no_path(self, tmp_path):
         report = {"environment": record.environment(origin="mac")}
-        blob = record.write_record(report, tmp_path).read_text()
+        blob = record.write_record(report, tmp_path).read_text(
+            encoding="utf-8")
         assert os.path.expanduser("~") not in blob
         for marker in ("/Users/", "/home/", "site-packages"):
             assert marker not in blob

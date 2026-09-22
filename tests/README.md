@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,325 automated tests** across **86 files**, in two
+This suite has **2,326 automated tests** across **86 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 48 | 1,266 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 48 | 1,267 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,059 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,893 tests, 81%) — guarantee the library
+- **Contract / regression** (1,894 tests, 81%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,313. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,314. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,16 +70,16 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,266)
+## Library body — `tests/` (1,267)
 
-### Claim guards — noise model, versions, backends, comparisons (88)
+### Claim guards — noise model, versions, backends, comparisons (89)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
 | 10 | `test_mlx_support.py` | MLX absent / installed-but-unusable / usable; NumPy fallback end-to-end |
 | 10 | `test_solver_comparison.py` | Same-problem scipy/lmfit comparison benchmark stays runnable + seed reproducibility |
 | 4 | `test_cli_surface.py` | CLI entry points stay importable and keep their documented flags |
-| 17 | `test_benchmarks_doc_citations.py` | Every figure `docs/BENCHMARKS.md` attributes to a committed record is in that record, and an unattributed measurement says "no record" |
+| 18 | `test_benchmarks_doc_citations.py` | Every figure `docs/BENCHMARKS.md` attributes to a committed record is in that record, and an unattributed measurement says "no record" |
 | 4 | `test_readme_inventory.py` | Every count on this page — total, per location, per section, per file, contract / reproduction split — against a fresh `pytest --collect-only` |
 | 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
