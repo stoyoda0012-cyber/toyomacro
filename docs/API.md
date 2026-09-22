@@ -172,11 +172,18 @@ a validation result, not a support claim. Before relying on it, read
   solver** (upstream MLX batched-GEMV grid-dimension limit,
   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Chunk to
   ≤ 65,535. Metal has no such limit.
-- **No CUDA CI**, and no committed performance record. On the one
-  machine measured, streaming/amplitude-only paths lost to that host's
-  CPU while compute-dense dictionary AP won 4–6×; MLX's `sm_120` GEMM
-  measured ~36× below what cuBLAS delivers on the same GPU. Do not
-  generalize any of that.
+- **No CUDA CI.** Performance records for this configuration are
+  committed under `benchmarks/records/` — measurements of MLX's CUDA
+  backend on one laptop GPU, not a supported performance claim. On that
+  host plain NumPy beats CUDA on three of five solvers, including both
+  streaming paths; CUDA wins the two compute-dense ones. The margin and
+  even the direction depend on the workload: an earlier measurement at
+  `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
+  committed records at `n_batch=200,000` put the 2-component multipeak
+  solver 3.5× ahead on the CPU. MLX's `sm_120` GEMM measured ~36× below
+  what cuBLAS delivers on the same GPU.
+  [`docs/CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md) has both. Do not
+  generalize any of it.
 
 ## 1. Lineshape
 
