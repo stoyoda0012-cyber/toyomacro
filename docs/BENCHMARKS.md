@@ -306,23 +306,63 @@ Same `input_sha256` across all three, default 200,000 batch.
 | `dict2d_parabola` | **8.5 M** | 0.98x | 8.5 / 8.6 / 8.4 M |
 | `multipeak_2comp` | **3.7 M** | 0.93x | 3.7 / 3.8 / 3.7 M |
 
-**On Metal the within-run range did bound the across-run spread** —
-every solver at or below 1.00x.
+#### `…043421Z…__from-windows.json` — three runs on the Ryzen/WSL2 host, CUDA
 
-**That is not a statement about the machine.** The Ryzen table above is
-built from records taken hours and code generations apart; this one
-from three runs in a single sitting. The two differ in *when* the
-measurements were taken at least as much as in *where*, so the
-comparison does not attribute the 2.07x to the host.
+| solver | median of 3 | across/within | the three runs |
+|---|---|---|---|
+| `projection_kernel` | **9.53 M** | 1.00x | 9.54 / 9.49 / 9.53 M |
+| `amp_only_projection` | **18.25 M** | 0.95x | 18.26 / 18.24 / 18.25 M |
+| `dict2d_parabola` | **1.47 M** | 0.96x | 1.47 / 1.39 / 1.47 M |
+| `taylor_4step` | **581 k** | 0.60x | 508 / 675 / 581 k |
+| `multipeak_2comp` | **35 k** | 0.51x | 35 / 31 / 40 k |
 
-What `--runs` varies is what changes between processes, and that is a
-strict subset of what changes between sittings. A low `understates_by`
-therefore says the back-to-back component is small and says nothing
-about the rest — it is a lower bound by construction, since the runs
-still share a thermal state, a GPU clock state and a warm page cache.
+#### `…042448Z…__from-windows.json` — the same host, NumPy
 
-Until a host has a `--runs` record, quote a median over several records
-or say plainly that you are quoting one.
+Graded `contended`: run 3 sat at a load average of 10.8, and an
+aggregate is only as clean as its dirtiest run, so `summarize_records`
+keeps this one out of its headline figures.
+
+| solver | median of 3 | across/within | the three runs |
+|---|---|---|---|
+| `projection_kernel` | **19.91 M** | 0.95x | 20.24 / 19.91 / 19.90 M |
+| `amp_only_projection` | **88.4 M** | **1.41x** | 102.2 / 40.5 / 88.4 M |
+| `dict2d_parabola` | **726 k** | 0.92x | 726 / 728 / 690 k |
+| `taylor_4step` | **383 k** | 0.93x | 392 / 373 / 383 k |
+| `multipeak_2comp` | **117 k** | 0.93x | 118 / 117 / 116 k |
+
+**On every machine and both backends, `understates_by` lands at or
+below 1.00 — with one exception.** NumPy `amp_only_projection` spreads
+2.52x across the three runs. The slow run is run 2, which is graded
+`quiet`; the `contended` run is the fast one. **The quality verdict
+does not account for it**, which makes this the CPU-side counterpart of
+§"Machine load, and what the verdict is worth" above, and an open
+question rather than a finding.
+
+Otherwise the reading is uniform: three back-to-back runs agree, on
+Metal, on CUDA and on NumPy. That is the result, and the next paragraph
+says why it is not the reassurance it looks like.
+
+**The Ryzen host demonstrates the limit on itself.** Its single-run
+records spread 2.07x on `projection_kernel`; three back-to-back runs on
+the same machine, at the same input hash, give 1.00x. Nothing about the
+machine differs between those two readings. What differs is whether the
+measurements were separated by hours.
+
+`--runs` varies what changes between processes, and that is a strict
+subset of what changes between sittings. A low `understates_by` says
+the back-to-back component is small and says nothing about the rest.
+
+**On this host the rest is known**: the PCIe link generation, above. A
+`--runs` record taken while the link held one generation cannot see a
+change of generation — and reported 1.00x with a straight face. That is
+not a defect in the metric. It is the metric measuring what it says it
+measures, on a host where that is not the dominant term.
+
+So `understates_by` is a lower bound by construction, since the runs
+share a thermal state, a GPU clock state and a warm page cache. Until a
+host has a `--runs` record, quote a median over several records or say
+plainly that you are quoting one. Once it has one, read `timings_s` as
+well as the median.
 
 ## 6. Measuring a new host
 

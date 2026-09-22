@@ -48,22 +48,32 @@ _CITATION = re.compile(r"`([^`]*\.json)`")
 #: a bold ``M``, which silently matched none of the slash-separated rows
 #: added later — the gate went inert on exactly the rows it was extended
 #: to cover, and a mutation test passed because nothing was checked.
+#: The unit is captured, because a row may quote ``581 k`` where another
+#: quotes ``9.5 M``. Before ``k`` was accepted, every sub-megaspectrum
+#: figure in the document was simply invisible to this gate -- which is
+#: the same failure as the two above, waiting for the first row to use
+#: one.
 _FIGURE = re.compile(
-    r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*M\b")
+    r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*([Mk])\b")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+_SCALE = {"M": 1e6, "k": 1e3}
 
 
 #: "4 M spectra" is a batch size, not a rate. Only throughputs are
 #: checked against a record's reported rates.
-_NOT_A_RATE = re.compile(r"\bM\s+(?:spectra|fits|px|pixels)\b")
+_NOT_A_RATE = re.compile(r"\b[Mk]\s+(?:spectra|fits|px|pixels)\b")
 
 
-def _figures(row: str) -> list[str]:
-    """Every throughput a row presents, as written (to keep precision)."""
+def _figures(row: str) -> list[tuple[str, float]]:
+    """Every throughput a row presents, as written (to keep precision).
+
+    Paired with its scale, so ``581 k`` and ``9.5 M`` are both checked
+    against the record in spectra per second.
+    """
     plain = _NOT_A_RATE.sub("", row.replace("**", ""))
-    out: list[str] = []
-    for span in _FIGURE.findall(plain):
-        out.extend(_NUMBER.findall(span))
+    out: list[tuple[str, float]] = []
+    for span, unit in _FIGURE.findall(plain):
+        out.extend((n, _SCALE[unit]) for n in _NUMBER.findall(span))
     return out
 
 
@@ -95,18 +105,18 @@ def _doc_rows(skip_record_free_sections: bool = True) -> list[tuple[str, str]]:
     return rows
 
 
-def _tolerance(figure_text: str) -> float:
+def _tolerance(figure_text: str, scale: float) -> float:
     """The rounding interval of the precision the document actually used.
 
     `478 M` is rounded to a whole million and must accept 477.5-478.5;
     `497.6 M` is rounded to a tenth and must accept far less. A single
     fixed tolerance either rejects honest rounding or waves through a
-    figure that disagrees.
+    figure that disagrees. `581 k` is the same rule one scale down.
     """
     if "." in figure_text:
         decimals = len(figure_text.split(".")[1])
-        return 0.5 * 10 ** (-decimals) * 1e6
-    return 0.5e6
+        return 0.5 * 10 ** (-decimals) * scale
+    return 0.5 * scale
 
 
 def _resolve(cited: str) -> Path | None:
@@ -189,11 +199,12 @@ def test_cited_figure_is_in_the_cited_record(row, cited):
     rates = [r for path in paths
              for r in _rates(json.loads(path.read_text(encoding="utf-8")))]
     assert rates, f"{[p.name for p in paths]} report no throughput to check"
-    for figure in figures:
-        want, tol = float(figure) * 1e6, _tolerance(figure)
+    for figure, scale in figures:
+        want, tol = float(figure) * scale, _tolerance(figure, scale)
+        unit = "M" if scale == 1e6 else "k"
         assert any(abs(rate - want) <= tol for rate in rates), (
-            f"{DOC.name} quotes {figure} M against {list(cited)}, which "
-            f"report {sorted(round(r / 1e6, 2) for r in rates)} M. The prose "
+            f"{DOC.name} quotes {figure} {unit} against {list(cited)}, which "
+            f"report {sorted(round(r / 1e6, 3) for r in rates)} M. The prose "
             "and the record disagree.")
 
 
