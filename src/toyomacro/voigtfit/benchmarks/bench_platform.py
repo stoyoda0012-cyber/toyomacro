@@ -53,6 +53,7 @@ import os
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -294,7 +295,7 @@ def _parity_dump(in_path: str, out_path: str) -> None:
              d_rate=r_d["rate_median"], t_rate=r_t["rate_median"])
 
 
-def parity_check(n: int, accel_est: dict, tmpdir: Path, energy, Y, truth) -> dict:
+def parity_check(n: int, accel_est: dict, energy, Y, truth) -> dict:
     """Refit the same spectra on the NumPy backend and report the difference.
 
     Runs in a subprocess with ``TOYOMACRO_DISABLE_MLX=1``, because the
@@ -303,7 +304,9 @@ def parity_check(n: int, accel_est: dict, tmpdir: Path, energy, Y, truth) -> dic
     differs, since the NumPy path falls back to the dictionary-only
     solver with no sub-grid refinement.
     """
-    in_path, path = tmpdir / "_parity_in.npz", tmpdir / "_parity_out.npz"
+    scratch = tempfile.TemporaryDirectory(prefix="toyomacro-parity-")
+    in_path = Path(scratch.name) / "parity_in.npz"
+    path = Path(scratch.name) / "parity_out.npz"
     np.savez(in_path, energy=energy, Y=Y[:n], amp=truth["amp"][:n],
              dE=truth["dE"][:n], dsigma=truth["dsigma"][:n])
     env = dict(os.environ, TOYOMACRO_DISABLE_MLX="1")
@@ -311,7 +314,6 @@ def parity_check(n: int, accel_est: dict, tmpdir: Path, energy, Y, truth) -> dic
                     "--parity-dump", str(in_path), "--parity-out", str(path)],
                    check=True, env=env)
     z = np.load(path)
-    in_path.unlink(missing_ok=True)
     out = {
         "n_spectra": n,
         "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
@@ -346,7 +348,7 @@ def parity_check(n: int, accel_est: dict, tmpdir: Path, energy, Y, truth) -> dic
             "fraction_amp_diff_gt_1e-3": float(np.mean(da > 1e-3)),
             "numpy_rate_spec_per_s": float(z[f"{pre}_rate"]),
         }
-    path.unlink(missing_ok=True)
+    scratch.cleanup()
     return out
 
 
@@ -363,7 +365,7 @@ def _check_tf32(allow: bool) -> None:
 
 
 def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
-        parity_n: int, do_parity: bool, tmpdir: Path,
+        parity_n: int, do_parity: bool,
         origin: str | None = None, host: str | None = None,
         chunk: int | None = CUDA_BATCH_LIMIT) -> dict:
     """Measure every contender and return the complete record.
@@ -415,7 +417,7 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
     parity = None
     if do_parity and mlx_usable():
         print(f"NumPy-backend parity on first {parity_n:,} spectra ...", flush=True)
-        parity = parity_check(parity_n, est, tmpdir, energy, Y, truth)
+        parity = parity_check(parity_n, est, energy, Y, truth)
         for k in ("dict2d_parabola", "taylor_4step"):
             q = parity[k]
             print(f"  {k}: |dAmp| med {q['abs_diff_amp']['median']:.2e} "
@@ -550,7 +552,7 @@ def aggregate_runs(records: list[dict]) -> dict:
     }
 
 
-def run_repeated(runs: int, argv_common: list[str], tmpdir: Path) -> dict:
+def run_repeated(runs: int, argv_common: list[str]) -> dict:
     """Measure `runs` times in separate processes and aggregate.
 
     Each child is a plain single-run invocation of this module. The
@@ -573,17 +575,20 @@ def run_repeated(runs: int, argv_common: list[str], tmpdir: Path) -> dict:
     between processes, and not what changes between afternoons.
     """
     records = []
-    for index in range(runs):
-        path = tmpdir / f"_run{index}.json"
-        argv = [sys.executable, "-m", __spec__.name, *argv_common,
-                "--runs", "1", "--out", str(path)]
-        if index > 0:
-            argv.append("--no-parity")
-        print(f"\n=== run {index + 1} of {runs} "
-              "(separate process) ===", flush=True)
-        subprocess.run(argv, check=True)
-        records.append(json.loads(path.read_text(encoding="utf-8")))
-        path.unlink(missing_ok=True)
+    # Not `tmpdir`: that is often the records directory, and a child that
+    # crashes would leave `_runN.json` there for `summarize_records` to
+    # glob up as a real record. A TemporaryDirectory cleans up either way.
+    with tempfile.TemporaryDirectory(prefix="toyomacro-runs-") as scratch:
+        for index in range(runs):
+            path = Path(scratch) / f"run{index}.json"
+            argv = [sys.executable, "-m", __spec__.name, *argv_common,
+                    "--runs", "1", "--out", str(path)]
+            if index > 0:
+                argv.append("--no-parity")
+            print(f"\n=== run {index + 1} of {runs} "
+                  "(separate process) ===", flush=True)
+            subprocess.run(argv, check=True)
+            records.append(json.loads(path.read_text(encoding="utf-8")))
     return aggregate_runs(records)
 
 
@@ -650,9 +655,8 @@ def main(argv: list[str] | None = None) -> None:
               flush=True)
 
     out_path = Path(args.out) if args.out else None
-    tmpdir = (out_path.parent if out_path
-              else Path(args.records_dir) if args.records_dir else Path.cwd())
-    tmpdir.mkdir(parents=True, exist_ok=True)
+    if out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if info["backend"] == "cuda" and args.n_batch > CUDA_BATCH_LIMIT:
         print(f"note: --n-batch {args.n_batch:,} exceeds the CUDA gridDim "
@@ -675,10 +679,10 @@ def main(argv: list[str] | None = None) -> None:
             common.append("--no-parity")
         if args.allow_tf32:
             common.append("--allow-tf32")
-        report = run_repeated(args.runs, common, tmpdir)
+        report = run_repeated(args.runs, common)
     else:
         report = run(args.n_batch, args.n_loop, args.repeats, args.warmup,
-                     args.parity_n, not args.no_parity, tmpdir,
+                     args.parity_n, not args.no_parity,
                      origin=args.origin, host=args.host_label,
                      chunk=args.chunk)
 
