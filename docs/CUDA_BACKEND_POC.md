@@ -29,8 +29,12 @@ overrides correctness.
 
 ## Target environment
 
-- Windows 11 + WSL2 (Ubuntu 24.04) — MLX has no native Windows support;
-  WSL2 is the supported route. NVIDIA officially supports CUDA in WSL2.
+- Windows 11 + WSL2 (Ubuntu 24.04) — WSL2 is the only route to MLX's
+  CUDA backend on a Windows box. MLX does publish `win_amd64` wheels
+  (since 0.32.0), but they declare no backend at all: every CUDA extra
+  in its metadata is gated on `platform_system == "Linux"`. A native
+  Windows install is CPU-only, not a faster CUDA. NVIDIA officially
+  supports CUDA in WSL2.
 - NVIDIA driver **on the Windows side only** (>= 580 for CUDA 13).
   Do NOT install a Linux GPU driver inside WSL2 — the Windows driver is
   exposed inside WSL as a stub `libcuda.so`.
@@ -434,6 +438,44 @@ answerable by `--runs N`, which reports `understates_by` per solver:
 NVIDIA_TF32_OVERRIDE=0 python -m toyomacro.voigtfit.benchmarks.bench_platform \
     --origin windows --runs 3 --records-dir benchmarks/records
 ```
+
+#### What the CPU-wins rows are measuring
+
+Not the GPU. `projection_kernel` reads 151 float32 channels per
+spectrum and writes little, so its rate converts straight to a
+bandwidth: 604 bytes × spectra/s.
+
+| host, backend | rate | effective bandwidth |
+|---|---|---|
+| M3 Max, Metal | 496.3 M/s | 300 GB/s |
+| Ryzen, NumPy | 18.8–20.1 M/s | 11.3–12.1 GB/s |
+| RTX 5070 Laptop, CUDA | 4.68–9.67 M/s | **2.8–5.8 GB/s** |
+
+The first two are those machines' memory bandwidths — unified memory on
+the M3 Max, DDR5 on the Ryzen — which is what a memory-bound kernel
+should report. The third is two orders of magnitude under this card's
+memory bandwidth, and sits in the range of its PCIe link.
+
+That is [`mlx#3861`](https://github.com/ml-explore/mlx/issues/3861),
+confirmed on this machine: WSL2 reports `concurrentManagedAccess == 0`,
+so MLX's unified allocator falls back to `cudaMallocHost`, and an array
+built from host data — which is what `mx.array(numpy_array)` does, and
+what this kernel does — stays in pinned host memory for life. Every
+step streams its operand across PCIe.
+
+So "CPU wins ~2–4×" is a true measurement of this software stack on
+this host, and not a statement about the GPU. Read it as: under WSL2,
+MLX's memory-bound paths do not reach the card. The rows the GPU still
+wins are the compute-dense ones, which is consistent with a per-byte
+penalty rather than a per-flop one — though that split has not been
+measured separately, and nothing here establishes it.
+
+**The fix is not on the Windows side.** There is no MLX CUDA backend
+for Windows to move to (see Target environment). Measuring CUDA without
+this fault means native Linux on this hardware, or waiting for the
+#3861 patch and re-measuring here — the second is the better
+experiment, because it moves the allocator while holding the hardware,
+the driver and WSL2 fixed.
 
 **The GPU's one decisive 2026-07 win is the row it loses here.** That
 table has dictionary AP 4–6× ahead on the GPU at `n_comp=4, 65k`;

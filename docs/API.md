@@ -176,7 +176,11 @@ a validation result, not a support claim. Before relying on it, read
   committed under `benchmarks/records/` — measurements of MLX's CUDA
   backend on one laptop GPU, not a supported performance claim. On that
   host plain NumPy beats CUDA on three of five solvers, including both
-  streaming paths; CUDA wins the two compute-dense ones. The margin and
+  streaming paths; CUDA wins the two compute-dense ones. Those losses
+  are not the card: under WSL2 MLX allocates host-built arrays in pinned
+  host memory (upstream `mlx#3861`), so a memory-bound kernel streams
+  its operand across PCIe and reports 2.8–5.8 GB/s where the same kernel
+  reports 300 GB/s on Metal. The margin and
   even the direction depend on the workload: an earlier measurement at
   `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
   committed records at `n_batch=200,000` put the 2-component multipeak

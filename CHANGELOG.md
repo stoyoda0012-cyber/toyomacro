@@ -92,6 +92,30 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **The CUDA-vs-NumPy comparison said something it had not measured.**
+  `README.md`, `docs/API.md` and `docs/CUDA_BACKEND_POC.md` reported
+  that NumPy beats MLX's CUDA backend on three of five solvers on one
+  RTX 5070 Laptop, which reads as a statement about the GPU. It is not.
+  `projection_kernel` reads 151 float32 channels per spectrum, so its
+  rate is a bandwidth: the committed records put that host at **2.8-5.8
+  GB/s** against 300 GB/s on Metal and 11.3-12.1 GB/s for NumPy on the
+  same Ryzen. The first two are those machines' memory bandwidths; the
+  third is two orders of magnitude below the card's and sits at its
+  PCIe link.
+
+  The cause is upstream `mlx#3861`, already confirmed on that machine:
+  WSL2 reports `concurrentManagedAccess == 0`, so MLX allocates arrays
+  built from host data in pinned host memory for life and every step
+  streams the operand across PCIe. The numbers stand; what they measure
+  is MLX under WSL2, not the hardware, and all three documents now say
+  so.
+
+  `CUDA_BACKEND_POC.md` also claimed MLX has no native Windows support.
+  It has had `win_amd64` wheels since 0.32.0 — but they carry no
+  backend, since every CUDA extra in MLX's metadata is gated on
+  `platform_system == "Linux"`. A native Windows install would be
+  CPU-only, so WSL2 remains the only route and the recipe is unchanged.
+
 - **Text I/O in the benchmark record modules names its encoding.**
   `Path.read_text`, `Path.write_text` and `open` without `encoding=`
   read and write in the platform's locale encoding, which is cp1252 on
