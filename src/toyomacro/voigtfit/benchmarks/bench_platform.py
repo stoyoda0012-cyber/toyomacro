@@ -38,10 +38,11 @@ Platform notes
   which is not an acceptable default for a fitting engine. This harness
   refuses to record a CUDA run with TF32 left on unless ``--allow-tf32``
   is given, and records the setting either way.
-- **All backends**: alternating projection is chunked at 65,535, the CUDA
-  ``gridDim`` limit (ml-explore/mlx#3858, unfixed as of MLX 0.32.2).
-  Metal has no such limit but chunks anyway, so that one command measures
-  the same work everywhere. The chunk size is recorded.
+- **All backends**: alternating projection is chunked at 65,535, once the
+  CUDA ``gridDim`` limit (ml-explore/mlx#3858, fixed upstream and measured
+  clear at MLX 0.32.2). Metal never had the limit. The chunking stays
+  because it is what makes one command measure the same work everywhere,
+  and it protects an older MLX. The chunk size is recorded.
 - **NumPy hosts**: every contender still runs; nothing is skipped. The
   backend-parity check is skipped, since both arms would be identical.
 """
@@ -102,13 +103,15 @@ PEAK_CONFIG = {"centers": np.array([CENTER]), "sigmas": np.array([SIGMA]),
                "gamma": GAMMA}
 GRID = dict(N_dE=13, N_ds=7)          # identical to solver_comparison_benchmark
 
-#: Above this, MLX's CUDA backend maps the batch onto a grid dimension
-#: untiled and the launch fails (ml-explore/mlx#3858), still unfixed as of
-#: MLX 0.32.2. Metal has no such limit -- but the chunking is applied on
-#: EVERY backend anyway, because a Metal run that processed 200k in one
-#: call and a CUDA run that processed it in four is not the same
-#: measurement, and comparing the two would be the exact error this
-#: harness exists to prevent.
+#: Above this, MLX's CUDA backend used to map the batch onto a grid
+#: dimension untiled and the launch failed (ml-explore/mlx#3858). That was
+#: fixed upstream in mlx#3929 and measured clear at MLX 0.32.2 -- a single
+#: chunk of 65,537 agrees with a split one bit for bit, on CUDA and on
+#: Metal. The chunking is applied on EVERY backend anyway, because a Metal
+#: run that processed 200k in one call and a CUDA run that processed it in
+#: four is not the same measurement, and comparing the two would be the
+#: exact error this harness exists to prevent. It also keeps an older MLX
+#: safe. It is no longer a workaround for a live crash.
 CUDA_BATCH_LIMIT = 65_535
 
 

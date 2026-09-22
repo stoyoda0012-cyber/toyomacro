@@ -368,6 +368,22 @@ as fixed mlx#2267/#3659/#2724); call-site workaround: chunk AP batches
 to ≤ 65,535 (the chunked infrastructure from `test_memory.py` already
 exists for this). Draft report: `docs/upstream-issues/mlx-issue-1-*.md`.
 
+**Fixed upstream; measured here 2026-09-22.** `mlx#3929` split the batch
+across `grid.y`/`grid.z` and was merged 2026-08-05;
+[mlx#3858](https://github.com/ml-explore/mlx/issues/3858) closed
+completed the next day, and MLX 0.32.2 shipped 2026-08-25. On this
+machine at 0.32.2, `solve_multipeak_chunked` at 65,535 / 65,536 /
+65,537 completes in a **single chunk** and agrees with the same problem
+split in two to the **bit** on `amplitudes`, `delta_E` and
+`delta_sigma`. Metal gives the same bit-identical agreement, which is
+the control: chunking does not itself change the answer, so a CUDA
+disagreement would have been the bug and there was none.
+
+The chunking stays in the harness. It is what makes a Metal record and
+a CUDA record the same measurement, and it protects anyone on an older
+MLX. What changed is that it is no longer a workaround for a live
+crash.
+
 ### Throughput: MLX CUDA GEMM is ~36× below the hardware on `sm_120`
 
 Raw 4096³ fp32 GEMM, same GPU, same WSL2 session, same cuBLAS libraries:
@@ -477,6 +493,47 @@ this fault means native Linux on this hardware, or waiting for the
 experiment, because it moves the allocator while holding the hardware,
 the driver and WSL2 fixed.
 
+#### The link generation moves mid-run, and halves the rate
+
+Measured 2026-09-22 on this machine: `nvidia-smi.exe` sampled from the
+**Windows side** at 0.5 s while a probe timed each repetition of the
+projection kernel.
+
+| | rate | effective bandwidth | link |
+|---|---|---|---|
+| repetitions 1-2 | 10.6 M/s | 6.4 GB/s | `gen4 x8` |
+| repetitions 3-9 | 5.4 M/s | 3.28 GB/s | `gen3 x8` |
+
+Not a warm-up transient: it held for seven repetitions, which is enough
+to move the median of nine. `gen4` to `gen3` is exactly a factor two
+per lane, and **the width never moved off `x8` in any sample** — the
+halving needs no width change. The efficiency is the same either side
+of the step, 40.6% of `gen4 x8`'s 15.75 GB/s and 41.6% of `gen3 x8`'s
+7.88 GB/s, which is what a fixed-fraction PCIe stream looks like when
+the line rate halves under it. Across the window the box visited
+`gen1`, `gen2`, `gen3` and `gen4`, all at `x8`.
+
+**This was already in the committed records.** `summarize` stores every
+repetition in `timings_s`. Converted to bandwidth,
+`…011702…from-windows.json` reads:
+
+    5.11  3.19  5.87  5.84  5.87  5.87  5.84  5.87  5.84   GB/s
+
+One repetition at `gen3` inside a run that is otherwise `gen4`. The two
+low-mode records sit at 2.80–2.92 GB/s across all nine. Nothing had to
+be added to the schema to see this — it had to be read.
+
+**`nvidia-smi` inside WSL2 cannot see it.** It returns `gen.max` for
+`pcie.link.gen.current`: `4`, always, idle or loaded. Only the
+Windows-side `nvidia-smi.exe` reports the live value. A sampling run
+driven from inside WSL2 shows a perfectly steady `gen4` while the link
+steps underneath it, and 78 such samples say no more than one does.
+
+So the 2.07× spread between this host's CUDA records is neither
+measurement noise nor a property of the solver. It is which PCIe
+generation the link happened to be in, and the record's own
+`timings_s` shows which.
+
 **The GPU's one decisive 2026-07 win is the row it loses here.** That
 table has dictionary AP 4–6× ahead on the GPU at `n_comp=4, 65k`;
 `multipeak_2comp` at 200 k puts the CPU 3.5× ahead. The CUDA side
@@ -492,7 +549,9 @@ survive being moved off it. The upside stated above — a GEMM engine at
 
 - Always: `MLX_ENABLE_TF32=0` (MLX-native; measured equivalent to the
   driver-level `NVIDIA_TF32_OVERRIDE=0`, and settable in-process via
-  `os.environ` before the first kernel call) and AP batch chunks ≤ 65,535.
+  `os.environ` before the first kernel call). AP batch chunks ≤ 65,535
+  are no longer required at MLX 0.32.2 (mlx#3858 is fixed, measured); the
+  harness keeps chunking so that Metal and CUDA measure the same work.
 - Streaming / amp-only paths: **stay on NumPy** — the Ryzen wins today.
 - Multipeak AP / dict2d at scale: CUDA is already a real 4–6× win.
 - Re-benchmark on each MLX release; the 36× GEMM gap is the number to watch.
@@ -524,7 +583,7 @@ Four, all accepted by the tracker; the drafts and repro scripts are in
 
 | issue | subject |
 |---|---|
-| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 |
+| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 — **fixed** in mlx#3929, verified here at 0.32.2 |
 | [mlx#3859](https://github.com/ml-explore/mlx/issues/3859) | the `[cuda13]` extra is missing runtime/CCCL headers |
 | [mlx#3860](https://github.com/ml-explore/mlx/issues/3860) | TF32 on by default, undocumented |
 | [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) | `sm_120` GEMM ~36× under cuBLAS |
@@ -561,8 +620,10 @@ Stated as limits, not plans — none of these is scheduled here.
   Anyone on this path sets one of the two variables themselves, and
   a run that forgets loses about three decimal digits silently.
 - `solve_alternating_projection` is not chunked against the 65,535
-  batch limit on the CUDA path, so on CUDA it has to be called below
-  that bound. The chunking the other solvers use would apply.
+  batch limit on the CUDA path. This was a live crash when written; it
+  is not one at MLX 0.32.2, where a single chunk of 65,537 agrees with
+  a split one bit for bit. Left unwired deliberately: adding a guard
+  now would work around a fixed bug.
 - The `[cuda13]` header install and `CUDA_HOME` are manual, as the
   setup recipe above spells out; the package does neither.
 
@@ -863,13 +924,14 @@ the NumPy baseline on the same host — 2.7× to 3.2× slower in wall
 clock. The `sm_120` GEMM shortfall recorded in 2026-07 is not fixed by
 driver 610.71 or MLX 0.32.2.
 
-### The batch > 65,535 limit is untested by this run
+### The batch > 65,535 limit, tested 2026-09-22
 
-The suite completed without hitting the batch > 65,535 crash
-([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)), but only
-because its batches stay at or below that size. The chunking is still
-unimplemented and this run is **not** evidence that the upstream bug is
-fixed.
+This 2026-09 suite completed without hitting the crash
+([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)) only
+because its batches stay at or below that size, so it was **not**
+evidence either way. It has since been tested directly: the limit is
+gone at MLX 0.32.2, bit-identically. See the resolution note under
+"NEW BUG: batch > 65,535" above.
 
 ### Two traps that cost 40 minutes here
 

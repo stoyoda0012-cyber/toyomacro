@@ -92,6 +92,40 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **The 65,535 batch limit was fixed upstream a month ago; four places
+  still warned about it.** `mlx#3858` — MLX's CUDA batched GEMV mapping
+  the batch onto one grid dimension, so a launch above 65,535 failed —
+  was fixed in `mlx#3929`, merged 2026-08-05 and closed completed the
+  next day. MLX 0.32.2 shipped 2026-08-25. Nothing here had tested it,
+  because the harness chunks unconditionally and so never crosses the
+  bound; `bench_platform` nonetheless asserted the bug was "still
+  unfixed as of MLX 0.32.2".
+
+  Measured now, on CUDA and on Metal: 65,535 / 65,536 / 65,537 each
+  complete in a single chunk and agree with the same problem split in
+  two **bit for bit** on `amplitudes`, `delta_E` and `delta_sigma`.
+  `README.md`, `docs/API.md`, `docs/CUDA_BACKEND_POC.md` and the
+  harness now say so, and
+  `docs/upstream-issues/verify-mlx-3858-batch-limit.py` is how the
+  claim gets re-checked on a future MLX. The chunking itself stays: it
+  is what makes a Metal record and a CUDA record the same measurement,
+  and it keeps an older MLX safe.
+
+- **The Ryzen host's 2.07x CUDA spread was the PCIe link, and the
+  records already contained the evidence.** `docs/BENCHMARKS.md` said a
+  record "can be wrong by a factor of two, and nothing in the record
+  says so". The second half was false. `summarize` stores every
+  repetition in `timings_s`; one committed record holds a single slow
+  repetition inside an otherwise fast run, and sampling from the
+  Windows side while timing each repetition shows the link stepping
+  `gen4 x8` to `gen3 x8` at that point — exactly a factor two per lane,
+  width unchanged, efficiency 40.6% and 41.6% either side.
+
+  `nvidia-smi` **inside WSL2 cannot see this**: it returns `gen.max`
+  for `pcie.link.gen.current`, so a sampling run driven from WSL2
+  reports a steady `gen4` while the link steps underneath it. Only the
+  Windows-side `nvidia-smi.exe` reports the live value.
+
 - **The CUDA-vs-NumPy comparison said something it had not measured.**
   `README.md`, `docs/API.md` and `docs/CUDA_BACKEND_POC.md` reported
   that NumPy beats MLX's CUDA backend on three of five solvers on one

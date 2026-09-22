@@ -171,10 +171,13 @@ a validation result, not a support claim. Before relying on it, read
   driver-level `NVIDIA_TF32_OVERRIDE=0` that the PoC's recipes use —
   the two are measured equivalent, and that document's §"Where
   `MLX_ENABLE_TF32` lives" says which to reach for when.
-- **Batches above 65,535 crash the multipeak alternating-projection
-  solver** (upstream MLX batched-GEMV grid-dimension limit,
-  [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Chunk to
-  ≤ 65,535. Metal has no such limit.
+- **Batches above 65,535 used to crash the multipeak
+  alternating-projection solver** (upstream MLX batched-GEMV
+  grid-dimension limit,
+  [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Fixed
+  upstream in mlx#3929 and measured clear at MLX 0.32.2: a single chunk
+  of 65,537 agrees bit for bit with the same problem split. On an older
+  MLX, chunk to ≤ 65,535. Metal never had the limit.
 - **No CUDA CI.** Performance records for this configuration are
   committed under `benchmarks/records/` — measurements of MLX's CUDA
   backend on one laptop GPU, not a supported performance claim. On that

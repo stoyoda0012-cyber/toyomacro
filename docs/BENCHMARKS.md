@@ -260,7 +260,22 @@ So `rate_min` and `rate_max` do not bound what a second run would give.
 The repetitions inside one invocation share a process, a memory layout
 and a clock state; whatever changes between invocations is invisible to
 them by construction. A record that looks confident can be wrong by a
-factor of two, and nothing in the record says so.
+factor of two.
+
+**On this host the cause is now known, and the record did say so.**
+The 2.07x is the GPU's PCIe link stepping between `gen4 x8` and
+`gen3 x8` — exactly a factor two per lane, width unchanged — measured
+2026-09-22 by sampling from the Windows side while timing each
+repetition. `summarize` stores every repetition in `timings_s`, and one
+of these records holds a single `gen3` repetition inside an otherwise
+`gen4` run. The step was in the committed JSON before anyone looked
+for it; the summary line that hid it was the median. See
+[`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md) §"The link generation moves
+mid-run".
+
+That is one host and one cause, and it does not license reading the
+other spreads as explained. It does say where to look first: **the
+per-repetition timings, before the median.**
 
 **What this does and does not undermine.** It does not undermine the
 cross-backend conclusions: on that host the CUDA and NumPy ranges do
