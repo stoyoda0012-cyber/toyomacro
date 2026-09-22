@@ -13,10 +13,35 @@ python -m toyomacro.voigtfit.benchmarks.<module>
 Docstrings occasionally cite `dev-log NN` — references to the
 maintainer's development log; see CONTRIBUTING.md.
 
+## Cross-platform record — start here
+
+`bench_platform` is the one harness meant to be run on **every** host:
+Apple Silicon (Metal), NVIDIA under WSL2 (CUDA), and any CPU-only
+machine (NumPy). Same seeded problem, same solvers, same schema, so the
+three records are directly comparable.
+
+```bash
+python -m toyomacro.voigtfit.benchmarks.bench_platform --out record.json
+```
+
+Batch size is an explicit argument (`--n-batch`, default 200,000) and is
+recorded, because it moves the answer — keep it equal across hosts or
+the comparison is meaningless. On CUDA the harness refuses to record a
+run with TF32 left enabled, and chunks alternating projection below the
+65,535 `gridDim` limit.
+
+Every record carries the machine's **load** at measurement time. A
+throughput number from a busy host reads low by more than its own
+reported range suggests, and the harness warns when it sees one. What a
+record does and does not contain, and why, is in
+[`record.py`](record.py); where each published number came from is in
+[`docs/BENCHMARKS.md`](../../../../docs/BENCHMARKS.md).
+
 ## Standalone (synthetic data only — run anywhere)
 
 | Module | What it measures |
 |--------|------------------|
+| `record` | Shared measurement-record schema: environment, backend, load, git state (no paths) |
 | `theoretical_limits` | Roofline analysis: memory/compute/SSD bounds vs measured Stage 1 rate |
 | `benchmark_rowmajor`, `benchmark_stage1_pipeline` | Stage 1 amplitude-kernel throughput |
 | `bench_dict2d`, `bench_dict2d_sweep`, `bench_dict2d_margin` | Dict2D solver accuracy/throughput vs grid settings |

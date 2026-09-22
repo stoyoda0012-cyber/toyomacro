@@ -1,0 +1,382 @@
+{
+ "schema_version": 3,
+ "description": "Cross-platform peak-fitting throughput: one problem, one schema, every backend.",
+ "problem": {
+  "n_energy": 151,
+  "center": 0.0,
+  "sigma": 0.5,
+  "gamma": 0.2,
+  "dE_range_sigma": 0.3,
+  "dsigma_range_sigma": 0.1,
+  "noise_level": 1000.0,
+  "peak_snr": 10.0,
+  "seed": 0,
+  "n_batch": 200000,
+  "n_common_accuracy_subset": 500,
+  "input_sha256": "53b9dda5b901e7daf33eb1bbbeeaa47070e5bb2b476315b3c9e0fcf7a37ee026",
+  "dtype": "float32 spectra",
+  "multipeak_chunk_size": 65535
+ },
+ "results": [
+  {
+   "solver": "projection_kernel",
+   "description": "amplitude-only projection kernel (A = Y @ W, chi2 on a 0.01% sample)",
+   "problem": "random float32 data, 151 channels x 3 components; no parameter recovery",
+   "dtype": "float32",
+   "n_energy": 151,
+   "n_comp": 3,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 4000000,
+   "timings_s": [
+    0.008081,
+    0.008069,
+    0.008053,
+    0.008051,
+    0.008039,
+    0.00801,
+    0.007998,
+    0.008014,
+    0.008032
+   ],
+   "time_median_s": 0.008039082998948288,
+   "rate_median": 497569187.99361813,
+   "rate_min": 494962702.7268924,
+   "rate_max": 500096393.65253466,
+   "aggregation": "median"
+  },
+  {
+   "solver": "amp_only_projection",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amplitude only at nominal (center, sigma)",
+   "setup_s": 0.00268845800019335,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.000592,
+    0.000482,
+    0.000475,
+    0.000473,
+    0.000474,
+    0.000466,
+    0.000458,
+    0.000476,
+    0.000477
+   ],
+   "time_median_s": 0.0004752910008392064,
+   "rate_median": 420794838.6291057,
+   "rate_min": 337909187.26425475,
+   "rate_max": 436601147.819625,
+   "aggregation": "median",
+   "mae_amp": 0.029441089055651473,
+   "mae_dE": null,
+   "mae_dsigma": null
+  },
+  {
+   "solver": "taylor_4step",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amp + dE + dsigma via 4-step Taylor residual projection (first-order lineshape expansion; pre-dictionary path)",
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.018433,
+    0.0186,
+    0.017887,
+    0.017796,
+    0.01824,
+    0.018456,
+    0.018322,
+    0.015439,
+    0.015762
+   ],
+   "time_median_s": 0.018239582999740378,
+   "rate_median": 10965162.964682186,
+   "rate_min": 10752784.715963598,
+   "rate_max": 12954172.476820106,
+   "aggregation": "median",
+   "mae_amp": 0.021891158557531223,
+   "mae_dE": 0.013760101054702585,
+   "mae_dsigma": 0.013913019855365524
+  },
+  {
+   "solver": "dict2d_parabola",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "amp + dE + dsigma; 2-D dictionary 13x7 (|dE|<=0.3sigma, |dsigma|<=0.1sigma) + parabola refine",
+   "setup_s": 0.0043563749986788025,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.024105,
+    0.023768,
+    0.02363,
+    0.02372,
+    0.023484,
+    0.023664,
+    0.023409,
+    0.023476,
+    0.023333
+   ],
+   "time_median_s": 0.023629790999621036,
+   "rate_median": 8463892.042177077,
+   "rate_min": 8297134.319200029,
+   "rate_max": 8571382.775495267,
+   "aggregation": "median",
+   "mae_amp": 0.022231290140590915,
+   "mae_dE": 0.013351191621674953,
+   "mae_dsigma": 0.01283407997807907
+  },
+  {
+   "solver": "multipeak_2comp",
+   "backend": "metal",
+   "dtype": "float32",
+   "problem": "2 Voigt components 4 sigma apart, per-component amp + dE + dsigma; alternating projection x3 + parabola, 13x7 grids",
+   "input_sha256": "a14e6a08b733fff627e2a32758a4fd25801b3e6c42e51ea9daa10b0a46eaaed0",
+   "setup_s": 0.008878167000148096,
+   "chunk_size": 65535,
+   "warmup": 2,
+   "repeats": 9,
+   "n_items": 200000,
+   "timings_s": [
+    0.058293,
+    0.054714,
+    0.05409,
+    0.053848,
+    0.053837,
+    0.054016,
+    0.05439,
+    0.053934,
+    0.053849
+   ],
+   "time_median_s": 0.054016000000046915,
+   "rate_median": 3702606.635067874,
+   "rate_min": 3430953.5101588545,
+   "rate_max": 3714885.5781138856,
+   "aggregation": "median",
+   "mae_amp": 0.028988386614238287,
+   "mae_dE": 0.019581564980794573,
+   "mae_dsigma": 0.01737454821305016
+  },
+  {
+   "solver": "scipy_curve_fit",
+   "problem": "amplitude + dE + dsigma (gamma fixed)",
+   "backend": "scipy curve_fit, bounded trust-region reflective (TRF), single-thread CPU per-spectrum loop",
+   "n_spectra": 500,
+   "setup_s": 0.0,
+   "repeats": 3,
+   "timings_s": [
+    0.609,
+    0.609,
+    0.61
+   ],
+   "aggregation": "median",
+   "throughput_spec_per_s": 820.8516573007997,
+   "mae_amp": 0.021946428478387483,
+   "mae_dE": 0.01308599968456347,
+   "mae_dsigma": 0.012530243647359886
+  },
+  {
+   "solver": "lmfit",
+   "problem": "amplitude + dE + dsigma (gamma fixed)",
+   "backend": "lmfit Model.fit (leastsq with bounds), single-thread CPU per-spectrum loop",
+   "n_spectra": 500,
+   "setup_s": 0.0,
+   "repeats": 3,
+   "timings_s": [
+    0.611,
+    0.623,
+    0.609
+   ],
+   "aggregation": "median",
+   "throughput_spec_per_s": 817.7215529001239,
+   "mae_amp": 0.021946305106439398,
+   "mae_dE": 0.013085977925327284,
+   "mae_dsigma": 0.012530236958096382
+  }
+ ],
+ "numpy_parity": {
+  "n_spectra": 50000,
+  "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
+  "repeats": 1,
+  "warmup": 0,
+  "aggregation": "single timing",
+  "rate_caveat": "numpy_rate_spec_per_s is ONE cold timing of n_spectra, not a warmed median of the full batch, and n_spectra is near the NumPy path's throughput peak. It is a parity artefact, not a throughput figure -- do not compare it with rate_median above or with a record taken at a different batch size.",
+  "dict2d_parabola": {
+   "note": "the NumPy backend falls back to the dictionary-only solver (no parabola sub-grid refinement), so grid-quantised dE/dsigma differences are expected",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 2.384185791015625e-07,
+    "max": 0.020322084426879883
+   },
+   "abs_diff_dE_eV": {
+    "median": 0.005488263443112373,
+    "p99": 0.01235878374427557,
+    "max": 0.025000005960464478
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 0.002841543173417449,
+    "p99": 0.008222878910601139,
+    "max": 0.01666666567325592
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.17738,
+   "fraction_amp_diff_gt_1e-3": 0.00022,
+   "numpy_rate_spec_per_s": 1842842.4000449516
+  },
+  "taylor_4step": {
+   "note": "same algorithm on both backends",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 3.5762786865234375e-07,
+    "max": 7.152557373046875e-07
+   },
+   "abs_diff_dE_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 2.9802322387695312e-08,
+    "max": 7.450580596923828e-08
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 7.171183824539185e-08,
+    "max": 1.2293457984924316e-07
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.0,
+   "fraction_amp_diff_gt_1e-3": 0.0,
+   "numpy_rate_spec_per_s": 1281432.4815841757
+  }
+ },
+ "environment": {
+  "schema_version": 3,
+  "timestamp_utc": "2026-09-21T13:17:32+00:00",
+  "timestamp_local": "2026-09-21T22:17:32+09:00",
+  "host_label": "darwin-apple-m3-max-16c",
+  "origin": "mac",
+  "os": "Darwin 25.6.0 (macOS 26.6.2)",
+  "machine": "arm64",
+  "cpu": "Apple M3 Max",
+  "logical_cores": 16,
+  "memory_gb": 128.0,
+  "python": "3.12.11",
+  "command": "bench_platform.py --origin mac --records-dir records",
+  "versions": {
+   "toyomacro": "0.2.0",
+   "mlx": "0.31.2",
+   "numpy": "2.3.5",
+   "scipy": "1.17.0",
+   "h5py": "3.15.1",
+   "lmfit": "1.3.4",
+   "numba": null,
+   "psutil": "7.2.2",
+   "hdf5_library": "1.14.6"
+  },
+  "backend": {
+   "backend": "metal",
+   "device_name": "Apple M3 Max",
+   "mlx_version": "0.31.2",
+   "mlx_default_device": "Device(gpu, 0)",
+   "tf32_enabled": null,
+   "TOYOMACRO_DISABLE_MLX": null
+  },
+  "load": {
+   "sampled_over_s": 0.2,
+   "load_average": [
+    5.208984375,
+    4.66552734375,
+    5.3681640625
+   ],
+   "logical_cores": 16,
+   "cpu_percent": 18.2,
+   "cpu_percent_others": 221.6,
+   "processes_redacted": false,
+   "top_processes": [
+    {
+     "name": "fileproviderd",
+     "cpu_percent": 192.7
+    },
+    {
+     "name": "Codex (Renderer)",
+     "cpu_percent": 6.8
+    },
+    {
+     "name": "Claude Helper (Renderer)",
+     "cpu_percent": 6.1
+    },
+    {
+     "name": "Claude Helper",
+     "cpu_percent": 5.3
+    },
+    {
+     "name": "Codex (Service)",
+     "cpu_percent": 3.8
+    }
+   ],
+   "looks_quiet": false,
+   "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+   "load_average_before": [
+    5.48193359375,
+    4.6845703125,
+    5.38720703125
+   ],
+   "cpu_percent_before": 16.8,
+   "top_processes_before": [
+    {
+     "name": "fileproviderd",
+     "cpu_percent": 189.1
+    },
+    {
+     "name": "claude",
+     "cpu_percent": 8.5
+    },
+    {
+     "name": "Claude Helper",
+     "cpu_percent": 5.5
+    },
+    {
+     "name": "Codex (Service)",
+     "cpu_percent": 4.0
+    },
+    {
+     "name": "Codex (Renderer)",
+     "cpu_percent": 3.4
+    }
+   ],
+   "looks_quiet_after_incl_self": false,
+   "looks_quiet_before": false,
+   "others_busy_after": false,
+   "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+   "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+  },
+  "steal_percent": null,
+  "thermal": {
+   "raw_lines": [
+    "Note: No thermal warning level has been recorded",
+    "Note: No performance warning level has been recorded",
+    "Note: No CPU power status has been recorded"
+   ],
+   "cpu_speed_limit": null,
+   "throttled": false
+  },
+  "quality": {
+   "verdict": "contended",
+   "reasons": [
+    "load average 5.5 before the run on 16 cores"
+   ],
+   "comparable": false,
+   "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+  },
+  "git": {
+   "git_commit": "58ace58947b150711aefb7b379e53acec5fd0597",
+   "git_tracked_dirty": true,
+   "git_dirty_files": [
+    " D benchmarks/records/20260921T103644Z__darwin-apple-m3-max-16c__from-mac.json",
+    " D benchmarks/records/20260921T113656Z__darwin-apple-m3-max-16c__from-mac.json"
+   ],
+   "harness_tracked_at_commit": true,
+   "untracked_files_present": false
+  }
+ }
+}
