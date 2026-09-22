@@ -834,9 +834,12 @@ The tree the PoC ran on is **`3aedcf3`** (2026-07-16,
 - `0bb1d14`, which recorded the PoC results, is dated 2026-07-17 11:15
   JST and changes five files, all under `docs/` — no code. Its parent
   is `3aedcf3`.
-- The WSL2 machine that ran the PoC still has its checkout parked on
-  `main` at `3aedcf3` with a clean tree, alongside the 3.0 GB venv
-  holding mlx 0.32.0 and the 2026-07 CUDA wheels.
+- Nothing outside this history is needed to place it. `3aedcf3` is
+  reachable from `main`, and the 2026-07-17 Environment table above
+  records the toolchain that run used — MLX 0.32.0, cublas 13.6.0.2,
+  driver 596.13 — none of which the 2026-09-21 re-verification below
+  shares. The two are separate runs on one machine, not one record
+  read twice.
 
 Correcting the base changes the numbers, and the conclusion partly. The
 real delta `3aedcf3..3a13de5` is **90 files, +11,807 / −4,264 across
