@@ -89,6 +89,19 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **Text I/O in the benchmark record modules names its encoding.**
+  `Path.read_text`, `Path.write_text` and `open` without `encoding=`
+  read and write in the platform's locale encoding, which is cp1252 on
+  Windows. `docs/BENCHMARKS.md` contains em dashes and ellipses, so the
+  new documentation gate raised `UnicodeDecodeError` at import time and
+  errored out of collection on both Windows CI jobs; `write_text`
+  would have failed the same way writing a record whose process names
+  were not ASCII. Ten call sites across `record`, `bench_platform`,
+  `summarize_records` and the gate now specify UTF-8, and a test
+  asserts they continue to. Enforcing it with ruff needs preview mode,
+  which surfaces 479 unrelated findings, so the guard lives in the test
+  suite instead.
+
 - **The load verdict no longer condemns an idle Windows host.** Windows
   reports idle time as a process — "System Idle Process", PID 0 — which
   psutil returns at close to 100% per core. It was counted as foreign

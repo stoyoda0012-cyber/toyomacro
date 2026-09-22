@@ -582,7 +582,7 @@ def run_repeated(runs: int, argv_common: list[str], tmpdir: Path) -> dict:
         print(f"\n=== run {index + 1} of {runs} "
               "(separate process) ===", flush=True)
         subprocess.run(argv, check=True)
-        records.append(json.loads(path.read_text()))
+        records.append(json.loads(path.read_text(encoding="utf-8")))
         path.unlink(missing_ok=True)
     return aggregate_runs(records)
 
@@ -700,7 +700,7 @@ def main(argv: list[str] | None = None) -> None:
             print(f"wrote {write_record(report, args.records_dir)}", flush=True)
         if out_path:
             out_path.write_text(json.dumps(report, indent=1, default=float)
-                                + "\n")
+                                + "\n", encoding="utf-8")
             print(f"wrote {out_path}", flush=True)
         return
 
@@ -727,7 +727,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.records_dir:
         print(f"wrote {write_record(report, args.records_dir)}", flush=True)
     if out_path:
-        out_path.write_text(json.dumps(report, indent=1, default=float) + "\n")
+        out_path.write_text(json.dumps(report, indent=1, default=float) + "\n",
+                            encoding="utf-8")
         print(f"wrote {out_path}", flush=True)
 
 
