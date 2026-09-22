@@ -540,3 +540,82 @@ class TestWindowsIdleProcess:
         env = record.environment(origin="windows", load_before=before)
         assert env["load"].get("others_busy_after") is not True
         assert env["quality"]["verdict"] == "quiet", env["quality"]["reasons"]
+
+
+class TestAggregateRuns:
+    """Combining separate runs, and the ratio that is the point of it."""
+
+    @staticmethod
+    def _run(rate, lo, hi, verdict="quiet", solver="k"):
+        return {
+            "problem": {"n_batch": 200000, "input_sha256": "abc"},
+            "results": [{"solver": solver, "backend": "metal",
+                         "rate_median": rate, "rate_min": lo, "rate_max": hi,
+                         "mae_amp": 0.02}],
+            "environment": {"host_label": "h", "origin": "mac",
+                            "quality": {"verdict": verdict}},
+        }
+
+    def test_median_is_taken_across_runs(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([self._run(10e6, 9.9e6, 10.1e6),
+                                 self._run(20e6, 19.9e6, 20.1e6),
+                                 self._run(30e6, 29.9e6, 30.1e6)])
+        r = agg["results"][0]
+        assert r["rate_median"] == 20e6
+        assert r["rate_min"] == 10e6 and r["rate_max"] == 30e6
+        assert r["runs"] == 3
+        assert "across" in r["aggregation"]
+
+    def test_understates_by_flags_an_optimistic_single_record(self):
+        """The Windows case: tight within-run range, wide across runs."""
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([
+            self._run(9.44e6, 9.3e6, 9.5e6),
+            self._run(9.27e6, 9.2e6, 9.4e6),
+            self._run(17.30e6, 17.18e6, 17.71e6),   # within-run 1.03x
+        ])
+        r = agg["results"][0]
+        assert r["across_run_spread"] == pytest.approx(17.30 / 9.27, rel=1e-3)
+        assert r["understates_by"] > 1.5, r["understates_by"]
+
+    def test_a_healthy_host_reports_about_one(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([self._run(10.0e6, 9.5e6, 10.5e6),
+                                 self._run(10.1e6, 9.6e6, 10.6e6),
+                                 self._run(9.9e6, 9.4e6, 10.4e6)])
+        assert agg["results"][0]["understates_by"] < 1.2
+
+    def test_the_aggregate_is_only_as_clean_as_its_dirtiest_run(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([self._run(10e6, 9e6, 11e6, "quiet"),
+                                 self._run(10e6, 9e6, 11e6, "contended")])
+        assert agg["all_runs_quiet"] is False
+        assert agg["environment"]["quality"]["verdict"] == "contended"
+        assert agg["environment"]["quality"]["comparable"] is False
+        assert any("run 2" in r for r in
+                   agg["environment"]["quality"]["reasons"])
+
+    def test_all_quiet_aggregates_to_quiet(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([self._run(10e6, 9e6, 11e6),
+                                 self._run(10e6, 9e6, 11e6)])
+        assert agg["environment"]["quality"]["verdict"] == "quiet"
+
+    def test_it_notices_the_runs_solved_different_problems(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        a, b = self._run(10e6, 9e6, 11e6), self._run(10e6, 9e6, 11e6)
+        b["problem"]["input_sha256"] = "different"
+        assert bp.aggregate_runs([a, b])["problem_identical_across_runs"] is False
+        assert bp.aggregate_runs([a, a])["problem_identical_across_runs"] is True
+
+    def test_the_aggregate_carries_a_filename_and_a_host(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        agg = bp.aggregate_runs([self._run(10e6, 9e6, 11e6)])
+        assert agg["environment"]["host_label"] == "h"
+        assert "from-mac" in record.record_filename(agg["environment"])
+
+    def test_no_records_is_an_error(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        with pytest.raises(ValueError, match="no run records"):
+            bp.aggregate_runs([])

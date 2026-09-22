@@ -50,6 +50,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import statistics
 import subprocess
 import sys
 import time
@@ -446,6 +447,146 @@ def run(n_batch: int, n_loop: int, repeats: int, warmup: int,
     }
 
 
+# --------------------------------------------------------------- repetition
+def aggregate_runs(records: list[dict]) -> dict:
+    """Combine single-run records into one, and say what repetition bought.
+
+    The number this exists to produce is ``understates_by``: the ratio of
+    the spread *across* runs to the spread *within* them. A record's own
+    ``rate_min``/``rate_max`` covers repetitions that shared a process, a
+    memory layout and a clock state, so it cannot see what changes when
+    those change. Measured on one host at 1.85x across runs against 1.03x
+    within the tightest of them -- a record that looked like the most
+    confident of three was the furthest from the other two.
+
+    An ``understates_by`` above 1 means exactly that: the per-run range
+    is optimistic by that factor, and quoting one record's range as the
+    uncertainty is wrong by it.
+    """
+    if not records:
+        raise ValueError("no run records to aggregate")
+
+    solvers: dict[str, list[dict]] = {}
+    for record in records:
+        for result in record.get("results", []):
+            solvers.setdefault(result["solver"], []).append(result)
+
+    results = []
+    for solver, entries in solvers.items():
+        medians = [e["rate_median"] for e in entries if e.get("rate_median")]
+        if not medians:
+            continue
+        within = [e["rate_max"] / e["rate_min"]
+                  for e in entries
+                  if e.get("rate_min") and e.get("rate_max")]
+        across = max(medians) / min(medians) if min(medians) > 0 else None
+        within_typical = statistics.median(within) if within else None
+        merged = {
+            "solver": solver,
+            "backend": entries[0].get("backend"),
+            "problem": entries[0].get("problem"),
+            "runs": len(medians),
+            # `rate_median` is the median ACROSS runs, so that readers and
+            # summarize_records get the repeated figure by default.
+            "rate_median": statistics.median(medians),
+            "rate_min": min(medians),
+            "rate_max": max(medians),
+            "aggregation": f"median across {len(medians)} separate runs",
+            "per_run_rate_median": medians,
+            "across_run_spread": across,
+            "within_run_spread_typical": within_typical,
+        }
+        if across and within_typical and within_typical > 0:
+            merged["understates_by"] = across / within_typical
+            merged["understates_note"] = (
+                "how much a single record's own rate_min/rate_max "
+                "understates the spread across separate runs; above 1 means "
+                "one record's range is optimistic by this factor")
+        mae = [e["mae_amp"] for e in entries if e.get("mae_amp") is not None]
+        merged["mae_amp_median"] = statistics.median(mae) if mae else None
+        results.append(merged)
+
+    problems = {json.dumps(r.get("problem"), sort_keys=True) for r in records}
+    verdicts = [r.get("environment", {}).get("quality", {}).get("verdict")
+                for r in records]
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "repeated",
+        "description": "Cross-platform peak-fitting throughput, repeated in "
+                       "separate processes.",
+        "runs": len(records),
+        "runs_note": (
+            "Each run is a separate process. Repeating inside one process "
+            "would share the memory layout and clock state that make "
+            "within-run repetitions agree, and would reproduce the blind "
+            "spot this exists to measure."),
+        "problem": records[0].get("problem"),
+        "problem_identical_across_runs": len(problems) == 1,
+        "results": results,
+        "numpy_parity": next((r.get("numpy_parity") for r in records
+                              if r.get("numpy_parity")), None),
+        "run_quality_verdicts": verdicts,
+        "all_runs_quiet": all(v == "quiet" for v in verdicts),
+        # The aggregate inherits the first run's environment so that the
+        # record has a host, a tree and a filename -- the parent process
+        # measured nothing, so it has no environment of its own worth
+        # recording. The verdict is replaced: an aggregate is only as
+        # clean as its dirtiest run.
+        "environment": {
+            **(records[0].get("environment") or {}),
+            "quality": {
+                "verdict": ("quiet" if all(v == "quiet" for v in verdicts)
+                            else "contended" if "contended" in verdicts
+                            else "unknown"),
+                "reasons": [f"run {i + 1} graded {v}"
+                            for i, v in enumerate(verdicts) if v != "quiet"],
+                "comparable": all(v == "quiet" for v in verdicts),
+                "note": ("the verdict of the worst of the runs; per-run "
+                         "verdicts are in run_quality_verdicts and each "
+                         "run's own load is in run_environments"),
+            },
+        },
+        "run_environments": [r.get("environment") for r in records],
+    }
+
+
+def run_repeated(runs: int, argv_common: list[str], tmpdir: Path) -> dict:
+    """Measure `runs` times in separate processes and aggregate.
+
+    Each child is a plain single-run invocation of this module. The
+    parent only collects; it deliberately does no measuring of its own,
+    so that every figure in the aggregate came from a process that did
+    nothing else first.
+
+    Parity runs once, on the first child: it is a correctness check on
+    the backend, not a throughput figure, and repeating it would double
+    the wall clock without adding information.
+
+    **This is a lower bound on run-to-run variability.** The children run
+    back to back, so they still share a thermal state, a GPU clock state
+    and a warm page cache. The observation that motivated this option
+    came from runs separated by hours and by code generations, where
+    `amp_only_projection` moved 1.85x on one host. Measured here on
+    Metal, back to back at a 20k batch, the across-run spread came out
+    *below* the within-run spread -- 0.88-1.03x over two independent
+    three-run experiments. Both can be true: this catches what changes
+    between processes, and not what changes between afternoons.
+    """
+    records = []
+    for index in range(runs):
+        path = tmpdir / f"_run{index}.json"
+        argv = [sys.executable, "-m", __spec__.name, *argv_common,
+                "--runs", "1", "--out", str(path)]
+        if index > 0:
+            argv.append("--no-parity")
+        print(f"\n=== run {index + 1} of {runs} "
+              "(separate process) ===", flush=True)
+        subprocess.run(argv, check=True)
+        records.append(json.loads(path.read_text()))
+        path.unlink(missing_ok=True)
+    return aggregate_runs(records)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
         description="Cross-platform throughput record (Metal / CUDA / NumPy).")
@@ -457,6 +598,13 @@ def main(argv: list[str] | None = None) -> None:
                    help="spectra given to the per-spectrum solvers")
     p.add_argument("--repeats", type=int, default=9)
     p.add_argument("--warmup", type=int, default=2)
+    p.add_argument("--runs", type=int, default=1,
+                   help="measure this many times, each in a SEPARATE process, "
+                        "and report the median across runs plus how much a "
+                        "single run's own range understates the spread. "
+                        "Repeating inside one process would share the memory "
+                        "layout and clock state that make within-run "
+                        "repetitions agree (default: %(default)s)")
     p.add_argument("--parity-n", type=int, default=50_000)
     p.add_argument("--no-parity", action="store_true",
                    help="skip the NumPy-backend parity check")
@@ -513,9 +661,48 @@ def main(argv: list[str] | None = None) -> None:
               "run will abort -- that is a finding, not a mistake; report it.",
               flush=True)
 
-    report = run(args.n_batch, args.n_loop, args.repeats, args.warmup,
-                 args.parity_n, not args.no_parity, tmpdir,
-                 origin=args.origin, host=args.host_label, chunk=args.chunk)
+    if args.runs < 1:
+        raise SystemExit("--runs must be at least 1")
+    if args.runs > 1:
+        common = ["--n-batch", str(args.n_batch), "--n-loop", str(args.n_loop),
+                  "--repeats", str(args.repeats), "--warmup", str(args.warmup),
+                  "--parity-n", str(args.parity_n), "--chunk", str(args.chunk)]
+        if args.origin:
+            common += ["--origin", args.origin]
+        if args.host_label:
+            common += ["--host-label", args.host_label]
+        if args.no_parity:
+            common.append("--no-parity")
+        if args.allow_tf32:
+            common.append("--allow-tf32")
+        report = run_repeated(args.runs, common, tmpdir)
+    else:
+        report = run(args.n_batch, args.n_loop, args.repeats, args.warmup,
+                     args.parity_n, not args.no_parity, tmpdir,
+                     origin=args.origin, host=args.host_label,
+                     chunk=args.chunk)
+
+    if report.get("kind") == "repeated":
+        print(f"\n=== {report['runs']} runs, medians across them ===",
+              flush=True)
+        for result in report["results"]:
+            line = f"  {result['solver']:<22s} {result['rate_median']:>14,.0f}"
+            if result.get("understates_by"):
+                line += (f"   across/within {result['understates_by']:.2f}x"
+                         + ("  <-- one run's range is optimistic"
+                            if result["understates_by"] > 1.5 else ""))
+            print(line, flush=True)
+        verdicts = report["run_quality_verdicts"]
+        print(f"\nrun verdicts: {verdicts}"
+              + ("" if report["all_runs_quiet"]
+                 else "  <-- not every run was quiet"), flush=True)
+        if args.records_dir:
+            print(f"wrote {write_record(report, args.records_dir)}", flush=True)
+        if out_path:
+            out_path.write_text(json.dumps(report, indent=1, default=float)
+                                + "\n")
+            print(f"wrote {out_path}", flush=True)
+        return
 
     load = report["environment"]["load"]
     # Gate on the load verdict, not the composite: `looks_quiet` is also

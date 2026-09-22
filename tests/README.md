@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,310 automated tests** across **86 files**, in two
+This suite has **2,318 automated tests** across **86 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 48 | 1,260 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,050 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,058 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,878 tests, 81%) — guarantee the library
+- **Contract / regression** (1,886 tests, 81%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,298. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,306. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -148,7 +148,7 @@ them would take real coverage with them:
 |--:|---|---|
 | 13 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,050)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,058)
 
 ### Solvers & fitting core (296)
 | Tests | File | Guards |
@@ -194,11 +194,11 @@ them would take real coverage with them:
 | 15 | `test_error_stats.py` | Error-statistics computation |
 | 2 | `test_bench_rank_model_selection.py` | Rank/model-selection benchmark stays runnable |
 
-### Infrastructure — compression, memory, I/O (158)
+### Infrastructure — compression, memory, I/O (166)
 | Tests | File | Guards |
 |--:|---|---|
 | 36 | `test_memory.py` | Memory detection, optimal chunk size, dict3d cache size |
-| 68 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
+| 76 | `test_benchmark_record.py` | Cross-platform record schema: leaks no paths, names the backend, captures load, steal and thermal state |
 | 22 | `test_compression.py` | `fitpara` compression codec |
 | 14 | `test_streaming_write.py` | Streaming HDF5 write |
 | 11 | `test_compression_integration.py` | Pipeline I/O compression |
