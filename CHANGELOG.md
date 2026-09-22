@@ -28,8 +28,9 @@ archived on Zenodo for a citable DOI.
   It is a lower bound: back-to-back runs still share a thermal state, a
   GPU clock state and a warm page cache. Measured on an M3 Max at a 20k
   batch, `understates_by` came out 0.88-1.03x over two independent
-  three-run experiments — there the within-run range did bound the
-  across-run spread. The 1.85x came from runs separated by hours and by
+  three-run experiments, and 0.83-1.00x at the default 200,000 batch in
+  the first committed `--runs` record — on that host the within-run
+  range did bound the across-run spread, on every solver. The 1.85x came from runs separated by hours and by
   code generations. Both readings are real and they measure different
   things.
 

@@ -266,9 +266,45 @@ factor of two, and nothing in the record says so.
 cross-backend conclusions: on that host the CUDA and NumPy ranges do
 not overlap on any solver, across every run taken, so "CUDA loses to
 NumPy on three of five solvers" survives. What it undermines is reading
-any single record as *the* number for its machine. The harness does not
-yet repeat runs; until it does, quote a median over several records or
-say plainly that you are quoting one.
+any single record as *the* number for its machine.
+
+### Measuring the blind spot: `--runs N`
+
+`bench_platform --runs N` repeats the whole measurement in **separate
+processes** and reports `understates_by` per solver — the across-run
+spread over the typical within-run spread. Above 1 means one record's
+own `rate_min`/`rate_max` is optimistic by that factor.
+
+Separate processes are the point. Repeating inside one would share the
+memory layout and clock state that make within-run repetitions agree,
+and so would reproduce the blind spot rather than measure it.
+
+#### `…043653Z…__from-mac.json` — three runs on M1, every one `quiet`
+
+Same `input_sha256` across all three, default 200,000 batch.
+
+| solver | median of 3 | across/within | the three runs |
+|---|---|---|---|
+| `projection_kernel` | **496.3 M** | 1.00x | 496.3 / 497.6 / 488.4 M |
+| `amp_only_projection` | **423.7 M** | 0.94x | 423.7 / 436.6 / 404.2 M |
+| `taylor_4step` | **10.8 M** | 0.83x | 10.8 / 10.9 / 10.5 M |
+| `dict2d_parabola` | **8.5 M** | 0.98x | 8.5 / 8.6 / 8.4 M |
+| `multipeak_2comp` | **3.7 M** | 0.93x | 3.7 / 3.8 / 3.7 M |
+
+**On Metal the within-run range did bound the across-run spread** —
+every solver at or below 1.00x. That is the opposite of the Ryzen host
+above, where `projection_kernel` spans 2.07x across runs, and it is the
+reason the ratio is reported per host rather than assumed: the same
+harness, the same solvers, and one machine has the problem while the
+other does not. Neither reading generalises to the other.
+
+It is still a lower bound. Back-to-back runs share a thermal state, a
+GPU clock state and a warm page cache; runs separated by hours or by
+code generations — which is what the Ryzen table above is made of — can
+differ by more.
+
+Until a host has a `--runs` record, quote a median over several records
+or say plainly that you are quoting one.
 
 ## 6. Measuring a new host
 
@@ -300,6 +336,10 @@ fixes rather than leaves to the operator:
   size is an argument and is recorded.
 - **The machine's load**, captured at measurement time, with a warning
   when the host was busy.
+
+`--runs N` repeats the whole thing in separate processes and reports
+how much one run's own range understates the spread across runs; see
+§"Measuring the blind spot" above before quoting a single record.
 
 Records are committed, so the schema deliberately carries no filesystem
 path, no interpreter location, no repository path and no sibling

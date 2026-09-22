@@ -1,0 +1,684 @@
+{
+ "schema_version": 3,
+ "kind": "repeated",
+ "description": "Cross-platform peak-fitting throughput, repeated in separate processes.",
+ "runs": 3,
+ "runs_note": "Each run is a separate process. Repeating inside one process would share the memory layout and clock state that make within-run repetitions agree, and would reproduce the blind spot this exists to measure.",
+ "problem": {
+  "n_energy": 151,
+  "center": 0.0,
+  "sigma": 0.5,
+  "gamma": 0.2,
+  "dE_range_sigma": 0.3,
+  "dsigma_range_sigma": 0.1,
+  "noise_level": 1000.0,
+  "peak_snr": 10.0,
+  "seed": 0,
+  "n_batch": 200000,
+  "n_common_accuracy_subset": 500,
+  "input_sha256": "53b9dda5b901e7daf33eb1bbbeeaa47070e5bb2b476315b3c9e0fcf7a37ee026",
+  "dtype": "float32 spectra",
+  "multipeak_chunk_size": 65535
+ },
+ "problem_identical_across_runs": true,
+ "results": [
+  {
+   "solver": "projection_kernel",
+   "backend": null,
+   "problem": "random float32 data, 151 channels x 3 components; no parameter recovery",
+   "runs": 3,
+   "rate_median": 496272804.8701885,
+   "rate_min": 488407942.7630217,
+   "rate_max": 497602674.6781887,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    496272804.8701885,
+    497602674.6781887,
+    488407942.7630217
+   ],
+   "across_run_spread": 1.0188259262598198,
+   "within_run_spread_typical": 1.0165382913746241,
+   "understates_by": 1.00225041683585,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": null
+  },
+  {
+   "solver": "amp_only_projection",
+   "backend": "metal",
+   "problem": "amplitude only at nominal (center, sigma)",
+   "runs": 3,
+   "rate_median": 423728813.8126533,
+   "rate_min": 404211072.28846866,
+   "rate_max": 436641182.25185585,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    423728813.8126533,
+    436641182.25185585,
+    404211072.28846866
+   ],
+   "across_run_spread": 1.080230632426227,
+   "within_run_spread_typical": 1.1553192017020675,
+   "understates_by": 0.9350062137241234,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.029441089055651473
+  },
+  {
+   "solver": "taylor_4step",
+   "backend": "metal",
+   "problem": "amp + dE + dsigma via 4-step Taylor residual projection (first-order lineshape expansion; pre-dictionary path)",
+   "runs": 3,
+   "rate_median": 10834064.810148237,
+   "rate_min": 10497953.08192716,
+   "rate_max": 10858819.704317294,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    10834064.810148237,
+    10858819.704317294,
+    10497953.08192716
+   ],
+   "across_run_spread": 1.034374950961763,
+   "within_run_spread_typical": 1.2412400942004398,
+   "understates_by": 0.8333399442982612,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.021891158557531223
+  },
+  {
+   "solver": "dict2d_parabola",
+   "backend": "metal",
+   "problem": "amp + dE + dsigma; 2-D dictionary 13x7 (|dE|<=0.3sigma, |dsigma|<=0.1sigma) + parabola refine",
+   "runs": 3,
+   "rate_median": 8535017.576378308,
+   "rate_min": 8421821.055611582,
+   "rate_max": 8596758.059163483,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    8535017.576378308,
+    8596758.059163483,
+    8421821.055611582
+   ],
+   "across_run_spread": 1.0207718737309595,
+   "within_run_spread_typical": 1.041448955086782,
+   "understates_by": 0.9801458523196659,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.022231290140590915
+  },
+  {
+   "solver": "multipeak_2comp",
+   "backend": "metal",
+   "problem": "2 Voigt components 4 sigma apart, per-component amp + dE + dsigma; alternating projection x3 + parabola, 13x7 grids",
+   "runs": 3,
+   "rate_median": 3723689.85087402,
+   "rate_min": 3700788.1681810166,
+   "rate_max": 3753791.93988908,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    3723689.85087402,
+    3753791.93988908,
+    3700788.1681810166
+   ],
+   "across_run_spread": 1.014322292792596,
+   "within_run_spread_typical": 1.095290475429,
+   "understates_by": 0.9260760643383749,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.028988386614238287
+  }
+ ],
+ "numpy_parity": {
+  "n_spectra": 50000,
+  "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
+  "repeats": 1,
+  "warmup": 0,
+  "aggregation": "single timing",
+  "rate_caveat": "numpy_rate_spec_per_s is ONE cold timing of n_spectra, not a warmed median of the full batch, and n_spectra is near the NumPy path's throughput peak. It is a parity artefact, not a throughput figure -- do not compare it with rate_median above or with a record taken at a different batch size.",
+  "dict2d_parabola": {
+   "note": "the NumPy backend falls back to the dictionary-only solver (no parabola sub-grid refinement), so grid-quantised dE/dsigma differences are expected",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 2.384185791015625e-07,
+    "max": 0.020322084426879883
+   },
+   "abs_diff_dE_eV": {
+    "median": 0.005488263443112373,
+    "p99": 0.01235878374427557,
+    "max": 0.025000005960464478
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 0.002841543173417449,
+    "p99": 0.008222878910601139,
+    "max": 0.01666666567325592
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.17738,
+   "fraction_amp_diff_gt_1e-3": 0.00022,
+   "numpy_rate_spec_per_s": 1881685.912704214
+  },
+  "taylor_4step": {
+   "note": "same algorithm on both backends",
+   "abs_diff_amp": {
+    "median": 0.0,
+    "p99": 3.5762786865234375e-07,
+    "max": 7.152557373046875e-07
+   },
+   "abs_diff_dE_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 2.9802322387695312e-08,
+    "max": 7.450580596923828e-08
+   },
+   "abs_diff_dsigma_eV": {
+    "median": 3.725290298461914e-09,
+    "p99": 7.171183824539185e-08,
+    "max": 1.2293457984924316e-07
+   },
+   "fraction_dE_diff_gt_0.01eV": 0.0,
+   "fraction_amp_diff_gt_1e-3": 0.0,
+   "numpy_rate_spec_per_s": 1331655.4474054098
+  }
+ },
+ "run_quality_verdicts": [
+  "quiet",
+  "quiet",
+  "quiet"
+ ],
+ "all_runs_quiet": true,
+ "environment": {
+  "schema_version": 3,
+  "timestamp_utc": "2026-09-22T04:36:53+00:00",
+  "timestamp_local": "2026-09-22T13:36:53+09:00",
+  "host_label": "darwin-apple-m3-max-16c",
+  "origin": "mac",
+  "os": "Darwin 25.6.0 (macOS 26.7)",
+  "machine": "arm64",
+  "cpu": "Apple M3 Max",
+  "logical_cores": 16,
+  "memory_gb": 128.0,
+  "python": "3.12.11",
+  "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out _run0.json",
+  "versions": {
+   "toyomacro": "0.2.0",
+   "mlx": "0.31.2",
+   "numpy": "2.3.5",
+   "scipy": "1.17.0",
+   "h5py": "3.15.1",
+   "lmfit": "1.3.4",
+   "numba": null,
+   "psutil": "7.2.2",
+   "hdf5_library": "1.14.6"
+  },
+  "backend": {
+   "backend": "metal",
+   "device_name": "Apple M3 Max",
+   "mlx_version": "0.31.2",
+   "mlx_default_device": "Device(gpu, 0)",
+   "tf32_enabled": null,
+   "TOYOMACRO_DISABLE_MLX": null
+  },
+  "load": {
+   "sampled_over_s": 0.2,
+   "load_average": [
+    2.2421875,
+    2.88916015625,
+    3.43896484375
+   ],
+   "logical_cores": 16,
+   "cpu_percent": 11.0,
+   "cpu_percent_others": 149.8,
+   "processes_redacted": false,
+   "top_processes": [
+    {
+     "name": "corespotlightd",
+     "cpu_percent": 126.9
+    },
+    {
+     "name": "com.apple.WebKit.WebContent",
+     "cpu_percent": 5.5
+    },
+    {
+     "name": "LINE WORKS",
+     "cpu_percent": 2.9
+    },
+    {
+     "name": "Codex (Renderer)",
+     "cpu_percent": 2.6
+    },
+    {
+     "name": "Codex (Service)",
+     "cpu_percent": 2.5
+    }
+   ],
+   "looks_quiet": true,
+   "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+   "load_average_before": [
+    2.390625,
+    2.95263671875,
+    3.47119140625
+   ],
+   "cpu_percent_before": 5.5,
+   "top_processes_before": [
+    {
+     "name": "com.apple.WebKit.WebContent",
+     "cpu_percent": 16.5
+    },
+    {
+     "name": "com.apple.WebKit.WebContent",
+     "cpu_percent": 6.3
+    },
+    {
+     "name": "LINE WORKS",
+     "cpu_percent": 4.8
+    },
+    {
+     "name": "Codex (Renderer)",
+     "cpu_percent": 3.9
+    },
+    {
+     "name": "Codex (Service)",
+     "cpu_percent": 3.8
+    }
+   ],
+   "looks_quiet_after_incl_self": true,
+   "looks_quiet_before": true,
+   "others_busy_after": false,
+   "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+   "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+  },
+  "steal_percent": null,
+  "thermal": {
+   "raw_lines": [
+    "Note: No thermal warning level has been recorded",
+    "Note: No performance warning level has been recorded",
+    "Note: No CPU power status has been recorded"
+   ],
+   "cpu_speed_limit": null,
+   "throttled": false
+  },
+  "quality": {
+   "verdict": "quiet",
+   "reasons": [],
+   "comparable": true,
+   "note": "the verdict of the worst of the runs; per-run verdicts are in run_quality_verdicts and each run's own load is in run_environments"
+  },
+  "git": {
+   "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+   "git_tracked_dirty": false,
+   "git_dirty_files": [],
+   "harness_tracked_at_commit": true,
+   "untracked_files_present": false
+  }
+ },
+ "run_environments": [
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:36:53+00:00",
+   "timestamp_local": "2026-09-22T13:36:53+09:00",
+   "host_label": "darwin-apple-m3-max-16c",
+   "origin": "mac",
+   "os": "Darwin 25.6.0 (macOS 26.7)",
+   "machine": "arm64",
+   "cpu": "Apple M3 Max",
+   "logical_cores": 16,
+   "memory_gb": 128.0,
+   "python": "3.12.11",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out _run0.json",
+   "versions": {
+    "toyomacro": "0.2.0",
+    "mlx": "0.31.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "metal",
+    "device_name": "Apple M3 Max",
+    "mlx_version": "0.31.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     2.2421875,
+     2.88916015625,
+     3.43896484375
+    ],
+    "logical_cores": 16,
+    "cpu_percent": 11.0,
+    "cpu_percent_others": 149.8,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "corespotlightd",
+      "cpu_percent": 126.9
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 5.5
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 2.9
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 2.6
+     },
+     {
+      "name": "Codex (Service)",
+      "cpu_percent": 2.5
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     2.390625,
+     2.95263671875,
+     3.47119140625
+    ],
+    "cpu_percent_before": 5.5,
+    "top_processes_before": [
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 16.5
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 6.3
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 4.8
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 3.9
+     },
+     {
+      "name": "Codex (Service)",
+      "cpu_percent": 3.8
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": null,
+   "thermal": {
+    "raw_lines": [
+     "Note: No thermal warning level has been recorded",
+     "Note: No performance warning level has been recorded",
+     "Note: No CPU power status has been recorded"
+    ],
+    "cpu_speed_limit": null,
+    "throttled": false
+   },
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:37:08+00:00",
+   "timestamp_local": "2026-09-22T13:37:08+09:00",
+   "host_label": "darwin-apple-m3-max-16c",
+   "origin": "mac",
+   "os": "Darwin 25.6.0 (macOS 26.7)",
+   "machine": "arm64",
+   "cpu": "Apple M3 Max",
+   "logical_cores": 16,
+   "memory_gb": 128.0,
+   "python": "3.12.11",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out _run1.json --no-parity",
+   "versions": {
+    "toyomacro": "0.2.0",
+    "mlx": "0.31.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "metal",
+    "device_name": "Apple M3 Max",
+    "mlx_version": "0.31.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     2.470703125,
+     2.90966796875,
+     3.43603515625
+    ],
+    "logical_cores": 16,
+    "cpu_percent": 5.4,
+    "cpu_percent_others": 48.8,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 15.8
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 4.6
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 4.5
+     },
+     {
+      "name": "Safari",
+      "cpu_percent": 4.2
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 4.1
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     2.2421875,
+     2.88916015625,
+     3.43896484375
+    ],
+    "cpu_percent_before": 11.0,
+    "top_processes_before": [
+     {
+      "name": "corespotlightd",
+      "cpu_percent": 125.9
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 5.1
+     },
+     {
+      "name": "Codex (Service)",
+      "cpu_percent": 2.9
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 2.6
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 2.2
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": null,
+   "thermal": {
+    "raw_lines": [
+     "Note: No thermal warning level has been recorded",
+     "Note: No performance warning level has been recorded",
+     "Note: No CPU power status has been recorded"
+    ],
+    "cpu_speed_limit": null,
+    "throttled": false
+   },
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-22T04:37:22+00:00",
+   "timestamp_local": "2026-09-22T13:37:22+09:00",
+   "host_label": "darwin-apple-m3-max-16c",
+   "origin": "mac",
+   "os": "Darwin 25.6.0 (macOS 26.7)",
+   "machine": "arm64",
+   "cpu": "Apple M3 Max",
+   "logical_cores": 16,
+   "memory_gb": 128.0,
+   "python": "3.12.11",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out _run2.json --no-parity",
+   "versions": {
+    "toyomacro": "0.2.0",
+    "mlx": "0.31.2",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "metal",
+    "device_name": "Apple M3 Max",
+    "mlx_version": "0.31.2",
+    "mlx_default_device": "Device(gpu, 0)",
+    "tf32_enabled": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     2.6728515625,
+     2.9306640625,
+     3.43310546875
+    ],
+    "logical_cores": 16,
+    "cpu_percent": 10.1,
+    "cpu_percent_others": 31.9,
+    "processes_redacted": false,
+    "top_processes": [
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 5.9
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 5.4
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 3.7
+     },
+     {
+      "name": "Activity Monitor",
+      "cpu_percent": 3.7
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 3.5
+     }
+    ],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     2.470703125,
+     2.90966796875,
+     3.43603515625
+    ],
+    "cpu_percent_before": 3.6,
+    "top_processes_before": [
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 9.3
+     },
+     {
+      "name": "com.apple.WebKit.WebContent",
+      "cpu_percent": 5.7
+     },
+     {
+      "name": "LINE WORKS",
+      "cpu_percent": 4.2
+     },
+     {
+      "name": "Safari",
+      "cpu_percent": 4.0
+     },
+     {
+      "name": "Codex (Renderer)",
+      "cpu_percent": 3.7
+     }
+    ],
+    "looks_quiet_after_incl_self": true,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": null,
+   "thermal": {
+    "raw_lines": [
+     "Note: No thermal warning level has been recorded",
+     "Note: No performance warning level has been recorded",
+     "Note: No CPU power status has been recorded"
+    ],
+    "cpu_speed_limit": null,
+    "throttled": false
+   },
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "aa2a2f71c2e853893cac82862ce91cebbcde181c",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  }
+ ]
+}
