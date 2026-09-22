@@ -180,10 +180,21 @@ a validation result, not a support claim. Before relying on it, read
   even the direction depend on the workload: an earlier measurement at
   `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
   committed records at `n_batch=200,000` put the 2-component multipeak
-  solver 3.5× ahead on the CPU. MLX's `sm_120` GEMM measured ~36× below
-  what cuBLAS delivers on the same GPU.
+  solver 3.5× ahead on the CPU.
   [`docs/CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md) has both. Do not
   generalize any of it.
+- **MLX's `sm_120` GEMM measured ~36× below what cuBLAS delivers on the
+  same GPU** — MLX 0.32.0, 2026-07, not re-measured since. This one is
+  a property of a third-party version rather than of this package, so
+  it can be invalidated from outside: check
+  [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) before
+  relying on it. Upstream has reproduced the slowdown on Windows and
+  attributes it to per-launch overhead, pending profiling. The
+  allocator diagnosis is this repository's, not upstream's: on hosts
+  reporting `concurrentManagedAccess == 0`, host-imported arrays stay
+  in pinned host memory and every kernel reads its operands across
+  PCIe. `docs/upstream-issues/mlx-3861-gemm-sweep.md` reproduces it
+  against cuBLASLt with only the allocator changed.
 
 ## 1. Lineshape
 
