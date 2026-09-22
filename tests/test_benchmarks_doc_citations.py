@@ -81,7 +81,7 @@ def _doc_rows(skip_record_free_sections: bool = True) -> list[tuple[str, str]]:
     preceding heading that names a ``.json`` file.
     """
     rows, exempt, heading_records = [], False, ()
-    for line in DOC.read_text().splitlines():
+    for line in DOC.read_text(encoding="utf-8").splitlines():
         if line.startswith("#"):
             exempt = _RECORD_FREE_SECTION in line.lower()
             # A heading may name a matched pair, as §2 does for the MLX
@@ -187,7 +187,7 @@ def test_cited_figure_is_in_the_cited_record(row, cited):
     if not figures:
         return                       # a row may cite a record without a figure
     rates = [r for path in paths
-             for r in _rates(json.loads(path.read_text()))]
+             for r in _rates(json.loads(path.read_text(encoding="utf-8")))]
     assert rates, f"{[p.name for p in paths]} report no throughput to check"
     for figure in figures:
         want, tol = float(figure) * 1e6, _tolerance(figure)
@@ -216,7 +216,7 @@ def test_every_committed_record_is_readable_and_self_describing():
     records = sorted(directory.glob("*.json"))
     assert records, f"no records under {directory.relative_to(REPO)}"
     for path in records:
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         env = record.get("environment", {})
         assert record.get("schema_version"), f"{path.name}: no schema_version"
         assert env.get("quality", {}).get("verdict") in {

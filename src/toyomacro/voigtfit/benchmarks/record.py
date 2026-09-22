@@ -649,7 +649,11 @@ def write_record(report: dict, directory: str | Path) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / record_filename(report.get("environment", {}))
-    path.write_text(json.dumps(report, indent=1, default=float) + "\n")
+    # Explicit UTF-8 both ways: these files are committed and read on
+    # every platform, and Python's text default is the locale's encoding,
+    # which is cp932 on a Japanese Windows install.
+    path.write_text(json.dumps(report, indent=1, default=float) + "\n",
+                    encoding="utf-8")
     return path
 
 

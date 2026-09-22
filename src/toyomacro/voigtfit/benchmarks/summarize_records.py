@@ -38,7 +38,7 @@ def load_records(directory: Path) -> list[dict]:
     out = []
     for path in sorted(directory.glob("*.json")):
         try:
-            rec = json.loads(path.read_text())
+            rec = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
             print(f"  skipped {path.name}: {type(exc).__name__}")
             continue
