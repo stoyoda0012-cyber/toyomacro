@@ -80,6 +80,13 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
     # Records only compare if they fitted the same numbers. They may not:
     # the spectra go through scipy.special.wofz, whose last bits depend on
     # the build, so two platforms at the same (n_batch, seed) can differ.
+    schemas = {rec.get("schema_version") for rec in records}
+    if len(schemas) > 1:
+        print(f"!! MIXED SCHEMA VERSIONS {sorted(s for s in schemas if s)}. "
+              "Field meanings differ between them — in particular a v2 "
+              "record's quality verdict was computed by a rule v3 replaced. "
+              "Re-record rather than compare across the boundary.\n")
+
     hashes: dict[str, list[str]] = defaultdict(list)
     for rec in records:
         h = rec.get("problem", {}).get("input_sha256")
@@ -111,6 +118,12 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
         if len(batches) > 1:
             print(f"   !! mixed batch sizes {batches} - these rows are NOT "
                   "comparable with each other")
+        group_hashes = {r.get("problem", {}).get("input_sha256")
+                        for r in recs} - {None}
+        if len(group_hashes) > 1:
+            print(f"   !! {len(group_hashes)} different input hashes pooled "
+                  "into the rows below - throughput compares, accuracy does "
+                  "not")
 
         # Only quiet records feed the table. Falling back to contended
         # ones and then printing "excluded" in the footer would make the

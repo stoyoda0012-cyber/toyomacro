@@ -7,9 +7,10 @@ which commit, whether a machine-readable record is committed, and how to
 regenerate it.
 
 It records provenance, not results: the results live in the records and
-in the documents that quote them. Where it does cite a measurement of
-its own — §5 has one — it says so and says that nothing regenerates it,
-which is the second of the two paths in "The rule" below.
+in the documents that quote them. Where it cites a measurement that has
+no record here — §5 has several — it says so on the row, which is the
+second of the two paths in "The rule" below and is enforced by
+`tests/test_benchmarks_doc_citations.py`.
 
 ## The rule
 
@@ -150,11 +151,16 @@ thresholds, which points at the thresholds. No performance claim
 anywhere derives from M3.
 
 **A Linux-only measurement bug, fixed.** `ru_maxrss` is in kibibytes on
-Linux; `memory.get_rss_gb` converted it at 1000 bytes per kilobyte, and
-five benchmark modules treated it as bytes outright, so peak-RSS figures
-measured on M2 or M3 were wrong by 1000x or 1024x depending on the call
-site. All six call sites now go through `memory.get_peak_rss_bytes()`,
-which converts at 1024 and reads the peak working set through psutil on
+Linux, and two different mistakes were made about it.
+`memory.get_rss_gb` converted at 1000 bytes per kilobyte rather than
+1024, which is **2.4% low**; four benchmark modules —
+`bench_gvrt_1b`, `benchmark_mlx_pipeline`, `bottleneck_analysis` and
+`chunk_optimization_benchmark` — treated the value as bytes outright,
+which is **1024x low**. A fifth, `bench_gvrt_multipeak_1b`, branched on
+the platform and was already correct.
+
+All six call sites now go through `memory.get_peak_rss_bytes()`, which
+converts at 1024 and reads the peak working set through psutil on
 Windows. No published number was affected — the figures come from M1,
 where `ru_maxrss` is already in bytes.
 
@@ -164,11 +170,19 @@ Every record written by these benchmarks carries an `environment`
 block. When comparing two numbers, check these before concluding
 anything:
 
-- `cpu` and `mlx_usable` — which machine and which backend.
-- `git_commit` and `git_tracked_dirty` — which tree. A dirty tree means
-  the record does not identify the code that produced it.
-- `input_sha256`, where present — whether two records fitted the same
-  data. The MLX/NumPy pair in §2 does.
+- `schema_version` — whether the two records mean the same thing by
+  their fields. Version 3 moved the quality verdict from the trailing
+  load sample to the one taken before the run; a version-2 verdict was
+  computed by a rule that no longer exists.
+- `cpu` and `backend.backend` — which machine, and which of `metal`,
+  `cuda`, `numpy` actually ran. Not "was MLX importable".
+- `git_commit`, `git_tracked_dirty` and `harness_tracked_at_commit` —
+  which tree, and whether that commit even contains the harness. A
+  dirty tree means the record does not identify the code that produced
+  it; the dirty list says what was modified, which is the difference
+  between an edited README and an edited kernel.
+- `input_sha256` — whether two records fitted the same data. Across
+  platforms they often did not: see §"Measuring a new host".
 - `aggregation`, `warmup`, `repeats` — a median over repetitions after
   discarded warmups is not comparable to a single cold timing. Cold
   first runs absorb MLX compilation and read low.
@@ -178,43 +192,77 @@ repository once compared a cold run against a warm one and reported
 that the pipeline doing more work was faster. Ratios need warmup on
 both arms and a median over repetitions.
 
-### What the record does not capture: machine load
+### Machine load, and what the verdict is worth
 
-The `environment` block identifies the machine, the software and the
-tree. It does not record how busy the machine was, and the amplitude-only
-kernel is sensitive to that at a scale larger than its own reported
-range.
+Schema 3 records load before and after the run, grades the host
+`quiet` / `contended` / `unknown`, and `summarize_records` keeps
+non-`quiet` records out of every headline figure. What follows is why
+that verdict should be read as a prompt to look rather than as a
+measurement.
 
-Measured on M1. Two of the three figures below carry a committed
-record; the middle one does not, and this paragraph is the whole of its
-provenance — it is an observation, not a result, and nothing
-regenerates it.
+Measured on M1, on the amplitude-only projection kernel:
 
-| | source |
-|---|---|
-| **478 M** median, 453–490 over 9 repetitions | `figure1_throughput.json`, committed |
-| **418–431 M** across four invocations at load ~12 | **no record** — observed once, on this machine, 2026-09-21 |
-| **488 M** at load 3.2, same problem | `benchmarks/records/…__from-mac.json`, committed |
+| | quality | projection kernel | source |
+|---|---|---|---|
+| load ~12, four invocations | — | **418–431 M** | **no record.** Observed once, 2026-09-21; nothing in the repository regenerates it |
+| before-load 5.5 / 4.7 / 5.4 | `contended` | **497.6 M** | `…131732Z…__from-mac.json`, committed |
+| — | — | 478 M (453–490, 9 reps) | `figure1_throughput.json`, committed |
 
-The contended figures were each internally consistent to about 3%, and
-all of them 9–13% below the committed median without overlapping it.
+**Heavy load did move the number.** The 418–431 M set is four
+invocations at load ~12, each internally consistent to about 3%, all
+9–13% below the committed median and none overlapping it. Repetitions
+*within* one invocation share the machine state that biases them, so a
+record's own min–max range understates the uncertainty across sessions.
+That is the case the verdict exists for.
 
-So the within-run range printed in a record understates the real
-uncertainty: repetitions inside one invocation share the machine state
-that biases them. Two consequences:
+**The threshold is not calibrated to it.** The committed record above
+is graded `contended` at a before-load of 5.5 on 16 cores, and reads
+497.6 M — above the 478 M committed median, not below it. Its own
+`top_processes` names the cause: `fileproviderd` at 192.7% of a
+`cpu_percent_others` of 221.6, an iCloud file provider working through
+a post-reboot backlog. Whatever that was competing for, it was not what
+this kernel is bound by.
 
-- **A number measured on a loaded machine is not a regression.** Before
-  concluding that throughput has changed, check that the host was quiet
-  — `uptime` and the top CPU consumers, at the time of the run.
-- **Comparing two records across dates compares two unrecorded machine
-  states as well.** Until load is captured in the `environment` block,
-  a cross-date difference under roughly 10% on this kernel is not
-  evidence of anything.
+So `contended` at this threshold does not imply a depressed number, and
+this repository has no measurement establishing where the boundary
+actually falls. The convention — every load average below a
+quarter of the core count — is recorded in each record as a convention
+for that reason. Treat a `contended` verdict as a reason to check
+`top_processes` and `cpu_percent_others`, not as grounds to discard a
+figure unexamined.
 
-Schema v2 closes this: `load` is now part of every record written by
-`benchmarks.record`, and the cross-platform harness warns when it
-measures a busy host. Records in §2 predate it and carry no load field,
-which is itself worth knowing when comparing them against anything new.
+### The larger problem: one record is one draw
+
+Load is not the dominant source of disagreement between records, and
+the quality verdict is not the field that most needs reading.
+
+Measured on the Ryzen/WSL2 host across three harness generations — same
+machine, same `input_sha256`, unchanged solver code, every run graded
+`quiet`:
+
+| solver | backend | runs | reported | source |
+|---|---|---|---|---|
+| `amp_only_projection` | cuda | 3 | **9.44 / 9.27 / 17.30 M** | no record in this branch; taken on the Windows host, proposed in PR #27 |
+| `amp_only_projection` | numpy | 2 | **33.4 / 66.0 M** | no record in this branch; same source |
+
+The 17.30 M run reported a **within-run spread of 1.03x** — the
+tightest of the three, and 1.85x away from the other two. One NumPy
+record spread 4.28x inside a single invocation while its median sat
+within the others' range.
+
+So `rate_min` and `rate_max` do not bound what a second run would give.
+The repetitions inside one invocation share a process, a memory layout
+and a clock state; whatever changes between invocations is invisible to
+them by construction. A record that looks confident can be wrong by a
+factor of two, and nothing in the record says so.
+
+**What this does and does not undermine.** It does not undermine the
+cross-backend conclusions: on that host the CUDA and NumPy ranges do
+not overlap on any solver, across every run taken, so "CUDA loses to
+NumPy on three of five solvers" survives. What it undermines is reading
+any single record as *the* number for its machine. The harness does not
+yet repeat runs; until it does, quote a median over several records or
+say plainly that you are quoting one.
 
 ## 6. Measuring a new host
 
@@ -252,6 +300,9 @@ path, no interpreter location, no repository path and no sibling
 project's version; process names in the load snapshot are bare names.
 `record.py` states this as its contract and
 `src/toyomacro/voigtfit/tests/test_benchmark_record.py` asserts it.
+(Note the path: `pytest` on a path that does not exist reports "no tests
+ran" and exits **0**, so a wrong path here would read as a passing
+check.)
 
 ### When a record disagrees with a published number
 

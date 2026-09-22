@@ -13,9 +13,10 @@ What every record carries
 - **What else the machine was doing.** Load is not noise you can average
   away: a contended host can read well below its own quiet figure while
   the repetitions *within* one invocation still agree closely, because
-  they share the machine state that biases them. ``docs/BENCHMARKS.md``
-  §5 gives the observation this rests on, and says plainly that the
-  contended half of it carries no committed record.
+  they share the machine state that biases them. It can also read the
+  same, or higher, when the load is not competing for the same
+  resource. ``docs/BENCHMARKS.md`` §5 has both cases and says which of
+  them carries a committed record.
 - **The tree**, as a commit and a dirty flag.
 
 What no record carries
@@ -49,7 +50,13 @@ import numpy as np
 
 #: Bumped when a field changes meaning or disappears. Readers should
 #: check it before comparing two records.
-SCHEMA_VERSION = 2
+#:
+#: 3 — the load block gained ``looks_quiet_before``, ``cpu_percent_others``
+#: and ``others_busy_after``, and ``looks_quiet`` changed meaning: it is
+#: now the BEFORE sample's verdict, where in 2 it was the trailing one.
+#: A version-2 record's verdict was computed by a rule that no longer
+#: exists and is not comparable with a version-3 one.
+SCHEMA_VERSION = 3
 
 #: Versions worth recording. Deliberately limited to this package and
 #: its published dependencies -- a record must not disclose what else
@@ -117,6 +124,27 @@ def _memory_gb() -> float | None:
         return None
 
 
+#: Processes whose CPU time is not work anyone is doing. Windows reports
+#: idle time as a process ("System Idle Process", PID 0) which psutil
+#: dutifully returns at close to 100% per core; counting it as foreign
+#: load condemned every record taken on an idle Windows host. PID 0 is
+#: the scheduler on Linux too and is never real work there either.
+_IDLE_PROCESS_NAMES = frozenset({"system idle process", "idle"})
+
+
+def _idle_pids(procs) -> set[int]:
+    """PIDs that report time nobody spent."""
+    pids = {0}
+    for p in procs:
+        try:
+            name = (p.info.get("name") or "").strip().lower()
+            if name in _IDLE_PROCESS_NAMES:
+                pids.add(p.pid)
+        except Exception:
+            continue
+    return pids
+
+
 def _self_pids() -> set[int]:
     """This process and its children, so a sample can exclude our own work."""
     pids = {os.getpid()}
@@ -135,7 +163,12 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
 
     ``load_average`` is the 1/5/15-minute POSIX triple, or ``None`` on
     Windows, which has no equivalent. ``cpu_percent`` is whole-machine
-    utilisation over the sampling window. ``top_processes`` names the
+    utilisation over the sampling window: 0-100, and it includes us.
+    ``cpu_percent_others`` is a different quantity on a different scale
+    -- the per-process sum over everything that is *not* this process
+    tree, where 100 means one core, so it can exceed 100 on a
+    multi-core host. The two are not comparable; the second is the one
+    the quality verdict uses. ``top_processes`` names the
     heaviest consumers **by process name only** -- never by path, since
     these records are committed.
 
@@ -165,7 +198,11 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
             except Exception:
                 pass
         snap["cpu_percent"] = psutil.cpu_percent(interval=interval)
-        skip = _self_pids() if exclude_self else set()
+        # The idle process is excluded unconditionally: it is not our work
+        # and it is not anyone else's either.
+        skip = _idle_pids(procs)
+        if exclude_self:
+            skip |= _self_pids()
         rows, rows_pid = [], []
         for p in procs:
             try:
@@ -178,9 +215,16 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
         rows.sort(reverse=True)
         # A sample taken after the benchmark contains the benchmark. Only
         # the processes that are NOT us say whether the host was shared.
-        others = [(v, n) for v, n, pid in rows_pid if pid not in skip]
+        others = [(v, n) for v, n, pid in rows_pid
+                  if pid not in skip
+                  and (n or "").strip().lower() not in _IDLE_PROCESS_NAMES]
+        others.sort(reverse=True)
         snap["cpu_percent_others"] = round(sum(v for v, _ in others), 1)
         if exclude_self:
+            # Must be re-sorted: `rows_pid` is in iteration order, so
+            # taking the first `top_n` of it drops the heaviest consumer
+            # whenever idle processes happen to come first -- in the one
+            # sample the verdict is based on.
             rows = others
         # These records are committed to a public repository, so the
         # process list discloses which applications the machine runs.
@@ -303,10 +347,13 @@ def assess_quality(load: dict, steal: float | None,
     -- it was that nothing recorded the busyness.
     """
     reasons: list[str] = []
-    if load.get("looks_quiet") is False:
-        # Cite the sample that actually decided. When a before-sample is
-        # present it is the judge, so quoting the trailing load average
-        # would name a number that did not determine the verdict.
+    # `looks_quiet` is composite: a busy start OR foreign load mid-run sets
+    # it False. Only the first of those is a statement about load average,
+    # so gate on the load verdict itself -- otherwise a genuinely idle
+    # 0.7-on-32-cores gets printed as a reason the host was contended.
+    load_verdict = load.get("looks_quiet_before",
+                            load.get("looks_quiet"))
+    if load_verdict is False:
         before = load.get("load_average_before")
         la = (before or load.get("load_average") or [None])[0]
         which = "before the run" if before else "after the run"
@@ -519,7 +566,7 @@ def environment(command: str | None = None, origin: str | None = None,
     """
     if command is None:
         command = sanitize_command(sys.argv)
-    load = load_snapshot()
+    load = load_snapshot(exclude_self=True)
     if load_before is not None:
         # **The BEFORE sample decides.** A load average taken afterwards
         # necessarily contains the benchmark that just ran, so on a CPU
@@ -534,6 +581,7 @@ def environment(command: str | None = None, origin: str | None = None,
         load["cpu_percent_before"] = load_before.get("cpu_percent")
         load["top_processes_before"] = load_before.get("top_processes")
         load["looks_quiet_after_incl_self"] = load.get("looks_quiet")
+        load["looks_quiet_before"] = load_before.get("looks_quiet")
         load["looks_quiet"] = load_before.get("looks_quiet")
         # The after sample still earns a say, but only through processes
         # that are not ours: that is work which appeared mid-run.
@@ -541,6 +589,9 @@ def environment(command: str | None = None, origin: str | None = None,
         cores = load.get("logical_cores")
         if others is not None and cores:
             load["others_busy_after"] = others > 25.0 * cores
+            load["others_busy_convention"] = (
+                "cpu_percent_others > 25 * logical_cores, where 100 = one "
+                "core; a convention, not a calibrated threshold")
             if load["others_busy_after"] and load["looks_quiet"]:
                 load["looks_quiet"] = False
         load["sampled"] = (
