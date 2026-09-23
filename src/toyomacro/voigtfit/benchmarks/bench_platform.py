@@ -39,10 +39,10 @@ Platform notes
   refuses to record a CUDA run with TF32 left on unless ``--allow-tf32``
   is given, and records the setting either way.
 - **All backends**: alternating projection is chunked at 65,535, once the
-  CUDA ``gridDim`` limit (ml-explore/mlx#3858, fixed upstream and measured
-  clear at MLX 0.32.2). Metal never had the limit. The chunking stays
-  because it is what makes one command measure the same work everywhere,
-  and it protects an older MLX. The chunk size is recorded.
+  CUDA ``gridDim`` limit (ml-explore/mlx#3858, fixed upstream in MLX
+  0.32.2). Metal never had the limit. The chunking stays because it is
+  what makes one command measure the same work everywhere, and it
+  protects an older MLX. The chunk size is recorded.
 - **NumPy hosts**: every contender still runs; nothing is skipped. The
   backend-parity check is skipped, since both arms would be identical.
 """
@@ -104,14 +104,17 @@ PEAK_CONFIG = {"centers": np.array([CENTER]), "sigmas": np.array([SIGMA]),
 GRID = dict(N_dE=13, N_ds=7)          # identical to solver_comparison_benchmark
 
 #: Above this, MLX's CUDA backend used to map the batch onto a grid
-#: dimension untiled and the launch failed (ml-explore/mlx#3858). That was
-#: fixed upstream in mlx#3929 and measured clear at MLX 0.32.2 -- a single
-#: chunk of 65,537 agrees with a split one bit for bit, on CUDA and on
-#: Metal. The chunking is applied on EVERY backend anyway, because a Metal
-#: run that processed 200k in one call and a CUDA run that processed it in
-#: four is not the same measurement, and comparing the two would be the
-#: exact error this harness exists to prevent. It also keeps an older MLX
-#: safe. It is no longer a workaround for a live crash.
+#: dimension untiled and the launch failed (ml-explore/mlx#3858). The fix,
+#: mlx#3929, was verified on this project's CUDA host twice: on a dev build
+#: on 2026-08-06, where the AP solver ran 200k spectra unchunked
+#: (docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md), and on the
+#: released MLX 0.32.2 on 2026-09-22, where a single chunk of 65,537
+#: agreed with a split one bit for bit. The same check on Metal (MLX
+#: 0.31.2) is the control. The chunking is applied on EVERY backend
+#: anyway, because a Metal run that processed 200k in one call and a CUDA
+#: run that processed it in four is not the same measurement, and
+#: comparing the two would be the exact error this harness exists to
+#: prevent. It also keeps an older MLX safe.
 CUDA_BATCH_LIMIT = 65_535
 
 
@@ -286,9 +289,9 @@ def bench_multipeak(n: int, repeats: int, warmup: int, n_common: int,
 # ------------------------------------------------------------- backend parity
 def _parity_dump(in_path: str, out_path: str) -> None:
     """Subprocess entry point, run with the MLX backend disabled."""
-    z = np.load(in_path)
-    energy, Y = z["energy"], z["Y"]
-    truth = {"amp": z["amp"], "dE": z["dE"], "dsigma": z["dsigma"]}
+    with np.load(in_path) as z:
+        energy, Y = z["energy"], z["Y"]
+        truth = {"amp": z["amp"], "dE": z["dE"], "dsigma": z["dsigma"]}
     n = Y.shape[0]
     r_d = bench_dict2d(energy, Y, truth, n, repeats=1, warmup=0)
     r_t = bench_taylor_4step(energy, Y, truth, n, repeats=1, warmup=0)
@@ -307,16 +310,19 @@ def parity_check(n: int, accel_est: dict, energy, Y, truth) -> dict:
     differs, since the NumPy path falls back to the dictionary-only
     solver with no sub-grid refinement.
     """
-    scratch = tempfile.TemporaryDirectory(prefix="toyomacro-parity-")
-    in_path = Path(scratch.name) / "parity_in.npz"
-    path = Path(scratch.name) / "parity_out.npz"
-    np.savez(in_path, energy=energy, Y=Y[:n], amp=truth["amp"][:n],
-             dE=truth["dE"][:n], dsigma=truth["dsigma"][:n])
-    env = dict(os.environ, TOYOMACRO_DISABLE_MLX="1")
-    subprocess.run([sys.executable, "-m", __spec__.name,
-                    "--parity-dump", str(in_path), "--parity-out", str(path)],
-                   check=True, env=env)
-    z = np.load(path)
+    # Both context managers matter on Windows: an NpzFile holds its file
+    # open, and a directory with an open file in it cannot be removed there.
+    with tempfile.TemporaryDirectory(prefix="toyomacro-parity-") as scratch:
+        in_path = Path(scratch) / "parity_in.npz"
+        path = Path(scratch) / "parity_out.npz"
+        np.savez(in_path, energy=energy, Y=Y[:n], amp=truth["amp"][:n],
+                 dE=truth["dE"][:n], dsigma=truth["dsigma"][:n])
+        env = dict(os.environ, TOYOMACRO_DISABLE_MLX="1")
+        subprocess.run([sys.executable, "-m", __spec__.name,
+                        "--parity-dump", str(in_path), "--parity-out", str(path)],
+                       check=True, env=env)
+        with np.load(path) as npz:
+            z = {k: npz[k] for k in npz.files}
     out = {
         "n_spectra": n,
         "numpy_backend": "TOYOMACRO_DISABLE_MLX=1 subprocess",
@@ -351,8 +357,20 @@ def parity_check(n: int, accel_est: dict, energy, Y, truth) -> dict:
             "fraction_amp_diff_gt_1e-3": float(np.mean(da > 1e-3)),
             "numpy_rate_spec_per_s": float(z[f"{pre}_rate"]),
         }
-    scratch.cleanup()
     return out
+
+
+def _mlx_older_than(version: str | None, fixed: tuple[int, ...]) -> bool:
+    """True if ``version`` is known and earlier than ``fixed``.
+
+    An unparseable or missing version is treated as older: the note it
+    gates is a warning, and a false warning costs less than a missed one.
+    """
+    try:
+        parts = tuple(int(p) for p in (version or "").split(".")[:3])
+    except ValueError:
+        return True
+    return len(parts) < 3 or parts < fixed
 
 
 def _check_tf32(allow: bool) -> None:
@@ -460,9 +478,14 @@ def aggregate_runs(records: list[dict]) -> dict:
     the spread *across* runs to the spread *within* them. A record's own
     ``rate_min``/``rate_max`` covers repetitions that shared a process, a
     memory layout and a clock state, so it cannot see what changes when
-    those change. Measured on one host at 1.85x across runs against 1.03x
-    within the tightest of them -- a record that looked like the most
-    confident of three was the furthest from the other two.
+    those change. Measured on one host at 2.01x across three separate
+    records against 1.03x within the tightest of them -- a record that
+    looked like the most confident of three was the furthest from the
+    other two.
+
+    Each run's per-repetition timings are kept as ``per_run_timings_s``.
+    A median hides a step or a drift inside a run; the repetitions show
+    it, and an aggregate that discarded them would hide it twice.
 
     An ``understates_by`` above 1 means exactly that: the per-run range
     is optimistic by that factor, and quoting one record's range as the
@@ -478,7 +501,8 @@ def aggregate_runs(records: list[dict]) -> dict:
 
     results = []
     for solver, entries in solvers.items():
-        medians = [e["rate_median"] for e in entries if e.get("rate_median")]
+        entries = [e for e in entries if e.get("rate_median")]
+        medians = [e["rate_median"] for e in entries]
         if not medians:
             continue
         within = [e["rate_max"] / e["rate_min"]
@@ -498,6 +522,7 @@ def aggregate_runs(records: list[dict]) -> dict:
             "rate_max": max(medians),
             "aggregation": f"median across {len(medians)} separate runs",
             "per_run_rate_median": medians,
+            "per_run_timings_s": [e.get("timings_s") for e in entries],
             "across_run_spread": across,
             "within_run_spread_typical": within_typical,
         }
@@ -567,15 +592,14 @@ def run_repeated(runs: int, argv_common: list[str]) -> dict:
     the backend, not a throughput figure, and repeating it would double
     the wall clock without adding information.
 
-    **This is a lower bound on run-to-run variability.** The children run
-    back to back, so they still share a thermal state, a GPU clock state
-    and a warm page cache. The observation that motivated this option
-    came from runs separated by hours and by code generations, where
-    `amp_only_projection` moved 1.85x on one host. Measured here on
-    Metal, back to back at a 20k batch, the across-run spread came out
-    *below* the within-run spread -- 0.88-1.03x over two independent
-    three-run experiments. Both can be true: this catches what changes
-    between processes, and not what changes between afternoons.
+    **This is biased low as a measure of run-to-run variability.** The
+    children run back to back, so they still share a thermal state, a GPU
+    clock state and a warm page cache. The observation that motivated this
+    option came from records separated by hours and by code generations,
+    where `amp_only_projection` moved 2.01x on one host. Three
+    back-to-back runs on that same host give 0.95x for that solver. Both
+    are true: this catches what changes between processes, and not what
+    changes between sittings.
     """
     records = []
     # Not `tmpdir`: that is often the records directory, and a child that
@@ -661,12 +685,12 @@ def main(argv: list[str] | None = None) -> None:
     if out_path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if info["backend"] == "cuda" and args.n_batch > CUDA_BATCH_LIMIT:
-        print(f"note: --n-batch {args.n_batch:,} exceeds the CUDA gridDim "
-              f"limit ({CUDA_BATCH_LIMIT:,}). Alternating projection is "
-              "chunked, but if a non-AP solver trips ml-explore/mlx#3858 the "
-              "run will abort -- that is a finding, not a mistake; report it.",
-              flush=True)
+    if (info["backend"] == "cuda" and args.n_batch > CUDA_BATCH_LIMIT
+            and _mlx_older_than(info.get("mlx_version"), (0, 32, 2))):
+        print(f"note: --n-batch {args.n_batch:,} exceeds {CUDA_BATCH_LIMIT:,}, "
+              f"and MLX {info.get('mlx_version')} predates the fix for "
+              "ml-explore/mlx#3858 (0.32.2). Alternating projection is "
+              "chunked, but a non-AP solver may abort the run.", flush=True)
 
     if args.runs < 1:
         raise SystemExit("--runs must be at least 1")

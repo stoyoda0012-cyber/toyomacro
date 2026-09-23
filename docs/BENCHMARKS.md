@@ -36,9 +36,10 @@ published value, however old it is.
 | **M3** | Intel Xeon @ 2.80 GHz, 4 vCPU, no GPU, Linux | NumPy | A control, used once to refute a host-specific hypothesis about two codec speed assertions. | No |
 | — | GitHub Actions: `ubuntu-26.04`, `macos-latest`, `windows-latest`, Python 3.11/3.12 | NumPy | Correctness only. **Runs no benchmarks**; speed assertions skip when `CI=true` (`skip_in_ci` in `test_compression.py`, `skipif(IN_CI, …)` elsewhere). | — |
 
-M2 and M3 measurements are recorded as prose in
-[`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md), not as JSON records —
-see §4 for what that means when reading them.
+M2's earlier measurements are prose in
+[`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md); since 2026-09-21 it also
+has JSON records under `benchmarks/records/`, tabulated in §5. M3's
+are prose only. See §4 for what either means when reading them.
 
 ## 2. Published numbers with a committed record
 
@@ -124,25 +125,27 @@ Two readability notes, since the same solver appears at two rates:
 
 ## 4. The CUDA and GPU-less machines
 
-Neither M2 nor M3 produced a JSON record. Their measurements are prose
-tables in [`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md), which is the
-authoritative text for both; this section only says what is there and
-how far it travels.
+M3 produced no JSON record, and M2's first measurements did not either:
+those are prose tables in [`CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md),
+which is the authoritative text for both machines. Since 2026-09-21 M2
+also has committed JSON records, which §5 tabulates. This section says
+what is there and how far it travels.
 
 **M2 — RTX 5070 / WSL2 (CUDA).** The MLX↔NumPy parity suite has been
 run end to end against MLX's CUDA backend and passed, with TF32
 disabled; `CUDA_BACKEND_POC.md` carries the dated runs and their
 criteria. Throughput and precision were also measured there, but
 **nothing from M2 is a published performance claim**: `README.md` and
-`docs/API.md` both state that CUDA has no CI and no committed
-performance record. Read those measurements as findings about MLX's
-CUDA backend on `sm_120`, not as the package's performance.
+`docs/API.md` both state that CUDA has no CI, and that its committed
+records are measurements of MLX's CUDA backend on one laptop GPU, not a
+supported performance claim. Read them as findings about MLX's CUDA
+backend under WSL2, not as the package's performance.
 
 Two operating constraints from M2 do carry into user-facing
 documentation, because they are correctness matters rather than
-performance ones: TF32 must be disabled (`MLX_ENABLE_TF32=0`), and
-multipeak alternating-projection batches must stay at or below 65,535
-(an upstream MLX limit).
+performance ones: TF32 must be disabled (`MLX_ENABLE_TF32=0`), and on an
+MLX older than 0.32.2 multipeak alternating-projection batches must
+stay at or below 65,535 (upstream mlx#3858, fixed in 0.32.2).
 
 **M3 — GPU-less Xeon (NumPy).** Used once, for one question: whether
 the `test_decode_speed` assertions fail on M2 because of something
@@ -334,39 +337,60 @@ keeps this one out of its headline figures.
 | `taylor_4step` | **383 k** | 0.93x | 392 / 373 / 383 k |
 | `multipeak_2comp` | **117 k** | 0.93x | 118 / 117 / 116 k |
 
-**On every machine and both backends, `understates_by` lands at or
-below 1.00 — with one exception.** NumPy `amp_only_projection` spreads
-2.52x across the three runs. The slow run is run 2, which is graded
-`quiet`; the `contended` run is the fast one. **The quality verdict
-does not account for it**, which makes this the CPU-side counterpart of
-§"Machine load, and what the verdict is worth" above, and an open
-question rather than a finding.
+**`understates_by` lands at or below 1.00 on every machine and all
+three backends, with one exception — but "at or below 1" is not the
+same as "the runs agree".** Two readings need the per-repetition
+timings, not the ratio.
 
-Otherwise the reading is uniform: three back-to-back runs agree, on
-Metal, on CUDA and on NumPy. That is the result, and the next paragraph
-says why it is not the reassurance it looks like.
+**CUDA `taylor_4step` and `multipeak_2comp` do not agree across runs**:
+508 / 675 / 581 k and 35 / 31 / 40 k, spreads of 1.33x and 1.30x. Their
+ratios come out at 0.60 and 0.51 only because the spread *inside* each
+run is larger still, 2.2x and 2.5x, and that inner spread is not noise.
+In all three single-run CUDA records `taylor_4step` falls repetition by
+repetition through the first seven — 546 to 402 k/s in
+`…101134Z…` — then roughly doubles for the last two, and
+`multipeak_2comp` slides steadily. A median of nine is then one point on
+a drift, not a rate. The Metal single-run record shows a smaller step
+at the same repetition (+18% from the eighth), and the NumPy records
+show scatter with no trend. Nothing here explains the drift or the
+step.
+
+**NumPy `amp_only_projection` spreads 2.52x across its three runs**:
+102.2 / 40.5 / 88.4 M. All three ran under the benchmark's own load:
+the records list no other busy process before or after any run, and
+each run started in the previous one's wake. Run 2 began at a load average of 7.98, against
+a threshold of 8.0, and so was graded `quiet` by a hair; it ended at
+11.65. Run 3 began at 10.79 and was graded `contended`. But run 3
+started under more load than run 2 and ran faster, so load alone does
+not order the three. It is an open question, and a demonstration that
+back-to-back runs on a CPU-saturating backend contaminate one another.
 
 **The Ryzen host demonstrates the limit on itself.** Its single-run
 records spread 2.07x on `projection_kernel`; three back-to-back runs on
-the same machine, at the same input hash, give 1.00x. Nothing about the
-machine differs between those two readings. What differs is whether the
-measurements were separated by hours.
+the same machine, at the same input hash, give 1.00x. Neither the
+hardware nor the input differs between those two readings. What differs
+is machine state that three back-to-back runs share and runs hours
+apart need not.
 
 `--runs` varies what changes between processes, and that is a strict
 subset of what changes between sittings. A low `understates_by` says
 the back-to-back component is small and says nothing about the rest.
 
-**On this host the rest is known**: the PCIe link generation, above. A
-`--runs` record taken while the link held one generation cannot see a
-change of generation — and reported 1.00x with a straight face. That is
-not a defect in the metric. It is the metric measuring what it says it
-measures, on a host where that is not the dominant term.
+**On this host the rest is probably known**: the PCIe link generation,
+above. A `--runs` record taken while the link held one generation
+cannot see a change of generation — and reported 1.00x with a straight
+face. That is not a defect in the metric. It is the metric measuring
+what it says it measures, on a host where that is not the dominant
+term.
 
-So `understates_by` is a lower bound by construction, since the runs
-share a thermal state, a GPU clock state and a warm page cache. Until a
-host has a `--runs` record, quote a median over several records or say
-plainly that you are quoting one. Once it has one, read `timings_s` as
-well as the median.
+So `understates_by` is biased low by construction, since the runs share
+a thermal state, a GPU clock state and a warm page cache, and with
+three runs it is a rough figure in any case. Until a host has a
+`--runs` record, quote a median over several records or say plainly
+that you are quoting one. Either way, read the per-repetition timings
+as well as the median: `timings_s` in a single-run record, and
+`per_run_timings_s` in an aggregate written from now on. The three
+aggregates above predate that field and carry none.
 
 ## 6. Measuring a new host
 

@@ -182,11 +182,11 @@ def compare_with_full_pipeline():
     print("=" * 70)
 
     n_energy = 151
-    # n cancels: read time scales with n_spectra, so every rate printed
-    # below is size-independent -- 8.3M (4K), 28M and 265M all give
-    # 8.58 M spec/s. The old label on this constant was wrong (4K is
-    # 8.3M pixels, not 28M; the same 28M appears in an early handoff as
-    # a *rate*). It is kept only to make the printed GB concrete.
+    # n cancels: disk and GPU time both scale with n_spectra, so every
+    # rate printed below is size-independent -- 8.3M (4K), 28M and 265M
+    # all print an effective rate of 8.4M spec/s. The old label on this
+    # constant was wrong (4K is 8.3M pixels, not 28M). It is kept only to
+    # make the printed GB concrete.
     n_spectra = 28_000_000
     bytes_per_float = 4
 

@@ -1,21 +1,25 @@
-"""Does MLX 0.32.2 still fail alternating projection above 65,535?
+"""Does this MLX still fail alternating projection above 65,535?
 
 ml-explore/mlx#3858: the CUDA batched GEMV mapped the batch onto a single
 grid dimension, so a launch above 65,535 failed. It was fixed upstream in
-mlx#3929, merged 2026-08-05 and closed completed 2026-08-06. MLX 0.32.2
-shipped 2026-08-25 and should contain it.
+mlx#3929 (merged and the issue closed 2026-08-06 UTC); MLX 0.32.2 shipped
+2026-08-25 with it.
 
-Measured 2026-09-22 on an RTX 5070 Laptop under WSL2 at MLX 0.32.2, and
-on an M3 Max: all three sizes complete in a single chunk and agree with
-the split run to the bit. The harness chunks unconditionally, so it
-never crosses the bound on its own -- this script is how that claim gets
-re-checked on a future MLX.
+The fix was first verified on this project's CUDA host on 2026-08-06,
+on a dev build, more broadly than this script does -- see
+`mlx-issue-1-batched-gemv-65536.md`, where the AP solver ran 200k
+spectra unchunked. This script re-checks the released package: on
+2026-09-22 it passed on an RTX 5070 Laptop under WSL2 at MLX 0.32.2
+(reported from that host; its output is not committed) and on an M3 Max
+at MLX 0.31.2, which never had the limit and is the control. The
+harness chunks unconditionally, so it never crosses the bound on its
+own -- this is how the claim gets re-checked on a future MLX.
 
 Each size is solved twice on the same input: once as a single chunk that
 crosses the bound, and once split in two so every chunk stays under it.
 A crash and a silent disagreement are then both visible.
 
-    python probe_mlx3858_batch_limit.py
+    python verify-mlx-3858-batch-limit.py
 """
 import traceback
 
@@ -62,11 +66,16 @@ for n in SIZES:
     print("  single chunk: ok", flush=True)
 
     split = solve(Y, dicts, n // 2 + 1)           # two chunks, both under it
-    worst = 0.0
+    agree = True
     for field in ("amplitudes", "delta_E", "delta_sigma"):
-        a, b = getattr(one, field), getattr(split, field)
-        d = float(np.max(np.abs(np.asarray(a) - np.asarray(b))))
-        worst = max(worst, d)
-        print(f"  {field:<12} max |one - split| = {d:.3e}", flush=True)
-    verdict = "AGREE" if worst < 1e-5 else "DISAGREE -- silently wrong"
+        a = np.asarray(getattr(one, field), dtype=np.float64)
+        b = np.asarray(getattr(split, field), dtype=np.float64)
+        # A NaN must not pass: `max(0.0, nan)` is 0.0 in Python, so a
+        # running maximum would read a NaN result as perfect agreement.
+        finite = bool(np.all(np.isfinite(a)) and np.all(np.isfinite(b)))
+        d = float(np.max(np.abs(a - b))) if finite else float("nan")
+        agree = agree and finite and d < 1e-5
+        note = "" if finite else "   <- non-finite values"
+        print(f"  {field:<12} max |one - split| = {d:.3e}{note}", flush=True)
+    verdict = "AGREE" if agree else "DISAGREE -- silently wrong"
     print(f"  -> {verdict}\n", flush=True)

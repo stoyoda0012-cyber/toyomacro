@@ -52,16 +52,19 @@ _CITATION = re.compile(r"`([^`]*\.json)`")
 #: quotes ``9.5 M``. Before ``k`` was accepted, every sub-megaspectrum
 #: figure in the document was simply invisible to this gate -- which is
 #: the same failure as the two above, waiting for the first row to use
-#: one.
+#: one. Uppercase ``K`` is accepted too: an audit found that rewriting a
+#: checked row as ``999 K`` dropped it from the gate silently. If a cited
+#: row ever holds a temperature in kelvin it will fail loudly here, which
+#: is the right way round.
 _FIGURE = re.compile(
-    r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*([Mk])\b")
+    r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*([MkK])\b")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
-_SCALE = {"M": 1e6, "k": 1e3}
+_SCALE = {"M": 1e6, "k": 1e3, "K": 1e3}
 
 
 #: "4 M spectra" is a batch size, not a rate. Only throughputs are
 #: checked against a record's reported rates.
-_NOT_A_RATE = re.compile(r"\b[Mk]\s+(?:spectra|fits|px|pixels)\b")
+_NOT_A_RATE = re.compile(r"\b[MkK]\s+(?:spectra|fits|px|pixels)\b")
 
 
 def _figures(row: str) -> list[tuple[str, float]]:

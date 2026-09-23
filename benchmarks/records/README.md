@@ -74,15 +74,18 @@ record reports `understates_by` per solver: the across-run spread
 divided by the typical within-run spread. Above 1 means a single
 record's own range is optimistic by that factor.
 
-**It is a lower bound.** The runs go back to back, so they still share
-a thermal state, a GPU clock state and a warm page cache. Measured on
-the M3 Max, back to back at a 20k batch, `understates_by` came out
-**0.88-1.03x** across two independent three-run experiments — the
-within-run range did bound the across-run spread there. The 2.01x above
-came from separate records taken hours and code generations apart,
-which is not what `--runs` varies. Both readings are real; they measure
-different things, and neither substitutes for the other. For a figure you intend to publish, take
-records on separate occasions as well as separate processes.
+**It is biased low.** The runs go back to back, so they still share a
+thermal state, a GPU clock state and a warm page cache. The committed
+`--runs` records put `understates_by` at or below 1.00 on every solver
+but one, on Metal, CUDA and NumPy alike; the 2.01x above came from
+separate records taken hours and code generations apart, which is not
+what `--runs` varies. On the Ryzen host the difference is probably the
+PCIe link generation (`docs/CUDA_BACKEND_POC.md`). Both readings are
+real; they measure different things, and neither substitutes for the
+other. A ratio at or below 1 is also not proof that the runs agree —
+read the per-repetition timings (`per_run_timings_s`) too. For a figure
+you intend to publish, take records on separate occasions as well as
+separate processes.
 
 ## Filenames
 

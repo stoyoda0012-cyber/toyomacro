@@ -175,18 +175,22 @@ a validation result, not a support claim. Before relying on it, read
   alternating-projection solver** (upstream MLX batched-GEMV
   grid-dimension limit,
   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Fixed
-  upstream in mlx#3929 and measured clear at MLX 0.32.2: a single chunk
-  of 65,537 agrees bit for bit with the same problem split. On an older
-  MLX, chunk to ≤ 65,535. Metal never had the limit.
+  upstream in mlx#3929, shipped in MLX 0.32.2, and verified on this
+  project's one CUDA host twice: on a dev build, with the AP solver
+  running 200k spectra unchunked, and on 0.32.2, with a single chunk of
+  65,537 matching a split one bit for bit. On an older MLX, chunk to
+  ≤ 65,535. Metal never had the limit.
 - **No CUDA CI.** Performance records for this configuration are
   committed under `benchmarks/records/` — measurements of MLX's CUDA
   backend on one laptop GPU, not a supported performance claim. On that
   host plain NumPy beats CUDA on three of five solvers, including both
-  streaming paths; CUDA wins the two compute-dense ones. Those losses
-  are not the card: under WSL2 MLX allocates host-built arrays in pinned
-  host memory (upstream `mlx#3861`), so a memory-bound kernel streams
-  its operand across PCIe and reports 2.8–5.8 GB/s where the same kernel
-  reports 300 GB/s on Metal. The margin and
+  streaming paths; CUDA wins the two compute-dense ones. The two
+  streaming losses are not the card: under WSL2 MLX allocates host-built
+  arrays in pinned host memory (upstream `mlx#3861`), so those kernels
+  stream their operand across PCIe and report 2.8–5.8 GB/s where the
+  same kernel reports 300 GB/s on Metal. The third loss, the
+  2-component multipeak solver, does not follow that pattern and is not
+  yet explained. The margin and
   even the direction depend on the workload: an earlier measurement at
   `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
   committed records at `n_batch=200,000` put the 2-component multipeak
@@ -198,13 +202,13 @@ a validation result, not a support claim. Before relying on it, read
   a property of a third-party version rather than of this package, so
   it can be invalidated from outside: check
   [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) before
-  relying on it. Upstream has reproduced the slowdown on Windows and
-  attributes it to per-launch overhead, pending profiling. The
-  allocator diagnosis is this repository's, not upstream's: on hosts
-  reporting `concurrentManagedAccess == 0`, host-imported arrays stay
-  in pinned host memory and every kernel reads its operands across
-  PCIe. `docs/upstream-issues/mlx-3861-gemm-sweep.md` reproduces it
-  against cuBLASLt with only the allocator changed.
+  relying on it. The cause is the allocator: on hosts reporting
+  `concurrentManagedAccess == 0` — Windows and WSL2 — host-imported
+  arrays stay in pinned host memory and every kernel reads its operands
+  across PCIe. The diagnosis was made here
+  (`docs/upstream-issues/mlx-3861-gemm-sweep.md` reproduces it against
+  cuBLASLt with only the allocator changed), and the maintainer agreed
+  on 2026-08-11 that it is the root cause. The fix is pending upstream.
 
 ## 1. Lineshape
 

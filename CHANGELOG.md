@@ -26,15 +26,17 @@ archived on Zenodo for a citable DOI.
   within-run spread — and is graded only as clean as its dirtiest run.
   `summarize_records` flags a collection where that ratio exceeds 1.5.
 
-  It is a lower bound: back-to-back runs still share a thermal state, a
-  GPU clock state and a warm page cache. Measured on an M3 Max at a 20k
-  batch, `understates_by` came out 0.88-1.03x over two independent
-  three-run experiments, and 0.83-1.00x at the default 200,000 batch in
-  the first committed `--runs` record — on that host the within-run
-  range did bound the across-run spread, on every solver. The 2.01x
-  above came from separate records taken hours and code generations
-  apart, which is not what `--runs` varies. Both readings are real and
-  they measure different things.
+  It is biased low: back-to-back runs still share a thermal state, a
+  GPU clock state and a warm page cache. The three committed `--runs`
+  records — Metal, CUDA and NumPy — give `understates_by` at or below
+  1.00 on every solver but one, while the 2.01x above came from separate
+  records taken hours and code generations apart, which is not what
+  `--runs` varies. A ratio at or below 1 is also not the same as runs
+  that agree: on CUDA two solvers differ by 1.3x across runs and score
+  low only because they drift further within each one.
+  `docs/BENCHMARKS.md` §5 has the readings. Aggregates written from now
+  on keep every run's per-repetition timings as `per_run_timings_s`;
+  the first three did not.
 
 - **One benchmark record schema, and a harness that runs on every
   supported host.** `voigtfit.benchmarks.bench_platform` measures the
@@ -92,66 +94,80 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
-- **The 65,535 batch limit was fixed upstream a month ago; four places
-  still warned about it.** `mlx#3858` — MLX's CUDA batched GEMV mapping
-  the batch onto one grid dimension, so a launch above 65,535 failed —
-  was fixed in `mlx#3929`, merged 2026-08-05 and closed completed the
-  next day. MLX 0.32.2 shipped 2026-08-25. Nothing here had tested it,
-  because the harness chunks unconditionally and so never crosses the
-  bound; `bench_platform` nonetheless asserted the bug was "still
-  unfixed as of MLX 0.32.2".
+- **The 65,535 batch limit was fixed upstream seven weeks ago, and the
+  documents went on warning about it.** `mlx#3858` — MLX's CUDA batched
+  GEMV mapping the batch onto one grid dimension, so a launch above
+  65,535 failed — was fixed in `mlx#3929`; it merged and the issue
+  closed on 2026-08-06 (UTC), and MLX 0.32.2 shipped with it on
+  2026-08-25. This repository verified the fix the same day, on a dev
+  build and broadly — the AP solver ran 200k spectra unchunked
+  (`docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md`) — yet
+  `README.md`, `docs/API.md`, `docs/BENCHMARKS.md`,
+  `docs/CUDA_BACKEND_POC.md` and `bench_platform` still described a
+  live limit, and the harness asserted the bug was "still unfixed as of
+  MLX 0.32.2".
 
-  Measured now, on CUDA and on Metal: 65,535 / 65,536 / 65,537 each
+  Re-checked on the released 0.32.2: 65,535 / 65,536 / 65,537 each
   complete in a single chunk and agree with the same problem split in
-  two **bit for bit** on `amplitudes`, `delta_E` and `delta_sigma`.
-  `README.md`, `docs/API.md`, `docs/CUDA_BACKEND_POC.md` and the
-  harness now say so, and
-  `docs/upstream-issues/verify-mlx-3858-batch-limit.py` is how the
-  claim gets re-checked on a future MLX. The chunking itself stays: it
-  is what makes a Metal record and a CUDA record the same measurement,
-  and it keeps an older MLX safe.
+  two **bit for bit** on `amplitudes`, `delta_E` and `delta_sigma`, on
+  the CUDA host (reported from there; the output is not committed) and
+  on Metal at MLX 0.31.2, which never had the limit and is the control.
+  All of those documents now say so, the harness prints its warning
+  only on an MLX older than 0.32.2, and
+  `docs/upstream-issues/verify-mlx-3858-batch-limit.py` re-checks it on
+  a future MLX. The chunking itself stays: it is what makes a Metal
+  record and a CUDA record the same measurement, and it keeps an older
+  MLX safe.
 
 - **The Ryzen host's 2.07x CUDA spread matches the PCIe link stepping
   generation, and the records already contained the evidence.**
   `docs/BENCHMARKS.md` said a record "can be wrong by a factor of two,
-  and nothing in the record says so". The second half was false.
-  `summarize` stores every repetition in `timings_s`, and one committed
-  record holds a single repetition at about half the rate of the rest.
-  In a separate probe run, sampling from the Windows side while timing
-  each repetition caught the link stepping `gen4 x8` to `gen3 x8` at
-  the moment the rate halved — exactly a factor two per lane, width
-  unchanged, 40.6% and 41.6% of line rate either side. The committed
-  records were not sampled; for them the generation is inferred from
-  bandwidth, not observed.
+  and nothing in the record says so". For `projection_kernel` that was
+  not true: `summarize` stores every repetition in `timings_s`, and one
+  committed record holds a single repetition at about half the rate of
+  the rest. For the other solvers no single record shows it. In a
+  separate probe run, sampling from the Windows side while timing each
+  repetition caught the link stepping `gen4 x8` to `gen3 x8` at the
+  moment the rate halved — exactly a factor two per lane, width
+  unchanged, 40.6% and 41.6% of line rate either side. The probe script
+  and log are not committed; those figures are as reported from that
+  host. The committed records were not sampled; for them the generation
+  is inferred from bandwidth, not observed.
 
-  `nvidia-smi` **inside WSL2 cannot see this**: it returns `gen.max`
-  for `pcie.link.gen.current`, so a sampling run driven from WSL2
-  reports a steady `gen4` while the link steps underneath it. Only the
-  Windows-side `nvidia-smi.exe` reports the live value.
+  On that host and driver, `nvidia-smi` **inside WSL2 did not see
+  this**: it returned `gen.max` for `pcie.link.gen.current`, so a
+  sampling run driven from WSL2 reported a steady `gen4` while the link
+  stepped underneath it. The Windows-side `nvidia-smi.exe` reported the
+  live value.
 
 - **The CUDA-vs-NumPy comparison said something it had not measured.**
   `README.md`, `docs/API.md` and `docs/CUDA_BACKEND_POC.md` reported
   that NumPy beats MLX's CUDA backend on three of five solvers on one
   RTX 5070 Laptop, which reads as a statement about the GPU. It is not.
   `projection_kernel` reads 151 float32 channels per spectrum, so its
-  rate is a bandwidth: the committed records put that host at **2.8-5.8
-  GB/s** against 300 GB/s on Metal and 11.3-12.1 GB/s for NumPy on the
-  same Ryzen. The first two are those machines' memory bandwidths; the
-  third is two orders of magnitude below the card's and sits at its
-  PCIe link.
+  rate is a bandwidth. The committed records put Metal at 300 GB/s,
+  about three quarters of the M3 Max's rated memory bandwidth; NumPy on
+  the Ryzen at 11.3-12.2 GB/s; and CUDA on the same Ryzen host at
+  **2.8-5.8 GB/s**, two orders of magnitude below the card's memory
+  bandwidth and in the range of its PCIe link.
 
-  The cause is upstream `mlx#3861`, already confirmed on that machine:
-  WSL2 reports `concurrentManagedAccess == 0`, so MLX allocates arrays
-  built from host data in pinned host memory for life and every step
-  streams the operand across PCIe. The numbers stand; what they measure
-  is MLX under WSL2, not the hardware, and all three documents now say
-  so.
+  The cause is upstream `mlx#3861`, confirmed on that machine and agreed
+  by the maintainer as the root cause: WSL2 reports
+  `concurrentManagedAccess == 0`, so MLX allocates arrays built from
+  host data in pinned host memory for life and every step streams the
+  operand across PCIe. That accounts for the two streaming solvers,
+  which halve and double together with the link. The third loss,
+  `multipeak_2comp`, does not follow it and is not explained. The
+  numbers stand; what the streaming ones measure is MLX under WSL2, not
+  the hardware, and the documents now say so for those two and no more.
 
   `CUDA_BACKEND_POC.md` also claimed MLX has no native Windows support.
-  It has had `win_amd64` wheels since 0.32.0 — but they carry no
-  backend, since every CUDA extra in MLX's metadata is gated on
-  `platform_system == "Linux"`. A native Windows install would be
-  CPU-only, so WSL2 remains the only route and the recipe is unchanged.
+  MLX's CUDA backends, `mlx-cuda-12` and `mlx-cuda-13`, have shipped
+  `win_amd64` wheels since 0.32.0; only the `mlx` package's extras are
+  gated on Linux, so they have to be installed by name. Native Windows
+  would not avoid `mlx#3861` — the maintainer reproduced it on a
+  native Windows build and not on DGX Linux — so the recipe stays on
+  WSL2, for that reason.
 
 - **Text I/O in the benchmark record modules names its encoding.**
   `Path.read_text`, `Path.write_text` and `open` without `encoding=`

@@ -579,12 +579,12 @@ class TestAggregateRuns:
     """Combining separate runs, and the ratio that is the point of it."""
 
     @staticmethod
-    def _run(rate, lo, hi, verdict="quiet", solver="k"):
+    def _run(rate, lo, hi, verdict="quiet", solver="k", timings=None):
         return {
             "problem": {"n_batch": 200000, "input_sha256": "abc"},
             "results": [{"solver": solver, "backend": "metal",
                          "rate_median": rate, "rate_min": lo, "rate_max": hi,
-                         "mae_amp": 0.02}],
+                         "timings_s": timings, "mae_amp": 0.02}],
             "environment": {"host_label": "h", "origin": "mac",
                             "quality": {"verdict": verdict}},
         }
@@ -606,11 +606,25 @@ class TestAggregateRuns:
         agg = bp.aggregate_runs([
             self._run(9.44e6, 9.3e6, 9.5e6),
             self._run(9.27e6, 9.2e6, 9.4e6),
-            self._run(17.30e6, 17.18e6, 17.71e6),   # within-run 1.03x
+            self._run(18.65e6, 18.45e6, 19.06e6),   # within-run 1.03x
         ])
         r = agg["results"][0]
-        assert r["across_run_spread"] == pytest.approx(17.30 / 9.27, rel=1e-3)
+        assert r["across_run_spread"] == pytest.approx(18.65 / 9.27, rel=1e-3)
         assert r["understates_by"] > 1.5, r["understates_by"]
+
+    def test_per_run_timings_survive_aggregation(self):
+        """A median hides a step inside a run; the repetitions show it.
+
+        The first aggregates dropped them, so the advice to read
+        per-repetition timings could not be followed on exactly the
+        records meant to be most trustworthy.
+        """
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        step = [0.41, 0.75, 0.41, 0.41]            # one slow repetition
+        flat = [0.40, 0.41, 0.40, 0.41]
+        agg = bp.aggregate_runs([self._run(9.7e6, 5.3e6, 9.8e6, timings=step),
+                                 self._run(9.8e6, 9.7e6, 9.9e6, timings=flat)])
+        assert agg["results"][0]["per_run_timings_s"] == [step, flat]
 
     def test_a_healthy_host_reports_about_one(self):
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
@@ -652,3 +666,20 @@ class TestAggregateRuns:
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
         with pytest.raises(ValueError, match="no run records"):
             bp.aggregate_runs([])
+
+
+class TestMlxVersionGate:
+    """The mlx#3858 note should fire only on an MLX that predates the fix."""
+
+    @pytest.mark.parametrize("version,older", [
+        ("0.32.1", True),
+        ("0.32.1.dev20260806+4652b008", True),   # the dev build it was verified on
+        ("0.32.2", False),
+        ("0.33.0", False),
+        ("1.0.0", False),
+        (None, True),                            # unknown: warn rather than stay silent
+        ("garbage", True),
+    ])
+    def test_version_comparison(self, version, older):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        assert bp._mlx_older_than(version, (0, 32, 2)) is older

@@ -29,12 +29,16 @@ overrides correctness.
 
 ## Target environment
 
-- Windows 11 + WSL2 (Ubuntu 24.04) — WSL2 is the only route to MLX's
-  CUDA backend on a Windows box. MLX does publish `win_amd64` wheels
-  (since 0.32.0), but they declare no backend at all: every CUDA extra
-  in its metadata is gated on `platform_system == "Linux"`. A native
-  Windows install is CPU-only, not a faster CUDA. NVIDIA officially
-  supports CUDA in WSL2.
+- Windows 11 + WSL2 (Ubuntu 24.04) — the route this PoC took, not the
+  only one. MLX's CUDA backends, `mlx-cuda-12` and `mlx-cuda-13`, have
+  published `win_amd64` wheels since 0.32.0 (2026-07-07). The `mlx`
+  package's own extras are gated on `platform_system == "Linux"`, so
+  `pip install "mlx[cuda13]"` on native Windows installs no backend; the
+  backend package has to be named directly. **Native Windows would not
+  avoid mlx#3861**: the maintainer reproduced it on a native Windows
+  build and not on DGX Linux, and `concurrentManagedAccess` is 0 on
+  Windows as on WSL2 (`upstream-issues/mlx-3861-gemm-sweep.md`). NVIDIA
+  officially supports CUDA in WSL2.
 - NVIDIA driver **on the Windows side only** (>= 580 for CUDA 13).
   Do NOT install a Linux GPU driver inside WSL2 — the Windows driver is
   exposed inside WSL as a stub `libcuda.so`.
@@ -368,16 +372,22 @@ as fixed mlx#2267/#3659/#2724); call-site workaround: chunk AP batches
 to ≤ 65,535 (the chunked infrastructure from `test_memory.py` already
 exists for this). Draft report: `docs/upstream-issues/mlx-issue-1-*.md`.
 
-**Fixed upstream; measured here 2026-09-22.** `mlx#3929` split the batch
-across `grid.y`/`grid.z` and was merged 2026-08-05;
-[mlx#3858](https://github.com/ml-explore/mlx/issues/3858) closed
-completed the next day, and MLX 0.32.2 shipped 2026-08-25. On this
-machine at 0.32.2, `solve_multipeak_chunked` at 65,535 / 65,536 /
-65,537 completes in a **single chunk** and agrees with the same problem
-split in two to the **bit** on `amplitudes`, `delta_E` and
-`delta_sigma`. Metal gives the same bit-identical agreement, which is
-the control: chunking does not itself change the answer, so a CUDA
-disagreement would have been the bug and there was none.
+**Fixed upstream; verified here twice.** `mlx#3929` split the batch
+across `grid.y`/`grid.z`; it merged and
+[mlx#3858](https://github.com/ml-explore/mlx/issues/3858) closed on
+2026-08-06 (UTC), and MLX 0.32.2 shipped with it on 2026-08-25. It was
+verified on this machine that same day, on a dev build and more broadly
+than below: the AP solver ran 200k spectra unchunked, and the raw repro
+held to B = 131,072 (`upstream-issues/mlx-issue-1-batched-gemv-65536.md`).
+On 2026-09-22 the released 0.32.2 was re-checked with
+`upstream-issues/verify-mlx-3858-batch-limit.py`:
+`solve_multipeak_chunked` at 65,535 / 65,536 / 65,537 completes in a
+**single chunk** and agrees with the same problem split in two to the
+**bit** on `amplitudes`, `delta_E` and `delta_sigma`. That result was
+reported from this host; its output is not committed. The same script
+on Metal (MLX 0.31.2), which never had the limit, gives the same
+bit-identical agreement — the control that chunking does not itself
+change the answer.
 
 The chunking stays in the harness. It is what makes a Metal record and
 a CUDA record the same measurement, and it protects anyone on an older
@@ -385,6 +395,14 @@ MLX. What changed is that it is no longer a workaround for a live
 crash.
 
 ### Throughput: MLX CUDA GEMM is ~36× below the hardware on `sm_120`
+
+> **Diagnosis superseded 2026-08-11.** The measurements below stand; the
+> "slow kernel" and "JIT-degraded" readings of them do not. The operands
+> were allocated in pinned host memory — MLX's allocator response to
+> `concurrentManagedAccess == 0` — so every GEMM pass crossed PCIe. The
+> maintainer agreed on
+> [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) that this is
+> the root cause. See `upstream-issues/mlx-3861-gemm-sweep.md`.
 
 Raw 4096³ fp32 GEMM, same GPU, same WSL2 session, same cuBLAS libraries:
 
@@ -455,49 +473,64 @@ NVIDIA_TF32_OVERRIDE=0 python -m toyomacro.voigtfit.benchmarks.bench_platform \
     --origin windows --runs 3 --records-dir benchmarks/records
 ```
 
-#### What the CPU-wins rows are measuring
+#### What the two streaming rows are measuring
 
 Not the GPU. `projection_kernel` reads 151 float32 channels per
 spectrum and writes little, so its rate converts straight to a
 bandwidth: 604 bytes × spectra/s.
 
-| host, backend | rate | effective bandwidth |
-|---|---|---|
-| M3 Max, Metal | 496.3 M/s | 300 GB/s |
-| Ryzen, NumPy | 18.8–20.1 M/s | 11.3–12.1 GB/s |
-| RTX 5070 Laptop, CUDA | 4.68–9.67 M/s | **2.8–5.8 GB/s** |
+| host, backend | rate | effective bandwidth | from |
+|---|---|---|---|
+| M3 Max, Metal | 496.3 M/s | 300 GB/s | `…043653Z…from-mac.json` |
+| Ryzen, NumPy | 18.8–20.2 M/s | 11.3–12.2 GB/s | every NumPy record from this host, `--runs` included |
+| RTX 5070 Laptop, CUDA | 4.68–9.67 M/s | **2.8–5.8 GB/s** | every CUDA record from this host, `--runs` included |
 
-The first two are those machines' memory bandwidths — unified memory on
-the M3 Max, DDR5 on the Ryzen — which is what a memory-bound kernel
-should report. The third is two orders of magnitude under this card's
-memory bandwidth, and sits in the range of its PCIe link.
+The Metal figure is about three quarters of Apple's rated 400 GB/s for
+the M3 Max, which is what a memory-bound kernel should report. The NumPy
+figure is what the CPU path reaches; nothing here establishes it as the
+Ryzen's memory bandwidth. The CUDA figure is two orders of magnitude
+under this card's memory bandwidth, and sits in the range of its PCIe
+link.
 
 That is [`mlx#3861`](https://github.com/ml-explore/mlx/issues/3861),
-confirmed on this machine: WSL2 reports `concurrentManagedAccess == 0`,
-so MLX's unified allocator falls back to `cudaMallocHost`, and an array
-built from host data — which is what `mx.array(numpy_array)` does, and
-what this kernel does — stays in pinned host memory for life. Every
-step streams its operand across PCIe.
+confirmed on this machine and agreed upstream as the root cause on
+2026-08-11: WSL2 reports `concurrentManagedAccess == 0`, so MLX's
+unified allocator falls back to `cudaMallocHost`, and an array built
+from host data — which is what `mx.array(numpy_array)` does, and what
+this kernel does — stays in pinned host memory for life. Every step
+streams its operand across PCIe.
 
-So "CPU wins ~2–4×" is a true measurement of this software stack on
-this host, and not a statement about the GPU. Read it as: under WSL2,
-MLX's memory-bound paths do not reach the card. The rows the GPU still
-wins are the compute-dense ones, which is consistent with a per-byte
-penalty rather than a per-flop one — though that split has not been
-measured separately, and nothing here establishes it.
+`amp_only_projection` shows the same split, in the same records: 9.27
+and 9.44 M/s where `projection_kernel` is low, 18.65 M/s where it is
+high. **`multipeak_2comp` does not.** It loses to NumPy by 2.8–3.8×
+but moves only 1.2–1.3× between those same records (31.7–40.6 k/s),
+and inside each run it slides steadily — 59 to 31 k/s across the nine
+repetitions of `…101134Z…`. The link does not explain that loss, and
+nothing here does.
 
-**The fix is not on the Windows side.** There is no MLX CUDA backend
-for Windows to move to (see Target environment). Measuring CUDA without
-this fault means native Linux on this hardware, or waiting for the
-#3861 patch and re-measuring here — the second is the better
-experiment, because it moves the allocator while holding the hardware,
-the driver and WSL2 fixed.
+So "CPU wins" on the two streaming rows is a true measurement of this
+software stack on this host, and not a statement about the GPU. The
+multipeak row is a loss without a diagnosis. The rows the GPU wins are
+compute-dense, which is consistent with a per-byte penalty rather than
+a per-flop one — though that split has not been measured separately,
+and nothing here establishes it.
+
+**Leaving WSL2 for native Windows would not fix it.** MLX's CUDA
+backend does install natively on Windows (see Target environment), but
+the fault is the allocator's response to `concurrentManagedAccess ==
+0`, which native Windows shares; the maintainer reproduced #3861 there
+and not on Linux. Measuring CUDA without this fault means native Linux
+on this hardware, or the #3861 patch re-measured here — the second is
+the better experiment, because it moves the allocator while holding the
+hardware, the driver and WSL2 fixed.
 
 #### The link generation moves mid-run, and halves the rate
 
 Measured 2026-09-22 on this machine: `nvidia-smi.exe` sampled from the
 **Windows side** at 0.5 s while a probe timed each repetition of the
-projection kernel.
+projection kernel. **The probe script and its sample log are not
+committed**; the figures in this subsection are as reported from that
+host, and nothing in the repository regenerates them.
 
 | | rate | effective bandwidth | link |
 |---|---|---|---|
@@ -510,8 +543,10 @@ per lane, and **the width never moved off `x8` in any sample** — the
 halving needs no width change. The efficiency is the same either side
 of the step, 40.6% of `gen4 x8`'s 15.75 GB/s and 41.6% of `gen3 x8`'s
 7.88 GB/s, which is what a fixed-fraction PCIe stream looks like when
-the line rate halves under it. Across the window the box visited
-`gen1`, `gen2`, `gen3` and `gen4`, all at `x8`.
+the line rate halves under it. The fraction belongs to the kernel, not
+the link: inferred the same way, `amp_only_projection` runs at about
+twice that fraction. Across the window the box visited `gen1`, `gen2`,
+`gen3` and `gen4`, all at `x8`.
 
 **The same step is in the committed records.** `summarize` stores every
 repetition in `timings_s`. Converted to bandwidth,
@@ -533,19 +568,24 @@ than the probe, which is why its absolute values sit below the probe's.
 That is strong circumstantial support. The only run in which generation
 and rate were recorded together is the probe above.
 
-Nothing had to be added to the schema to see the step — it had to be
-read.
+For single-run records, nothing had to be added to the schema to see
+the step — it had to be read. `--runs` aggregates did drop the
+per-repetition timings; they keep them as `per_run_timings_s` from now
+on, but the three committed aggregates predate that and carry none.
 
-**`nvidia-smi` inside WSL2 cannot see it.** It returns `gen.max` for
-`pcie.link.gen.current`: `4`, always, idle or loaded. Only the
-Windows-side `nvidia-smi.exe` reports the live value. A sampling run
-driven from inside WSL2 shows a perfectly steady `gen4` while the link
-steps underneath it, and 78 such samples say no more than one does.
+**`nvidia-smi` inside WSL2 did not see it.** On this host and driver it
+returned `gen.max` for `pcie.link.gen.current` — `4`, idle or loaded —
+while the Windows-side `nvidia-smi.exe` reported the live value. A
+sampling run driven from inside WSL2 showed a steady `gen4` while the
+link stepped underneath it, and 78 such samples said no more than one
+does. That is one host and one driver; check it on any other before
+trusting a WSL2 reading of the link.
 
-So the 2.07× spread between this host's CUDA records is neither
-measurement noise nor a property of the solver. It is which PCIe
-generation the link happened to be in, and the record's own
-`timings_s` shows which.
+So the 2.07× spread between this host's CUDA records is not
+measurement noise and not a property of the solver. It matches which
+PCIe generation the link was in — observed in the probe, inferred for
+the records. The records' own `timings_s` show where the rate stepped;
+they cannot show which generation caused it.
 
 **The GPU's one decisive 2026-07 win is the row it loses here.** That
 table has dictionary AP 4–6× ahead on the GPU at `n_comp=4, 65k`;
@@ -563,11 +603,17 @@ survive being moved off it. The upside stated above — a GEMM engine at
 - Always: `MLX_ENABLE_TF32=0` (MLX-native; measured equivalent to the
   driver-level `NVIDIA_TF32_OVERRIDE=0`, and settable in-process via
   `os.environ` before the first kernel call). AP batch chunks ≤ 65,535
-  are no longer required at MLX 0.32.2 (mlx#3858 is fixed, measured); the
-  harness keeps chunking so that Metal and CUDA measure the same work.
-- Streaming / amp-only paths: **stay on NumPy** — the Ryzen wins today.
-- Multipeak AP / dict2d at scale: CUDA is already a real 4–6× win.
-- Re-benchmark on each MLX release; the 36× GEMM gap is the number to watch.
+  are no longer required at MLX 0.32.2 (mlx#3858 is fixed, and verified
+  here); the harness keeps chunking so that Metal and CUDA measure the
+  same work.
+- Streaming / amp-only paths: **stay on NumPy** — the Ryzen wins today,
+  because these paths stream host-pinned operands across PCIe (#3861).
+- Multipeak AP: the GPU won 4–6× at `n_comp=4, 65k` in 2026-07; at
+  2 components and 200k in the 2026-09 records the CPU wins 2.8–3.8×,
+  for reasons not yet understood. `dict2d_parabola` is a CUDA win in
+  both, about 2×. Measure at your own operating point before choosing.
+- Re-benchmark on each MLX release; the #3861 allocator fix is the change
+  to watch for.
 - `cupy-cuda13x` is installed in the venv as the ground-truth harness
   (`uv pip install cupy-cuda13x`); keep it for regression comparisons.
 
@@ -594,12 +640,12 @@ dictionaries are constant across the batch loop.
 Four, all accepted by the tracker; the drafts and repro scripts are in
 `docs/upstream-issues/`.
 
-| issue | subject |
-|---|---|
-| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 — **fixed** in mlx#3929, verified here at 0.32.2 |
-| [mlx#3859](https://github.com/ml-explore/mlx/issues/3859) | the `[cuda13]` extra is missing runtime/CCCL headers |
-| [mlx#3860](https://github.com/ml-explore/mlx/issues/3860) | TF32 on by default, undocumented |
-| [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) | `sm_120` GEMM ~36× under cuBLAS |
+| issue | subject | status (checked 2026-09-23) |
+|---|---|---|
+| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 | closed completed 2026-08-06 (mlx#3929); verified here on a dev build that day and on 0.32.2 |
+| [mlx#3859](https://github.com/ml-explore/mlx/issues/3859) | the `[cuda13]` extra is missing runtime/CCCL headers | closed completed 2026-08-17 |
+| [mlx#3860](https://github.com/ml-explore/mlx/issues/3860) | TF32 on by default, undocumented | closed completed 2026-08-04 |
+| [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) | filed as `sm_120` GEMM ~36× under cuBLAS; retitled upstream to "matmul ~36× slower than cuBLAS on Windows when data are allocated in host" | **open**; root cause (host-pinned operands) agreed by the maintainer 2026-08-11, fix pending |
 
 ### Where `MLX_ENABLE_TF32` lives
 

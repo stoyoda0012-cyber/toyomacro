@@ -27,15 +27,18 @@ python -m toyomacro.voigtfit.benchmarks.bench_platform --out record.json
 Batch size is an explicit argument (`--n-batch`, default 200,000) and is
 recorded, because it moves the answer — keep it equal across hosts or
 the comparison is meaningless. On CUDA the harness refuses to record a
-run with TF32 left enabled, and chunks alternating projection below the
-65,535 `gridDim` limit.
+run with TF32 left enabled. Alternating projection is chunked at 65,535
+on every backend — once a CUDA crash limit, fixed in MLX 0.32.2, and
+kept so that every backend measures the same work.
 
 `--runs N` repeats the whole measurement in **separate processes** and
 reports `understates_by` per solver — the across-run spread over the
 typical within-run spread. Above 1 means one record's own
-`rate_min`/`rate_max` is optimistic by that factor. It is a lower
-bound: back-to-back runs still share a thermal and clock state, so runs
-separated by hours can differ by more.
+`rate_min`/`rate_max` is optimistic by that factor. It is biased low:
+back-to-back runs still share a thermal and clock state, so runs
+separated by hours can differ by more. Each run's per-repetition
+timings are kept in the aggregate as `per_run_timings_s`; read them as
+well as the ratio.
 
 Every record carries the machine's **load** at measurement time. A
 throughput number from a busy host reads low by more than its own
