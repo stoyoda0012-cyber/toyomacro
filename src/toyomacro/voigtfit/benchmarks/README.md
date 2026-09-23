@@ -28,7 +28,7 @@ Batch size is an explicit argument (`--n-batch`, default 200,000) and is
 recorded, because it moves the answer — keep it equal across hosts or
 the comparison is meaningless. On CUDA the harness refuses to record a
 run with TF32 left enabled. Alternating projection is chunked at 65,535
-on every backend — once a CUDA crash limit, fixed in MLX 0.32.2, and
+on every backend — once a CUDA crash limit, fixed from MLX 0.32.1, and
 kept so that every backend measures the same work.
 
 `--runs N` repeats the whole measurement in **separate processes** and

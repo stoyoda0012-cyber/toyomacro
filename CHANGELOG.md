@@ -29,11 +29,14 @@ archived on Zenodo for a citable DOI.
   It is biased low: back-to-back runs still share a thermal state, a
   GPU clock state and a warm page cache. The three committed `--runs`
   records — Metal, CUDA and NumPy — give `understates_by` at or below
-  1.00 on every solver but one, while the 2.01x above came from separate
+  1.00, to two decimals, on every solver but one, while the 2.01x above
+  came from separate
   records taken hours and code generations apart, which is not what
   `--runs` varies. A ratio at or below 1 is also not the same as runs
   that agree: on CUDA two solvers differ by 1.3x across runs and score
-  low only because they drift further within each one.
+  low only because the spread within each run is larger still — and in
+  the single-run records, where repetitions are committed, that inner
+  spread is a drift.
   `docs/BENCHMARKS.md` §5 has the readings. Aggregates written from now
   on keep every run's per-repetition timings as `per_run_timings_s`;
   the first three did not.
@@ -94,13 +97,13 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
-- **The 65,535 batch limit was fixed upstream seven weeks ago, and the
+- **The 65,535 batch limit was fixed upstream in August, and the
   documents went on warning about it.** `mlx#3858` — MLX's CUDA batched
   GEMV mapping the batch onto one grid dimension, so a launch above
   65,535 failed — was fixed in `mlx#3929`; it merged and the issue
-  closed on 2026-08-06 (UTC), and MLX 0.32.2 shipped with it on
-  2026-08-25. This repository verified the fix the same day, on a dev
-  build and broadly — the AP solver ran 200k spectra unchunked
+  closed on 2026-08-06 (UTC), and MLX 0.32.1, released 2026-08-18, is
+  the first release carrying it. This repository verified the fix on
+  2026-08-06, the day it merged, on a dev build and broadly — the AP solver ran 200k spectra unchunked
   (`docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md`) — yet
   `README.md`, `docs/API.md`, `docs/BENCHMARKS.md`,
   `docs/CUDA_BACKEND_POC.md` and `bench_platform` still described a
@@ -113,7 +116,7 @@ archived on Zenodo for a citable DOI.
   the CUDA host (reported from there; the output is not committed) and
   on Metal at MLX 0.31.2, which never had the limit and is the control.
   All of those documents now say so, the harness prints its warning
-  only on an MLX older than 0.32.2, and
+  only on an MLX that may predate 0.32.1, and
   `docs/upstream-issues/verify-mlx-3858-batch-limit.py` re-checks it on
   a future MLX. The chunking itself stays: it is what makes a Metal
   record and a CUDA record the same measurement, and it keeps an older
@@ -156,7 +159,9 @@ archived on Zenodo for a citable DOI.
   `concurrentManagedAccess == 0`, so MLX allocates arrays built from
   host data in pinned host memory for life and every step streams the
   operand across PCIe. That accounts for the two streaming solvers,
-  which halve and double together with the link. The third loss,
+  which halve and double together across the records, in step with
+  `projection_kernel` — the one kernel the probe timed against the
+  link. The third loss,
   `multipeak_2comp`, does not follow it and is not explained. The
   numbers stand; what the streaming ones measure is MLX under WSL2, not
   the hardware, and the documents now say so for those two and no more.

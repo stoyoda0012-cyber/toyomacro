@@ -622,9 +622,15 @@ class TestAggregateRuns:
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
         step = [0.41, 0.75, 0.41, 0.41]            # one slow repetition
         flat = [0.40, 0.41, 0.40, 0.41]
+        broken = self._run(None, None, None, timings=[9.9, 9.9])   # no rate
         agg = bp.aggregate_runs([self._run(9.7e6, 5.3e6, 9.8e6, timings=step),
+                                 broken,
                                  self._run(9.8e6, 9.7e6, 9.9e6, timings=flat)])
-        assert agg["results"][0]["per_run_timings_s"] == [step, flat]
+        r = agg["results"][0]
+        # Aligned with per_run_rate_median: the run without a rate is
+        # dropped from both lists, not from one of them.
+        assert r["per_run_rate_median"] == [9.7e6, 9.8e6]
+        assert r["per_run_timings_s"] == [step, flat]
 
     def test_a_healthy_host_reports_about_one(self):
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
@@ -672,14 +678,19 @@ class TestMlxVersionGate:
     """The mlx#3858 note should fire only on an MLX that predates the fix."""
 
     @pytest.mark.parametrize("version,older", [
-        ("0.32.1", True),
-        ("0.32.1.dev20260806+4652b008", True),   # the dev build it was verified on
+        ("0.32.0", True),
+        ("0.32.1", False),                       # the first release with mlx#3929
+        # A dev build of the fixing release: the string cannot say whether
+        # the fix is in it (the one it was verified on was), so warn.
+        ("0.32.1.dev20260806+4652b008", True),
+        ("0.32.1rc1", True),
+        ("0.32.1+local", False),                 # a local label is not a pre-release
         ("0.32.2", False),
-        ("0.33.0", False),
+        ("0.33", False),                         # two-part versions pad, not fail
         ("1.0.0", False),
         (None, True),                            # unknown: warn rather than stay silent
         ("garbage", True),
     ])
     def test_version_comparison(self, version, older):
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
-        assert bp._mlx_older_than(version, (0, 32, 2)) is older
+        assert bp._mlx_older_than(version, (0, 32, 1)) is older

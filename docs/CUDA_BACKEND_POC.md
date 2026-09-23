@@ -375,9 +375,9 @@ exists for this). Draft report: `docs/upstream-issues/mlx-issue-1-*.md`.
 **Fixed upstream; verified here twice.** `mlx#3929` split the batch
 across `grid.y`/`grid.z`; it merged and
 [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) closed on
-2026-08-06 (UTC), and MLX 0.32.2 shipped with it on 2026-08-25. It was
-verified on this machine that same day, on a dev build and more broadly
-than below: the AP solver ran 200k spectra unchunked, and the raw repro
+2026-08-06 (UTC); MLX 0.32.1, released 2026-08-18, is the first release
+carrying it. It was verified on this machine on 2026-08-06, the day it
+merged, on a dev build and more broadly than below: the AP solver ran 200k spectra unchunked, and the raw repro
 held to B = 131,072 (`upstream-issues/mlx-issue-1-batched-gemv-65536.md`).
 On 2026-09-22 the released 0.32.2 was re-checked with
 `upstream-issues/verify-mlx-3858-batch-limit.py`:
@@ -437,9 +437,12 @@ the microbench is consistent with a mis-selected tensor-core code path.
 Both of this document's predictions were correct: streaming loses to the
 PCIe hop, compute-dense dictionary AP wins even on the crippled backend.
 The headline is the upside: dict2d wins 4–6× while the GEMM engine runs
-at ~3 % of the hardware. If upstream MLX ships `sm_120`-tuned kernels
-(or routes matmul to cuBLASLt properly), a further order of magnitude is
-on the table without touching voigtfit code.
+at ~3 % of the hardware. *(Reading since superseded: the shortfall is
+not the kernels. It is mlx#3861, operands left in host-pinned memory;
+the sweep in `upstream-issues/mlx-3861-gemm-sweep.md` measures a 4096²
+matmul at 7.88 ms with device-resident operands against 775 ms with
+host-resident ones. The upside depends on upstream fixing the
+allocator, not on new kernels, and still needs no change to voigtfit.)*
 
 ### The same machine re-measured (2026-09-21/22, records committed)
 
@@ -451,14 +454,15 @@ correction of the table above**: the 2026-07 rows measure `n_comp=4` at
 65 k and Stage-1 streaming at 100 k/1 M. Both stay.
 
 Ranges are min–max of `rate_median` across runs, not one run's own
-spread. Records are in `benchmarks/records/`, filenames beginning
-`20260921T1011`, `…T1129`, `…T1134` and `20260922T0117`, `…T0123`.
+spread. Records are in `benchmarks/records/`: CUDA `20260921T101134Z`,
+`…T112904Z`, `20260922T011702Z`; NumPy `20260921T101303Z`,
+`…T102748Z`, `…T113035Z`, `…T113459Z`, `20260922T012329Z`.
 
 | solver | CUDA TF32off | NumPy (same host) | verdict |
 |---|---|---|---|
 | `projection_kernel` | 4.68–9.67 M/s | **18.76–20.11 M/s** | CPU wins ~2–4× |
 | `amp_only_projection` | 9.27–18.65 M/s | **33.42–88.95 M/s** | CPU wins ~2–7× |
-| `multipeak_2comp` | 31.7–40.6 k/s | **111.7–117.8 k/s** | CPU wins ~3.5× |
+| `multipeak_2comp` | 31.7–40.6 k/s | **111.7–117.8 k/s** | CPU wins 2.8–3.7× |
 | `dict2d_parabola` | **1.37–1.48 M/s** | 0.63–0.74 M/s | GPU wins ~2× |
 | `taylor_4step` | **0.43–0.50 M/s** | 0.35–0.40 M/s | GPU wins, narrowly |
 
@@ -502,11 +506,14 @@ streams its operand across PCIe.
 
 `amp_only_projection` shows the same split, in the same records: 9.27
 and 9.44 M/s where `projection_kernel` is low, 18.65 M/s where it is
-high. **`multipeak_2comp` does not.** It loses to NumPy by 2.8–3.8×
-but moves only 1.2–1.3× between those same records (31.7–40.6 k/s),
-and inside each run it slides steadily — 59 to 31 k/s across the nine
-repetitions of `…101134Z…`. The link does not explain that loss, and
-nothing here does.
+high. **`multipeak_2comp` does not.** It loses to NumPy by about 3×
+(2.8–3.8× across every record from this host) but moves only 1.2–1.3×
+between those same records (31.7–40.6 k/s), and inside each run it falls
+— 59 to 31 k/s across the nine repetitions of `…101134Z…`. The link
+does not explain that loss. One candidate, untested: #3861's second
+mechanism, a buffer cache keyed on size alone that hands freed
+host-pinned buffers to later device allocations, would make a run slow
+down as it recycles its buffers.
 
 So "CPU wins" on the two streaming rows is a true measurement of this
 software stack on this host, and not a statement about the GPU. The
@@ -544,8 +551,9 @@ halving needs no width change. The efficiency is the same either side
 of the step, 40.6% of `gen4 x8`'s 15.75 GB/s and 41.6% of `gen3 x8`'s
 7.88 GB/s, which is what a fixed-fraction PCIe stream looks like when
 the line rate halves under it. The fraction belongs to the kernel, not
-the link: inferred the same way, `amp_only_projection` runs at about
-twice that fraction. Across the window the box visited `gen1`, `gen2`,
+the link: inferred the same way from the records, `amp_only_projection`
+runs at about 71% of line rate, against about 37% for
+`projection_kernel` in the same records. Across the window the box visited `gen1`, `gen2`,
 `gen3` and `gen4`, all at `x8`.
 
 **The same step is in the committed records.** `summarize` stores every
@@ -589,7 +597,7 @@ they cannot show which generation caused it.
 
 **The GPU's one decisive 2026-07 win is the row it loses here.** That
 table has dictionary AP 4–6× ahead on the GPU at `n_comp=4, 65k`;
-`multipeak_2comp` at 200 k puts the CPU 3.5× ahead. The CUDA side
+`multipeak_2comp` at 200 k puts the CPU about 3× ahead. The CUDA side
 barely moved — 36.2 k/s then, 31.7–40.6 k/s now — and the NumPy side
 went from 8.9 k/s to 111.7–117.8 k/s. Component count, batch size and
 five months of solver work all differ between the two, so this is not
@@ -603,15 +611,16 @@ survive being moved off it. The upside stated above — a GEMM engine at
 - Always: `MLX_ENABLE_TF32=0` (MLX-native; measured equivalent to the
   driver-level `NVIDIA_TF32_OVERRIDE=0`, and settable in-process via
   `os.environ` before the first kernel call). AP batch chunks ≤ 65,535
-  are no longer required at MLX 0.32.2 (mlx#3858 is fixed, and verified
-  here); the harness keeps chunking so that Metal and CUDA measure the
-  same work.
+  are no longer required from MLX 0.32.1 (mlx#3858 is fixed, and
+  verified here); the harness keeps chunking so that Metal and CUDA
+  measure the same work.
 - Streaming / amp-only paths: **stay on NumPy** — the Ryzen wins today,
   because these paths stream host-pinned operands across PCIe (#3861).
 - Multipeak AP: the GPU won 4–6× at `n_comp=4, 65k` in 2026-07; at
-  2 components and 200k in the 2026-09 records the CPU wins 2.8–3.8×,
+  2 components and 200k in the 2026-09 records the CPU wins about 3×,
   for reasons not yet understood. `dict2d_parabola` is a CUDA win in
-  both, about 2×. Measure at your own operating point before choosing.
+  the 2026-09 records, about 2×; the 2026-07 table has no comparable
+  row. Measure at your own operating point before choosing.
 - Re-benchmark on each MLX release; the #3861 allocator fix is the change
   to watch for.
 - `cupy-cuda13x` is installed in the venv as the ground-truth harness
@@ -642,7 +651,7 @@ Four, all accepted by the tracker; the drafts and repro scripts are in
 
 | issue | subject | status (checked 2026-09-23) |
 |---|---|---|
-| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 | closed completed 2026-08-06 (mlx#3929); verified here on a dev build that day and on 0.32.2 |
+| [mlx#3858](https://github.com/ml-explore/mlx/issues/3858) | batched-GEMV crashes for batch > 65,535 | closed completed 2026-08-06 (mlx#3929), first released in 0.32.1; verified here on a dev build that day and re-checked on 0.32.2 |
 | [mlx#3859](https://github.com/ml-explore/mlx/issues/3859) | the `[cuda13]` extra is missing runtime/CCCL headers | closed completed 2026-08-17 |
 | [mlx#3860](https://github.com/ml-explore/mlx/issues/3860) | TF32 on by default, undocumented | closed completed 2026-08-04 |
 | [mlx#3861](https://github.com/ml-explore/mlx/issues/3861) | filed as `sm_120` GEMM ~36× under cuBLAS; retitled upstream to "matmul ~36× slower than cuBLAS on Windows when data are allocated in host" | **open**; root cause (host-pinned operands) agreed by the maintainer 2026-08-11, fix pending |
@@ -680,8 +689,8 @@ Stated as limits, not plans — none of these is scheduled here.
   a run that forgets loses about three decimal digits silently.
 - `solve_alternating_projection` is not chunked against the 65,535
   batch limit on the CUDA path. This was a live crash when written; it
-  is not one at MLX 0.32.2, where a single chunk of 65,537 agrees with
-  a split one bit for bit. Left unwired deliberately: adding a guard
+  is not one from MLX 0.32.1 on, and at 0.32.2 a single chunk of 65,537
+  agrees with a split one bit for bit. Left unwired deliberately: adding a guard
   now would work around a fixed bug.
 - The `[cuda13]` header install and `CUDA_HOME` are manual, as the
   setup recipe above spells out; the package does neither.
@@ -980,8 +989,9 @@ here. The record above stands as measured on the tree that was run.
 
 The CUDA suite took 559 s (TF32 on) and 481 s (off) against 177 s for
 the NumPy baseline on the same host — 2.7× to 3.2× slower in wall
-clock. The `sm_120` GEMM shortfall recorded in 2026-07 is not fixed by
-driver 610.71 or MLX 0.32.2.
+clock. The GEMM shortfall recorded in 2026-07 — since diagnosed as
+mlx#3861, host-pinned operands, not an `sm_120` kernel problem — is not
+fixed by driver 610.71 or MLX 0.32.2.
 
 ### The batch > 65,535 limit, tested 2026-09-22
 
@@ -989,7 +999,8 @@ This 2026-09 suite completed without hitting the crash
 ([mlx#3858](https://github.com/ml-explore/mlx/issues/3858)) only
 because its batches stay at or below that size, so it was **not**
 evidence either way. It has since been tested directly: the limit is
-gone at MLX 0.32.2, bit-identically. See the resolution note under
+gone from MLX 0.32.1, the first release with the fix, and the check on
+0.32.2 agreed bit-identically. See the resolution note under
 "NEW BUG: batch > 65,535" above.
 
 ### Two traps that cost 40 minutes here

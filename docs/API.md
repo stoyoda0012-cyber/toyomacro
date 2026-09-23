@@ -175,10 +175,11 @@ a validation result, not a support claim. Before relying on it, read
   alternating-projection solver** (upstream MLX batched-GEMV
   grid-dimension limit,
   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Fixed
-  upstream in mlx#3929, shipped in MLX 0.32.2, and verified on this
-  project's one CUDA host twice: on a dev build, with the AP solver
-  running 200k spectra unchunked, and on 0.32.2, with a single chunk of
-  65,537 matching a split one bit for bit. On an older MLX, chunk to
+  upstream in mlx#3929, first released in MLX 0.32.1, and verified on
+  this project's one CUDA host: on a dev build, with the AP solver
+  running 200k spectra unchunked (committed record), and on 0.32.2,
+  where a single chunk of 65,537 matched a split one bit for bit
+  (reported from that host, not committed). On an older MLX, chunk to
   ≤ 65,535. Metal never had the limit.
 - **No CUDA CI.** Performance records for this configuration are
   committed under `benchmarks/records/` — measurements of MLX's CUDA
@@ -187,14 +188,15 @@ a validation result, not a support claim. Before relying on it, read
   streaming paths; CUDA wins the two compute-dense ones. The two
   streaming losses are not the card: under WSL2 MLX allocates host-built
   arrays in pinned host memory (upstream `mlx#3861`), so those kernels
-  stream their operand across PCIe and report 2.8–5.8 GB/s where the
-  same kernel reports 300 GB/s on Metal. The third loss, the
+  stream their operand across PCIe. The projection kernel reports
+  2.8–5.8 GB/s there against 300 GB/s on Metal; the amplitude-only
+  projection, 5.6–11.3 GB/s. The third loss, the
   2-component multipeak solver, does not follow that pattern and is not
   yet explained. The margin and
   even the direction depend on the workload: an earlier measurement at
   `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
   committed records at `n_batch=200,000` put the 2-component multipeak
-  solver 3.5× ahead on the CPU.
+  solver about 3× ahead on the CPU.
   [`docs/CUDA_BACKEND_POC.md`](CUDA_BACKEND_POC.md) has both. Do not
   generalize any of it.
 - **MLX's `sm_120` GEMM measured ~36× below what cuBLAS delivers on the

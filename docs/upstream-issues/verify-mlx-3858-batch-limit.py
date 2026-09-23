@@ -2,8 +2,8 @@
 
 ml-explore/mlx#3858: the CUDA batched GEMV mapped the batch onto a single
 grid dimension, so a launch above 65,535 failed. It was fixed upstream in
-mlx#3929 (merged and the issue closed 2026-08-06 UTC); MLX 0.32.2 shipped
-2026-08-25 with it.
+mlx#3929 (merged and the issue closed 2026-08-06 UTC); MLX 0.32.1,
+released 2026-08-18, is the first release carrying it.
 
 The fix was first verified on this project's CUDA host on 2026-08-06,
 on a dev build, more broadly than this script does -- see

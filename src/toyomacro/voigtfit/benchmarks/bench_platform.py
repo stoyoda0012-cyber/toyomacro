@@ -39,8 +39,8 @@ Platform notes
   refuses to record a CUDA run with TF32 left on unless ``--allow-tf32``
   is given, and records the setting either way.
 - **All backends**: alternating projection is chunked at 65,535, once the
-  CUDA ``gridDim`` limit (ml-explore/mlx#3858, fixed upstream in MLX
-  0.32.2). Metal never had the limit. The chunking stays because it is
+  CUDA ``gridDim`` limit (ml-explore/mlx#3858, first released fixed in
+  MLX 0.32.1). Metal never had the limit. The chunking stays because it is
   what makes one command measure the same work everywhere, and it
   protects an older MLX. The chunk size is recorded.
 - **NumPy hosts**: every contender still runs; nothing is skipped. The
@@ -51,6 +51,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import subprocess
 import sys
@@ -109,8 +110,9 @@ GRID = dict(N_dE=13, N_ds=7)          # identical to solver_comparison_benchmark
 #: on 2026-08-06, where the AP solver ran 200k spectra unchunked
 #: (docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md), and on the
 #: released MLX 0.32.2 on 2026-09-22, where a single chunk of 65,537
-#: agreed with a split one bit for bit. The same check on Metal (MLX
-#: 0.31.2) is the control. The chunking is applied on EVERY backend
+#: agreed with a split one bit for bit -- reported from that host, not
+#: committed. The first release carrying the fix is 0.32.1. The same
+#: check on Metal (MLX 0.31.2) is the control. The chunking is applied on EVERY backend
 #: anyway, because a Metal run that processed 200k in one call and a CUDA
 #: run that processed it in four is not the same measurement, and
 #: comparing the two would be the exact error this harness exists to
@@ -360,17 +362,27 @@ def parity_check(n: int, accel_est: dict, energy, Y, truth) -> dict:
     return out
 
 
-def _mlx_older_than(version: str | None, fixed: tuple[int, ...]) -> bool:
-    """True if ``version`` is known and earlier than ``fixed``.
+_VERSION = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(.*)$")
+_PRERELEASE = re.compile(r"(dev|rc|a|b|alpha|beta|pre)\d*", re.IGNORECASE)
 
-    An unparseable or missing version is treated as older: the note it
-    gates is a warning, and a false warning costs less than a missed one.
+
+def _mlx_older_than(version: str | None, fixed: tuple[int, int, int]) -> bool:
+    """True unless ``version`` is known to be release ``fixed`` or later.
+
+    A pre-release or dev build *of* ``fixed`` counts as older, because its
+    version string cannot say whether it includes the fix. So does a
+    missing or unparseable version. The note this gates is a warning, and
+    a false one costs less than a missed one. A local label (``+abc``)
+    does not make a release a pre-release.
     """
-    try:
-        parts = tuple(int(p) for p in (version or "").split(".")[:3])
-    except ValueError:
+    m = _VERSION.match(version or "")
+    if not m:
         return True
-    return len(parts) < 3 or parts < fixed
+    release = tuple(int(g or 0) for g in m.group(1, 2, 3))
+    if release != fixed:
+        return release < fixed
+    suffix = (m.group(4) or "").split("+", 1)[0]
+    return bool(_PRERELEASE.search(suffix))
 
 
 def _check_tf32(allow: bool) -> None:
@@ -594,12 +606,13 @@ def run_repeated(runs: int, argv_common: list[str]) -> dict:
 
     **This is biased low as a measure of run-to-run variability.** The
     children run back to back, so they still share a thermal state, a GPU
-    clock state and a warm page cache. The observation that motivated this
-    option came from records separated by hours and by code generations,
-    where `amp_only_projection` moved 2.01x on one host. Three
-    back-to-back runs on that same host give 0.95x for that solver. Both
-    are true: this catches what changes between processes, and not what
-    changes between sittings.
+    clock state and a warm page cache. The option was motivated by
+    records separated by hours and by code generations, across which
+    `amp_only_projection` moved 1.85x on one host; the record behind that
+    figure was later re-taken, and the committed set moves 2.01x. Three
+    back-to-back runs on the same host moved it 1.001x. Both are true:
+    this catches what changes between processes, and not what changes
+    between sittings.
     """
     records = []
     # Not `tmpdir`: that is often the records directory, and a child that
@@ -686,11 +699,12 @@ def main(argv: list[str] | None = None) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if (info["backend"] == "cuda" and args.n_batch > CUDA_BATCH_LIMIT
-            and _mlx_older_than(info.get("mlx_version"), (0, 32, 2))):
+            and _mlx_older_than(info.get("mlx_version"), (0, 32, 1))):
         print(f"note: --n-batch {args.n_batch:,} exceeds {CUDA_BATCH_LIMIT:,}, "
-              f"and MLX {info.get('mlx_version')} predates the fix for "
-              "ml-explore/mlx#3858 (0.32.2). Alternating projection is "
-              "chunked, but a non-AP solver may abort the run.", flush=True)
+              f"and MLX {info.get('mlx_version')} may predate the fix for "
+              "ml-explore/mlx#3858 (first released in 0.32.1). Alternating "
+              "projection is chunked, but a non-AP solver may abort the "
+              "run.", flush=True)
 
     if args.runs < 1:
         raise SystemExit("--runs must be at least 1")

@@ -53,9 +53,10 @@ _CITATION = re.compile(r"`([^`]*\.json)`")
 #: figure in the document was simply invisible to this gate -- which is
 #: the same failure as the two above, waiting for the first row to use
 #: one. Uppercase ``K`` is accepted too: an audit found that rewriting a
-#: checked row as ``999 K`` dropped it from the gate silently. If a cited
-#: row ever holds a temperature in kelvin it will fail loudly here, which
-#: is the right way round.
+#: checked row as ``999 K`` dropped it from the gate silently. The price
+#: is that a cited row mentioning a temperature (``300 K``) or an image
+#: size (``4K``) would be read as a rate and fail. That fails loudly,
+#: which is the right way round; today no cited row does.
 _FIGURE = re.compile(
     r"((?:\d+(?:\.\d+)?\s*[/–-]\s*)*\d+(?:\.\d+)?)\s*([MkK])\b")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
