@@ -177,9 +177,11 @@ a validation result, not a support claim. Before relying on it, read
   [mlx#3858](https://github.com/ml-explore/mlx/issues/3858)). Fixed
   upstream in mlx#3929, first released in MLX 0.32.1, and verified on
   this project's one CUDA host: on a dev build, with the AP solver
-  running 200k spectra unchunked (committed record), and on 0.32.2,
+  running 200k spectra unchunked (written up in
+  `docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md`), and on 0.32.2,
   where a single chunk of 65,537 matched a split one bit for bit
-  (reported from that host, not committed). On an older MLX, chunk to
+  (output in `docs/upstream-issues/pcie-link-probe-2026-09-22.md`). On an
+  older MLX, chunk to
   ≤ 65,535. Metal never had the limit.
 - **No CUDA CI.** Performance records for this configuration are
   committed under `benchmarks/records/` — measurements of MLX's CUDA
@@ -190,10 +192,13 @@ a validation result, not a support claim. Before relying on it, read
   arrays in pinned host memory (upstream `mlx#3861`), so those kernels
   stream their operand across PCIe. The projection kernel reports
   2.8–5.8 GB/s there against 300 GB/s on Metal; the amplitude-only
-  projection, 5.6–11.3 GB/s. The third loss, the
-  2-component multipeak solver, does not follow that pattern and is not
-  yet explained. The margin and
-  even the direction depend on the workload: an earlier measurement at
+  projection, 5.6–11.3 GB/s. The third loss, the 2-component multipeak
+  solver, is MLX's buffer cache: with it disabled
+  (`mx.set_cache_limit(0)`) that solver runs about twice as fast as
+  NumPy, while `dict2d_parabola` falls below NumPy, and no fitted value
+  changes (`docs/upstream-issues/mlx-buffer-cache-ab-2026-09-23.md`).
+  The margin and even the direction depend on the workload and on that
+  setting: an earlier measurement at
   `n_comp=4, 65k` put dictionary AP 4–6× ahead on the GPU, where the
   committed records at `n_batch=200,000` put the 2-component multipeak
   solver about 3× ahead on the CPU.

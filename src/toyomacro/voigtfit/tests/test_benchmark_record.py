@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+from pathlib import Path
 
 import pytest
 
@@ -85,6 +86,19 @@ class TestBackendInfo:
     def test_reports_one_of_three_backends(self):
         info = record.backend_info()
         assert info["backend"] in {"metal", "cuda", "numpy"}
+
+    def test_cache_limit_is_recorded_and_left_as_it_was(self):
+        """The limit moves CUDA results several-fold, so a record must carry
+        it -- and reading it must not change it, since MLX offers no getter
+        and the read is a set followed by a restore."""
+        info = record.backend_info()
+        if info["backend"] == "numpy":
+            assert info["mlx_cache_limit_bytes"] is None
+            return
+        import mlx.core as mx
+        after = mx.set_cache_limit(2 ** 62)
+        mx.set_cache_limit(after)
+        assert info["mlx_cache_limit_bytes"] == after
 
     def test_tf32_is_only_meaningful_on_cuda(self):
         info = record.backend_info()
@@ -675,7 +689,11 @@ class TestAggregateRuns:
 
 
 class TestMlxVersionGate:
-    """The mlx#3858 note should fire only on an MLX that predates the fix."""
+    """The mlx#3858 note fires on any MLX not known to carry the fix.
+
+    That includes dev builds of 0.32.1, some of which do carry it: a
+    version string cannot say which, and the note is only a warning.
+    """
 
     @pytest.mark.parametrize("version,older", [
         ("0.32.0", True),
@@ -684,6 +702,7 @@ class TestMlxVersionGate:
         # the fix is in it (the one it was verified on was), so warn.
         ("0.32.1.dev20260806+4652b008", True),
         ("0.32.1rc1", True),
+        ("0.32.1c1", True),                      # PEP 440 spelling of rc1
         ("0.32.1+local", False),                 # a local label is not a pre-release
         ("0.32.2", False),
         ("0.33", False),                         # two-part versions pad, not fail
@@ -694,3 +713,49 @@ class TestMlxVersionGate:
     def test_version_comparison(self, version, older):
         from toyomacro.voigtfit.benchmarks import bench_platform as bp
         assert bp._mlx_older_than(version, (0, 32, 1)) is older
+
+
+class TestConsolePaths:
+    """The console line reporting where a record went must not carry the
+    home directory: records sanitise their command field, the console did
+    not, and console output gets pasted into committed documents."""
+
+    def test_a_path_outside_the_working_directory_is_reduced(self, tmp_path,
+                                                             monkeypatch):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        monkeypatch.chdir(tmp_path)
+        shown = bp._shown(Path.home() / "somewhere" / "rec.json")
+        assert shown == "<dir>/rec.json"
+        assert str(Path.home()) not in shown
+
+    def test_a_path_inside_it_stays_relative(self, tmp_path, monkeypatch):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "records").mkdir()
+        target = tmp_path / "records" / "rec.json"
+        assert bp._shown(target) == str(Path("records") / "rec.json")
+
+
+class TestMixedCacheLimits:
+    """Records taken with different buffer-cache limits are not one
+    configuration, and the summary has to say so rather than pool them."""
+
+    @staticmethod
+    def _rec(limit):
+        return {"schema_version": 3, "_file": f"cache-{limit}.json",
+                "problem": {"input_sha256": "abc"},
+                "results": [{"solver": "k", "rate_median": 1e6}],
+                "environment": {"host_label": "h", "origin": "windows",
+                                "backend": {"backend": "cuda",
+                                            "mlx_cache_limit_bytes": limit},
+                                "quality": {"verdict": "quiet"}}}
+
+    def test_mixed_limits_are_flagged(self, capsys):
+        from toyomacro.voigtfit.benchmarks import summarize_records as sr
+        sr.summarize([self._rec(0), self._rec(5 * 2 ** 30)], ("k",))
+        assert "MIXED MLX buffer-cache limits" in capsys.readouterr().out
+
+    def test_records_that_predate_the_field_are_not_a_conflict(self, capsys):
+        from toyomacro.voigtfit.benchmarks import summarize_records as sr
+        sr.summarize([self._rec(None), self._rec(5 * 2 ** 30)], ("k",))
+        assert "MIXED MLX buffer-cache" not in capsys.readouterr().out

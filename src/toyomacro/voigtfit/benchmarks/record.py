@@ -400,6 +400,12 @@ def backend_info() -> dict:
     float32 matmul in TF32 by default, which costs roughly 1000x the
     matmul error and measurably degrades fitted parameters, so a record
     taken with TF32 on is not comparable to one taken with it off.
+
+    ``mlx_cache_limit_bytes`` is load-bearing too. On the one CUDA host
+    measured, disabling MLX's buffer cache moved three solvers by 1.4x to
+    7.4x, in both directions, while leaving every fitted value unchanged
+    (``docs/upstream-issues/mlx-buffer-cache-ab-2026-09-23.md``). ``0``
+    means the cache is off; ``None`` means MLX is not in use.
     """
     info: dict = {
         "backend": "numpy",
@@ -407,6 +413,7 @@ def backend_info() -> dict:
         "mlx_version": None,
         "mlx_default_device": None,
         "tf32_enabled": None,
+        "mlx_cache_limit_bytes": None,
         "TOYOMACRO_DISABLE_MLX": os.environ.get("TOYOMACRO_DISABLE_MLX") or None,
     }
     try:
@@ -433,6 +440,14 @@ def backend_info() -> dict:
             info["tf32_enabled"] = not disabled
         elif is_metal:
             info["backend"] = "metal"
+        # MLX has no getter for the limit. `set_cache_limit` returns the
+        # previous value, and setting that straight back leaves it as it was.
+        try:
+            limit = mx.set_cache_limit(2 ** 62)
+            mx.set_cache_limit(limit)
+            info["mlx_cache_limit_bytes"] = int(limit)
+        except Exception:
+            pass
         try:
             dev = mx.device_info()          # mx.metal.device_info() is deprecated
         except Exception:

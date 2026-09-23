@@ -10,8 +10,9 @@ on a dev build, more broadly than this script does -- see
 `mlx-issue-1-batched-gemv-65536.md`, where the AP solver ran 200k
 spectra unchunked. This script re-checks the released package: on
 2026-09-22 it passed on an RTX 5070 Laptop under WSL2 at MLX 0.32.2
-(reported from that host; its output is not committed) and on an M3 Max
-at MLX 0.31.2, which never had the limit and is the control. The
+(output in `pcie-link-probe-2026-09-22.md`) and on an M3 Max at MLX
+0.31.2, which never had the limit and is the control (that output is
+not committed). The
 harness chunks unconditionally, so it never crosses the bound on its
 own -- this is how the claim gets re-checked on a future MLX.
 

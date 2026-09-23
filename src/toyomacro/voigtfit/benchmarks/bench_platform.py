@@ -110,10 +110,10 @@ GRID = dict(N_dE=13, N_ds=7)          # identical to solver_comparison_benchmark
 #: on 2026-08-06, where the AP solver ran 200k spectra unchunked
 #: (docs/upstream-issues/mlx-issue-1-batched-gemv-65536.md), and on the
 #: released MLX 0.32.2 on 2026-09-22, where a single chunk of 65,537
-#: agreed with a split one bit for bit -- reported from that host, not
-#: committed. The first release carrying the fix is 0.32.1. The same
-#: check on Metal (MLX 0.31.2) is the control. The chunking is applied on EVERY backend
-#: anyway, because a Metal run that processed 200k in one call and a CUDA
+#: agreed with a split one bit for bit
+#: (docs/upstream-issues/pcie-link-probe-2026-09-22.md). The first release
+#: carrying the fix is 0.32.1. The same check on Metal (MLX 0.31.2) is the
+#: control. The chunking is applied on EVERY backend anyway, because a Metal run that processed 200k in one call and a CUDA
 #: run that processed it in four is not the same measurement, and
 #: comparing the two would be the exact error this harness exists to
 #: prevent. It also keeps an older MLX safe.
@@ -363,7 +363,7 @@ def parity_check(n: int, accel_est: dict, energy, Y, truth) -> dict:
 
 
 _VERSION = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(.*)$")
-_PRERELEASE = re.compile(r"(dev|rc|a|b|alpha|beta|pre)\d*", re.IGNORECASE)
+_PRERELEASE = re.compile(r"(dev|rc|c|a|b|alpha|beta|pre)\d*", re.IGNORECASE)
 
 
 def _mlx_older_than(version: str | None, fixed: tuple[int, int, int]) -> bool:
@@ -383,6 +383,21 @@ def _mlx_older_than(version: str | None, fixed: tuple[int, int, int]) -> bool:
         return release < fixed
     suffix = (m.group(4) or "").split("+", 1)[0]
     return bool(_PRERELEASE.search(suffix))
+
+
+def _shown(path) -> str:
+    """A path as the console prints it: never with the home directory.
+
+    A record's ``command`` field is sanitised, but the console line that
+    reports where the record went was not -- and console output gets
+    pasted into documents, which is how an absolute path reached one.
+    Relative to the working directory when inside it, else just its name.
+    """
+    p = Path(path)
+    try:
+        return str(p.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return f"<dir>/{p.name}"
 
 
 def _check_tf32(allow: bool) -> None:
@@ -742,11 +757,11 @@ def main(argv: list[str] | None = None) -> None:
               + ("" if report["all_runs_quiet"]
                  else "  <-- not every run was quiet"), flush=True)
         if args.records_dir:
-            print(f"wrote {write_record(report, args.records_dir)}", flush=True)
+            print(f"wrote {_shown(write_record(report, args.records_dir))}", flush=True)
         if out_path:
             out_path.write_text(json.dumps(report, indent=1, default=float)
                                 + "\n", encoding="utf-8")
-            print(f"wrote {out_path}", flush=True)
+            print(f"wrote {_shown(out_path)}", flush=True)
         return
 
     load = report["environment"]["load"]
@@ -770,11 +785,11 @@ def main(argv: list[str] | None = None) -> None:
           + (f" - {'; '.join(q['reasons'])}" if q["reasons"] else ""), flush=True)
 
     if args.records_dir:
-        print(f"wrote {write_record(report, args.records_dir)}", flush=True)
+        print(f"wrote {_shown(write_record(report, args.records_dir))}", flush=True)
     if out_path:
         out_path.write_text(json.dumps(report, indent=1, default=float) + "\n",
                             encoding="utf-8")
-        print(f"wrote {out_path}", flush=True)
+        print(f"wrote {_shown(out_path)}", flush=True)
 
 
 if __name__ == "__main__":

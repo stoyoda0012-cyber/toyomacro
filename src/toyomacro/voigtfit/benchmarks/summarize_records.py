@@ -112,6 +112,13 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
         print(f"   cpu      {env0.get('cpu')}  |  {env0.get('logical_cores')} cores"
               f"  |  {env0.get('memory_gb')} GB  |  {env0.get('os')}")
         print(f"   launched from: {', '.join(origins)}")
+        # Records older than the field carry None and are not a conflict.
+        limits = {r.get("environment", {}).get("backend", {})
+                  .get("mlx_cache_limit_bytes") for r in recs} - {None}
+        if len(limits) > 1:
+            print(f"   !! MIXED MLX buffer-cache limits {sorted(limits)}. On "
+                  "CUDA this alone has moved solvers several-fold; these "
+                  "records are not one configuration.")
         print(f"   {len(recs)} record(s), {len(quiet)} of them quiet")
         repeated = [r for r in recs if r.get("kind") == "repeated"]
         if repeated:

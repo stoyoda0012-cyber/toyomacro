@@ -269,10 +269,14 @@ factor of two.
 **On this host the likely cause is now known, and the record did show
 it.** The 2.07x matches the GPU's PCIe link stepping between `gen4 x8`
 and `gen3 x8` — exactly a factor two per lane, width unchanged. That
-step was observed on 2026-09-22 in a separate probe run, sampled from
-the Windows side while each repetition was timed: the rate halved at
-the moment the link dropped a generation. The probe's script and log
-are not committed; its figures are as reported from that host. The committed
+step was observed on 2026-09-22 in a separate probe, sampled from the
+Windows side while each repetition was timed
+([`upstream-issues/pcie-link-probe-2026-09-22.md`](upstream-issues/pcie-link-probe-2026-09-22.md)):
+in one of three runs the rate halved as the link dropped a generation,
+and in the other two the link held `gen4` and the rate held with it.
+Power draw and SM clock changed within one sample of the step, so the
+link generation is one part of a wider power-state change; the factor
+of exactly two is why it is the part taken to bind. The committed
 records were not sampled, so for them the generation is inferred from
 bandwidth, not observed. But `summarize` stores every repetition in
 `timings_s`, and one of these records holds a single repetition at
@@ -351,29 +355,38 @@ run is larger still, 2.2x and 2.5x, and that inner spread is not noise.
 In all three single-run CUDA records `taylor_4step` falls repetition by
 repetition through the first seven — 546 to 402 k/s in
 `…101134Z…` — then roughly doubles for the last two, and
-`multipeak_2comp` falls across the run, steadily in two records and
-after a plateau in the third. A median of nine is then one point on a
-drift, not a rate. The Metal single-run record shows a smaller step
-at the same repetition (+18% from the eighth), and the NumPy records
-show scatter with no trend. Nothing here establishes the cause. One
-candidate is untested but specific: mlx#3861's second mechanism, a
-buffer cache keyed on size alone that hands freed host-pinned buffers
-to later device allocations, would make a run slow down as it recycles
-its buffers. Rerunning with MLX's buffer cache disabled would test it.
+`multipeak_2comp` falls and then levels off. A median of nine is then
+one point on a pattern, not a rate.
+
+**On CUDA the pattern is MLX's buffer cache.** Disabling it with
+`mx.set_cache_limit(0)` removes it, in two sessions on the same host: a
+single pair, and four runs alternating the cache on and off
+([`upstream-issues/mlx-buffer-cache-ab-2026-09-23.md`](upstream-issues/mlx-buffer-cache-ab-2026-09-23.md)).
+With the cache, `taylor_4step` falls and then doubles as above; without
+it, it shows no such shape. `multipeak_2comp` runs at 250–254 k/s
+without the cache in the alternating runs against 34–46 k/s with it.
+Every fitted value is identical either way. Which mechanism inside the
+cache is responsible is not established: mlx#3861's second one, a cache
+keyed on size alone that hands freed host-pinned buffers to later
+device allocations, fits, but was not isolated. The Metal single-run
+record shows a smaller step at the same repetition (+18% from the
+eighth), which the CUDA experiment does not address; the NumPy records
+show scatter with no trend.
 
 **NumPy `amp_only_projection` spreads 2.52x across its three runs**:
-102.2 / 40.5 / 88.4 M. All three ran under the benchmark's own load:
-the records list no other busy process before or after any run. Run 1
-began at a load average of 0.30. Runs 2 and 3 began in the previous
-run's wake — run 2 at 7.98, against a threshold of 8.0, so it was
-graded `quiet` by a hair; run 3 at 10.79, graded `contended`. By the
-load at the start, the three are not in order: run 3 started under more
-load than run 2 and ran faster. By the load at the end (5.89 / 11.65 /
-7.85), or the mean of start and end, they are in exactly reverse order
-of their rates. The end-of-run load includes the run's own work, so it
-cannot say whether load slowed a run or a slow run raised the load. It
-does show that back-to-back runs on a CPU-saturating backend
-contaminate one another, which is what the verdict did not catch.
+102.2 / 40.5 / 88.4 M. The records list no other busy process before
+or after any run. Run 1 began at a load average of 0.30 and ended at
+5.89; run 2 began at 7.98, higher than run 1 ended, and against a
+threshold of 8.0, so it was graded `quiet` by 0.02; run 3 began at
+10.79 and was graded `contended`. By the load at the start, the three
+are not in order: run 3 started under more load than run 2 and ran
+faster. By the load at the end (5.89 / 11.65 / 7.85), or the mean of
+start and end, they are in exactly reverse order of their rates. The
+end-of-run load includes the run's own work, so it cannot say whether
+load slowed a run or a slow run raised the load. What the records do
+show is that the benchmark's own activity is what raised the host's
+load between runs, and that the verdict caught run 3 and missed run 2
+by 0.02.
 
 **The Ryzen host demonstrates the limit on itself.** Its single-run
 records spread 2.07x on `projection_kernel`; three back-to-back runs on
