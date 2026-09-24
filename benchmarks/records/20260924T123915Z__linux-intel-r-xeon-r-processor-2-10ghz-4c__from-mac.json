@@ -1,0 +1,656 @@
+{
+ "schema_version": 3,
+ "kind": "repeated",
+ "description": "Cross-platform peak-fitting throughput, repeated in separate processes.",
+ "runs": 3,
+ "runs_note": "Each run is a separate process. Repeating inside one process would share the memory layout and clock state that make within-run repetitions agree, and would reproduce the blind spot this exists to measure.",
+ "problem": {
+  "n_energy": 151,
+  "center": 0.0,
+  "sigma": 0.5,
+  "gamma": 0.2,
+  "dE_range_sigma": 0.3,
+  "dsigma_range_sigma": 0.1,
+  "noise_level": 1000.0,
+  "peak_snr": 10.0,
+  "seed": 0,
+  "n_batch": 200000,
+  "n_common_accuracy_subset": 500,
+  "input_sha256": "212b959b22568c16662ad51506e2b356ebbc4038457748eab4b09866eaeef091",
+  "dtype": "float32 spectra",
+  "multipeak_chunk_size": 65535
+ },
+ "problem_identical_across_runs": true,
+ "results": [
+  {
+   "solver": "projection_kernel",
+   "backend": null,
+   "problem": "random float32 data, 151 channels x 3 components; no parameter recovery",
+   "runs": 3,
+   "rate_median": 26420905.916986555,
+   "rate_min": 25169753.152743578,
+   "rate_max": 27690771.067520034,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    25169753.152743578,
+    27690771.067520034,
+    26420905.916986555
+   ],
+   "per_run_timings_s": [
+    [
+     0.181026,
+     0.150789,
+     0.158921,
+     0.163346,
+     0.157952,
+     0.151634,
+     0.154675,
+     0.16822,
+     0.15897
+    ],
+    [
+     0.163324,
+     0.137128,
+     0.151894,
+     0.157403,
+     0.139096,
+     0.147538,
+     0.140069,
+     0.142357,
+     0.144452
+    ],
+    [
+     0.155908,
+     0.142076,
+     0.140424,
+     0.176474,
+     0.168331,
+     0.146499,
+     0.151395,
+     0.167678,
+     0.149389
+    ]
+   ],
+   "across_run_spread": 1.1001606133948778,
+   "within_run_spread_typical": 1.2005206511495476,
+   "understates_by": 0.9164029059736948,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": null
+  },
+  {
+   "solver": "amp_only_projection",
+   "backend": "numpy",
+   "problem": "amplitude only at nominal (center, sigma)",
+   "runs": 3,
+   "rate_median": 128568499.04643303,
+   "rate_min": 125803253.77506708,
+   "rate_max": 140169296.47478077,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    125803253.77506708,
+    140169296.47478077,
+    128568499.04643303
+   ],
+   "per_run_timings_s": [
+    [
+     0.002813,
+     0.001505,
+     0.001441,
+     0.00159,
+     0.003409,
+     0.002719,
+     0.002234,
+     0.001497,
+     0.001383
+    ],
+    [
+     0.002307,
+     0.001618,
+     0.001427,
+     0.001404,
+     0.002012,
+     0.002858,
+     0.001403,
+     0.00141,
+     0.001419
+    ],
+    [
+     0.001854,
+     0.00148,
+     0.001358,
+     0.002315,
+     0.001774,
+     0.001935,
+     0.001556,
+     0.001462,
+     0.001553
+    ]
+   ],
+   "across_run_spread": 1.11419452413687,
+   "within_run_spread_typical": 2.036963792340752,
+   "understates_by": 0.5469878887029734,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.029441090843790818
+  },
+  {
+   "solver": "taylor_4step",
+   "backend": "numpy",
+   "problem": "amp + dE + dsigma via 4-step Taylor residual projection (first-order lineshape expansion; pre-dictionary path)",
+   "runs": 3,
+   "rate_median": 332140.7195266994,
+   "rate_min": 304991.2856288693,
+   "rate_max": 333698.71284579014,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    332140.7195266994,
+    304991.2856288693,
+    333698.71284579014
+   ],
+   "per_run_timings_s": [
+    [
+     0.617448,
+     0.593972,
+     0.693588,
+     0.634188,
+     0.602154,
+     0.694429,
+     0.577244,
+     0.591761,
+     0.570959
+    ],
+    [
+     0.644798,
+     0.709134,
+     0.616002,
+     0.657987,
+     0.655756,
+     0.59691,
+     0.666415,
+     0.651452,
+     0.709191
+    ],
+    [
+     0.60349,
+     0.574635,
+     0.627073,
+     0.568334,
+     0.56415,
+     0.576395,
+     0.599343,
+     0.607943,
+     0.678067
+    ]
+   ],
+   "across_run_spread": 1.0941254015101718,
+   "within_run_spread_typical": 1.201927001789328,
+   "understates_by": 0.9103093614515106,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.021891159451600896
+  },
+  {
+   "solver": "dict2d_parabola",
+   "backend": "numpy",
+   "problem": "amp + dE + dsigma; 2-D dictionary 13x7 (|dE|<=0.3sigma, |dsigma|<=0.1sigma) + parabola refine",
+   "runs": 3,
+   "rate_median": 892219.9345156751,
+   "rate_min": 858273.5172479922,
+   "rate_max": 928858.9744489955,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    858273.5172479922,
+    892219.9345156751,
+    928858.9744489955
+   ],
+   "per_run_timings_s": [
+    [
+     0.203962,
+     0.218771,
+     0.246187,
+     0.233026,
+     0.232662,
+     0.230469,
+     0.252315,
+     0.249692,
+     0.27871
+    ],
+    [
+     0.218745,
+     0.226514,
+     0.201822,
+     0.212985,
+     0.22416,
+     0.320775,
+     0.216583,
+     0.262323,
+     0.237559
+    ],
+    [
+     0.208094,
+     0.219211,
+     0.212677,
+     0.206699,
+     0.212494,
+     0.219547,
+     0.215318,
+     0.222467,
+     0.345683
+    ]
+   ],
+   "across_run_spread": 1.082241215396383,
+   "within_run_spread_typical": 1.5893931957367695,
+   "understates_by": 0.6809147153135419,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.02223129818721796
+  },
+  {
+   "solver": "multipeak_2comp",
+   "backend": "numpy",
+   "problem": "2 Voigt components 4 sigma apart, per-component amp + dE + dsigma; alternating projection x3 + parabola, 13x7 grids",
+   "runs": 3,
+   "rate_median": 105486.14255312426,
+   "rate_min": 104148.3530466857,
+   "rate_max": 107784.55216622307,
+   "aggregation": "median across 3 separate runs",
+   "per_run_rate_median": [
+    105486.14255312426,
+    104148.3530466857,
+    107784.55216622307
+   ],
+   "per_run_timings_s": [
+    [
+     1.687142,
+     1.772471,
+     1.895984,
+     1.643267,
+     1.945382,
+     2.17214,
+     2.278985,
+     1.998592,
+     1.865267
+    ],
+    [
+     1.714925,
+     2.048245,
+     1.867191,
+     2.134662,
+     1.850537,
+     2.088543,
+     2.100465,
+     1.920338,
+     1.86827
+    ],
+    [
+     1.734209,
+     1.981331,
+     1.926402,
+     1.916302,
+     1.679316,
+     1.855553,
+     1.813466,
+     1.889264,
+     1.818394
+    ]
+   ],
+   "across_run_spread": 1.0349136497425686,
+   "within_run_spread_typical": 1.2447554657357696,
+   "understates_by": 0.8314192451694403,
+   "understates_note": "how much a single record's own rate_min/rate_max understates the spread across separate runs; above 1 means one record's range is optimistic by this factor",
+   "mae_amp_median": 0.028961524827395942
+  }
+ ],
+ "numpy_parity": null,
+ "run_quality_verdicts": [
+  "quiet",
+  "quiet",
+  "quiet"
+ ],
+ "all_runs_quiet": true,
+ "environment": {
+  "schema_version": 3,
+  "timestamp_utc": "2026-09-24T12:39:15+00:00",
+  "timestamp_local": "2026-09-24T12:39:15+00:00",
+  "host_label": "linux-intel-r-xeon-r-processor-2-10ghz-4c",
+  "origin": "mac",
+  "os": "Linux 6.18.44-fc-v37",
+  "machine": "x86_64",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "logical_cores": 4,
+  "memory_gb": 15.7,
+  "python": "3.12.3",
+  "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out run0.json",
+  "versions": {
+   "toyomacro": "0.3.0",
+   "mlx": null,
+   "numpy": "2.3.5",
+   "scipy": "1.17.0",
+   "h5py": "3.15.1",
+   "lmfit": "1.3.4",
+   "numba": null,
+   "psutil": "7.2.2",
+   "hdf5_library": "1.14.6"
+  },
+  "backend": {
+   "backend": "numpy",
+   "device_name": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+   "mlx_version": null,
+   "mlx_default_device": null,
+   "tf32_enabled": null,
+   "mlx_cache_limit_bytes": null,
+   "TOYOMACRO_DISABLE_MLX": null
+  },
+  "load": {
+   "sampled_over_s": 0.2,
+   "load_average": [
+    1.76513671875,
+    0.61669921875,
+    0.22314453125
+   ],
+   "logical_cores": 4,
+   "cpu_percent": 0.0,
+   "cpu_percent_others": 0,
+   "processes_redacted": false,
+   "top_processes": [],
+   "looks_quiet": true,
+   "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+   "load_average_before": [
+    0.48828125,
+    0.12548828125,
+    0.0419921875
+   ],
+   "cpu_percent_before": 3.8,
+   "top_processes_before": [
+    {
+     "name": "claude",
+     "cpu_percent": 19.7
+    },
+    {
+     "name": "process_api",
+     "cpu_percent": 4.9
+    }
+   ],
+   "looks_quiet_after_incl_self": false,
+   "looks_quiet_before": true,
+   "others_busy_after": false,
+   "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+   "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+  },
+  "steal_percent": 0.6397591494966601,
+  "thermal": null,
+  "quality": {
+   "verdict": "quiet",
+   "reasons": [],
+   "comparable": true,
+   "note": "the verdict of the worst of the runs; per-run verdicts are in run_quality_verdicts and each run's own load is in run_environments"
+  },
+  "git": {
+   "git_commit": "d3c4db2bc7ff7cab7b3daa7c1f7668bce6f4e981",
+   "git_tracked_dirty": false,
+   "git_dirty_files": [],
+   "harness_tracked_at_commit": true,
+   "untracked_files_present": false
+  }
+ },
+ "run_environments": [
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-24T12:39:15+00:00",
+   "timestamp_local": "2026-09-24T12:39:15+00:00",
+   "host_label": "linux-intel-r-xeon-r-processor-2-10ghz-4c",
+   "origin": "mac",
+   "os": "Linux 6.18.44-fc-v37",
+   "machine": "x86_64",
+   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+   "logical_cores": 4,
+   "memory_gb": 15.7,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out run0.json",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": null,
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "numpy",
+    "device_name": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "mlx_version": null,
+    "mlx_default_device": null,
+    "tf32_enabled": null,
+    "mlx_cache_limit_bytes": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     1.76513671875,
+     0.61669921875,
+     0.22314453125
+    ],
+    "logical_cores": 4,
+    "cpu_percent": 0.0,
+    "cpu_percent_others": 0,
+    "processes_redacted": false,
+    "top_processes": [],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     0.48828125,
+     0.12548828125,
+     0.0419921875
+    ],
+    "cpu_percent_before": 3.8,
+    "top_processes_before": [
+     {
+      "name": "claude",
+      "cpu_percent": 19.7
+     },
+     {
+      "name": "process_api",
+      "cpu_percent": 4.9
+     }
+    ],
+    "looks_quiet_after_incl_self": false,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.6397591494966601,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "d3c4db2bc7ff7cab7b3daa7c1f7668bce6f4e981",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-24T12:41:16+00:00",
+   "timestamp_local": "2026-09-24T12:41:16+00:00",
+   "host_label": "linux-intel-r-xeon-r-processor-2-10ghz-4c",
+   "origin": "mac",
+   "os": "Linux 6.18.44-fc-v37",
+   "machine": "x86_64",
+   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+   "logical_cores": 4,
+   "memory_gb": 15.7,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out run1.json --no-parity",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": null,
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "numpy",
+    "device_name": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "mlx_version": null,
+    "mlx_default_device": null,
+    "tf32_enabled": null,
+    "mlx_cache_limit_bytes": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     1.7822265625,
+     0.890625,
+     0.36474609375
+    ],
+    "logical_cores": 4,
+    "cpu_percent": 0.0,
+    "cpu_percent_others": 0,
+    "processes_redacted": false,
+    "top_processes": [],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     0.9033203125,
+     0.5380859375,
+     0.21142578125
+    ],
+    "cpu_percent_before": 1.2,
+    "top_processes_before": [],
+    "looks_quiet_after_incl_self": false,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.5352674753745289,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "d3c4db2bc7ff7cab7b3daa7c1f7668bce6f4e981",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  },
+  {
+   "schema_version": 3,
+   "timestamp_utc": "2026-09-24T12:43:16+00:00",
+   "timestamp_local": "2026-09-24T12:43:16+00:00",
+   "host_label": "linux-intel-r-xeon-r-processor-2-10ghz-4c",
+   "origin": "mac",
+   "os": "Linux 6.18.44-fc-v37",
+   "machine": "x86_64",
+   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+   "logical_cores": 4,
+   "memory_gb": 15.7,
+   "python": "3.12.3",
+   "command": "bench_platform.py --n-batch 200000 --n-loop 500 --repeats 9 --warmup 2 --parity-n 50000 --chunk 65535 --origin mac --runs 1 --out run2.json --no-parity",
+   "versions": {
+    "toyomacro": "0.3.0",
+    "mlx": null,
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "h5py": "3.15.1",
+    "lmfit": "1.3.4",
+    "numba": null,
+    "psutil": "7.2.2",
+    "hdf5_library": "1.14.6"
+   },
+   "backend": {
+    "backend": "numpy",
+    "device_name": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "mlx_version": null,
+    "mlx_default_device": null,
+    "tf32_enabled": null,
+    "mlx_cache_limit_bytes": null,
+    "TOYOMACRO_DISABLE_MLX": null
+   },
+   "load": {
+    "sampled_over_s": 0.2,
+    "load_average": [
+     1.65234375,
+     1.02880859375,
+     0.4736328125
+    ],
+    "logical_cores": 4,
+    "cpu_percent": 0.0,
+    "cpu_percent_others": 0,
+    "processes_redacted": false,
+    "top_processes": [],
+    "looks_quiet": true,
+    "quiet_convention": "every load average (1/5/15 min) < 0.25 * logical_cores; a convention, not a calibrated threshold",
+    "load_average_before": [
+     0.91259765625,
+     0.77734375,
+     0.3486328125
+    ],
+    "cpu_percent_before": 0.0,
+    "top_processes_before": [],
+    "looks_quiet_after_incl_self": false,
+    "looks_quiet_before": true,
+    "others_busy_after": false,
+    "others_busy_convention": "cpu_percent_others > 25 * logical_cores, where 100 = one core; a convention, not a calibrated threshold",
+    "sampled": "before and after; the verdict is the BEFORE sample, because the after sample contains this benchmark"
+   },
+   "steal_percent": 0.5198639368461588,
+   "thermal": null,
+   "quality": {
+    "verdict": "quiet",
+    "reasons": [],
+    "comparable": true,
+    "note": "'quiet' means no contention signal was detected, not that the machine was idle; 'unknown' means the platform did not report enough to tell."
+   },
+   "git": {
+    "git_commit": "d3c4db2bc7ff7cab7b3daa7c1f7668bce6f4e981",
+    "git_tracked_dirty": false,
+    "git_dirty_files": [],
+    "harness_tracked_at_commit": true,
+    "untracked_files_present": false
+   }
+  }
+ ],
+ "settle_between_runs": {
+  "timeout_s": 600.0,
+  "waits": [
+   {
+    "waited_s": 41.1,
+    "settled": true,
+    "load_average": [
+     0.9033203125,
+     0.5380859375,
+     0.21142578125
+    ]
+   },
+   {
+    "waited_s": 41.0,
+    "settled": true,
+    "load_average": [
+     0.91259765625,
+     0.77734375,
+     0.3486328125
+    ]
+   }
+  ],
+  "note": "before each run after the first, the parent waited until the host looked quiet by the verdict's convention, so a run is not graded on the previous run's load; 'settled' false means the timeout ran out first"
+ }
+}
