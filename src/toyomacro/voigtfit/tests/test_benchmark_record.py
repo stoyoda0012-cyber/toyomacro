@@ -759,3 +759,61 @@ class TestMixedCacheLimits:
         from toyomacro.voigtfit.benchmarks import summarize_records as sr
         sr.summarize([self._rec(None), self._rec(5 * 2 ** 30)], ("k",))
         assert "MIXED MLX buffer-cache" not in capsys.readouterr().out
+
+
+class TestSettleBetweenRuns:
+    """`--runs` must not grade a run on the previous run's own load.
+
+    On a 4-core cloud host each child started the instant the previous one
+    ended, so its before-load sample equalled the previous after-load
+    sample, and runs 2 and 3 were graded `contended` on 1.6 and 1.9 of the
+    benchmark's own load.
+    """
+
+    class _Clock:
+        def __init__(self):
+            self.t = 0.0
+
+        def now(self):
+            return self.t
+
+        def sleep(self, s):
+            self.t += s
+
+    @staticmethod
+    def _snaps(*quiet):
+        seq = iter(quiet)
+
+        def snapshot():
+            q = next(seq)
+            la = None if q is None else [0.5 if q else 1.9, 0.8, 0.3]
+            return {"looks_quiet": q, "load_average": la, "logical_cores": 4}
+        return snapshot
+
+    def test_a_quiet_host_is_not_kept_waiting(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        c = self._Clock()
+        out = bp.settle(600, snapshot=self._snaps(True), sleep=c.sleep, clock=c.now)
+        assert out["settled"] is True and out["waited_s"] == 0
+
+    def test_it_waits_out_the_previous_runs_load(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        c = self._Clock()
+        out = bp.settle(600, poll_s=10, snapshot=self._snaps(False, False, True),
+                        sleep=c.sleep, clock=c.now)
+        assert out["settled"] is True
+        assert out["waited_s"] == 20
+
+    def test_it_gives_up_at_the_timeout_and_says_so(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        c = self._Clock()
+        out = bp.settle(25, poll_s=10, snapshot=self._snaps(*[False] * 10),
+                        sleep=c.sleep, clock=c.now)
+        assert out["settled"] is False
+        assert 25 <= out["waited_s"] <= 30
+
+    def test_no_load_average_means_nothing_to_wait_for(self):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        c = self._Clock()
+        out = bp.settle(600, snapshot=self._snaps(None), sleep=c.sleep, clock=c.now)
+        assert out["settled"] is None and out["waited_s"] == 0

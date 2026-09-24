@@ -47,7 +47,10 @@ from a distribution of machines. This repository has already watched one
 container change CPU mid-session — a 2.80GHz Xeon became a 2.10GHz one,
 while the tracked document describing it went on saying 2.80GHz. A
 single run from each origin cannot separate an origin effect from the
-instance lottery.
+instance lottery. The first cloud record, a 4-vCPU Xeon launched from the
+Mac, graded runs 2 and 3 `contended` on the benchmark's own residual
+load; `--runs` now waits for the host to settle between runs for that
+reason.
 
 **And so do local arms.** An earlier version of this file said they did
 not. Measured on the Ryzen host: `amp_only_projection` read 9.27, 9.44

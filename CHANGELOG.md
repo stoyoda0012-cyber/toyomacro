@@ -41,6 +41,15 @@ archived on Zenodo for a citable DOI.
   from now on keep every run's per-repetition timings as
   `per_run_timings_s`; the first three did not.
 
+  Runs after the first now wait for the host to settle before starting
+  (`--settle-timeout`, default 600 s, 0 to disable), and the waits are
+  recorded. Each child used to start the instant the previous one
+  ended, so its before-load sample was the previous run's after-load
+  sample: a 4-core cloud host graded runs 2 and 3 `contended` on 1.6 and
+  1.9 of the benchmark's own load, and the Ryzen host did the same to
+  its NumPy run 3. On a small host and a CPU-saturating backend, an
+  all-quiet `--runs` record was not obtainable at all.
+
 - **Records say how MLX's buffer cache was set.** `backend_info` now
   records `mlx_cache_limit_bytes` (`0` = disabled, `None` = MLX not in
   use), and `summarize_records` flags a group whose records mix limits.

@@ -607,7 +607,44 @@ def aggregate_runs(records: list[dict]) -> dict:
     }
 
 
-def run_repeated(runs: int, argv_common: list[str]) -> dict:
+def settle(timeout_s: float, poll_s: float = 10.0, snapshot=None,
+           sleep=time.sleep, clock=time.monotonic) -> dict:
+    """Wait until the host looks quiet by the verdict's own convention.
+
+    Between ``--runs`` children the next process used to start the instant
+    the previous one ended, so its before-load sample *was* the previous
+    run's after-load sample. On a CPU-saturating backend that residue
+    alone crossed the quiet threshold: a 4-core cloud host graded runs 2
+    and 3 ``contended`` on 1.6 and 1.9 of its own load, and the Ryzen host
+    did the same to its NumPy run 3. The harness should not grade its own
+    wake as contention, so it waits it out -- using ``load_snapshot`` so
+    that "quiet" here means exactly what it means in the verdict.
+
+    Returns how long it waited and whether the host reached quiet. On a
+    platform with no load average there is nothing to wait for. Waiting
+    stops at ``timeout_s``; the next run then goes ahead, and its own
+    verdict says what it found.
+    """
+    snapshot = snapshot or (lambda: load_snapshot(interval=0.2, exclude_self=True))
+    start = clock()
+    while True:
+        snap = snapshot()
+        quiet = snap.get("looks_quiet")
+        waited = clock() - start
+        if quiet is None or quiet:
+            return {"waited_s": round(waited, 1), "settled": quiet,
+                    "load_average": snap.get("load_average")}
+        if waited >= timeout_s:
+            return {"waited_s": round(waited, 1), "settled": False,
+                    "load_average": snap.get("load_average")}
+        la = snap.get("load_average") or [None]
+        print(f"  waiting for the host to settle: load {la[0]:.2f} on "
+              f"{snap.get('logical_cores')} cores ({waited:.0f} s)", flush=True)
+        sleep(poll_s)
+
+
+def run_repeated(runs: int, argv_common: list[str],
+                 settle_timeout_s: float = 600.0) -> dict:
     """Measure `runs` times in separate processes and aggregate.
 
     Each child is a plain single-run invocation of this module. The
@@ -619,9 +656,13 @@ def run_repeated(runs: int, argv_common: list[str]) -> dict:
     the backend, not a throughput figure, and repeating it would double
     the wall clock without adding information.
 
+    Before every run after the first, the parent waits for the host to
+    settle (``settle``, up to ``settle_timeout_s``; 0 disables), so a run
+    is not graded on the previous run's load. The waits are recorded.
+
     **This is biased low as a measure of run-to-run variability.** The
-    children run back to back, so they still share a thermal state, a GPU
-    clock state and a warm page cache. The option was motivated by
+    children run minutes apart at most, so they still share a thermal
+    state, a GPU clock state and a warm page cache. The option was motivated by
     records separated by hours and by code generations, across which
     `amp_only_projection` moved 1.85x on one host; the record behind that
     figure was later re-taken, and the committed set moves 2.01x. Three
@@ -629,7 +670,7 @@ def run_repeated(runs: int, argv_common: list[str]) -> dict:
     this catches what changes between processes, and not what changes
     between sittings.
     """
-    records = []
+    records, waits = [], []
     # Not `tmpdir`: that is often the records directory, and a child that
     # crashes would leave `_runN.json` there for `summarize_records` to
     # glob up as a real record. A TemporaryDirectory cleans up either way.
@@ -640,11 +681,25 @@ def run_repeated(runs: int, argv_common: list[str]) -> dict:
                     "--runs", "1", "--out", str(path)]
             if index > 0:
                 argv.append("--no-parity")
+                if settle_timeout_s > 0:
+                    waits.append(settle(settle_timeout_s))
+                else:
+                    waits.append({"waited_s": 0.0, "settled": None,
+                                  "load_average": None})
             print(f"\n=== run {index + 1} of {runs} "
                   "(separate process) ===", flush=True)
             subprocess.run(argv, check=True)
             records.append(json.loads(path.read_text(encoding="utf-8")))
-    return aggregate_runs(records)
+    report = aggregate_runs(records)
+    report["settle_between_runs"] = {
+        "timeout_s": settle_timeout_s,
+        "waits": waits,
+        "note": ("before each run after the first, the parent waited until "
+                 "the host looked quiet by the verdict's convention, so a run "
+                 "is not graded on the previous run's load; 'settled' false "
+                 "means the timeout ran out first"),
+    }
+    return report
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -665,6 +720,11 @@ def main(argv: list[str] | None = None) -> None:
                         "Repeating inside one process would share the memory "
                         "layout and clock state that make within-run "
                         "repetitions agree (default: %(default)s)")
+    p.add_argument("--settle-timeout", type=float, default=600.0,
+                   help="with --runs: before each run after the first, wait "
+                        "up to this many seconds for the host to look quiet "
+                        "again, so a run is not graded on the previous run's "
+                        "load. 0 disables (default: %(default)s)")
     p.add_argument("--parity-n", type=int, default=50_000)
     p.add_argument("--no-parity", action="store_true",
                    help="skip the NumPy-backend parity check")
@@ -735,7 +795,7 @@ def main(argv: list[str] | None = None) -> None:
             common.append("--no-parity")
         if args.allow_tf32:
             common.append("--allow-tf32")
-        report = run_repeated(args.runs, common)
+        report = run_repeated(args.runs, common, args.settle_timeout)
     else:
         report = run(args.n_batch, args.n_loop, args.repeats, args.warmup,
                      args.parity_n, not args.no_parity,

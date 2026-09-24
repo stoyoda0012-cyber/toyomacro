@@ -38,7 +38,10 @@ typical within-run spread. Above 1 means one record's own
 back-to-back runs still share a thermal and clock state, so runs
 separated by hours can differ by more. Each run's per-repetition
 timings are kept in the aggregate as `per_run_timings_s`; read them as
-well as the ratio.
+well as the ratio. Before each run after the first, the harness waits
+for the host's load to fall back under the quiet threshold
+(`--settle-timeout`, default 600 s), so no run is graded on the load
+the previous one left behind.
 
 Every record carries the machine's **load** at measurement time. A
 throughput number from a busy host reads low by more than its own
