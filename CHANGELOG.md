@@ -98,7 +98,7 @@ archived on Zenodo for a citable DOI.
   bytes, on every platform the package runs on.** Internal tier in the
   sense of `docs/API.md`: `voigtfit.memory` is not exported and not
   listed as an entry point, so this may change without notice; it is
-  recorded here because the benchmark records report it. macOS and Linux keep
+  recorded here because `get_rss_gb()` now goes through it (see Fixed). macOS and Linux keep
   reading `ru_maxrss` from `resource.getrusage`; Windows, which has no
   `resource` module, reads the peak working set through psutil (already
   a required dependency). `get_rss_gb()` is now a thin wrapper over it
@@ -108,7 +108,7 @@ archived on Zenodo for a citable DOI.
 
 - **Windows is a tested platform.** CI runs the full suite on
   `windows-latest` for Python 3.11 and 3.12, alongside Ubuntu and macOS,
-  so the import-time platform work above is now covered by a regression
+  so the import-time platform work under Fixed is now covered by a regression
   gate rather than by one developer's machine. Every `run:` step in that
   job is pinned to `bash`: Windows runners default to pwsh, where a
   multi-line step reports only the last command's exit code, and the
@@ -150,19 +150,25 @@ archived on Zenodo for a citable DOI.
   Because `lookup()` fits one cubic in log–log through every tabulated
   point of a line, a cell 100x off moved the line everywhere: Ar 3p at
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
-  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. Fe 3d,
-  Se 4p and Pd 3p move by 3.0%, 0.17% and 0.15% at most. Lines that
+  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. On the
+  16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 3.0%, 0.17% and
+  0.15% at most; between them Pd 3p reaches 0.5%. Lines that
   `lookup()` extrapolates across elements move as well, because the
-  corrected cells are among the points it extrapolates from: the 3d
-  lines of Tm to U, which Yeh–Lindau does not tabulate, come out 6 to
-  16% lower at 8047.8 eV. That is the input correction propagating, not
-  a gain in accuracy: against the bundled Scofield table both the old
-  and the new values of those 24 lines are low, by 15–46% before and
-  20–55% after, while the 3d lines Yeh–Lindau does tabulate for heavy
-  elements agree with Scofield to within 5% (see Known issues). An earlier version of this entry said no other
-  line changes; that was checked on tabulated lines only. The release
-  notes for this version open with a table of every changed line, its
-  photon energy and its factor. Si 2p at Al Kα is bit-identical. The thirteen cells are
+  corrected cells are among the points it extrapolates from. Of the
+  occupied subshells it extrapolates, 37 move by 1% or more at Mg, Al
+  or Cu Kα above their binding energy: the 3d lines of Tm to Lr, which
+  Yeh–Lindau does not tabulate, come out 6 to 21% lower at 8047.8 eV,
+  K 4s 5.8% lower at Al Kα and Cs 6s 1.2% higher at 8047.8 eV. That is
+  the input correction propagating, not a gain in accuracy: against the
+  bundled Scofield table the 3d of Tm to Fm (Md to Lr are not in it)
+  are low before and after, by 15–56% in v0.3.0 and 20–65% now, while
+  the 3d lines Yeh–Lindau does tabulate agree with Scofield to within
+  4% for Cs to Er and 7% for Rb to Xe (see Known issues). An earlier
+  version of this entry said no other line changes; that was checked on
+  tabulated lines only. The release notes for this version open with a
+  table of every tabulated line and every occupied extrapolated line
+  that changes by 1% or more, with photon energy and factor. Si 2p at
+  Al Kα is bit-identical. The thirteen cells are
   pinned to Table I in `tests/test_cross_section_yeh_lindau_transcription.py`.
   The 3,929 other compared cells rest on the agreement of two
   transcriptions, and the elements outside the comparison on one;
@@ -324,7 +330,8 @@ archived on Zenodo for a citable DOI.
   filename containing backslashes. Verified at `decc8e2` on Windows 11
   (Python 3.12.14, clean tree): 1884 passed, 175 skipped, 2 failed —
   both `test_decode_speed` throughput gates, which this machine misses
-  on hardware, not platform. Windows is still not covered by CI.
+  on hardware, not platform. Windows has been covered by CI since
+  (see Added).
 
 - **Peak RSS was misreported on Linux.** `ru_maxrss` is in kibibytes
   there, but `memory.get_rss_gb` converted it at 1000 bytes per
@@ -342,16 +349,18 @@ Yeh–Lindau corrections above made them visible.
   atom does not have.** A label the table lacks for an element is
   extrapolated across elements whether or not that subshell is occupied,
   and the result is returned as if tabulated: H 6s at 21.2 eV comes out
-  near 1e227 Mb, Si 4s at 21.2 eV 18 Mb. 162 such element–label pairs
-  exist over the table's grid.
+  near 1e227 Mb, Si 4s at 21.2 eV 18 Mb. Judged by the ground-state
+  electron configuration, 737 element–label pairs that are not occupied
+  return a number at one or more of the table's 16 energies.
 - **The extrapolation path does not apply the binding-energy threshold
   to a bare doublet label.** `lookup("Au", "3d", 21.2)` returns a
   number although Au 3d is bound by 2206 eV; a tabulated line returns
   `None` below threshold.
 - **Extrapolated real core levels are unreliable.** The 3d lines of
-  Tm to U are not in Yeh–Lindau and are extrapolated across Z; at
-  8047.8 eV they fall 20–55% below Scofield, while tabulated heavy 3d
-  lines agree with it to within 5%. The extrapolation pool includes
+  Tm to Lr are not in Yeh–Lindau and are extrapolated across Z; at
+  8047.8 eV those of Tm to Fm fall 20–65% below Scofield, while the
+  3d lines Yeh–Lindau tabulates agree with it to within 4% for Cs to Er
+  and 7% for Rb to Xe. The extrapolation pool includes
   light-element 3d cells at 8047.8 eV that scatter around Scofield by a
   factor of up to 30 (Cu 3d, printed `.32E-3` in Table I, is 30x
   Scofield and 70x its neighbour Zn). Use `table="scofield"` for these

@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,369. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,389. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
