@@ -87,6 +87,42 @@ and calling the absent one zero. The listed component is still available
 as a j-resolved request, and the 38-count is pinned by test so the
 evidence remains actionable if the rule is later confirmed.
 
+## `cross_section.json` — what has been read against Table I
+
+In 2026-10 a downstream project compared this file with its own,
+independently made transcription of Yeh & Lindau (1985) Table I:
+67 elements, 3,942 cells on the same 16-energy grid. Thirteen cells
+disagreed, and each was read from the journal table (pages 7–10).
+Seven were wrong in this file and are now corrected — three by a factor
+of 100, one by 10, three in the last digit; the other six were right
+here and wrong in the other transcription. The entry under *Fixed* in
+`CHANGELOG.md` (2026-10) lists the cells and what the correction did to
+`lookup()`, and `tests/test_cross_section_yeh_lindau_transcription.py`
+pins all thirteen to the printed values.
+
+The same comparison exposed three structural artifacts of the
+transcription: Ta 4s keyed `4S`, Ir 6s filed under a mistyped element
+`lr`, and the CSV header row carried along as an element `Photon`. The
+first two made `lookup()` miss a tabulated line and fall through to its
+extrapolation from neighbouring elements. All three are fixed in the
+JSON (keys only; the values were read against Table I pages 11 and 12
+and were right) and pinned by the same test file. The CSV still has them
+(records 2, 447 and 484; the file has CR line endings, so line-oriented
+tools see it as one line).
+
+What that does and does not establish. The 3,929 other compared cells
+agree between two transcriptions that are not copies of each other —
+the thirteen disagreements fall on both sides, six wrong only in the
+spreadsheet and seven only here — which is good evidence that they are
+right but is not a reading of the table. The elements outside the comparison have been transcribed
+once and checked against nothing. The table prints at most four
+significant figures, and the file stores what is printed.
+
+The CSV this file was generated from (`Common/data/CrossSectionTable_Yeh=Lindau.csv`,
+not part of this repository) carries the seven errors unless it is
+corrected separately, and `regenerate_cache()` would write them back.
+The shipped JSON is the reviewed copy; see *Rebuilding a table* below.
+
 ## `compounds.json` — where these numbers came from
 
 The other bundled tables are transcriptions of a named publication. This
@@ -440,7 +476,10 @@ The directory is called `_cache/` for historical reasons. Its contents
 are **shipped reference data**, not a disposable cache: they are
 reviewed, described above, and pinned by tests. The `Common/data/*.csv`
 files they were originally built from are not part of this repository
-and are not shipped.
+and are not shipped. For `cross_section.json` the CSV is also
+known to be *behind* the shipped file: the seven cells and three keys
+corrected against Table I in 2026-10 (above) were corrected in the JSON,
+not in the CSV.
 
 A missing table therefore raises rather than rebuilding itself. The
 earlier behaviour — delete the file, do a lookup, get it back — was a

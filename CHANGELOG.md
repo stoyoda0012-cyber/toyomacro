@@ -116,6 +116,42 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **Seven cells of the bundled Yeh–Lindau table were mistranscribed,
+  and `lookup()` carried each one along its whole line.** A downstream
+  comparison of `cross_section.json` with an independent transcription
+  of Yeh & Lindau (1985), Table I — 67 elements, 3,942 cells on the
+  same 16-energy grid — disagreed in thirteen cells, and each was then
+  read from the table (journal pages 7–10). Seven were wrong here:
+  Ar 3p at 600 eV (3.8 → 0.038 Mb), Cu 4s at 1486.6 eV
+  (0.027 → 0.00027), As 4s at 151.4 eV (7.2 → 0.072), Zn 3d at
+  8047.8 eV (4.7e-7 → 4.7e-6), Fe 3d at 16.7 eV (3.676 → 3.576),
+  Se 4p at 26.8 eV (3.069 → 3.089) and Pd 3p at 1041 eV
+  (0.2859 → 0.2869). The other six — Cl 3p, La 4d, C 2p, S 3p, Nb 3p,
+  Cs 5p — were right as shipped and wrong in the other transcription.
+  Because `lookup()` fits one cubic in log–log through every tabulated
+  point of a line, a cell 100x off moved the line everywhere: Ar 3p at
+  Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
+  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. Fe 3d,
+  Se 4p and Pd 3p move by 3.0%, 0.17% and 0.15% at most; no other line
+  changes (Si 2p at Al Kα is bit-identical). The thirteen cells are
+  pinned to Table I in `tests/test_cross_section_yeh_lindau_transcription.py`.
+  The 3,929 other compared cells rest on the agreement of two
+  transcriptions, and the elements outside the comparison on one;
+  `docs/DATA_SOURCES.md` records what has and has not been checked.
+
+- **Two Yeh–Lindau lines were in the table but unreachable, and
+  `lookup()` extrapolated them from other elements instead.** Ta 4s
+  was keyed `4S`, and Ir 6s sat under a mistyped element `lr` while
+  `Ir` had no 6s. Neither key matched a request, so `lookup()` fell
+  through to its Z-based extrapolation from neighbouring elements and
+  returned a number that looked tabulated: Ta 4s 2.4% high at Al Kα
+  and 19% high at 600 eV; Ir 6s 7.7% high at Al Kα, 24% at 10.2 eV
+  and 35% at 8047.8 eV. The keys are fixed (values untouched, checked
+  against Table I pages 11 and 12), `get_available_orbitals("Ta")` now
+  lists `4s`, and a pseudo-element `Photon` — the CSV header row — is
+  gone, so the table has exactly the 103 elements of Table I. The
+  three defects are in the source CSV too (`docs/DATA_SOURCES.md`).
+
 - **The 65,535 batch limit was fixed upstream in August, and the
   documents went on warning about it.** `mlx#3858` — MLX's CUDA batched
   GEMV mapping the batch onto one grid dimension, so a launch above
