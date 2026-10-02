@@ -348,6 +348,19 @@ process default table — Yeh–Lindau unless `set_default_table()` changed
 it — so pass `table=` explicitly whenever the choice matters, and read
 `unit_info()` before comparing anything across tables.
 
+`CrossSection.to_dict(table)` returns the table as loaded, in the
+shape the bundled JSON has for all three tables:
+`{"photon_energies": [...], "data": {element: {orbital:
+{"binding_energy": eV or None, "cross_sections": [...]}}}}`, with one
+entry per photon energy and `None` where the source table has no entry
+(usually, not only, below the binding energy; Scofield lines carry no
+binding energy). It is the live process cache, not a copy — read from
+it, or deep-copy before mutating — and `photon_energies` and a line's
+`cross_sections` are only meaningful read as a pair. The grid values are
+the tabulated ones in the unit `unit_info()` reports; `lookup()`
+interpolates through them and does not return a grid value at a grid
+energy.
+
 **A bare orbital is the whole doublet.** `lookup('Si', '2p', hv)` returns
 σ(2p1/2) + σ(2p3/2) — what a measured peak envelope contains. Each
 component is evaluated at the requested energy and then added; summing

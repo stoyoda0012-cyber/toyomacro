@@ -689,7 +689,15 @@ class CrossSection:
 
     @classmethod
     def to_dict(cls, table: str | None = None) -> dict[str, Any]:
-        """Get raw data as dict (for API responses)."""
+        """Return the table as loaded: the bundled JSON's own structure.
+
+        ``{"photon_energies": [...], "data": {element: {orbital:
+        {"binding_energy": eV or None, "cross_sections": [...]}}}}`` —
+        one entry per photon energy, ``None`` where the source table has
+        no entry, values in the unit :meth:`unit_info` reports. The same
+        shape for every table. This is the live process cache, not a
+        copy: read from it, or deep-copy before mutating.
+        """
         return cls._get_data(table)
 
     # Polynomial order for log-log cross-section interpolation.

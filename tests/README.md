@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,381 automated tests** across **86 files**, in two
+This suite has **2,400 automated tests** across **87 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 48 | 1,301 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 49 | 1,320 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,11 +21,11 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,949 tests, 82%) — guarantee the library
+- **Contract / regression** (1,968 tests, 82%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 19%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 18%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,301)
+## Library body — `tests/` (1,320)
 
 ### Claim guards — noise model, versions, backends, comparisons (123)
 | Tests | File | Guards |
@@ -126,11 +126,12 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (510)
+### Quantification data (529)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
 | 45 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
+| 19 | `test_cross_section_yeh_lindau_transcription.py` | Thirteen cells of the bundled Yeh–Lindau table where two transcriptions disagreed, pinned to what Table I prints; every key an element of Z = 1–103 and a `nl` subshell; the two lines that were present under wrong keys found by `lookup()` rather than extrapolated |
 | 26 | `test_element_dedup.py` | Element-name dedup + `ElementInfo` utilities |
 | 53 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits, and the `DescribedLength` / report provenance contract |
 | 41 | `test_sampling_depth.py` | Mean escape depth and information depth; published slopes held apart from the EAL's, the required emission angle and percentage, the straight-line limits, and the source's own tabulated albedos |
