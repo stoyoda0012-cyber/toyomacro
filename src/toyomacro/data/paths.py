@@ -208,6 +208,13 @@ def _csv_to_json_cross_section(csv_path: Path) -> dict[str, Any]:
 
             if not symbol or not orbital:
                 continue
+            # The first data row of the MATLAB-era CSV is not an element:
+            # "0,Photon,Energy,0,10.2,..." carries the photon energies for
+            # CalcCrossSection.m, which reads them from row 1. Here they come
+            # from the column names, so the row would only become a
+            # pseudo-element "Photon" in the table.
+            if symbol == "Photon":
+                continue
 
             if symbol not in data:
                 data[symbol] = {}

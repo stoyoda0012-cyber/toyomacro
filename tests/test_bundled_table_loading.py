@@ -224,3 +224,33 @@ def test_shipped_compound_table_is_the_reviewed_one():
     data = paths.load_compound_data()
     assert len(data) == 109
     assert "Si3N4" in data
+
+
+def test_cross_section_csv_photon_energy_row_is_not_an_element(tmp_path):
+    """The MATLAB-era CSV's first data row holds the photon energies.
+
+    ``CalcCrossSection.m`` reads them from row 1, so the row stays in the
+    CSV; the parser takes them from the column names and must not turn
+    the row into an element. It did until 2026-10 (CR line endings as in
+    the real file).
+    """
+    csv_path = tmp_path / "CrossSectionTable_Yeh=Lindau.csv"
+    csv_path.write_bytes(
+        b"\r".join(
+            [
+                b"AtomicNumber,ElementSymbol,AtomicOrbital,BindingEnergy,"
+                b"CrossSec_PE_10_2,CrossSec_PE_1486_6",
+                b"0,Photon,Energy,0,10.2,1486.6",
+                b"1,H,1s,13.6,3.632,0.0000046",
+            ]
+        )
+    )
+
+    table = paths._csv_to_json_cross_section(csv_path)
+
+    assert table["photon_energies"] == [10.2, 1486.6]
+    assert list(table["data"]) == ["H"]
+    assert table["data"]["H"]["1s"] == {
+        "binding_energy": 13.6,
+        "cross_sections": [3.632, 4.6e-06],
+    }

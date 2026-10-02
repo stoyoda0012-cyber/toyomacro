@@ -106,9 +106,10 @@ transcription: Ta 4s keyed `4S`, Ir 6s filed under a mistyped element
 first two made `lookup()` miss a tabulated line and fall through to its
 extrapolation from neighbouring elements. All three are fixed in the
 JSON (keys only; the values were read against Table I pages 11 and 12
-and were right) and pinned by the same test file. The CSV still has them
-(records 2, 447 and 484; the file has CR line endings, so line-oriented
-tools see it as one line).
+and were right) and pinned by the same test file. The two keys were
+corrected in the CSV as well. The `Photon` row stays there: it is the
+MATLAB Toyomacro reader's photon-energy row (`CalcCrossSection.m` reads
+row 1), and the rebuild parser here now skips it.
 
 What that does and does not establish. The 3,929 other compared cells
 agree between two transcriptions that are not copies of each other —
@@ -119,9 +120,10 @@ once and checked against nothing. The table prints at most four
 significant figures, and the file stores what is printed.
 
 The CSV this file was generated from (`Common/data/CrossSectionTable_Yeh=Lindau.csv`,
-not part of this repository) carries the seven errors unless it is
-corrected separately, and `regenerate_cache()` would write them back.
-The shipped JSON is the reviewed copy; see *Rebuilding a table* below.
+not part of this repository, CR line endings) was corrected in the same
+way in 2026-10; rebuilt from it, the table is identical to the shipped
+JSON. The shipped JSON remains the reviewed copy; see *Rebuilding a
+table* below.
 
 ## `compounds.json` — where these numbers came from
 
@@ -476,10 +478,9 @@ The directory is called `_cache/` for historical reasons. Its contents
 are **shipped reference data**, not a disposable cache: they are
 reviewed, described above, and pinned by tests. The `Common/data/*.csv`
 files they were originally built from are not part of this repository
-and are not shipped. For `cross_section.json` the CSV is also
-known to be *behind* the shipped file: the seven cells and three keys
-corrected against Table I in 2026-10 (above) were corrected in the JSON,
-not in the CSV.
+and are not shipped. For `cross_section.json` the maintainer's CSV was
+corrected together with the JSON in 2026-10 (above); a CSV from before
+that would write the old errors back.
 
 A missing table therefore raises rather than rebuilding itself. The
 earlier behaviour — delete the file, do a lookup, get it back — was a
