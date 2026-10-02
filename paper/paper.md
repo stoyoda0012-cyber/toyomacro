@@ -12,10 +12,12 @@ tags:
 authors:
   - name: Satoshi Toyoda
     orcid: 0009-0007-1091-1579
-    affiliation: 1
+    affiliation: "1, 2"
 affiliations:
   - name: Advanced Equipment Division, Vacuum Products Corporation, Tokyo, Japan
     index: 1
+  - name: Office of Institutional Advancement and Communications, Kyoto University, Kyoto, Japan
+    index: 2
 date: 26 July 2026
 bibliography: paper.bib
 ---
