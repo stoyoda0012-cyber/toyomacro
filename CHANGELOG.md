@@ -151,7 +151,7 @@ archived on Zenodo for a citable DOI.
   point of a line, a cell 100x off moved the line everywhere: Ar 3p at
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
   200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. On the
-  16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 3.0%, 0.17% and
+  16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 2.9%, 0.17% and
   0.15% at most; between them Pd 3p reaches 0.5%. Lines that
   `lookup()` extrapolates across elements move as well, because the
   corrected cells are among the points it extrapolates from. Of the
@@ -163,7 +163,7 @@ archived on Zenodo for a citable DOI.
   bundled Scofield table the 3d of Tm to Fm (Md to Lr are not in it)
   are low before and after, by 15–56% in v0.3.0 and 20–65% now, while
   the 3d lines Yeh–Lindau does tabulate agree with Scofield to within
-  4% for Cs to Er and 7% for Rb to Xe (see Known issues). An earlier
+  4% for Cs to Er and about 7% for Rb to Xe (see Known issues). An earlier
   version of this entry said no other line changes; that was checked on
   tabulated lines only. The release notes for this version open with a
   table of every tabulated line and every occupied extrapolated line
@@ -350,8 +350,8 @@ Yeh–Lindau corrections above made them visible.
   extrapolated across elements whether or not that subshell is occupied,
   and the result is returned as if tabulated: H 6s at 21.2 eV comes out
   near 1e227 Mb, Si 4s at 21.2 eV 18 Mb. Judged by the ground-state
-  electron configuration, 737 element–label pairs that are not occupied
-  return a number at one or more of the table's 16 energies.
+  electron configuration, 737 element–label pairs that the table lacks
+  and that are not occupied return a number at one or more of the table's 16 energies.
 - **The extrapolation path does not apply the binding-energy threshold
   to a bare doublet label.** `lookup("Au", "3d", 21.2)` returns a
   number although Au 3d is bound by 2206 eV; a tabulated line returns
@@ -360,7 +360,7 @@ Yeh–Lindau corrections above made them visible.
   Tm to Lr are not in Yeh–Lindau and are extrapolated across Z; at
   8047.8 eV those of Tm to Fm fall 20–65% below Scofield, while the
   3d lines Yeh–Lindau tabulates agree with it to within 4% for Cs to Er
-  and 7% for Rb to Xe. The extrapolation pool includes
+  and about 7% for Rb to Xe. The extrapolation pool includes
   light-element 3d cells at 8047.8 eV that scatter around Scofield by a
   factor of up to 30 (Cu 3d, printed `.32E-3` in Table I, is 30x
   Scofield and 70x its neighbour Zn). Use `table="scofield"` for these
