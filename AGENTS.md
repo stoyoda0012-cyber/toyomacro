@@ -90,6 +90,11 @@ the numerical meaning of a result carry a higher bar than ordinary code:
   for an unbiased, correctly specified model must say so.
 - Never present a bound, a fitted coefficient, or a simulation result as
   a measurement.
+- A change to bundled data is compared old against new over the whole
+  output space of the functions that read it — every element, label
+  and energy those functions accept, interpolated and extrapolated —
+  not only at the inputs that were changed. A corrected cell can move
+  values it is not part of.
 
 ## Roles
 

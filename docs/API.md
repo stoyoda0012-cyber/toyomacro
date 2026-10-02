@@ -42,7 +42,9 @@ call signature in the sections below (`dictionary_solver`,
 `multipeak_solver`, `gvrt_service`, `spectra_generator`). These are
 covered by the test suite, exercised by `examples/`, and will not
 change signature or semantics without a minor-version bump and a
-changelog entry.
+changelog entry. A supported class's public methods (no leading
+underscore) are supported with it, whether or not this page names
+them.
 
 Two mechanical checks: `python -c "import toyomacro.voigtfit as v;
 print(v.__all__)"` enumerates the exported surface, and a submodule that

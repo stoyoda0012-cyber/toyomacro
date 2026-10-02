@@ -155,7 +155,11 @@ archived on Zenodo for a citable DOI.
   `lookup()` extrapolates across elements move as well, because the
   corrected cells are among the points it extrapolates from: the 3d
   lines of Tm to U, which Yeh–Lindau does not tabulate, come out 6 to
-  16% lower at 8047.8 eV. An earlier version of this entry said no other
+  16% lower at 8047.8 eV. That is the input correction propagating, not
+  a gain in accuracy: against the bundled Scofield table both the old
+  and the new values of those 24 lines are low, by 15–46% before and
+  20–55% after, while the 3d lines Yeh–Lindau does tabulate for heavy
+  elements agree with Scofield to within 5% (see Known issues). An earlier version of this entry said no other
   line changes; that was checked on tabulated lines only. The release
   notes for this version open with a table of every changed line, its
   photon energy and its factor. Si 2p at Al Kα is bit-identical. The thirteen cells are
@@ -328,6 +332,30 @@ archived on Zenodo for a citable DOI.
   `bottleneck_analysis` and `chunk_optimization_benchmark` treated it as
   bytes outright (1024x low). All six call sites now go through
   `get_peak_rss_bytes()`. Figures measured on macOS are unaffected.
+
+### Known issues
+
+These are present in v0.3.0 as well; they are recorded here because the
+Yeh–Lindau corrections above made them visible.
+
+- **`CrossSection.lookup(table="yeh_lindau")` extrapolates orbitals the
+  atom does not have.** A label the table lacks for an element is
+  extrapolated across elements whether or not that subshell is occupied,
+  and the result is returned as if tabulated: H 6s at 21.2 eV comes out
+  near 1e227 Mb, Si 4s at 21.2 eV 18 Mb. 162 such element–label pairs
+  exist over the table's grid.
+- **The extrapolation path does not apply the binding-energy threshold
+  to a bare doublet label.** `lookup("Au", "3d", 21.2)` returns a
+  number although Au 3d is bound by 2206 eV; a tabulated line returns
+  `None` below threshold.
+- **Extrapolated real core levels are unreliable.** The 3d lines of
+  Tm to U are not in Yeh–Lindau and are extrapolated across Z; at
+  8047.8 eV they fall 20–55% below Scofield, while tabulated heavy 3d
+  lines agree with it to within 5%. The extrapolation pool includes
+  light-element 3d cells at 8047.8 eV that scatter around Scofield by a
+  factor of up to 30 (Cu 3d, printed `.32E-3` in Table I, is 30x
+  Scofield and 70x its neighbour Zn). Use `table="scofield"` for these
+  lines.
 
 ## [0.3.0] - 2026-09-21
 
