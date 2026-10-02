@@ -95,7 +95,10 @@ archived on Zenodo for a citable DOI.
   benchmark regenerates at all. It changes no published number.
 
 - **`voigtfit.memory.get_peak_rss_bytes()`: this process's peak RSS, in
-  bytes, on every platform the package runs on.** macOS and Linux keep
+  bytes, on every platform the package runs on.** Internal tier in the
+  sense of `docs/API.md`: `voigtfit.memory` is not exported and not
+  listed as an entry point, so this may change without notice; it is
+  recorded here because the benchmark records report it. macOS and Linux keep
   reading `ru_maxrss` from `resource.getrusage`; Windows, which has no
   `resource` module, reads the peak working set through psutil (already
   a required dependency). `get_rss_gb()` is now a thin wrapper over it
@@ -113,6 +116,22 @@ archived on Zenodo for a citable DOI.
   This changes what is tested, not what is supported — the accelerated
   MLX path remains Apple-Silicon only, and all three CI platforms
   exercise the NumPy backend.
+
+### Changed
+
+- **Two example runs no longer write to tracked files.**
+  `examples/04_projection_law_validation.py` used to copy its figure
+  into `docs/figures/` on every run, so an ordinary run, and the CI
+  examples step, left the tree modified; the copy now happens only with
+  the new flag `--update-docs-figure`. Its outputs under
+  `examples/output/` are unchanged. `examples/data/make_example_data.py`
+  now writes `si2p_single.txt` with `\n` line endings on every
+  platform; on Windows it used to rewrite all 156 lines with `\r\n`,
+  numbers unchanged.
+- **The twelve wall-clock tests carry a `perf` marker.**
+  `pytest -m "not perf"` runs everything else on hardware slower than
+  the machine the thresholds were set on (README, "Development").
+  A plain `pytest` still runs all of them, and CI is unchanged.
 
 ### Fixed
 
@@ -132,8 +151,14 @@ archived on Zenodo for a citable DOI.
   point of a line, a cell 100x off moved the line everywhere: Ar 3p at
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
   200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. Fe 3d,
-  Se 4p and Pd 3p move by 3.0%, 0.17% and 0.15% at most; no other line
-  changes (Si 2p at Al Kα is bit-identical). The thirteen cells are
+  Se 4p and Pd 3p move by 3.0%, 0.17% and 0.15% at most. Lines that
+  `lookup()` extrapolates across elements move as well, because the
+  corrected cells are among the points it extrapolates from: the 3d
+  lines of Tm to U, which Yeh–Lindau does not tabulate, come out 6 to
+  16% lower at 8047.8 eV. An earlier version of this entry said no other
+  line changes; that was checked on tabulated lines only. The release
+  notes for this version open with a table of every changed line, its
+  photon energy and its factor. Si 2p at Al Kα is bit-identical. The thirteen cells are
   pinned to Table I in `tests/test_cross_section_yeh_lindau_transcription.py`.
   The 3,929 other compared cells rest on the agreement of two
   transcriptions, and the elements outside the comparison on one;
