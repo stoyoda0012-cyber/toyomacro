@@ -150,7 +150,9 @@ archived on Zenodo for a citable DOI.
   against Table I pages 11 and 12), `get_available_orbitals("Ta")` now
   lists `4s`, and a pseudo-element `Photon` — the CSV header row — is
   gone, so the table has exactly the 103 elements of Table I. The
-  three defects are in the source CSV too (`docs/DATA_SOURCES.md`).
+  source CSV outside the repository carried the same defects and was
+  corrected with it, except for the `Photon` row, which the MATLAB
+  reader needs and the rebuild parser now skips (`docs/DATA_SOURCES.md`).
 
 - **The 65,535 batch limit was fixed upstream in August, and the
   documents went on warning about it.** `mlx#3858` — MLX's CUDA batched

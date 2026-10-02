@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,400 automated tests** across **87 files**, in two
+This suite has **2,401 automated tests** across **87 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 49 | 1,320 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 49 | 1,321 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (1,968 tests, 82%) — guarantee the library
+- **Contract / regression** (1,969 tests, 82%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,320)
+## Library body — `tests/` (1,321)
 
 ### Claim guards — noise model, versions, backends, comparisons (123)
 | Tests | File | Guards |
@@ -126,7 +126,7 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (529)
+### Quantification data (530)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -138,7 +138,7 @@ them would take real coverage with them:
 | 37 | `test_sessa_sam_par.py` | SESSA `sam_par.txt` reader — header-driven columns and units, the one-row pairing and the detection of a pair split across rows, caller-declared material and version (invented fixtures only; no SESSA data bundled) |
 | 25 | `test_compound_parameters.py` | `compounds.json` entries are arithmetically coherent with their own formulas — the one thing checkable without a recorded source |
 | 22 | `test_compound_provenance.py` | `compounds_provenance.json` stays in step with `compounds.json` field by field, and never leaks into the values |
-| 14 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself |
+| 15 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself; the rebuild parser does not turn the CSV's photon-energy row into an element |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
