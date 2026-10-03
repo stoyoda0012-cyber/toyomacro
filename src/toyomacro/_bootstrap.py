@@ -55,7 +55,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.optimize import brentq
 from scipy.special import ndtr, ndtri, xlogy
+from scipy.stats import chi2
 
 __all__ = [
     "BootstrapResult",
@@ -66,6 +68,7 @@ __all__ = [
     "fit_poisson_mle",
     "poisson_deviance",
     "poisson_mle_fitter",
+    "profile_interval",
 ]
 
 #: (mean, jacobian) for a batch of parameter vectors: (n, p) -> (n, n_channels),
@@ -386,3 +389,105 @@ def bootstrap(
             f"p{i}" for i in range(result.params.shape[1])),
         kind=kind, n_draws=int(n_draws), n_failed=int((~ok).sum()), at_bound=at_bound,
         mean_counts=source)
+
+
+@dataclass
+class ProfileInterval:
+    """A likelihood-ratio interval for one parameter.
+
+    Attributes:
+        low, high: Ends. ``low`` equals the lower bound when the profile
+            stays under the threshold all the way down to it.
+        bound_included: Whether the lower bound itself belongs to the set.
+            Judged with the Self & Liang threshold (see ``profile_interval``),
+            so it can be False while ``low`` equals the bound: the set is
+            then open at the bound. This is what decides coverage when the
+            true value sits exactly on the bound.
+    """
+
+    low: float
+    high: float
+    bound_included: bool
+
+    def covers(self, value: float, lower_bound: float = -np.inf) -> bool:
+        if value == lower_bound:
+            return self.bound_included
+        return self.low <= value <= self.high
+
+
+def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray, index: int,
+                     lower: np.ndarray | None = None, *, level: float = 0.95,
+                     max_iter: int = 200) -> ProfileInterval:
+    """Profile-likelihood interval for parameter ``index`` from one spectrum.
+
+    The parameter is fixed at t, every other parameter is refitted
+    (constrained Poisson MLE), and the set is ``{t : D_p(t) - D_min <= c}``.
+    Away from a bound ``c`` is the ``level`` quantile of chi2 with one
+    degree of freedom (3.84 at 95%). At the lower bound itself the null
+    distribution of the statistic is the 50:50 mixture of chi2_0 and chi2_1
+    (Self & Liang 1987), so the bound is in the set when the excess is under
+    the ``2*level - 1`` quantile of chi2_1 (2.71 at 95%). That correction is
+    exact for one parameter on its bound with the others interior; when a
+    nuisance parameter also sits on a bound the mixture changes, and it is
+    not applied.
+
+    Args:
+        counts: (n_channels,) one spectrum
+        model: Mean and Jacobian for a batch of parameter vectors
+        estimate: (p,) the constrained MLE for ``counts``
+        index: Which parameter
+        lower: (p,) lower bounds
+        level: Coverage level
+    """
+    counts = np.asarray(counts, dtype=np.float64)[None, :]
+    theta = np.asarray(estimate, dtype=np.float64)
+    p = theta.size
+    lo_b = np.full(p, -np.inf) if lower is None else np.asarray(lower, dtype=np.float64)
+    keep = [i for i in range(p) if i != index]
+    d_min = float(poisson_deviance(counts, model(theta[None])[0])[0])
+    c_in = float(chi2.ppf(level, 1))
+    c_bound = float(chi2.ppf(2.0 * level - 1.0, 1))
+
+    def reduced(t):
+        def m(theta_r):
+            full = np.insert(np.asarray(theta_r, dtype=np.float64), index, t, axis=1)
+            mean, jac = model(full)
+            return mean, np.delete(jac, index, axis=2)
+        return m
+
+    def excess(t):
+        fit = fit_poisson_mle(counts, reduced(t), theta[keep], lower=lo_b[keep], max_iter=max_iter)
+        return float(fit.deviance[0]) - d_min
+
+    mean, jac = model(theta[None])
+    info = jac[0].T @ (jac[0] / np.maximum(mean[0], 1e-300)[:, None])
+    step = float(np.sqrt(max(np.linalg.pinv(info)[index, index], 0.0)))
+    if not np.isfinite(step) or step <= 0.0:
+        step = max(abs(theta[index]), 1.0) * 1e-3
+
+    def bracket(direction):
+        a, h = theta[index], step
+        for _ in range(60):
+            b = a + direction * h
+            if direction < 0 and b <= lo_b[index]:
+                return None
+            if excess(b) > c_in:
+                return b
+            h *= 2.0
+        return np.inf * direction
+
+    hi_edge = bracket(+1.0)
+    high = (hi_edge if not np.isfinite(hi_edge)
+            else brentq(lambda t: excess(t) - c_in, theta[index], hi_edge, xtol=step * 1e-4))
+
+    bound_included = False
+    if np.isfinite(lo_b[index]) and excess(lo_b[index]) <= c_in:
+        low = float(lo_b[index])
+        bound_included = excess(lo_b[index]) <= c_bound
+    else:
+        lo_edge = bracket(-1.0)
+        if lo_edge is None:
+            lo_edge = lo_b[index]
+        low = (lo_edge if not np.isfinite(lo_edge)
+               else brentq(lambda t: excess(t) - c_in, lo_edge, theta[index], xtol=step * 1e-4))
+    return ProfileInterval(low=float(low), high=float(high), bound_included=bool(bound_included))
