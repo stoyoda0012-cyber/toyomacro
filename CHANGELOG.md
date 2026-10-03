@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-03
+
 ### Added
 
 - **`bench_platform --runs N`: repeat the measurement in separate
@@ -95,7 +97,10 @@ archived on Zenodo for a citable DOI.
   benchmark regenerates at all. It changes no published number.
 
 - **`voigtfit.memory.get_peak_rss_bytes()`: this process's peak RSS, in
-  bytes, on every platform the package runs on.** macOS and Linux keep
+  bytes, on every platform the package runs on.** Internal tier in the
+  sense of `docs/API.md`: `voigtfit.memory` is not exported and not
+  listed as an entry point, so this may change without notice; it is
+  recorded here because `get_rss_gb()` now goes through it (see Fixed). macOS and Linux keep
   reading `ru_maxrss` from `resource.getrusage`; Windows, which has no
   `resource` module, reads the peak working set through psutil (already
   a required dependency). `get_rss_gb()` is now a thin wrapper over it
@@ -105,7 +110,7 @@ archived on Zenodo for a citable DOI.
 
 - **Windows is a tested platform.** CI runs the full suite on
   `windows-latest` for Python 3.11 and 3.12, alongside Ubuntu and macOS,
-  so the import-time platform work above is now covered by a regression
+  so the import-time platform work under Fixed is now covered by a regression
   gate rather than by one developer's machine. Every `run:` step in that
   job is pinned to `bash`: Windows runners default to pwsh, where a
   multi-line step reports only the last command's exit code, and the
@@ -113,6 +118,26 @@ archived on Zenodo for a citable DOI.
   This changes what is tested, not what is supported — the accelerated
   MLX path remains Apple-Silicon only, and all three CI platforms
   exercise the NumPy backend.
+
+### Changed
+
+- **Two example runs no longer write to tracked files.**
+  `examples/04_projection_law_validation.py` used to copy its figure
+  into `docs/figures/` on every run, so an ordinary run, and the CI
+  examples step, left the tree modified; the copy now happens only with
+  the new flag `--update-docs-figure`. Its outputs under
+  `examples/output/` are unchanged. `examples/data/make_example_data.py`
+  now writes `si2p_single.txt` with `\n` line endings on every
+  platform; on Windows it used to rewrite all 156 lines with `\r\n`,
+  numbers unchanged.
+- **The twelve wall-clock tests carry a `perf` marker.**
+  `pytest -m "not perf"` runs everything else on hardware slower than
+  the machine the thresholds were set on (README, "Development").
+  A plain `pytest` still runs all of them, and CI is unchanged.
+- **A supported class's public methods are supported with it.**
+  `docs/API.md` now says so instead of leaving it to be inferred, which
+  brings `CrossSection.to_dict`, `get_available_orbitals`,
+  `set_poly_order` and the like explicitly under the stability promise.
 
 ### Fixed
 
@@ -131,9 +156,18 @@ archived on Zenodo for a citable DOI.
   Because `lookup()` fits one cubic in log–log through every tabulated
   point of a line, a cell 100x off moved the line everywhere: Ar 3p at
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
-  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. Fe 3d,
-  Se 4p and Pd 3p move by 3.0%, 0.17% and 0.15% at most; no other line
-  changes (Si 2p at Al Kα is bit-identical). The thirteen cells are
+  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low (a corrected
+  line can also move away from an independent reference elsewhere; see
+  Known issues). On the
+  16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 2.9%, 0.17% and
+  0.15% at most; between them Pd 3p reaches 0.5%. Values `lookup()`
+  extrapolates across elements moved as well. Those are not
+  corrections, and most moved away from an independent reference; see
+  Known issues. An earlier version of this entry said no other line
+  changes; that was checked on tabulated lines only. The release notes
+  for this version list every changed line, corrected and extrapolated
+  separately, with its factor and its direction against Scofield.
+  Si 2p at Al Kα is bit-identical. The thirteen cells are
   pinned to Table I in `tests/test_cross_section_yeh_lindau_transcription.py`.
   The 3,929 other compared cells rest on the agreement of two
   transcriptions, and the elements outside the comparison on one;
@@ -295,7 +329,8 @@ archived on Zenodo for a citable DOI.
   filename containing backslashes. Verified at `decc8e2` on Windows 11
   (Python 3.12.14, clean tree): 1884 passed, 175 skipped, 2 failed —
   both `test_decode_speed` throughput gates, which this machine misses
-  on hardware, not platform. Windows is still not covered by CI.
+  on hardware, not platform. Windows has been covered by CI since
+  (see Added).
 
 - **Peak RSS was misreported on Linux.** `ru_maxrss` is in kibibytes
   there, but `memory.get_rss_gb` converted it at 1000 bytes per
@@ -303,6 +338,48 @@ archived on Zenodo for a citable DOI.
   `bottleneck_analysis` and `chunk_optimization_benchmark` treated it as
   bytes outright (1024x low). All six call sites now go through
   `get_peak_rss_bytes()`. Figures measured on macOS are unaffected.
+
+### Known issues
+
+These are present in v0.3.0 as well; they are recorded here because the
+Yeh–Lindau corrections above made them visible.
+
+- **`CrossSection.lookup(table="yeh_lindau")` extrapolates orbitals the
+  atom does not have.** A label the table lacks for an element is
+  extrapolated across elements whether or not that subshell is occupied,
+  and the result is returned as if tabulated: H 6s at 21.2 eV comes out
+  near 1e227 Mb, Si 4s at 21.2 eV 18 Mb. Judged by the ground-state
+  electron configuration, 737 element–label pairs that the table lacks
+  and that are not occupied return a number at one or more of the table's 16 energies.
+- **The extrapolation path does not apply the binding-energy threshold
+  to a bare doublet label.** `lookup("Au", "3d", 21.2)` returns a
+  number although Au 3d is bound by 2206 eV; a tabulated line returns
+  `None` below threshold.
+- **Extrapolated real core levels are unreliable, and this release
+  moved most of them further from an independent reference.** Table I
+  prints no 3d row for Tm and heavier elements, and none for K 4s or
+  Cs 6s; `lookup()` extrapolates them across Z from tabulated lines,
+  and the cells corrected in this release are among its inputs. Against
+  the bundled Scofield table the 3d lines of Tm to Fm were 15–56% low
+  in v0.3.0 and are 20–65% low now, all 32 further away; Cs 6s also
+  moved away and K 4s slightly closer. Md to Lr are not in the Scofield
+  table, and `table="scofield"` extrapolates them across Z as well.
+  The 3d lines Yeh–Lindau does tabulate agree with Scofield within 4%
+  for Cs to Er. Use `table="scofield"` for these lines.
+- **`lookup()` can return something other than the printed value at a
+  tabulated energy.** It fits one cubic in log–log through all the cells of a
+  line and returns the fit, so even at a grid energy the result can
+  differ from what Table I prints, and a corrected cell can move the
+  fitted value at another energy away from an independent reference:
+  Ar 3p at 8047.8 eV moved from 1.02 to 1.28 of Scofield in this
+  release. The interpolation is to be reviewed in v0.4.0.
+- **Cu 3d at 8047.8 eV is probably a misprint in the source, and is
+  kept as printed.** Table I prints `.32E-3` Mb. Along the 3d row the
+  value falls 38-fold from 1486.6 to 8047.8 eV for Cu, against 300-fold
+  for Ni and 2,600-fold for Zn; it is 68x its neighbour Zn (`.47E-5`)
+  and 30x the bundled Scofield value, while Zn is 0.31x and Ni 3.0x
+  Scofield. No erratum has been found. The bundled table reproduces the
+  printed value; it is corrected only against a published correction.
 
 ## [0.3.0] - 2026-09-21
 
@@ -1663,7 +1740,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0

@@ -496,8 +496,15 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
    recorded. Deferred past v0.3.0.
 2. **`poisson_err` is an additional field, not a replacement.** The
    default `*_err` was left exactly as it was so that no released
-   number moves; whether the sandwich should become the default is a
-   later decision.
+   number moves. It stays that way until a detector gain can be
+   estimated: the sandwich is correctly scaled only when `intensity` is
+   raw counts (and even then it is an asymptotic result), and the intensities an electron analyser such as a Scienta
+   CCD/MCP detector reports are counts times an unknown gain, often not
+   integers. Made the default without that, it would give confident
+   Poisson error bars to data that is not Poisson on the scale it is
+   stored in. Estimating a gain needs real data, which the "Not in
+   scope" paragraph below leaves out of this release; the default is
+   reconsidered once a gain can be estimated.
 3. **τ's bound is withheld once and offered twice.** `report.sd_tau` is
    `None` where the split is `not_separable`, while
    `report.parameters` still carries the same number with a status on

@@ -117,7 +117,13 @@ the thirteen disagreements fall on both sides, six wrong only in the
 spreadsheet and seven only here — which is good evidence that they are
 right but is not a reading of the table. The elements outside the comparison have been transcribed
 once and checked against nothing. The table prints at most four
-significant figures, and the file stores what is printed.
+significant figures, and the file stores what is printed — including
+one value that is probably a misprint. Cu 3d at 8047.8 eV is printed
+`.32E-3` Mb: along the 3d row it falls only 38-fold from 1486.6 eV,
+against 300-fold for Ni and 2,600-fold for Zn, and it is 68x Zn's
+`.47E-5` and 30x the bundled Scofield value (Zn is 0.31x, Ni 3.0x).
+No erratum has been found, so it stays as printed; it would be changed
+only against a published correction, cited here.
 
 The CSV this file was generated from (`Common/data/CrossSectionTable_Yeh=Lindau.csv`,
 not part of this repository, CR line endings) was corrected in the same

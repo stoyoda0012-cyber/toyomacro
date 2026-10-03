@@ -442,6 +442,11 @@ class CrossSection:
 
         Interpolates between tabulated values using log-log interpolation.
         Falls back to Z-based extrapolation if no direct data is available.
+        Inside the tabulated range the interpolant is one polynomial fitted
+        through all the cells of a line (a power law through the end cells
+        outside it), so even at a tabulated energy the result can be the
+        smoothed fit, not the printed value (e.g. Ar 3p at 8047.8 eV on
+        ``yeh_lindau``).
 
         Args:
             element: Element symbol (e.g., 'Si', 'Au')
