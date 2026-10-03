@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-03
+
 ### Added
 
 - **`bench_platform --runs N`: repeat the measurement in separate
@@ -156,23 +158,14 @@ archived on Zenodo for a citable DOI.
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
   200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. On the
   16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 2.9%, 0.17% and
-  0.15% at most; between them Pd 3p reaches 0.5%. Lines that
-  `lookup()` extrapolates across elements move as well, because the
-  corrected cells are among the points it extrapolates from. Of the
-  occupied subshells it extrapolates, 37 move by 1% or more at Mg, Al
-  or Cu Kα above their binding energy: the 3d lines of Tm to Lr, which
-  Yeh–Lindau does not tabulate, come out 6 to 21% lower at 8047.8 eV,
-  K 4s 5.8% lower at Al Kα and Cs 6s 1.2% higher at 8047.8 eV. That is
-  the input correction propagating, not a gain in accuracy: against the
-  bundled Scofield table the 3d of Tm to Fm (Md to Lr are not in it)
-  are low before and after, by 15–56% in v0.3.0 and 20–65% now, while
-  the 3d lines Yeh–Lindau does tabulate agree with Scofield to within
-  4% for Cs to Er and about 7% for Rb to Xe (see Known issues). An earlier
-  version of this entry said no other line changes; that was checked on
-  tabulated lines only. The release notes for this version open with a
-  table of every tabulated line and every occupied extrapolated line
-  that changes by 1% or more, with photon energy and factor. Si 2p at
-  Al Kα is bit-identical. The thirteen cells are
+  0.15% at most; between them Pd 3p reaches 0.5%. Values `lookup()`
+  extrapolates across elements moved as well. Those are not
+  corrections, and most moved away from an independent reference; see
+  Known issues. An earlier version of this entry said no other line
+  changes; that was checked on tabulated lines only. The release notes
+  for this version list every changed line, corrected and extrapolated
+  separately, with its factor and its direction against Scofield.
+  Si 2p at Al Kα is bit-identical. The thirteen cells are
   pinned to Table I in `tests/test_cross_section_yeh_lindau_transcription.py`.
   The 3,929 other compared cells rest on the agreement of two
   transcriptions, and the elements outside the comparison on one;
@@ -360,15 +353,23 @@ Yeh–Lindau corrections above made them visible.
   to a bare doublet label.** `lookup("Au", "3d", 21.2)` returns a
   number although Au 3d is bound by 2206 eV; a tabulated line returns
   `None` below threshold.
-- **Extrapolated real core levels are unreliable.** The 3d lines of
-  Tm to Lr are not in Yeh–Lindau and are extrapolated across Z; at
-  8047.8 eV those of Tm to Fm fall 20–65% below Scofield, while the
-  3d lines Yeh–Lindau tabulates agree with it to within 4% for Cs to Er
-  and about 7% for Rb to Xe. The extrapolation pool includes
-  light-element 3d cells at 8047.8 eV that scatter around Scofield by a
-  factor of up to 30 (Cu 3d, printed `.32E-3` in Table I, is 30x
-  Scofield and 70x its neighbour Zn). Use `table="scofield"` for these
-  lines.
+- **Extrapolated real core levels are unreliable, and this release
+  moved most of them further from an independent reference.** Table I
+  prints no 3d row for Tm and heavier elements, and none for K 4s or
+  Cs 6s; `lookup()` extrapolates them across Z from tabulated lines,
+  and the cells corrected in this release are among its inputs. Against
+  the bundled Scofield table the 3d lines of Tm to Fm were 15–56% low
+  in v0.3.0 and are 20–65% low now, all 32 further away; Cs 6s also
+  moved away and K 4s slightly closer; Md to Lr have no Scofield value.
+  The 3d lines Yeh–Lindau does tabulate agree with Scofield within 4%
+  for Cs to Er. Use `table="scofield"` for these lines.
+- **`lookup()` does not return the printed value at a tabulated
+  energy.** It fits one cubic in log–log through all the cells of a
+  line and returns the fit, so even at a grid energy the result can
+  differ from what Table I prints, and a corrected cell can move the
+  fitted value at another energy away from an independent reference:
+  Ar 3p at 8047.8 eV moved from 1.02 to 1.28 of Scofield in this
+  release. The interpolation is to be reviewed in v0.4.0.
 - **Cu 3d at 8047.8 eV is probably a misprint in the source, and is
   kept as printed.** Table I prints `.32E-3` Mb. Along the 3d row the
   value falls 38-fold from 1486.6 to 8047.8 eV for Cu, against 300-fold
@@ -1736,7 +1737,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/stoyoda0012-cyber/toyomacro/releases/tag/v0.1.0
