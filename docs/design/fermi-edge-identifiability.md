@@ -505,12 +505,13 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
    stored in. Estimating a gain needs real data, which the "Not in
    scope" paragraph below leaves out of this release; the default is
    reconsidered once a gain can be estimated.
-3. **τ's bound is withheld once and offered twice.** `report.sd_tau` is
-   `None` where the split is `not_separable`, while
-   `report.parameters` still carries the same number with a status on
-   the width scale (§5). Making them agree needs a status value that
-   says "not separable", which is a label change and so not this
-   release.
+3. **τ's bound was withheld once and offered twice** — resolved in
+   v0.4.0. `report.sd_tau` is `None` where the split is
+   `not_separable`, and `report.parameters` now labels τ
+   `not_separable` too instead of judging its sd on the width scale
+   (§5). The sd stays in the entry, as a measure of the trade with v,
+   and the scan's status codes gain `not_separable` = 5 with the
+   earlier codes unchanged.
 4. **Lifetime broadening.** A Lorentzian component would add a third
    width to the same κ₂ and is not modelled. On a clean metal edge it is
    small; this is not checked here.

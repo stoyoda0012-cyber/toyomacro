@@ -48,6 +48,13 @@ archived on Zenodo for a citable DOI.
   reports the same as an error that names the table. This resolves the
   three `lookup()` known issues of v0.3.1 and the one about grid
   values; the Cu 3d misprint is unaffected.
+- **`fermi_edge_identifiability`: tau's per-parameter status agrees with
+  the withheld bound.** Where the width split is `not_separable`,
+  `report.parameters` now labels tau `not_separable` instead of a status
+  judged against the edge's own width, which could read `identified`
+  while `report.sd_tau` was `None`. Its `sd` stays, as a measure of the
+  trade with v. The scan's status codes gain `not_separable` = 5; the
+  earlier codes are unchanged. This resolves the v0.3.0 known issue.
 
 ## [0.3.1] - 2026-10-03
 

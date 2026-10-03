@@ -80,7 +80,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, NamedTuple
 
 import numpy as np
@@ -844,7 +844,10 @@ class EdgeParameterAssessment:
             for a background term
         relative_sd: ``sd / reference_scale``, or None
         status: 'rank_deficient', 'weakly_identified', 'identified',
-            'undersampled' (widths only) or 'not_assessed'
+            'undersampled' (widths only), 'not_separable' (tau only, where
+            the report's ``separation`` is 'not_separable': its ``sd``
+            then measures the trade with v on the width scale, not the
+            temperature) or 'not_assessed'
     """
 
     name: str
@@ -1115,6 +1118,11 @@ def assess_edge_identifiability(
         block = effective_information(fisher.fisher, fisher.width_index).effective
     if undersampled:
         separation = "undersampled"
+    if separation == "not_separable":
+        # sd_tau is withheld for this case; the per-parameter entry must
+        # not read 'identified' against the edge's own width either.
+        it = fisher.width_index[1]
+        parameters[it] = replace(parameters[it], status="not_separable")
 
     # How far a fit's resolution moves when the temperature it holds fixed is
     # wrong by 1 K: -(I_vv)^-1 I_v_tau dtau/dT on the effective block, i.e.
@@ -1152,7 +1160,7 @@ def assess_edge_identifiability(
 
 _SEPARATION_CODE = {"separable": 0, "not_separable": 1, "assumed": 2, "undersampled": 3}
 _STATUS_CODE = {"identified": 0, "weakly_identified": 1, "rank_deficient": 2, "undersampled": 3,
-                "not_assessed": 4}
+                "not_assessed": 4, "not_separable": 5}
 
 
 @dataclass(frozen=True)

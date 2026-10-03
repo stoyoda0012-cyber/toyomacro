@@ -651,6 +651,8 @@ def test_the_labels_follow_the_temperature_mode():
     assert free.separation == "not_separable" and free.sd_tau is None
     assert free.near_boundary_tau is None
     assert next(p.status for p in free.parameters if p.name == "variance") == "weakly_identified"
+    # v0.4.0: the parameter entry for tau agrees with the withheld sd_tau
+    assert next(p.status for p in free.parameters if p.name == "tau") == "not_separable"
 
     prior = _report(temperature_mode="temperature_prior", temperature_sd=10.0)
     assert prior.separation == "separable" and prior.sd_tau is not None
@@ -998,3 +1000,15 @@ def test_the_scan_says_which_of_its_arrays_depend_on_the_temperature_mode(scan):
                                   np.nan_to_num(b, nan=-999.0)), name
     assert set(same) | set(differ) == {
         k for k, v in out.items() if getattr(v, "ndim", 0) == 7}
+
+
+def test_status_codes_are_stable_and_not_separable_is_appended():
+    """Scan outputs store status codes; existing codes must not move."""
+    assert fi._STATUS_CODE == {"identified": 0, "weakly_identified": 1, "rank_deficient": 2,
+                               "undersampled": 3, "not_assessed": 4, "not_separable": 5}
+
+
+def test_tau_status_is_not_separable_only_when_the_split_is():
+    prior = _report(temperature_mode="temperature_prior", temperature_sd=10.0)
+    assert prior.separation == "separable"
+    assert next(p.status for p in prior.parameters if p.name == "tau") != "not_separable"
