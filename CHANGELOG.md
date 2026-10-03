@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.3.1] - 2026-10-03
 
+Archived on Zenodo:
+[10.5281/zenodo.23113379](https://doi.org/10.5281/zenodo.23113379).
+
 ### Added
 
 - **`bench_platform --runs N`: repeat the measurement in separate
