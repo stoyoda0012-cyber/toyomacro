@@ -445,11 +445,13 @@ class CrossSection:
         the earlier whole-line polynomial, kept as ``"polyfit"``.
 
         Only what the table carries is returned. A subshell the table does
-        not list for this element — an unoccupied one, or a deep level the
+        not list for this element returns None; it is not estimated from
+        other elements. That covers unoccupied subshells, deep levels the
         table leaves out (Yeh-Lindau lists none with a binding energy above
-        about 1.5 keV) — returns None; it is not estimated from other
-        elements. For deep levels at HAXPES energies use
-        ``table="scofield"``.
+        about 1.5 keV — for those at HAXPES energies use
+        ``table="scofield"``), and a few occupied valence lines Yeh-Lindau
+        Table I does not print (K 4s, Ga 4p, Rb 5s, In 5p, Cs 6s, Ce 5d,
+        Fr 7s, Lr 7p), for which no bundled table covers UPS energies.
 
         Args:
             element: Element symbol (e.g., 'Si', 'Au')
@@ -516,10 +518,10 @@ class CrossSection:
         A bare subshell label is the sum over its j components, each
         evaluated **independently at** ``photon_energy`` and then added.
         Summing the stored arrays first and interpolating once is not
-        equivalent: the interpolator fits one polynomial over an
-        element's whole tabulated range, so where the two components are
-        listed on different grids — routine just above a split threshold
-        — a few dropped points move the result by tens of percent.
+        equivalent: where the two components are listed on different
+        grids — routine just above a split threshold — the summed array has
+        points where only one component is present, and interpolating it
+        mixes the two lines.
         """
         data = cls._get_data(table)
         elements_data = data.get("data", {})
@@ -633,7 +635,7 @@ class CrossSection:
         the same table. Each is whatever ``lookup()`` returns, so either
         may be a power-law extrapolation beyond the tabulated energies —
         see ``lookup()``; that is not signalled here. None if either
-        line is not in the table.
+        line is not in the table or is below its binding energy.
 
         Despite the historical method name, this is **not** a complete
         relative sensitivity factor and **not** an average-matrix RSF. It

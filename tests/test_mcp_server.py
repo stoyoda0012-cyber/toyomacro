@@ -198,3 +198,17 @@ class TestGVRTTools:
         assert len(out) == 2
         # More noise -> lower average PSNR
         assert out[0]["psnr_dB"]["average"] > out[1]["psnr_dB"]["average"]
+
+
+def test_sensitivity_table_argument_reaches_deep_levels():
+    """Yeh-Lindau carries no Si 1s; the default call says so and names the
+    way out, and table='scofield' answers it (v0.4.0)."""
+    from toyomacro.mcp_server import calculate_sensitivity
+
+    default = json.loads(calculate_sensitivity("Si", "1s"))
+    assert "error" in default and "table='scofield'" in default["error"]
+    sc = json.loads(calculate_sensitivity("Si", "1s", table="scofield"))
+    assert sc["cross_section"] > 0 and sc["cross_section_table"] == "scofield"
+    bad = json.loads(calculate_sensitivity("Si", "2p", table="nope"))
+    assert "Unknown table" in bad["error"]
+
