@@ -49,6 +49,7 @@ import warnings
 from typing import Any
 
 import numpy as np
+from scipy.interpolate import PchipInterpolator
 
 from toyomacro.data.paths import (
     REGENERATE_ENV_VAR,
@@ -133,10 +134,10 @@ _TABLE_UNITS: dict[str, tuple[str | None, str | None, str]] = {
 class _Refused:
     """Sentinel: the table covers this subshell and still cannot answer.
 
-    Distinct from ``None``, which means "no data here" and licenses the
-    cross-element extrapolation. A refusal must not be extrapolated over:
-    doing so would replace a known gap with a fabricated number that is
-    indistinguishable from a tabulated one.
+    Distinct from ``None``, which means "no data here". Both end as
+    ``None`` from :meth:`CrossSection.lookup`; the distinction is kept
+    because a refusal is a statement about a table that covers the
+    subshell, and must never be filled in from anywhere else.
     """
 
     __slots__ = ()
@@ -426,9 +427,6 @@ class CrossSection:
 
         return {"photon_energies": photon_energies, "data": data}
 
-    # Guard to prevent _extrapolate → lookup → _extrapolate recursion
-    _extrapolating: bool = False
-
     @classmethod
     def lookup(
         cls,
@@ -440,13 +438,18 @@ class CrossSection:
         """
         Look up cross-section for an element, orbital, and photon energy.
 
-        Interpolates between tabulated values using log-log interpolation.
-        Falls back to Z-based extrapolation if no direct data is available.
-        Inside the tabulated range the interpolant is one polynomial fitted
-        through all the cells of a line (a power law through the end cells
-        outside it), so even at a tabulated energy the result can be the
-        smoothed fit, not the printed value (e.g. Ar 3p at 8047.8 eV on
-        ``yeh_lindau``).
+        Inside a line's tabulated range the value is a monotone piecewise
+        cubic (PCHIP) through the tabulated cells in log-log space, so at a
+        tabulated energy it is the tabulated value. Beyond the range it is a
+        power law through the end cells. See :meth:`set_interpolation` for
+        the earlier whole-line polynomial, kept as ``"polyfit"``.
+
+        Only what the table carries is returned. A subshell the table does
+        not list for this element — an unoccupied one, or a deep level the
+        table leaves out (Yeh-Lindau lists none with a binding energy above
+        about 1.5 keV) — returns None; it is not estimated from other
+        elements. For deep levels at HAXPES energies use
+        ``table="scofield"``.
 
         Args:
             element: Element symbol (e.g., 'Si', 'Au')
@@ -463,7 +466,9 @@ class CrossSection:
             Cross-section in the unit reported by :meth:`unit_info` for
             ``table`` — Mb for 'yeh_lindau' and 'scofield', ~10³ larger
             (inferred kb, unconfirmed) for 'trzhaskovskaya' — or None if
-            not found. Do not compare across tables without converting.
+            the table does not carry the subshell for this element, or the
+            photon energy is below its binding energy. Do not compare
+            across tables without converting.
         """
         # Physical threshold. Gate a *bare* label per component instead,
         # inside `_lookup_direct`: a subshell-level binding energy is the
@@ -480,20 +485,17 @@ class CrossSection:
                 return None  # Cannot ionize: hν < BE
 
         result = cls._lookup_direct(element, orbital, photon_energy, table)
-        if result is _REFUSED:
-            # The table covers this subshell and still cannot answer —
-            # a component missing for an unestablished reason, or nothing
-            # ionizable at this energy. Extrapolating from other elements
-            # would replace a known gap with a fabricated number that
-            # looks tabulated, so refuse instead.
+        if result is _REFUSED or result is None:
+            # Either the table covers this subshell and cannot answer (a
+            # component missing for an unestablished reason, or nothing
+            # ionizable at this energy), or it does not carry the subshell
+            # at all. Until v0.4.0 the second case fell back to a fit
+            # across Z; against Scofield that put 1s 4.3x and 2p 3.9x too
+            # high at the median, and returned numbers for subshells with
+            # no electrons. Nothing is returned that the table does not
+            # carry.
             return None
-        if result is not None:
-            return result
-
-        # Fallback: extrapolate from other elements with the same orbital
-        if not cls._extrapolating:
-            return cls._extrapolate(element, orbital, photon_energy, table)
-        return None
+        return result
 
     @classmethod
     def _lookup_direct(
@@ -506,7 +508,7 @@ class CrossSection:
         """Direct table lookup without extrapolation fallback.
 
         Returns a value, ``None`` when the table has no data for this
-        subshell at all (so an extrapolation may legitimately try), or
+        subshell at all, or
         ``_REFUSED`` when the table covers the subshell and still cannot
         answer — a component missing for a reason this package has not
         established, or nothing ionizable at this energy.
@@ -538,8 +540,7 @@ class CrossSection:
             siblings = _J_COMPONENTS.get(base[-1:], ())
             if any(f"{base}{s}" in elem_data for s in siblings):
                 # The table carries this subshell and omits this component.
-                # Whatever the reason, it is not a coverage gap that an
-                # extrapolation from other elements may fill in.
+                # Whatever the reason, it is not a coverage gap.
                 return _REFUSED
             return None
 
@@ -558,7 +559,7 @@ class CrossSection:
             return cls._interp_one(elem_data[base], data, photon_energy)
 
         if not any(f"{base}{s}" in elem_data for s in components):
-            return None  # subshell absent entirely: extrapolation may try
+            return None  # subshell absent entirely
 
         total = 0.0
         contributed = False
@@ -630,9 +631,9 @@ class CrossSection:
 
         Returns ``sigma1 / sigma2`` at the given photon energy, both from
         the same table. Each is whatever ``lookup()`` returns, so either
-        may be a log-log extrapolation beyond the tabulated energies, or
-        a cross-element fit in log(Z) for an orbital the table does not
-        carry at all — see ``lookup()``. Neither case is signalled here.
+        may be a power-law extrapolation beyond the tabulated energies —
+        see ``lookup()``; that is not signalled here. None if either
+        line is not in the table.
 
         Despite the historical method name, this is **not** a complete
         relative sensitivity factor and **not** an average-matrix RSF. It
@@ -705,14 +706,49 @@ class CrossSection:
         """
         return cls._get_data(table)
 
-    # Polynomial order for log-log cross-section interpolation.
+    # Interpolation inside a line's tabulated range. "pchip" passes through
+    # every tabulated cell; "polyfit" is the whole-line polynomial used up to
+    # v0.3.1 (and by the MATLAB Toyomacro suite), kept for reproducing
+    # earlier results.
+    INTERPOLATIONS: tuple[str, ...] = ("pchip", "polyfit")
+    _interpolation: str = "pchip"
+
+    # Polynomial order for the "polyfit" interpolation only.
     # MATLAB default = 3, DepthProfiler overrides to 6.
-    # 3 is safer for general use (less Runge oscillation on extrapolation).
     _poly_order: int = 3
 
     @classmethod
+    def set_interpolation(cls, method: str) -> None:
+        """Choose how ``lookup()`` interpolates inside a tabulated range.
+
+        Args:
+            method: ``"pchip"`` (default since v0.4.0) — a monotone
+                piecewise cubic through the tabulated cells in log-log
+                space, which returns the tabulated value at a tabulated
+                energy; or ``"polyfit"`` — one polynomial of order
+                :meth:`set_poly_order` fitted through all the cells of a
+                line, the behaviour up to v0.3.1. Left out cells in a
+                leave-one-out test across the three bundled tables, the
+                median error is 2.0% / 0.02% / 0.53% for "pchip" against
+                8.9% / 0.17% / 1.16% for "polyfit" (Yeh-Lindau / Scofield /
+                Trzhaskovskaya). Beyond the tabulated range both use the
+                same power law through the end cells.
+        """
+        if method not in cls.INTERPOLATIONS:
+            raise ValueError(f"Unknown interpolation '{method}'. Choose from {cls.INTERPOLATIONS}")
+        cls._interpolation = method
+
+    @classmethod
+    def get_interpolation(cls) -> str:
+        """Return the current interpolation method."""
+        return cls._interpolation
+
+    @classmethod
     def set_poly_order(cls, order: int) -> None:
-        """Set the polynomial order for log-log interpolation.
+        """Set the polynomial order of the ``"polyfit"`` interpolation.
+
+        Has no effect on the default ``"pchip"`` interpolation; see
+        :meth:`set_interpolation`.
 
         Args:
             order: Polynomial degree (MATLAB default 3, DepthProfiler default 6).
@@ -725,15 +761,15 @@ class CrossSection:
         points: list[tuple[float, float]],
         x: float,
     ) -> float:
-        """Interpolate/extrapolate in log-log space using polynomial fit.
+        """Interpolate/extrapolate in log-log space.
 
-        Matches MATLAB ``xps.CrossSection`` behaviour:
-        ``polyfit(log10(PE), log10(CS), polyOrder)`` over all valid points,
-        then ``10^polyval(p, log10(hv))``.
+        Inside the range: with ``"pchip"`` a monotone piecewise cubic
+        through the points; with ``"polyfit"`` the MATLAB ``xps.CrossSection``
+        behaviour, ``polyfit(log10(PE), log10(CS), polyOrder)`` over all
+        valid points, then ``10^polyval(p, log10(hv))``.
 
-        For extrapolation beyond the table range, uses at most order-1
-        (power-law) from the last few points to avoid high-order
-        polynomial divergence (Runge phenomenon).
+        Beyond the range (either method): a power law through the last or
+        first few points, to avoid high-order polynomial divergence.
         """
         points = sorted(points, key=lambda p: p[0])
         n = len(points)
@@ -759,6 +795,10 @@ class CrossSection:
             log_ys = np.log10(ys)
             order = min(1, len(tail) - 1)  # Linear in log-log = power law
             coeffs = np.polyfit(log_xs, log_ys, order)
+        elif cls._interpolation == "pchip":
+            xs = np.log10(np.array([p[0] for p in points]))
+            ys = np.log10(np.array([p[1] for p in points]))
+            return float(10.0 ** PchipInterpolator(xs, ys)(math.log10(x)))
         else:
             # Interpolation within range: use all points with full poly_order
             xs = np.array([p[0] for p in points])
@@ -794,75 +834,3 @@ class CrossSection:
             return None
         except Exception:
             return None
-
-    @classmethod
-    def _extrapolate(
-        cls,
-        element: str,
-        orbital: str,
-        photon_energy: float,
-        table: str | None = None,
-    ) -> float | None:
-        """Extrapolate cross-section for missing element/orbital.
-
-        Collects cross-sections at ``photon_energy`` for all elements that
-        have the same orbital type, then fits a polynomial in log(Z)-log(σ)
-        space to estimate the value for the target element.
-
-        σ roughly scales as Z^n, so log-log fit is more physical than
-        linear polynomial for extrapolation beyond the data range.
-
-        Donor elements are sampled with the **same** label that was
-        requested. Normalizing '4f7/2' to '4f' here would fit the summed
-        doublet and hand it back as a single j component — the same
-        miscounting this module fixes in ``_lookup_direct``, laundered
-        through an extrapolation so that it looks tabulated.
-        """
-        from toyomacro.data.binding_energy import BindingEnergy
-
-        # Get target atomic number
-        be_data = BindingEnergy._get_data()
-        elem_entry = be_data.get("elements", {}).get(element)
-        if elem_entry is None:
-            return None
-        target_z = elem_entry["Z"]
-        base_orbital = orbital
-
-        data = cls._get_data(table)
-        elements_data = data.get("data", {})
-
-        # Collect (Z, sigma) for all elements that have this orbital
-        # Set guard to prevent recursive extrapolation
-        cls._extrapolating = True
-        try:
-            z_sigma: list[tuple[int, float]] = []
-            for sym, orbitals in elements_data.items():
-                sym_entry = be_data.get("elements", {}).get(sym)
-                if sym_entry is None:
-                    continue
-                z = sym_entry["Z"]
-
-                # Use lookup (without extrapolation due to guard)
-                sigma = cls.lookup(sym, base_orbital, photon_energy, table)
-                if sigma is not None and sigma > 0:
-                    z_sigma.append((z, sigma))
-        finally:
-            cls._extrapolating = False
-
-        if len(z_sigma) < 3:
-            return None
-
-        z_sigma.sort()
-        zs = np.array([z for z, _ in z_sigma], dtype=np.float64)
-        sigmas = np.array([s for _, s in z_sigma], dtype=np.float64)
-
-        # Log-log polynomial fit: σ ∝ Z^n → log(σ) = n·log(Z) + const
-        # Z-based extrapolation is inherently approximate — limit to order 2
-        # to avoid wild oscillation beyond the data range.
-        log_zs = np.log(zs)
-        log_sigmas = np.log(sigmas)
-        poly_order = min(2, len(z_sigma) - 1)
-        coeffs = np.polyfit(log_zs, log_sigmas, poly_order)
-        result = float(np.exp(np.polyval(coeffs, math.log(target_z))))
-
-        return result if result > 0 else None

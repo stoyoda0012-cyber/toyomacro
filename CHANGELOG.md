@@ -8,6 +8,47 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`CrossSection.set_interpolation()` / `get_interpolation()`.**
+  `"pchip"` (the new default) or `"polyfit"`, the whole-line polynomial
+  used up to v0.3.1, which reproduces v0.3.1's values bit for bit and is
+  the only method `set_poly_order()` affects.
+
+### Changed
+
+- **`CrossSection.lookup()` returns the tabulated value at a tabulated
+  energy.** Inside a line's range it now interpolates with a monotone
+  piecewise cubic (PCHIP) through the cells in log–log space. Up to
+  v0.3.1 it fitted one cubic through all the cells of a line, which on
+  Yeh–Lindau missed 39% of the very cells it was fitted to by more than
+  10% (64x at worst, Mo 5s at 10.2 eV), on Trzhaskovskaya 4.2% and on
+  Scofield 1.2% (4.1x at worst, just above the Ir 3d5/2 threshold).
+  Predicting each interior cell from the others, the median error falls
+  from 8.9% to 2.0% (Yeh–Lindau), 0.17% to 0.02% (Scofield) and 1.16% to
+  0.53% (Trzhaskovskaya). Values move accordingly. On Yeh–Lindau 753
+  element–subshell lines change, 424 values by more than 2x at the 16
+  tabulated energies and the five common sources; of the changes above
+  10% at Mg, Al, Cr, Cu and Ga Kα, 643 moved closer to Scofield and 166
+  further (C 2p at Al Kα, for one, from 1.69 to 0.47 of it). Scofield
+  values move by 0.17% at the median, Trzhaskovskaya by 0.82%. Beyond
+  the tabulated energies nothing changes: a power law through the end
+  cells, as before. The release notes list the lines that change most.
+- **A subshell the table does not carry returns `None`.** `lookup()` no
+  longer estimates it from other elements. That fit across Z was
+  outside the range of the elements it used for 356 of the 357 occupied
+  subshells it served on Yeh–Lindau, and against Scofield it put 1s
+  4.3x and 2p 3.9x too high at the median, with none of the 1s and 5%
+  of the 2p within 20%. It also returned numbers for subshells with no
+  electrons (737 on Yeh–Lindau, up to 1e227 Mb, and `inf`), and for
+  bare doublets below their threshold. Yeh–Lindau lists no level bound
+  by more than about 1.5 keV, so deep levels at HAXPES energies (Si 1s
+  at Cr Kα, Au 3d at Cu Kα) now return `None` from the default table;
+  use `table="scofield"`. The MCP server's `calculate_sensitivity`
+  reports the same as an error that names the table. This resolves the
+  three `lookup()` known issues of v0.3.1 and the one about grid
+  values; the Cu 3d misprint is unaffected.
+
 ## [0.3.1] - 2026-10-03
 
 Archived on Zenodo:

@@ -104,7 +104,8 @@ The same comparison exposed three structural artifacts of the
 transcription: Ta 4s keyed `4S`, Ir 6s filed under a mistyped element
 `lr`, and the CSV header row carried along as an element `Photon`. The
 first two made `lookup()` miss a tabulated line and fall through to its
-extrapolation from neighbouring elements. All three are fixed in the
+extrapolation from neighbouring elements (an extrapolation removed in
+v0.4.0). All three are fixed in the
 JSON (keys only; the values were read against Table I pages 11 and 12
 and were right) and pinned by the same test file. The two keys were
 corrected in the CSV as well. The `Photon` row stays there: it is the

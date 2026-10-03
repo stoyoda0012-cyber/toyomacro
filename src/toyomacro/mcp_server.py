@@ -110,15 +110,12 @@ def calculate_sensitivity(
       `cross_section_extrapolated`. The default Yeh & Lindau table
       stops at 8047.8 eV, below the 9251.7 eV default.
 
-    `cross_section_extrapolated` only covers the energy axis, and only
-    one-sidedly. False does NOT mean the value came from the table:
-
-    - within the range, sigma is a polynomial fit in log-log space over
-      the whole grid, not a local interpolation, and a sparsely
-      tabulated orbital can still be extrapolated;
-    - where the table lacks the requested orbital and the reason is not
-      established, `lookup` may still fall back to a cross-element fit
-      in log(Z), and this flag stays False for that value.
+    `cross_section_extrapolated` covers the energy axis. Within the
+    range, sigma is a monotone piecewise cubic through the tabulated
+    cells in log-log space, so at a tabulated energy it is the tabulated
+    value. An orbital the default table does not carry returns an error,
+    not an estimate: Yeh & Lindau lists no level bound by more than about
+    1.5 keV, so deep levels at HAXPES energies are not in it.
 
     A j-resolved request the table cannot answer is refused rather than
     reconstructed. The default table (Yeh & Lindau) stores no j-resolved
@@ -144,7 +141,9 @@ def calculate_sensitivity(
     sigma = CrossSection.lookup(element, orbital, photon_energy)
     if sigma is None:
         return json.dumps({
-            "error": f"No cross-section for {element} {orbital} at {photon_energy} eV"
+            "error": (f"No cross-section for {element} {orbital} at {photon_energy} eV "
+                      f"in the '{CrossSection.get_default_table()}' table: the subshell is "
+                      "not tabulated there, or the energy is below its binding energy")
         })
     lam = IMFP.tpp2m(kinetic_energy=ke, compound=compound)
     lo, hi = TPP2M_FITTED_RANGE_EV

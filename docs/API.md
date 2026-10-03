@@ -350,6 +350,19 @@ process default table — Yeh–Lindau unless `set_default_table()` changed
 it — so pass `table=` explicitly whenever the choice matters, and read
 `unit_info()` before comparing anything across tables.
 
+**What `lookup()` returns, and what it does not.** Inside a line's
+tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
+in log–log space, so a tabulated energy returns the tabulated value;
+beyond the range it uses a power law through the end cells. A subshell
+the table does not carry for that element returns `None` — it is not
+estimated from other elements. Yeh–Lindau lists no level bound by more
+than about 1.5 keV (no 1s above Mg, no 2p above Kr, no 3d above Er), so
+for deep levels at HAXPES energies use `table="scofield"`, whose bundled
+copy covers 1–30 keV and Z = 1–100. Up to v0.3.1 `lookup()` fitted one
+polynomial through all the cells of a line and estimated absent
+subshells across Z; `set_interpolation("polyfit")` restores the first
+for reproducing earlier numbers, and the second is gone.
+
 `CrossSection.to_dict(table)` returns the table as loaded, in the
 shape the bundled JSON has for all three tables:
 `{"photon_energies": [...], "data": {element: {orbital:
@@ -360,15 +373,14 @@ binding energy). It is the live process cache, not a copy — read from
 it, or deep-copy before mutating — and `photon_energies` and a line's
 `cross_sections` are only meaningful read as a pair. The grid values are
 the tabulated ones in the unit `unit_info()` reports; `lookup()`
-interpolates through them and does not return a grid value at a grid
-energy.
+interpolates through them and returns them at their own energies.
 
 **A bare orbital is the whole doublet.** `lookup('Si', '2p', hv)` returns
 σ(2p1/2) + σ(2p3/2) — what a measured peak envelope contains. Each
 component is evaluated at the requested energy and then added; summing
-the stored arrays and interpolating once is not equivalent, because the
-interpolator fits one polynomial across an element's whole tabulated
-range. Pass `'2p3/2'` for a single component.
+the stored arrays and interpolating once is not equivalent where the two
+components are tabulated on different grids, which is routine just above
+a split threshold. Pass `'2p3/2'` for a single component.
 
 `BindingEnergy` uses the opposite convention for bare labels (the main
 line, j = l+1/2), deliberately: a binding energy is a position, of which
