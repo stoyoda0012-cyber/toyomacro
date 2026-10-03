@@ -132,6 +132,10 @@ archived on Zenodo for a citable DOI.
   `pytest -m "not perf"` runs everything else on hardware slower than
   the machine the thresholds were set on (README, "Development").
   A plain `pytest` still runs all of them, and CI is unchanged.
+- **A supported class's public methods are supported with it.**
+  `docs/API.md` now says so instead of leaving it to be inferred, which
+  brings `CrossSection.to_dict`, `get_available_orbitals`,
+  `set_poly_order` and the like explicitly under the stability promise.
 
 ### Fixed
 
@@ -365,6 +369,13 @@ Yeh–Lindau corrections above made them visible.
   factor of up to 30 (Cu 3d, printed `.32E-3` in Table I, is 30x
   Scofield and 70x its neighbour Zn). Use `table="scofield"` for these
   lines.
+- **Cu 3d at 8047.8 eV is probably a misprint in the source, and is
+  kept as printed.** Table I prints `.32E-3` Mb. Along the 3d row the
+  value falls 38-fold from 1486.6 to 8047.8 eV for Cu, against 300-fold
+  for Ni and 2,600-fold for Zn; it is 68x its neighbour Zn (`.47E-5`)
+  and 30x the bundled Scofield value, while Zn is 0.31x and Ni 3.0x
+  Scofield. No erratum has been found. The bundled table reproduces the
+  printed value; it is corrected only against a published correction.
 
 ## [0.3.0] - 2026-09-21
 
