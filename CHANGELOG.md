@@ -8,6 +8,70 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`CrossSection.set_interpolation()` / `get_interpolation()`.**
+  `"pchip"` (the new default) or `"polyfit"`, the whole-line polynomial
+  used up to v0.3.1, which reproduces v0.3.1's values wherever v0.3.1
+  read the table itself — bit for bit on the same platform, to about
+  1e-13 across platforms.
+- **The MCP server's `calculate_sensitivity` takes a `table` argument.**
+  Without it a deep level at the default 9251.7 eV (Si 1s, Au 3d) has no
+  answer from the default table and the tool had no way to ask another;
+  the error now names `table='scofield'`.
+
+### Changed
+
+- **`CrossSection.lookup()` returns the tabulated value at a tabulated
+  energy.** Inside a line's range it now interpolates with a monotone
+  piecewise cubic (PCHIP) through the cells in log–log space. Up to
+  v0.3.1 it fitted one cubic through all the cells of a line, which
+  missed by more than 10% 39% of the very cells it was fitted to on
+  Yeh–Lindau (64x at worst, Mo 5s at 10.2 eV), 4.2% on Trzhaskovskaya
+  (6.4x, Cf 5f7/2 at 200 eV) and 1.2% on Scofield (4.1x, just above the
+  Ir 3d5/2 threshold). Predicting each interior cell from the others,
+  the median error falls from 8.9% to 2.0% (Yeh–Lindau), 0.17% to
+  0.02% (Scofield) and 1.16% to 0.53% (Trzhaskovskaya). Values move
+  accordingly. On Yeh–Lindau 725 element–subshell lines change beyond
+  round-off, 424 values by more than 2x at the 16 tabulated energies and
+  Mg, Al, Cr, Cu and Ga Kα; of the changes above 10% at those five
+  sources, 643 moved closer to Scofield and 166 further (C 2p at Al Kα,
+  for one, from 1.69 to 0.47 of it). Scofield values move by 0.17% at
+  the median, Trzhaskovskaya by 0.8%. Beyond the tabulated energies
+  nothing changes: a least-squares power law through the last few
+  cells, as before. The release notes list the lines that change most.
+- **`set_poly_order()` now affects only `set_interpolation("polyfit")`.**
+  Under the default it has no effect, with no warning; a caller that
+  set order 6 to match DepthProfiler gets PCHIP unless it also selects
+  `"polyfit"`.
+- **A subshell the table does not carry returns `None`.** `lookup()` no
+  longer estimates it from other elements. Of the 357 occupied
+  subshells Yeh–Lindau lacks, only Ce 5d lay inside the Z range of the
+  elements that fit drew on; the rest were extrapolations in Z. Against
+  Scofield at Al, Cr, Cu and Ga Kα, above 1.05 times the binding energy,
+  it put 1s 4.3x and 2p 3.9x too high at the median, with none of the
+  1s and 5% of the 2p within 20% (other samples give 2.8–4.5x and
+  3.6–4.3x); only 3s was fair (median 0.93x). It also returned numbers
+  for subshells with no electrons (737 on Yeh–Lindau, up to 1e227 Mb,
+  and `inf`), and for bare doublets below their threshold. Now `None`
+  is returned for: unoccupied subshells; deep levels Yeh–Lindau leaves
+  out — it lists no level bound by more than about 1.5 keV, so Si 1s at
+  Cr Kα and Au 3d at Cu Kα need `table="scofield"`; and a few occupied
+  valence lines its Table I does not print (K 4s, Ga 4p, Rb 5s, In 5p,
+  Cs 6s, Ce 5d, Fr 7s, Lr 7p), which no bundled table covers at UPS
+  energies. Nothing any table carries became `None`. This resolves the
+  three `lookup()` known issues of v0.3.1 and the one about grid values;
+  the Cu 3d misprint is unaffected.
+- **`fermi_edge_identifiability`: tau's per-parameter status agrees with
+  the withheld bound.** Where the width split is `not_separable`,
+  `report.parameters` now labels tau `not_separable` instead of a status
+  judged against the edge's own width, which could read `identified`
+  while `report.sd_tau` was `None`. Its `sd` stays, as a measure of the
+  trade with v. The status code table gains `not_separable` = 5 with the
+  earlier codes unchanged; the scan records only the variance's status,
+  so the new code does not occur in its arrays. This resolves the
+  v0.3.0 known issue.
+
 ## [0.3.1] - 2026-10-03
 
 Archived on Zenodo:

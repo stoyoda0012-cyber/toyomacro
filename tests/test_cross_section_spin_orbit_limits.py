@@ -455,33 +455,26 @@ def test_every_half_listed_subshell_behaves_the_same_way():
         ) is None, f"{element} {absent} was fabricated"
 
 
-def test_a_wholly_absent_subshell_still_reaches_the_extrapolation_path():
-    """The counter-case showing the refusal is targeted, not blanket.
+def test_a_wholly_absent_subshell_returns_none_not_an_estimate():
+    """A subshell the table does not carry is not estimated (v0.4.0).
 
-    Refusing a *half-listed* subshell is a statement about a table that
-    covers the subshell and omits one component. Where the table carries
-    no component of it at all there is nothing to contradict, so the
-    cross-element log(Z) fallback still answers — otherwise the fix
-    would have quietly disabled it everywhere.
-
-    Ce 1s is the case to use: the orbital is real and occupied, and it is
-    absent from Yeh-Lindau only because that table covers the soft-x-ray
-    range where a 40 keV level is inaccessible. So the extrapolation is
-    filling a coverage gap rather than inventing a cross-section for an
-    orbital that holds no electrons — which is what an unoccupied-valence
-    example would have pinned.
+    Until v0.3.1 a wholly absent subshell fell back to a fit across Z, and
+    this test pinned that it still did. The fallback was removed: against
+    Scofield it put 1s 4.3x and 2p 3.9x too high at the median and gave
+    numbers for subshells with no electrons. Ce 1s is the same case as
+    before: real and occupied, absent from Yeh-Lindau because that table
+    stops at 8047.8 eV, so it must now come back as None at any energy.
     """
     keys = _keys("Ce", "yeh_lindau")
     assert keys and "1s" not in keys, "Ce 1s should be outside this table"
 
-    be = 40443.0  # Ce 1s, far above the table's 8047.8 eV ceiling
-    assert CrossSection.lookup("Ce", "1s", AL_KA_EV) is None, (
-        "below threshold it must still refuse"
-    )
-
-    value = CrossSection.lookup("Ce", "1s", 100_000.0, table="yeh_lindau")
-    assert value is not None and value > 0
-    assert 100_000.0 > be
+    assert CrossSection.lookup("Ce", "1s", AL_KA_EV) is None
+    assert CrossSection.lookup("Ce", "1s", 100_000.0, table="yeh_lindau") is None
+    # A deep level Yeh-Lindau leaves out is answered by the table that
+    # carries it: Si 1s at Cr K-alpha (the bundled Scofield stops at 30 keV,
+    # below Ce 1s, so Ce cannot serve as the control).
+    assert CrossSection.lookup("Si", "1s", 5414.7, table="yeh_lindau") is None
+    assert CrossSection.lookup("Si", "1s", 5414.7, table="scofield") > 0
 
 
 # ---------------------------------------------------------------------------

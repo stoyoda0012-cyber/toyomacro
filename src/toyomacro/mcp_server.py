@@ -57,6 +57,7 @@ def calculate_sensitivity(
     orbital: str,
     photon_energy: float = 9251.7,
     compound: str = "SiO2",
+    table: str | None = None,
 ) -> str:
     """Calculate a simplified intrinsic sensitivity, sigma x lambda.
 
@@ -110,21 +111,18 @@ def calculate_sensitivity(
       `cross_section_extrapolated`. The default Yeh & Lindau table
       stops at 8047.8 eV, below the 9251.7 eV default.
 
-    `cross_section_extrapolated` only covers the energy axis, and only
-    one-sidedly. False does NOT mean the value came from the table:
-
-    - within the range, sigma is a polynomial fit in log-log space over
-      the whole grid, not a local interpolation, and a sparsely
-      tabulated orbital can still be extrapolated;
-    - where the table lacks the requested orbital and the reason is not
-      established, `lookup` may still fall back to a cross-element fit
-      in log(Z), and this flag stays False for that value.
+    `cross_section_extrapolated` covers the energy axis. Within the
+    range, sigma is a monotone piecewise cubic through the tabulated
+    cells in log-log space, so at a tabulated energy it is the tabulated
+    value. An orbital the default table does not carry returns an error,
+    not an estimate: Yeh & Lindau lists no level bound by more than about
+    1.5 keV, so deep levels at HAXPES energies are not in it.
 
     A j-resolved request the table cannot answer is refused rather than
     reconstructed. The default table (Yeh & Lindau) stores no j-resolved
     key, so asking it for '2p3/2' returns an error rather than a value
     split from the doublet by an assumed branching ratio. Ask for the
-    bare orbital, or select 'scofield' / 'trzhaskovskaya'. See
+    bare orbital, or pass table='scofield' / 'trzhaskovskaya'. See
     `docs/API.md` section 5 for the per-table behavior.
 
     Args:
@@ -133,32 +131,45 @@ def calculate_sensitivity(
         photon_energy: X-ray photon energy in eV.
             Default 9251.7 (Ga Ka); Al Ka is 1486.6.
         compound: Matrix compound for the IMFP (e.g. 'SiO2', 'Si').
+        table: Cross-section table: 'yeh_lindau', 'scofield' or
+            'trzhaskovskaya'. Default: the package default (Yeh & Lindau),
+            which carries no level bound by more than about 1.5 keV — pass
+            'scofield' for deep levels at HAXPES energies.
     """
     from toyomacro.data import IMFP, BindingEnergy, CrossSection
+    from toyomacro.data.cross_section import AVAILABLE_TABLES
     from toyomacro.data.imfp import TPP2M_FITTED_RANGE_EV
+
+    if table is not None and table not in AVAILABLE_TABLES:
+        return json.dumps({"error": f"Unknown table '{table}'. Choose from {list(AVAILABLE_TABLES)}"})
+    table_name = table or CrossSection.get_default_table()
 
     be = BindingEnergy.lookup(element, orbital)
     if be is None:
         return json.dumps({"error": f"No binding energy for {element} {orbital}"})
     ke = photon_energy - be
-    sigma = CrossSection.lookup(element, orbital, photon_energy)
+    sigma = CrossSection.lookup(element, orbital, photon_energy, table=table_name)
     if sigma is None:
         return json.dumps({
-            "error": f"No cross-section for {element} {orbital} at {photon_energy} eV"
+            "error": (f"No cross-section for {element} {orbital} at {photon_energy} eV "
+                      f"in the '{table_name}' table: the subshell is not tabulated there, "
+                      "or the energy is below its binding energy"
+                      + ("" if table_name == "scofield" else "; for deep levels at HAXPES "
+                         "energies try table='scofield'"))
         })
     lam = IMFP.tpp2m(kinetic_energy=ke, compound=compound)
     lo, hi = TPP2M_FITTED_RANGE_EV
     # Report sigma's grid limits alongside lambda's. Flagging only the
     # IMFP would imply the cross-section is on firmer ground at the same
     # energy, and at the HAXPES default it is not.
-    grid = CrossSection.get_available_photon_energies()
+    grid = CrossSection.get_available_photon_energies(table=table_name)
     cs_lo, cs_hi = (min(grid), max(grid)) if grid else (None, None)
     # Carry the unit through with its status intact. Collapsing an
     # inferred unit into a single confirmed-looking string here would
     # undo the separation `unit_info()` exists to keep — so a unit that
     # was never read from a primary source stays None, and the candidate
     # travels in its own field.
-    units = CrossSection.unit_info()
+    units = CrossSection.unit_info(table_name)
     sens_unit = f"{units['unit']}*nm" if units["unit"] else None
     sens_inferred = (
         f"{units['inferred_unit']}*nm" if units["inferred_unit"] else None
@@ -170,7 +181,7 @@ def calculate_sensitivity(
         "binding_energy_eV": be,
         "kinetic_energy_eV": ke,
         "cross_section": sigma,
-        "cross_section_table": CrossSection.get_default_table(),
+        "cross_section_table": table_name,
         "cross_section_unit": units["unit"],
         "cross_section_inferred_unit": units["inferred_unit"],
         "cross_section_unit_status": units["status"],
