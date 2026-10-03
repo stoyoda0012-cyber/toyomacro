@@ -183,7 +183,16 @@ def fit_poisson_mle(
         both = free[:, :, np.newaxis] & free[:, np.newaxis, :]
         system = np.where(both, info, 0.0) + np.where(free, 0.0, 1.0)[:, :, np.newaxis] * eye
         system += (damping[todo, np.newaxis] * scale**2)[:, :, np.newaxis] * eye * both
-        step = np.linalg.solve(system, np.where(free, score, 0.0)[:, :, np.newaxis])[:, :, 0]
+        rhs = np.where(free, score, 0.0)[:, :, np.newaxis]
+        try:
+            step = np.linalg.solve(system, rhs)[:, :, 0]
+        except np.linalg.LinAlgError:
+            # One singular replica (e.g. a resampled spectrum whose channels
+            # cannot separate two parameters) used to abort the whole batch.
+            # Its least-norm step lets the rest proceed; it then converges
+            # or is reported as not converged like any other replica. Batches
+            # without a singular system take the branch above, unchanged.
+            step = (np.linalg.pinv(system) @ rhs)[:, :, 0]
 
         trial = np.maximum(theta[todo] + step, bounds)
         trial_mean, trial_jac = model(trial)

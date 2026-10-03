@@ -423,3 +423,18 @@ def test_the_least_squares_fitter_scatters_as_its_sandwich_says():
     assert spread / bound > 1.2
     assert abs(sigmas.mean() - edge.sigma) < 0.1 * spread * math.sqrt(sigmas.size)
     assert "unit" in label
+
+
+def test_one_singular_replica_does_not_abort_the_batch():
+    """Two parameters with identical Jacobian columns make the Fisher
+    system singular for every replica. The solver used to raise
+    LinAlgError and lose the whole batch; it must return instead."""
+    def model(theta):
+        theta = np.asarray(theta, dtype=float)
+        mean = np.repeat((theta[:, 0] + theta[:, 1])[:, None], 3, axis=1)
+        return mean, np.ones((theta.shape[0], 3, 2))
+
+    counts = np.array([[9.0, 10.0, 11.0], [20.0, 19.0, 21.0]])
+    out = fit_poisson_mle(counts, model, np.array([5.0, 5.0]), max_iter=50)
+    assert out.params.shape == (2, 2)
+    assert np.allclose(out.params.sum(axis=1), counts.mean(axis=1), rtol=1e-6)
