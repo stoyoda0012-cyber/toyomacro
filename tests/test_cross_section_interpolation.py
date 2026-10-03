@@ -7,7 +7,9 @@ Since v0.4.0:
   energy returns the tabulated value. Up to v0.3.1 it was one polynomial
   fitted through all the cells of a line, which on Yeh-Lindau missed 39%
   of the cells it was fitted to by more than 10%. That method is kept as
-  ``set_interpolation("polyfit")`` and reproduces v0.3.1 bit for bit.
+  ``set_interpolation("polyfit")`` and reproduces v0.3.1 to round-off
+  (bit for bit on the same platform; the least-squares fit differs in the
+  last bits between platforms, about 3e-14 relative).
 - A subshell the table does not carry returns None. Up to v0.3.1 it was
   fitted across Z from other elements; against Scofield that put 1s 4.3x
   and 2p 3.9x too high at the median, and it returned numbers (up to
@@ -59,8 +61,9 @@ def test_pchip_returns_every_tabulated_cell(table):
     assert checked > 7000
 
 
-# Values lookup() returned in v0.3.1 (whole-line cubic, order 3 unless
-# stated). "polyfit" must reproduce them exactly.
+# Values lookup() returned in v0.3.1 on macOS/arm64 (whole-line cubic,
+# order 3 unless stated). "polyfit" must reproduce them to round-off; the
+# least-squares fit's last bits differ between platforms.
 V031 = [
     ("yeh_lindau", "Si", "2p", 1486.6, 3, 0.01058780110464214),
     ("yeh_lindau", "Ar", "3p", 8047.8, 3, 1.62378556370801e-05),
@@ -78,7 +81,7 @@ V031 = [
 def test_polyfit_reproduces_v031(table, el, orb, hv, order, value):
     CrossSection.set_interpolation("polyfit")
     CrossSection.set_poly_order(order)
-    assert CrossSection.lookup(el, orb, hv, table=table) == value
+    assert CrossSection.lookup(el, orb, hv, table=table) == pytest.approx(value, rel=1e-12)
 
 
 def test_poly_order_only_affects_polyfit():

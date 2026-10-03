@@ -12,8 +12,9 @@ archived on Zenodo for a citable DOI.
 
 - **`CrossSection.set_interpolation()` / `get_interpolation()`.**
   `"pchip"` (the new default) or `"polyfit"`, the whole-line polynomial
-  used up to v0.3.1, which reproduces v0.3.1's values bit for bit
-  wherever v0.3.1 read the table itself.
+  used up to v0.3.1, which reproduces v0.3.1's values wherever v0.3.1
+  read the table itself — bit for bit on the same platform, to about
+  1e-13 across platforms.
 - **The MCP server's `calculate_sensitivity` takes a `table` argument.**
   Without it a deep level at the default 9251.7 eV (Si 1s, Au 3d) has no
   answer from the default table and the tool had no way to ask another;
