@@ -98,7 +98,7 @@ the numerical meaning of a result carry a higher bar than ordinary code:
 - Reproducing the numbers of such a change is not enough: judge the
   direction of each change against an independent reference (another
   tabulation, a measurement). A correct input can move a derived value
-  further from the truth, and that must be reported as such, not as a
+  further from an independent reference, and that must be reported as such, not as a
   fix.
 
 ## Roles

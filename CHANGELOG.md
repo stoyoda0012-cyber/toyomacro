@@ -156,7 +156,9 @@ archived on Zenodo for a citable DOI.
   Because `lookup()` fits one cubic in log–log through every tabulated
   point of a line, a cell 100x off moved the line everywhere: Ar 3p at
   Al Kα came out 2.0x too high, Cu 4s 2.7x, As 4s between 80 and
-  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low. On the
+  200 eV about 2.4x, and Zn 3d at 8047.8 eV 9.6x too low (a corrected
+  line can also move away from an independent reference elsewhere; see
+  Known issues). On the
   16 tabulated energies Fe 3d, Se 4p and Pd 3p move by 2.9%, 0.17% and
   0.15% at most; between them Pd 3p reaches 0.5%. Values `lookup()`
   extrapolates across elements moved as well. Those are not
@@ -360,11 +362,12 @@ Yeh–Lindau corrections above made them visible.
   and the cells corrected in this release are among its inputs. Against
   the bundled Scofield table the 3d lines of Tm to Fm were 15–56% low
   in v0.3.0 and are 20–65% low now, all 32 further away; Cs 6s also
-  moved away and K 4s slightly closer; Md to Lr have no Scofield value.
+  moved away and K 4s slightly closer. Md to Lr are not in the Scofield
+  table, and `table="scofield"` extrapolates them across Z as well.
   The 3d lines Yeh–Lindau does tabulate agree with Scofield within 4%
   for Cs to Er. Use `table="scofield"` for these lines.
-- **`lookup()` does not return the printed value at a tabulated
-  energy.** It fits one cubic in log–log through all the cells of a
+- **`lookup()` can return something other than the printed value at a
+  tabulated energy.** It fits one cubic in log–log through all the cells of a
   line and returns the fit, so even at a grid energy the result can
   differ from what Table I prints, and a corrected cell can move the
   fitted value at another energy away from an independent reference:
