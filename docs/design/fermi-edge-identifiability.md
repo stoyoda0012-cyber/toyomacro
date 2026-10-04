@@ -336,8 +336,8 @@ in the non-separable region v and τ covered 95.4% parametric against
 the two kinds still part company there, but the other way round — the
 parametric bootstrap over-covers (99%) and the nonparametric one is close
 to nominal (93–94%), about five standard errors apart. Rerunning
-v0.3.0's own harness at that point (200 × 200, its seed, numpy's
-quantiles) gives 94.0 / 94.5% nonparametric, so 86.2% does not come back
+v0.3.0's own harness at that point (200 × 200, the harness's default
+seed — the v0.3.0 run's seed is not recorded — and numpy's quantiles) gives 94.0 / 94.5% nonparametric, so 86.2% does not come back
 with the old method either.
 
 | point | parameter | percentile, parametric / nonparametric | BCa | profile likelihood |
@@ -350,7 +350,8 @@ with the old method either.
 
 Trials that converged at the first level: 600 (interior), 579 (v at the
 bound), 598 (not separable; 597 for the E_F profile). The 21 dropped at
-the bound all have v̂ within 3e-5 of zero and fail to converge there, so
+the bound all have v̂ within 3e-5 of zero and do not report convergence
+within 200 iterations, so
 the exclusion selects on the boundary itself; if all of them were
 covered the 94.6% below would read 94.8%, if none 91.3%. Within a trial,
 non-converged bootstrap replicas are dropped too (at least 883 of 1000

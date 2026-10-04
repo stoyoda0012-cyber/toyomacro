@@ -435,8 +435,10 @@ def test_one_singular_replica_does_not_abort_the_batch():
     system singular. The solver used to raise LinAlgError and lose the
     whole batch; it must return instead. On that ridge the split between
     the two parameters is not unique (the least-norm step picks one), so
-    only their sum is checked; a regular replica in the same batch must
-    come out exactly as it does on its own."""
+    only their sum is checked. A batch holding a singular system takes the
+    least-norm step for every replica in it, so a regular replica in the
+    same batch must reach its solo estimate to round-off (not bit for
+    bit; batches without a singular system are unchanged)."""
     def model(theta):
         theta = np.asarray(theta, dtype=float)
         mean = np.repeat((theta[:, 0] + theta[:, 1])[:, None], 3, axis=1)
@@ -466,6 +468,8 @@ def test_one_singular_replica_does_not_abort_the_batch():
         sel[-1] = True
         return np.where(sel, m1, m0), np.where(sel[:, :, None], j1, j0)
 
-    both = fit_poisson_mle(np.vstack([counts[:1], regular]), switch, np.array([4.0, 6.0]), max_iter=50)
-    assert np.array_equal(both.params[1], alone.params[0])
+    # counts[1:] (sum 20) is away from its optimum at the start (4, 6), so the
+    # singular replica really reaches the singular solve alongside the regular one.
+    both = fit_poisson_mle(np.vstack([counts[1:], regular]), switch, np.array([4.0, 6.0]), max_iter=50)
+    assert np.allclose(both.params[1], alone.params[0], rtol=1e-10, atol=0.0)
 

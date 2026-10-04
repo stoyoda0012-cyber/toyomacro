@@ -43,6 +43,7 @@ def test_profile_interval_is_the_likelihood_ratio_interval_for_a_poisson_mean():
     assert iv.low == pytest.approx(lo, rel=1e-5)
     assert iv.high == pytest.approx(hi, rel=1e-5)
     assert not iv.bound_included
+    assert iv.n_unconverged == 0
 
 
 @pytest.mark.parametrize(("y", "included"), [(8.0, True), (20.0, False)])

@@ -376,7 +376,7 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
     Measured on the Fermi edge for E_F, v and tau (design record section
     7): nominal at an interior point, and for tau with v on its bound; for
     v there 98.1% at the true value and 94.6% judged at the bound, a
-    reading chosen after the measurement. Over-wide (98%) where the width
+    reading chosen after the measurement. Over-covering (98%) where the width
     split is ``not_separable``, where an interval for v or tau should be
     withheld as ``sd_tau`` is.
 
