@@ -74,9 +74,9 @@ archived on Zenodo for a citable DOI.
   subshells Yeh–Lindau lacks, only Ce 5d lay inside the Z range of the
   elements that fit drew on; the rest were extrapolations in Z. Against
   Scofield at Al, Cr, Cu and Ga Kα, above 1.05 times the binding energy,
-  it put 1s and 2p about 3–4x too high at the median, depending on how
-  the sample is drawn (1s 2.7–4.5x, 2p 3.0–4.3x), with none of the 1s
-  and under 10% of the 2p within 20%; only 3s was fair (median 0.93x). It also returned numbers
+  over every occupied subshell Yeh–Lindau lacks, it put 1s 2.7x and 2p
+  3.0x too high at the median, with none of the 1s and 7% of the 2p
+  within 20%; only 3s was fair (median 0.93x). It also returned numbers
   for subshells with no electrons (737 on Yeh–Lindau, up to 1e227 Mb,
   and `inf`), and for bare doublets below their threshold. Now `None`
   is returned for: unoccupied subshells; deep levels Yeh–Lindau leaves
@@ -128,8 +128,10 @@ archived on Zenodo for a citable DOI.
   experimental binding energy, the table is silent there and the power
   law is not: Tl 5d at He I (21.2 eV) comes out at 796 Mb on Yeh–Lindau,
   whose Table I prints Tl 5d only from 40.8 eV (53 Mb); Pb 5d and In
-  4d likewise. Below a table's start the factor over the first cell reaches
-  10⁹ (Scofield's lanthanide 4f near threshold). Where `BindingEnergy`
+  4d likewise. Below a table's start the factor over the first cell
+  exceeds 10⁹ at a few eV for the lanthanide 4f lines on Scofield,
+  which `BindingEnergy` does not gate (Ce 4f7/2 at 1 eV, 2.9 × 10¹⁰).
+  Where `BindingEnergy`
   has no value for a level no threshold applies at all, so Scofield's
   deep levels of Np to Fm return numbers at Al Kα (Fm 2p3/2 about 1,500
   times its first cell). Unchanged from v0.3.1. Treat a value below the
