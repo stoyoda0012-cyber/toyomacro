@@ -39,9 +39,22 @@ archived on Zenodo for a citable DOI.
   Mg, Al, Cr, Cu and Ga Kα; of the changes above 10% at those five
   sources, 643 moved closer to Scofield and 166 further (C 2p at Al Kα,
   for one, from 1.69 to 0.47 of it). Scofield values move by 0.17% at
-  the median, Trzhaskovskaya by 0.8%. Beyond the tabulated energies
-  nothing changes: a least-squares power law through the last few
-  cells, as before. The release notes list the lines that change most.
+  the median, Trzhaskovskaya by 0.8%; on Scofield the largest moves,
+  up to 3.4x, lie at or between the first two cells of a line just
+  above an absorption edge (3d of Lu to Tl; Ir 3d5/2 at 2062.5 eV);
+  holding out the first interior cell of every line, PCHIP predicts it
+  better (median 0.19% against 0.29%). Trzhaskovskaya does not improve
+  everywhere: predicting the second and third cell above a line's first
+  tabulated energy, PCHIP misses by 2.0% at the median against 1.2% for
+  the polynomial (better on 38% of 2,480 cells). Its changes above 10% at
+  the five sources moved further from Scofield more often than closer
+  (144 against 92, after dividing out the median Trzhaskovskaya/Scofield
+  factor of 898): in every one of the 144 the new value is within 5% of
+  the table's own ratio to Scofield at the neighbouring cells, so there
+  the table, not the interpolation, differs from Scofield. Beyond the
+  tabulated energies nothing changes: a least-squares power law through
+  the last few cells, as before (checked line by line, on all three
+  tables). The release notes list the lines that change most.
 - **`set_poly_order()` now affects only `set_interpolation("polyfit")`.**
   Under the default it has no effect, with no warning; a caller that
   set order 6 to match DepthProfiler gets PCHIP unless it also selects
