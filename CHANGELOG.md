@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-05
+
 ### Added
 
 - **`CrossSection.set_interpolation()` / `get_interpolation()`.**
@@ -36,10 +38,40 @@ archived on Zenodo for a citable DOI.
   round-off, 424 values by more than 2x at the 16 tabulated energies and
   Mg, Al, Cr, Cu and Ga Kα; of the changes above 10% at those five
   sources, 643 moved closer to Scofield and 166 further (C 2p at Al Kα,
-  for one, from 1.69 to 0.47 of it). Scofield values move by 0.17% at
-  the median, Trzhaskovskaya by 0.8%. Beyond the tabulated energies
-  nothing changes: a least-squares power law through the last few
-  cells, as before. The release notes list the lines that change most.
+  for one, from 1.69 to 0.47 of it). At Mg, Al and Cu Kα, which
+  Yeh–Lindau tabulates, the new value is the printed cell, so what
+  remains is the table's difference from Scofield. The 69 at Cr Kα lie
+  between its 1486.6 and 8047.8 eV cells; 22 of them fall outside the
+  range of the two neighbouring cells' ratios to Scofield widened by 5%,
+  a deviation beyond what the neighbouring cells show (Al 3p from 0.94
+  to 1.77 of Scofield, Mo 5s from 0.89 to 1.56). At Cr Kα prefer
+  `table="scofield"`. Factors here are max(new/old, old/new). Among
+  values that changed, for the labels each table stores, the median
+  change is 0.18% on Scofield (its full grid and the midpoints) and 0.85%
+  on Trzhaskovskaya. On Scofield 74 stored-label values move by more
+  than 2x (119 counting bare-subshell queries such as `3d`), all on the
+  3d lines of Gd to Tl at or between the first two cells above their
+  edge, at most 4.1x (Ir 3d5/2 at 2058.8 eV, where the new value is the
+  cell); holding out the first interior cell of every line with at
+  least five cells, PCHIP predicts it better (median 0.19% against
+  0.29%). Trzhaskovskaya does not improve everywhere: predicting the
+  second and third cell above a line's first tabulated energy, PCHIP
+  misses by 2.0% at the median against 1.2% for the polynomial (better
+  on 38% of 2,480 cells). Its changes above 10% at the five sources
+  moved further from Scofield more often than closer (144 against 92,
+  after dividing out the median Trzhaskovskaya/Scofield factor of 898).
+  All 144 new ratios lie within 5% of the ratios at the neighbouring
+  tabulated energies, which suggests that a difference already present
+  in the bundled table contributes; it does not isolate an
+  interpolation error. Neither comparison establishes physical
+  accuracy: Trzhaskovskaya's unit is inferred and its
+  photoelectron-energy grid is read as photon energy (see
+  `docs/DATA_SOURCES.md`). For a line the table carries, nothing changes
+  outside its tabulated range: a power law through the end cells, as
+  before (checked line by line, on all three tables). Values v0.3.1
+  estimated from other elements are now `None` (below), and
+  `set_interpolation("polyfit")` does not bring them back. The release
+  notes list the lines that change most.
 - **`set_poly_order()` now affects only `set_interpolation("polyfit")`.**
   Under the default it has no effect, with no warning; a caller that
   set order 6 to match DepthProfiler gets PCHIP unless it also selects
@@ -49,17 +81,22 @@ archived on Zenodo for a citable DOI.
   subshells Yeh–Lindau lacks, only Ce 5d lay inside the Z range of the
   elements that fit drew on; the rest were extrapolations in Z. Against
   Scofield at Al, Cr, Cu and Ga Kα, above 1.05 times the binding energy,
-  it put 1s 4.3x and 2p 3.9x too high at the median, with none of the
-  1s and 5% of the 2p within 20% (other samples give 2.8–4.5x and
-  3.6–4.3x); only 3s was fair (median 0.93x). It also returned numbers
+  over every occupied subshell Yeh–Lindau lacks, it put 1s 2.7x and 2p
+  3.0x too high at the median, with none of the 1s and 7% of the 2p
+  within 20%; only 3s was fair (median 0.93x). It also returned numbers
   for subshells with no electrons (737 on Yeh–Lindau, up to 1e227 Mb,
   and `inf`), and for bare doublets below their threshold. Now `None`
   is returned for: unoccupied subshells; deep levels Yeh–Lindau leaves
   out — it lists no level bound by more than about 1.5 keV, so Si 1s at
-  Cr Kα and Au 3d at Cu Kα need `table="scofield"`; and a few occupied
-  valence lines its Table I does not print (K 4s, Ga 4p, Rb 5s, In 5p,
-  Cs 6s, Ce 5d, Fr 7s, Lr 7p), which no bundled table covers at UPS
-  energies. Nothing any table carries became `None`. This resolves the
+  Cr Kα and Au 3d at Cu Kα need `table="scofield"`; deep levels the
+  bundled Trzhaskovskaya table leaves out (2s and 2p from Cs, 3s from
+  Dy, 3p from Er, 3d from Os, so Au 3d there too), for which use
+  `scofield`;
+  a few occupied valence lines Yeh–Lindau's Table I does not print (K
+  4s, Ga 4p, Rb 5s, In 5p, Cs 6s, Ce 5d, Fr 7s), which no bundled table
+  covers at UPS energies; and Ir 6s on Scofield, whose report lists no
+  6s state for Ir (UCRL-51326, Z = 77, 21 states against 22 for Os and
+  Pt). Nothing any table carries became `None`. This resolves the
   three `lookup()` known issues of v0.3.1 and the one about grid values;
   the Cu 3d misprint is unaffected.
 - **`fermi_edge_identifiability`: tau's per-parameter status agrees with
@@ -90,15 +127,37 @@ archived on Zenodo for a citable DOI.
 
 ### Known issues
 
+- **Below a line's first tabulated energy `lookup()` extrapolates, and
+  the result can be far off.** Between the binding energy and a line's
+  first cell, and below a table's lowest energy (Scofield 1 keV,
+  Trzhaskovskaya 100 eV), it returns a power law through the line's
+  first four cells. Where a table's own threshold lies above the
+  experimental binding energy, the table is silent there and the power
+  law is not: Tl 5d at He I (21.2 eV) comes out at 796 Mb on Yeh–Lindau,
+  whose Table I prints Tl 5d only from 40.8 eV (53 Mb); Pb 5d and In
+  4d likewise. Below a table's start the factor over the first cell
+  exceeds 10⁹ at a few eV for the lanthanide 4f lines on Scofield,
+  which `BindingEnergy` does not gate (Ce 4f7/2 at 1 eV, 2.9 × 10¹⁰).
+  Where `BindingEnergy`
+  has no value for a level no threshold applies at all, so Scofield's
+  deep levels of Np to Fm return numbers at Al Kα (Fm 2p3/2 about 1,500
+  times its first cell). Unchanged from v0.3.1. Treat a value below the
+  first tabulated energy of the line as unsupported.
+- **Yeh–Lindau Cu 3d at 8047.8 eV is still the suspected misprint
+  recorded in v0.3.1** (30x Scofield). `lookup()` now returns the
+  printed cell exactly at that energy; reproducing a tabulated value
+  does not validate it.
 - **`fit_fermi_edge`'s errors assume independent channels, and on one
   real detector they are not.** On repeated sweeps of a laboratory HAXPES
   Au Fermi edge, adjacent energy channels were correlated (+0.16), and
   the stored intensities were not counts even after dividing by the
   detector gain (`poisson_err` is empty for such intensities). `*_err`
   treats channels as independent, and so does `poisson_err` where it is
-  filled, so on such data they may be too small: for a parameter that
-  depends smoothly on many channels, by up to about 15% in sd at that
-  correlation (a factor up to sqrt(1 + 2 × 0.16)). A replicate test
+  filled, so on such data they may be too small. As a guide: if only
+  adjacent channels correlate, a parameter that depends smoothly on many
+  channels has its sd understated by about 15% (sqrt(1 + 2 × 0.16));
+  correlation reaching further than one channel would add to that. A
+  replicate test
   of them on the same sweeps was inconclusive. Design record §7 and §10
   item 5 say what was measured and what a decisive test needs.
 
@@ -1837,7 +1896,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.1.0...v0.2.0
