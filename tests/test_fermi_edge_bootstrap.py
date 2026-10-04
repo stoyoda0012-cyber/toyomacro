@@ -91,7 +91,9 @@ def test_the_bound_is_not_the_spread_at_the_boundary(record_property):
     0.536 over 300 draws) and the spread of the rest is several times the
     bound (3.7).
 
-    A nested bootstrap at the same point (200 trials x 200 draws,
+    History (v0.3.0; superseded by the v0.4.0 remeasurement in design
+    record section 7, 600 trials x 1000 draws: tau 89.1 / 90.0%, v 97.8 /
+    95.0%). A nested bootstrap at the same point (200 trials x 200 draws,
     binomial se 1.56%) shows what that does to an interval a user would
     quote. 98.5% of the 95% percentile intervals for v begin at the
     bound, so they hold the true zero 98.5% of the time (97.4%
@@ -123,7 +125,10 @@ def test_where_the_width_cannot_be_split_the_distribution_is_recorded(record_pro
     the bound (0.82 and 0.81 measured) because the likelihood is not
     quadratic there. Recorded, not judged.
 
-    A nested bootstrap at the same point (200 x 200, se 1.56%): E_F, the
+    History (v0.3.0; the gap below did not reproduce in the v0.4.0
+    remeasurement, design record section 7: v and tau 99.0 / 99.2%
+    parametric, 93.3 / 94.1% nonparametric). A nested bootstrap at the
+    same point (200 x 200, se 1.56%): E_F, the
     amplitude, the DOS slope and the background cover 92.9 to 95.4%
     either way, but v and tau cover 95.4% parametric against 86.2%
     nonparametric -- the one place measured where the two versions part
@@ -423,3 +428,48 @@ def test_the_least_squares_fitter_scatters_as_its_sandwich_says():
     assert spread / bound > 1.2
     assert abs(sigmas.mean() - edge.sigma) < 0.1 * spread * math.sqrt(sigmas.size)
     assert "unit" in label
+
+
+def test_one_singular_replica_does_not_abort_the_batch():
+    """Two parameters with identical Jacobian columns make the Fisher
+    system singular. The solver used to raise LinAlgError and lose the
+    whole batch; it must return instead. On that ridge the split between
+    the two parameters is not unique (the least-norm step picks one), so
+    only their sum is checked. A batch holding a singular system takes the
+    least-norm step for every replica in it, so a regular replica in the
+    same batch must reach its solo estimate to round-off (not bit for
+    bit; batches without a singular system are unchanged)."""
+    def model(theta):
+        theta = np.asarray(theta, dtype=float)
+        mean = np.repeat((theta[:, 0] + theta[:, 1])[:, None], 3, axis=1)
+        return mean, np.ones((theta.shape[0], 3, 2))
+
+    counts = np.array([[9.0, 10.0, 11.0], [20.0, 19.0, 21.0]])
+    out = fit_poisson_mle(counts, model, np.array([5.0, 5.0]), max_iter=50)
+    assert out.params.shape == (2, 2)
+    assert np.allclose(out.params.sum(axis=1), counts.mean(axis=1), rtol=1e-6)
+
+    def mixed(theta):
+        theta = np.asarray(theta, dtype=float)
+        n = theta.shape[0]
+        mean = np.stack([theta[:, 0] + theta[:, 1], 2 * theta[:, 0] + theta[:, 1],
+                         theta[:, 0] + 3 * theta[:, 1]], axis=1)
+        jac = np.broadcast_to(np.array([[1.0, 1.0], [2.0, 1.0], [1.0, 3.0]]), (n, 3, 2)).copy()
+        return mean, jac
+
+    regular = np.array([[12.0, 17.0, 26.0]])
+    alone = fit_poisson_mle(regular, mixed, np.array([4.0, 6.0]), max_iter=50)
+
+    def switch(theta):  # replica 0 singular (model), replica 1 regular (mixed)
+        theta = np.asarray(theta, dtype=float)
+        m0, j0 = model(theta)
+        m1, j1 = mixed(theta)
+        sel = np.zeros((theta.shape[0], 1), dtype=bool)
+        sel[-1] = True
+        return np.where(sel, m1, m0), np.where(sel[:, :, None], j1, j0)
+
+    # counts[1:] (sum 20) is away from its optimum at the start (4, 6), so the
+    # singular replica really reaches the singular solve alongside the regular one.
+    both = fit_poisson_mle(np.vstack([counts[1:], regular]), switch, np.array([4.0, 6.0]), max_iter=50)
+    assert np.allclose(both.params[1], alone.params[0], rtol=1e-10, atol=0.0)
+

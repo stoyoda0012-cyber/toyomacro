@@ -55,7 +55,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.optimize import brentq
 from scipy.special import xlogy
+from scipy.stats import chi2
 
 __all__ = [
     "BootstrapResult",
@@ -65,6 +67,7 @@ __all__ = [
     "fit_poisson_mle",
     "poisson_deviance",
     "poisson_mle_fitter",
+    "profile_interval",
 ]
 
 #: (mean, jacobian) for a batch of parameter vectors: (n, p) -> (n, n_channels),
@@ -179,7 +182,16 @@ def fit_poisson_mle(
         both = free[:, :, np.newaxis] & free[:, np.newaxis, :]
         system = np.where(both, info, 0.0) + np.where(free, 0.0, 1.0)[:, :, np.newaxis] * eye
         system += (damping[todo, np.newaxis] * scale**2)[:, :, np.newaxis] * eye * both
-        step = np.linalg.solve(system, np.where(free, score, 0.0)[:, :, np.newaxis])[:, :, 0]
+        rhs = np.where(free, score, 0.0)[:, :, np.newaxis]
+        try:
+            step = np.linalg.solve(system, rhs)[:, :, 0]
+        except np.linalg.LinAlgError:
+            # One singular replica (e.g. a resampled spectrum whose channels
+            # cannot separate two parameters) used to abort the whole batch.
+            # Its least-norm step lets the rest proceed; it then converges
+            # or is reported as not converged like any other replica. Batches
+            # without a singular system take the branch above, unchanged.
+            step = (np.linalg.pinv(system) @ rhs)[:, :, 0]
 
         trial = np.maximum(theta[todo] + step, bounds)
         trial_mean, trial_jac = model(trial)
@@ -309,3 +321,127 @@ def bootstrap(
             f"p{i}" for i in range(result.params.shape[1])),
         kind=kind, n_draws=int(n_draws), n_failed=int((~ok).sum()), at_bound=at_bound,
         mean_counts=source)
+
+
+@dataclass
+class ProfileInterval:
+    """A likelihood-ratio interval for one parameter.
+
+    Attributes:
+        low, high: Ends. ``low`` equals the lower bound when the profile
+            stays under the threshold all the way down to it.
+        bound_included: Whether the lower bound itself belongs to the set.
+            Judged with the Self & Liang threshold (see ``profile_interval``),
+            so it can be False while ``low`` equals the bound: the set is
+            then open at the bound. This is what decides coverage when the
+            true value sits exactly on the bound.
+        n_unconverged: How many of the constrained refits behind the
+            profile did not report convergence. Not zero means the
+            profile was read from fits that stopped at ``max_iter``.
+    """
+
+    low: float
+    high: float
+    bound_included: bool
+    n_unconverged: int = 0
+
+    def covers(self, value: float, lower_bound: float = -np.inf) -> bool:
+        if value == lower_bound:
+            return self.bound_included
+        return self.low <= value <= self.high
+
+
+def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray, index: int,
+                     lower: np.ndarray | None = None, *, level: float = 0.95,
+                     max_iter: int = 200) -> ProfileInterval:
+    """Profile-likelihood interval for parameter ``index`` from one spectrum.
+
+    The parameter is fixed at t, every other parameter is refitted
+    (constrained Poisson MLE), and the set is ``{t : D_p(t) - D_min <= c}``.
+    Away from a bound ``c`` is the ``level`` quantile of chi2 with one
+    degree of freedom (3.84 at 95%). At the lower bound itself the null
+    distribution of the statistic is the 50:50 mixture of chi2_0 and chi2_1
+    (Self & Liang 1987), so the bound is in the set when the excess is under
+    the ``2*level - 1`` quantile of chi2_1 (2.71 at 95%). That threshold is
+    always used at the bound, and it is exact only for one parameter on its
+    bound with the others interior; when a nuisance parameter sits on a
+    bound too the true mixture differs and ``bound_included`` is
+    approximate.
+
+    ``estimate`` must be the constrained MLE for ``counts``: ``D_min`` is
+    taken there and nothing checks it. The result is the connected set
+    around the estimate; a separate region elsewhere under the threshold
+    is not reported.
+
+    Measured on the Fermi edge for E_F, v and tau (design record section
+    7): nominal at an interior point, and for tau with v on its bound; for
+    v there 98.1% at the true value and 94.6% judged at the bound, a
+    reading chosen after the measurement. Over-covering (98%) where the width
+    split is ``not_separable``, where an interval for v or tau should be
+    withheld as ``sd_tau`` is.
+
+    Args:
+        counts: (n_channels,) one spectrum
+        model: Mean and Jacobian for a batch of parameter vectors
+        estimate: (p,) the constrained MLE for ``counts``
+        index: Which parameter
+        lower: (p,) lower bounds
+        level: Coverage level
+    """
+    counts = np.asarray(counts, dtype=np.float64)[None, :]
+    theta = np.asarray(estimate, dtype=np.float64)
+    p = theta.size
+    lo_b = np.full(p, -np.inf) if lower is None else np.asarray(lower, dtype=np.float64)
+    keep = [i for i in range(p) if i != index]
+    d_min = float(poisson_deviance(counts, model(theta[None])[0])[0])
+    c_in = float(chi2.ppf(level, 1))
+    c_bound = float(chi2.ppf(2.0 * level - 1.0, 1))
+
+    def reduced(t):
+        def m(theta_r):
+            full = np.insert(np.asarray(theta_r, dtype=np.float64), index, t, axis=1)
+            mean, jac = model(full)
+            return mean, np.delete(jac, index, axis=2)
+        return m
+
+    unconverged = [0]
+
+    def excess(t):
+        fit = fit_poisson_mle(counts, reduced(t), theta[keep], lower=lo_b[keep], max_iter=max_iter)
+        unconverged[0] += int(not fit.converged[0])
+        return float(fit.deviance[0]) - d_min
+
+    mean, jac = model(theta[None])
+    info = jac[0].T @ (jac[0] / np.maximum(mean[0], 1e-300)[:, None])
+    step = float(np.sqrt(max(np.linalg.pinv(info)[index, index], 0.0)))
+    if not np.isfinite(step) or step <= 0.0:
+        step = max(abs(theta[index]), 1.0) * 1e-3
+
+    def bracket(direction):
+        a, h = theta[index], step
+        for _ in range(60):
+            b = a + direction * h
+            if direction < 0 and b <= lo_b[index]:
+                return None
+            if excess(b) > c_in:
+                return b
+            h *= 2.0
+        return np.inf * direction
+
+    hi_edge = bracket(+1.0)
+    high = (hi_edge if not np.isfinite(hi_edge)
+            else brentq(lambda t: excess(t) - c_in, theta[index], hi_edge, xtol=step * 1e-4))
+
+    bound_included = False
+    at_bound = excess(lo_b[index]) if np.isfinite(lo_b[index]) else np.inf
+    if at_bound <= c_in:
+        low = float(lo_b[index])
+        bound_included = at_bound <= c_bound
+    else:
+        lo_edge = bracket(-1.0)
+        if lo_edge is None:
+            lo_edge = lo_b[index]
+        low = (lo_edge if not np.isfinite(lo_edge)
+               else brentq(lambda t: excess(t) - c_in, lo_edge, theta[index], xtol=step * 1e-4))
+    return ProfileInterval(low=float(low), high=float(high), bound_included=bool(bound_included),
+                           n_unconverged=unconverged[0])

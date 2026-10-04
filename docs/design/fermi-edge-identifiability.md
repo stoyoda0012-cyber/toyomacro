@@ -324,19 +324,72 @@ Efron & Tibshirani 1993 §13.3), which is nominally 95.00% at any B. The
 same correction applied to the *old* draws moves the pooled coverage up
 by 0.33 to 1.17 points per parameter, against a predicted 0.95.
 
-At the boundary, 98.5% of the intervals for v begin at the bound and are
-4.5 times the Cramér–Rao width — coverage bought with width. Where the
-split is `not_separable`, v and τ cover 95.4% parametric against 86.2%
-nonparametric, the one place the two kinds part company. With 25% of
-channels empty the two agree within 3% on every parameter that is
-determined.
+With 25% of channels empty the two kinds agree within 3% on every
+parameter that is determined.
 
-Those three sets were measured before the quantile convention above was
-corrected, on an interval nominally 94.05% rather than 95%. They are
-recorded and not judged, so they were not re-measured; read each
-coverage as about a point low. It does not touch what they are for —
-that coverage at a boundary is bought with width, and that the two
-kinds part company where the split cannot be made.
+**Remeasured in v0.4.0, and the earlier findings superseded.** v0.3.0
+recorded the boundary and the non-separable point on 200 × 200 nested
+runs with numpy's default quantiles (nominally 94.05%), and reported that
+in the non-separable region v and τ covered 95.4% parametric against
+86.2% nonparametric. On 600 trials per point and kind, B = 1000 draws,
+(B+1) quantiles and the same three points, both figures are superseded:
+the two kinds still part company there, but the other way round — the
+parametric bootstrap over-covers (99%) and the nonparametric one is close
+to nominal (93–94%), about five standard errors apart. Rerunning
+v0.3.0's own harness at that point (200 × 200, the harness's default
+seed — the v0.3.0 run's seed is not recorded — and numpy's quantiles) gives 94.0 / 94.5% nonparametric, so 86.2% does not come back
+with the old method either.
+
+| point | parameter | percentile, parametric / nonparametric | BCa | profile likelihood |
+|---|---|---|---|---|
+| interior | all six | 93.7–95.7% | 93.3–95.3%, same width | 94.5–95.7% (E_F, v, τ), width 0.99–1.00 |
+| v at the bound | τ | 89.1 / 90.0% | 93.4 / 93.1% | 94.6%, width 0.90–0.95 |
+| v at the bound | v | 97.8 / 95.0% | 98.1 / 94.3% | 98.1% at the true value; 94.6% judged at the bound (see below) |
+| not separable | v | 99.0 / 93.3% | 67.2 / 68.2% | 98.3%, width 1.03–1.04 |
+| not separable | τ | 99.2 / 94.1% | 88.8 / 88.6% | 98.3%, width 1.01 |
+
+Trials that converged at the first level: 600 (interior), 579 (v at the
+bound), 598 (not separable; 597 for the E_F profile). The 21 dropped at
+the bound all have v̂ within 3e-5 of zero and do not report convergence
+within 200 iterations, so
+the exclusion selects on the boundary itself; if all of them were
+covered the 94.6% below would read 94.8%, if none 91.3%. Within a trial,
+non-converged bootstrap replicas are dropped too (at least 883 of 1000
+remain).
+
+Acceptance was fixed before measuring: coverage of the true value within
+two binomial standard errors (±1.78 points) of 95%, and a median width
+no larger than the percentile interval's.
+
+- **BCa is not adopted.** At the interior it changes nothing. At the
+  bound it met the criterion in two of the four cells (τ parametric
+  93.4%, v nonparametric 94.3%, both narrower) and missed in the other
+  two (τ nonparametric 93.1%, v parametric 98.1%). Where the split
+  cannot be made it is harmful (v 67%). Its acceleration is at most
+  0.004 here, so it rests on the bias correction z0, which an atom of
+  draws held at a bound distorts — about half the draws for v at the
+  bound (0.536 in the single-level run above), the failure the method's
+  own assumption predicts. The implementation was removed.
+- **The profile-likelihood interval meets the criteria at the interior
+  and, for τ, at the bound** (`toyomacro._bootstrap.profile_interval`,
+  private; profiled for E_F, v and τ only — the amplitude, DOS slope and
+  background were not measured). For v at the bound the fixed rule
+  fails it: judged at the true value, 1e-8 eV², it covers 98.1%. Judged
+  instead on whether the bound itself is in the set, with the 50:50
+  χ²₀/χ²₁ threshold of Self & Liang (1987), it covers 94.6%. **That
+  reading was chosen after the run.** The true value was meant to stand
+  for zero, but by construction the set also over-covers true values
+  just inside the bound, which is what the 98.1% shows.
+- **Where the split is not separable, no interval is a stable answer.**
+  The nonparametric percentile interval covers 93–94%, inside the band,
+  but the parametric one covers 99%, BCa breaks, and the profile interval
+  over-covers at 98%: which interval is "right" depends on a choice the
+  data cannot make. The label `not_separable` already says the split
+  cannot be made, and the report withholds `sd_tau` there; an interval
+  for v or τ should be withheld with it.
+
+Those v0.3.0 sets are kept in the tests' docstrings only as history;
+this table supersedes them.
 
 **Anti-circularity.** The fitter shares its model with what it tests, so
 four things are pinned independently: the constrained fit against a
@@ -486,14 +539,13 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
 
 **Known open, in the order they are likely to matter.**
 
-1. **Bias-corrected intervals.** Not implemented, and — unlike what an
-   earlier draft of this record said — not needed to explain anything
-   measured here: once the quantile convention is right, the percentile
-   interval covers at nominal at the interior point (§7). A BCa
-   interval would still be the thing to reach for at a boundary or
-   where the split is not separable, which is where the estimator's
-   distribution is skewed and where coverage is currently only
-   recorded. Deferred past v0.3.0.
+1. **Intervals at a boundary — measured in v0.4.0, not yet public.**
+   BCa was measured and rejected; the profile-likelihood interval is
+   the candidate: nominal at the interior and for τ with v on its bound,
+   and for v there only when coverage is judged at the bound, a reading
+   chosen after the run (§7). No interval is exposed
+   until the real-data validation; where the split is not separable none
+   should be.
 2. **`poisson_err` is an additional field, not a replacement.** The
    default `*_err` was left exactly as it was so that no released
    number moves. It stays that way until a detector gain can be
