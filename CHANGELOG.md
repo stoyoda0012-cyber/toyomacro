@@ -38,33 +38,40 @@ archived on Zenodo for a citable DOI.
   round-off, 424 values by more than 2x at the 16 tabulated energies and
   Mg, Al, Cr, Cu and Ga Kα; of the changes above 10% at those five
   sources, 643 moved closer to Scofield and 166 further (C 2p at Al Kα,
-  for one, from 1.69 to 0.47 of it). Not all of those 166 are the
-  table's doing: 69 are at Cr Kα, which Yeh–Lindau does not tabulate
-  (it lies between its 1486.6 and 8047.8 eV cells), and 22 of them fall
-  outside the range of the two neighbouring cells' ratios to Scofield
-  widened by 5% — there the interpolation itself moved the value away
-  (Al 3p from 0.94 to 1.77 of Scofield, Mo 5s from 0.89 to 1.56). At
-  Cr Kα prefer `table="scofield"`. Scofield values move by 0.18% at the
-  median over its full grid and the midpoints, Trzhaskovskaya by 0.8%;
-  on Scofield 74 values move by more than 2x, all on the 3d lines of Gd
-  to Tl at or between the first two cells above their edge, at most
-  4.1x (Ir 3d5/2 at 2058.8 eV, where the new value is the cell);
-  holding out the first interior cell of every line with at least five
-  cells, PCHIP predicts it better (median 0.19% against 0.29%).
-  Trzhaskovskaya does not improve
-  everywhere: predicting the second and third cell above a line's first
-  tabulated energy, PCHIP misses by 2.0% at the median against 1.2% for
-  the polynomial (better on 38% of 2,480 cells). Its changes above 10% at
-  the five sources moved further from Scofield more often than closer
-  (144 against 92, after dividing out the median Trzhaskovskaya/Scofield
-  factor of 898): in every one of the 144 the new value is within 5% of
-  the table's own ratio to Scofield at the neighbouring cells, so there
-  the bundled table as read here — its photoelectron-energy grid is
-  read as photon energy (see `docs/DATA_SOURCES.md`) — not the
-  interpolation, differs from Scofield. Beyond the
-  tabulated energies nothing changes: a least-squares power law through
-  the last few cells, as before (checked line by line, on all three
-  tables). The release notes list the lines that change most.
+  for one, from 1.69 to 0.47 of it). At Mg, Al and Cu Kα, which
+  Yeh–Lindau tabulates, the new value is the printed cell, so what
+  remains is the table's difference from Scofield. The 69 at Cr Kα lie
+  between its 1486.6 and 8047.8 eV cells; 22 of them fall outside the
+  range of the two neighbouring cells' ratios to Scofield widened by 5%,
+  a deviation beyond what the neighbouring cells show (Al 3p from 0.94
+  to 1.77 of Scofield, Mo 5s from 0.89 to 1.56). At Cr Kα prefer
+  `table="scofield"`. Factors here are max(new/old, old/new). Among
+  values that changed, for the labels each table stores, the median
+  change is 0.18% on Scofield (its full grid and the midpoints) and 0.85%
+  on Trzhaskovskaya. On Scofield 74 stored-label values move by more
+  than 2x (119 counting bare-subshell queries such as `3d`), all on the
+  3d lines of Gd to Tl at or between the first two cells above their
+  edge, at most 4.1x (Ir 3d5/2 at 2058.8 eV, where the new value is the
+  cell); holding out the first interior cell of every line with at
+  least five cells, PCHIP predicts it better (median 0.19% against
+  0.29%). Trzhaskovskaya does not improve everywhere: predicting the
+  second and third cell above a line's first tabulated energy, PCHIP
+  misses by 2.0% at the median against 1.2% for the polynomial (better
+  on 38% of 2,480 cells). Its changes above 10% at the five sources
+  moved further from Scofield more often than closer (144 against 92,
+  after dividing out the median Trzhaskovskaya/Scofield factor of 898).
+  All 144 new ratios lie within 5% of the ratios at the neighbouring
+  tabulated energies, which suggests that a difference already present
+  in the bundled table contributes; it does not isolate an
+  interpolation error. Neither comparison establishes physical
+  accuracy: Trzhaskovskaya's unit is inferred and its
+  photoelectron-energy grid is read as photon energy (see
+  `docs/DATA_SOURCES.md`). For a line the table carries, nothing changes
+  outside its tabulated range: a power law through the end cells, as
+  before (checked line by line, on all three tables). Values v0.3.1
+  estimated from other elements are now `None` (below), and
+  `set_interpolation("polyfit")` does not bring them back. The release
+  notes list the lines that change most.
 - **`set_poly_order()` now affects only `set_interpolation("polyfit")`.**
   Under the default it has no effect, with no warning; a caller that
   set order 6 to match DepthProfiler gets PCHIP unless it also selects
@@ -136,15 +143,21 @@ archived on Zenodo for a citable DOI.
   deep levels of Np to Fm return numbers at Al Kα (Fm 2p3/2 about 1,500
   times its first cell). Unchanged from v0.3.1. Treat a value below the
   first tabulated energy of the line as unsupported.
+- **Yeh–Lindau Cu 3d at 8047.8 eV is still the suspected misprint
+  recorded in v0.3.1** (30x Scofield). `lookup()` now returns the
+  printed cell exactly at that energy; reproducing a tabulated value
+  does not validate it.
 - **`fit_fermi_edge`'s errors assume independent channels, and on one
   real detector they are not.** On repeated sweeps of a laboratory HAXPES
   Au Fermi edge, adjacent energy channels were correlated (+0.16), and
   the stored intensities were not counts even after dividing by the
   detector gain (`poisson_err` is empty for such intensities). `*_err`
   treats channels as independent, and so does `poisson_err` where it is
-  filled, so on such data they may be too small: for a parameter that
-  depends smoothly on many channels, by up to about 15% in sd at that
-  correlation (a factor up to sqrt(1 + 2 × 0.16)). A replicate test
+  filled, so on such data they may be too small. As a guide: if only
+  adjacent channels correlate, a parameter that depends smoothly on many
+  channels has its sd understated by about 15% (sqrt(1 + 2 × 0.16));
+  correlation reaching further than one channel would add to that. A
+  replicate test
   of them on the same sweeps was inconclusive. Design record §7 and §10
   item 5 say what was measured and what a decisive test needs.
 
