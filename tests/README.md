@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,434 automated tests** across **89 files**, in two
+This suite has **2,445 automated tests** across **90 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 51 | 1,354 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 52 | 1,365 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,002 tests, 82%) — guarantee the library
+- **Contract / regression** (2,013 tests, 82%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -70,9 +70,9 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,354)
+## Library body — `tests/` (1,365)
 
-### Claim guards — noise model, versions, backends, comparisons (128)
+### Claim guards — noise model, versions, backends, comparisons (139)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
@@ -86,6 +86,7 @@ them would take real coverage with them:
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
 | 14 | `test_fermi_edge_bootstrap.py` | Fermi-edge resampling: the Monte Carlo spread against the bound at an interior point, the boundary and the non-separable region recorded rather than judged, the constrained fit against a different optimiser, a replica held at a bound against the Karush-Kuhn-Tucker condition, the draws against the Poisson law, the deviance against its own value, a per-replica start through the chunked path, whether a nested bootstrap interval covers the truth, whether zero channels split the parametric and nonparametric draws, `fit_fermi_edge`'s own spread against its sandwich covariance, and one singular replica not aborting a batch |
 | 4 | `test_bootstrap_profile.py` | Profile-likelihood intervals in the private bootstrap: equal to the likelihood-ratio interval for a Poisson mean, and the Self & Liang threshold (2.71, not 3.84) decides whether a lower bound is in the set |
+| 11 | `test_bootstrap_sweeps.py` | Sweep resampling and the detector-gain estimate in the private bootstrap, on synthetic sweeps: the gain recovered within 2.5% through source drift and jitter and a drifting edge, a tolerance that fails without either the per-sweep scaling or the sweep differences, read noise landing in the offset and none without it, the sweep bootstrap equal to the Poisson one for independent sweeps and wider by the predicted factor under source variation |
 
 ### Lineshape & background — physics core (246)
 | Tests | File | Guards |

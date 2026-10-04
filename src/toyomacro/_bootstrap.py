@@ -64,6 +64,7 @@ __all__ = [
     "MLEResult",
     "bootstrap",
     "draw_poisson",
+    "estimate_gain",
     "fit_poisson_mle",
     "poisson_deviance",
     "poisson_mle_fitter",
@@ -290,13 +291,31 @@ def bootstrap(
 ) -> BootstrapResult:
     """Resample counts, fit each draw, and collect the estimates.
 
+    Three ways to resample:
+
+    - ``'parametric'``: Poisson draws from expected counts (a fit's mean).
+    - ``'nonparametric'``: Poisson draws from the observed counts.
+    - ``'sweep'``: the spectrum is the sum of repeated sweeps; each draw
+      resamples the sweeps with replacement and sums them. It needs no
+      noise model, so it also carries whatever the sweeps share beyond
+      Poisson noise (source intensity, drift), and it does not need the
+      intensities to be counts.
+
+    Intensities from an analog (ADC) detector are not counts. Dividing
+    them by the slope from :func:`estimate_gain` matches each channel's
+    variance to a Poisson draw's, and nothing more: the result is in
+    general not integer (``'nonparametric'`` rejects it; round only
+    knowingly), and a correlation between channels is not modelled by
+    either Poisson kind.
+
     Args:
-        source: Expected counts per channel ('parametric'), or the
-            observed counts ('nonparametric'), which must be integers
-        fit: Takes (n, n_channels) counts and returns an ``MLEResult``
+        source: Expected counts per channel ('parametric'), the observed
+            counts ('nonparametric', non-negative integers), or the sweeps,
+            shape (n_sweeps, n_channels) ('sweep')
+        fit: Takes (n, n_channels) spectra and returns an ``MLEResult``
         n_draws: Number of draws
         rng: Generator
-        kind: 'parametric' or 'nonparametric'
+        kind: 'parametric', 'nonparametric' or 'sweep'
         names: Parameter names for the result
     """
     source = np.asarray(source, dtype=np.float64)
@@ -306,10 +325,18 @@ def bootstrap(
                 "a nonparametric bootstrap draws from observed counts: they must be "
                 "non-negative integers. Pass the expected counts with kind='parametric' "
                 "to bootstrap a model instead.")
+    elif kind == "sweep":
+        if source.ndim != 2 or source.shape[0] < 2:
+            raise ValueError("a sweep bootstrap needs the sweeps as (n_sweeps >= 2, n_channels)")
     elif kind != "parametric":
-        raise ValueError(f"kind must be 'parametric' or 'nonparametric', got {kind!r}")
+        raise ValueError(f"kind must be 'parametric', 'nonparametric' or 'sweep', got {kind!r}")
 
-    counts = draw_poisson(source, n_draws, rng)
+    if kind == "sweep":
+        n_sweeps = source.shape[0]
+        picks = rng.integers(0, n_sweeps, size=(int(n_draws), n_sweeps))
+        counts = source[picks].sum(axis=1)
+    else:
+        counts = draw_poisson(source, n_draws, rng)
     result = fit(counts)
     ok = result.converged
     estimates = result.params[ok]
@@ -320,7 +347,7 @@ def bootstrap(
         names=tuple(names) if names is not None else tuple(
             f"p{i}" for i in range(result.params.shape[1])),
         kind=kind, n_draws=int(n_draws), n_failed=int((~ok).sum()), at_bound=at_bound,
-        mean_counts=source)
+        mean_counts=source.sum(axis=0) if kind == "sweep" else source)
 
 
 @dataclass
@@ -445,3 +472,66 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
                else brentq(lambda t: excess(t) - c_in, lo_edge, theta[index], xtol=step * 1e-4))
     return ProfileInterval(low=float(low), high=float(high), bound_included=bool(bound_included),
                            n_unconverged=unconverged[0])
+
+
+@dataclass
+class GainEstimate:
+    """Detector gain from repeated sweeps.
+
+    Attributes:
+        gain: Intensity per count, ``b`` in ``intensity = b * counts``
+        offset: Intercept of the variance-mean line, intensity^2 per
+            channel; read noise or a pedestal shows here, zero for a
+            pure scaled Poisson
+        sweep_factor_sd: Standard deviation of the per-sweep total
+            relative to its mean (source intensity and Poisson together)
+        n_sweeps, n_channels: Data used
+    """
+
+    gain: float
+    offset: float
+    sweep_factor_sd: float
+    n_sweeps: int
+    n_channels: int
+
+
+def estimate_gain(sweeps: np.ndarray) -> GainEstimate:
+    """Estimate ``b`` in ``intensity = b * counts`` from repeated sweeps.
+
+    Each sweep is first divided by its total relative to the mean, which
+    removes changes of source intensity from sweep to sweep. Differences
+    of adjacent sweeps then remove what drifts slowly, and per channel
+    ``E[(x_s - x_{s+1})^2] / 2 = b * mean + offset`` for counts that are
+    Poisson up to the factor ``b``. ``b`` and ``offset`` are the
+    least-squares line through all channels.
+
+    Valid for: a detector whose output is proportional to Poisson counts,
+    sweeps taken under the same conditions, and drift slow on the scale
+    of one sweep. Two small biases of opposite sign: normalising by the
+    total takes out a part of the Poisson noise of the total itself,
+    which biases ``b`` low by about one part in the number of channels,
+    and dividing by the noisy per-sweep factor adds its variance,
+    biasing ``b`` high by about ``sweep_factor_sd**2``.
+
+    Not valid as a per-event gain when channels are correlated (for
+    instance by charge spreading or rebinning): ``b`` is then the
+    per-channel variance-to-mean slope on the stored scale, which is what
+    a per-channel noise model needs, but not intensity per detected
+    electron.
+
+    Args:
+        sweeps: (n_sweeps, n_channels), raw intensities of each sweep
+    """
+    x = np.asarray(sweeps, dtype=np.float64)
+    if x.ndim != 2 or x.shape[0] < 3:
+        raise ValueError("estimate_gain needs (n_sweeps >= 3, n_channels)")
+    totals = x.sum(axis=1)
+    factor = totals / totals.mean()
+    xn = x / factor[:, None]
+    mean = xn.mean(axis=0)
+    half_var = 0.5 * ((xn[:-1] - xn[1:]) ** 2).mean(axis=0)
+    design = np.stack([mean, np.ones_like(mean)], axis=1)
+    (b, offset), *_ = np.linalg.lstsq(design, half_var, rcond=None)
+    return GainEstimate(gain=float(b), offset=float(offset),
+                        sweep_factor_sd=float(factor.std(ddof=1)),
+                        n_sweeps=x.shape[0], n_channels=x.shape[1])

@@ -406,6 +406,58 @@ it checks is not independent**, however different the other parts are.
 The same run showed the active-set logic untested for a related reason:
 the cross-check runs at an interior point, where nothing is held.
 
+### Sweeps, the gain, and a first look at real data (v0.4.0, exploratory)
+
+Two private tools were added for spectra recorded as repeated sweeps.
+`bootstrap(kind="sweep")` resamples whole sweeps with replacement and sums
+them, so it needs no noise model and carries sweep-to-sweep variation of
+the source that a Poisson draw cannot. `estimate_gain` fits
+`E[(x_s − x_{s+1})²]/2 = b·mean + offset` over channels, after scaling
+each sweep to a common total, for the gain `b` in intensity = b × counts
+(where channels are correlated, `b` is only the variance-to-mean slope);
+read noise lands in the offset. Both are tested on synthetic sweeps only
+(`tests/test_bootstrap_sweeps.py`).
+
+They were then run on one laboratory HAXPES Au Fermi edge kept as
+per-sweep arrays (two acquisitions, 136 and 1,109 sweeps; not bundled).
+What this showed, and what it did not:
+
+- **The variance-to-mean slope is stable but does not make the data
+  counts.** `b` = 0.58 in both acquisitions, within about 3% for sweep
+  lags 1 to 30 and with or without the per-sweep scaling. Divided by it, the intensities are still
+  not integers: the detector reports converted values, not counts. Under
+  compound Poisson noise the variance-mean slope is E[A²]/E[A] of the
+  per-event output A, not its mean, so `b` fixes the *variance* on the
+  stored scale; it does not recover raw counts.
+- **Adjacent energy channels are correlated**, +0.16, with the next
+  channel but one near zero, and present off the edge as well as on
+  it, which points to mixing of neighbouring channels in the detector
+  or its binning rather than to energy jitter of the sweeps. Every
+  error in this package treats channels as independent — `*_err`, `poisson_err` and the
+  bound alike — so on such data none of them is correctly scaled, gain or
+  no gain. A sandwich that takes a channel covariance would not need
+  integers; it is not implemented.
+- Sweep-to-sweep noise shows no time correlation once each sweep is
+  scaled to its total.
+- **The replicate test was inconclusive.** Fitting disjoint groups of M
+  consecutive sweeps and comparing the spread of E_F and resolution with
+  the errors each group reports needs the fit to be stable, and it was
+  not: about 1,340 counts per channel on the plateau in total, FWHM about
+  0.66 eV, and the Au 5d onset about 2 eV deeper in binding energy than
+  E_F. In a narrow window E_F, resolution and DOS slope trade off and
+  35–77% of the groups fit, fewer the smaller M; in a wider one 85–91%
+  fit, and the failures include fits that moved to the 5d onset. The
+  ratio of reported error to observed spread moved with M and with the
+  window by more than its own uncertainty (one standard error is 16–24%
+  with 10–20 successful group fits). The window, M and the handling of failed fits were chosen after seeing
+  results, and the group fits rounded the gain-scaled sums to integers to
+  obtain `poisson_err`; this is exploration and supports no claim about
+  any of the errors.
+
+What a decisive test needs — a noise model with the channel covariance,
+the number of sweeps per group and of groups worked out by simulation
+beforehand, and the analysis fixed before it is run — is listed under §10.
+
 ## 8. The density of states: two separate faults
 
 The fitted DOS is flat below E_F and polynomial above it, so its slope
@@ -544,7 +596,8 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
    the candidate: nominal at the interior and for τ with v on its bound,
    and for v there only when coverage is judged at the bound, a reading
    chosen after the run (§7). No interval is exposed
-   until the real-data validation; where the split is not separable none
+   until it has been validated on real data; the first attempt, in
+   v0.4.0, was inconclusive (§7). Where the split is not separable none
    should be.
 2. **`poisson_err` is an additional field, not a replacement.** The
    default `*_err` was left exactly as it was so that no released
@@ -554,9 +607,10 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
    CCD/MCP detector reports are counts times an unknown gain, often not
    integers. Made the default without that, it would give confident
    Poisson error bars to data that is not Poisson on the scale it is
-   stored in. Estimating a gain needs real data, which the "Not in
-   scope" paragraph below leaves out of this release; the default is
-   reconsidered once a gain can be estimated.
+   stored in. v0.4.0 estimated a gain on real data (§7) and found it
+   is not enough: it fixes the variance, not the counts, and adjacent
+   channels are correlated, which no error here allows for. The default
+   is reconsidered once the errors take a channel covariance.
 3. **τ's bound was withheld once and offered twice** — resolved in
    v0.4.0. `report.sd_tau` is `None` where the split is
    `not_separable`, and `report.parameters` now labels τ
@@ -569,13 +623,21 @@ low-order polynomial DOS, Poisson counts, one spectrum at a time.
    small; this is not checked here.
 5. **Real data.** Everything above is simulation. The bound, the
    sandwich, the coverage and the DOS biases have not been measured
-   against a spectrometer whose resolution is independently known.
+   against a spectrometer whose resolution is independently known. A
+   replicate test on repeated sweeps of one Au edge (§7) was
+   inconclusive: the fits were not stable enough at that exposure, and
+   the channels are correlated. A decisive one needs a noise model with
+   the channel covariance, the sweeps per group and the number of groups
+   set by simulation from a realistic mean spectrum (including the Au 5d
+   onset and a misspecified DOS), and the window, the fit and the
+   handling of failed fits fixed before the data are analysed.
 6. **The series term count and switch point** (§2) are calibrated on the
    settings tested, not derived.
 
-**Not in scope, deliberately.** Sweep-level resampling, block bootstraps
-over a map, prior weighting of the resampled draws, and gain checks on
-real data were all considered for this release and excluded.
+**Not in scope, deliberately.** Block bootstraps over a map and prior
+weighting of the resampled draws were considered and excluded. Sweep
+resampling and a gain estimate were added in v0.4.0 as private tools
+(§7); neither changes a reported error.
 
 ## References
 
