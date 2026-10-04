@@ -301,10 +301,12 @@ def bootstrap(
       Poisson noise (source intensity, drift), and it does not need the
       intensities to be counts.
 
-    Intensities from an analog (ADC) detector are counts times a gain.
-    Divide them by the gain from :func:`estimate_gain` before a
-    ``'parametric'`` or ``'nonparametric'`` draw: Poisson noise is then
-    on the right scale.
+    Intensities from an analog (ADC) detector are not counts. Dividing
+    them by the slope from :func:`estimate_gain` matches each channel's
+    variance to a Poisson draw's, and nothing more: the result is in
+    general not integer (``'nonparametric'`` rejects it; round only
+    knowingly), and a correlation between channels is not modelled by
+    either Poisson kind.
 
     Args:
         source: Expected counts per channel ('parametric'), the observed
@@ -505,9 +507,17 @@ def estimate_gain(sweeps: np.ndarray) -> GainEstimate:
 
     Valid for: a detector whose output is proportional to Poisson counts,
     sweeps taken under the same conditions, and drift slow on the scale
-    of one sweep. Normalising by the total takes out a part of the
-    Poisson noise of the total itself, which biases ``b`` low by about
-    one part in the number of channels.
+    of one sweep. Two small biases of opposite sign: normalising by the
+    total takes out a part of the Poisson noise of the total itself,
+    which biases ``b`` low by about one part in the number of channels,
+    and dividing by the noisy per-sweep factor adds its variance,
+    biasing ``b`` high by about ``sweep_factor_sd**2``.
+
+    Not valid as a per-event gain when channels are correlated (for
+    instance by charge spreading or rebinning): ``b`` is then the
+    per-channel variance-to-mean slope on the stored scale, which is what
+    a per-channel noise model needs, but not intensity per detected
+    electron.
 
     Args:
         sweeps: (n_sweeps, n_channels), raw intensities of each sweep

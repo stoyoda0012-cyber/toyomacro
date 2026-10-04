@@ -88,6 +88,20 @@ archived on Zenodo for a citable DOI.
   `docs/design/fermi-edge-identifiability.md` §7 has the table and its
   denominators.
 
+### Known issues
+
+- **`fit_fermi_edge`'s errors assume independent channels, and on one
+  real detector they are not.** On repeated sweeps of a laboratory HAXPES
+  Au Fermi edge, adjacent energy channels were correlated (+0.16), and
+  the stored intensities were not counts even after dividing by the
+  detector gain (`poisson_err` is empty for such intensities). `*_err`
+  treats channels as independent, and so does `poisson_err` where it is
+  filled, so on such data they may be too small: for a parameter that
+  depends smoothly on many channels, by up to about 15% in sd at that
+  correlation (a factor up to sqrt(1 + 2 × 0.16)). A replicate test
+  of them on the same sweeps was inconclusive. Design record §7 and §10
+  item 5 say what was measured and what a decisive test needs.
+
 ## [0.3.1] - 2026-10-03
 
 Archived on Zenodo:

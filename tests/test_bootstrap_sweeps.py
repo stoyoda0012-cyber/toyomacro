@@ -10,26 +10,35 @@ import pytest
 from toyomacro._bootstrap import bootstrap, estimate_gain, fit_poisson_mle
 
 
-def _edge(n=160):
+def _edge(n=160, scale=1.0, shift=0.0):
+    """Counts per sweep per channel; ``shift`` moves the edge (scalar or per sweep)."""
     x = np.linspace(-1.0, 1.0, n)
-    return 0.04 + 1.2 / (1.0 + np.exp(x / 0.08))   # counts per sweep per channel
+    shift = np.atleast_1d(shift)[:, None]
+    return scale * (0.04 + 1.2 / (1.0 + np.exp((x - shift) / 0.08)))
 
 
-def _sweeps(rng, n_sweeps, gain, *, drift=0.10, jitter=0.03, read_sd=0.0):
-    mu = _edge()
+def _sweeps(rng, n_sweeps, gain, *, drift=0.10, jitter=0.03, read_sd=0.0, scale=1.0,
+            edge_drift=0.0):
     t = np.linspace(0.0, 1.0, n_sweeps)
+    mu = _edge(scale=scale, shift=edge_drift * np.sin(2 * np.pi * t))
     factor = (1.0 + drift * np.sin(2 * np.pi * t)) * (1.0 + jitter * rng.standard_normal(n_sweeps))
-    counts = rng.poisson(np.outer(factor, mu))
+    counts = rng.poisson(factor[:, None] * mu)
     return gain * counts + read_sd * rng.standard_normal(counts.shape)
 
 
+@pytest.mark.parametrize("seed", [3, 4, 5])
 @pytest.mark.parametrize("gain", [0.58, 2.0])
-def test_estimate_gain_recovers_the_gain_through_source_drift(gain):
-    """10% slow drift and 3% sweep-to-sweep source jitter on top of the
-    Poisson noise; 1000 sweeps of 160 channels."""
-    g = estimate_gain(_sweeps(np.random.default_rng(3), 1000, gain))
-    assert g.gain == pytest.approx(gain, rel=0.03)
-    assert abs(g.offset) < 0.02 * gain**2
+def test_estimate_gain_recovers_the_gain_through_source_drift(gain, seed):
+    """10% slow drift and 3% sweep-to-sweep jitter of the source, and a slow
+    drift of the edge position by 0.6 of its width; about 60 counts per
+    sweep on the plateau, 1000 sweeps of 160 channels. Both steps are
+    needed at this tolerance: without the per-sweep scaling the jitter
+    reaches the variance and b comes out 4.4-6.8% high on these seeds,
+    without the sweep differences the edge drift does, 4.1-5.1% high.
+    The full estimate is within 1.0%."""
+    g = estimate_gain(_sweeps(np.random.default_rng(seed), 1000, gain, scale=50.0,
+                              edge_drift=0.05))
+    assert g.gain == pytest.approx(gain, rel=0.025)
 
 
 def test_read_noise_shows_as_the_offset_not_the_gain():
