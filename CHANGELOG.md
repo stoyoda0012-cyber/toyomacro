@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.4.0] - 2026-10-05
 
+Archived on Zenodo:
+[10.5281/zenodo.23140144](https://doi.org/10.5281/zenodo.23140144).
+
 ### Added
 
 - **`CrossSection.set_interpolation()` / `get_interpolation()`.**

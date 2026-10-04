@@ -415,6 +415,8 @@ release is archived on Zenodo:
 
 - **All versions** (resolves to the latest release):
   [10.5281/zenodo.22092076](https://doi.org/10.5281/zenodo.22092076)
+- **v0.4.0**:
+  [10.5281/zenodo.23140144](https://doi.org/10.5281/zenodo.23140144)
 - **v0.3.1**:
   [10.5281/zenodo.23113379](https://doi.org/10.5281/zenodo.23113379)
 - **v0.3.0**:
