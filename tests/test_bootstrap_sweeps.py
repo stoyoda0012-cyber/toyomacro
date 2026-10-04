@@ -41,6 +41,14 @@ def test_estimate_gain_recovers_the_gain_through_source_drift(gain, seed):
     assert g.gain == pytest.approx(gain, rel=0.025)
 
 
+def test_pure_scaled_poisson_has_no_offset():
+    """Without read noise the intercept is zero up to sampling (low counts,
+    source drift and jitter only)."""
+    gain = 0.58
+    g = estimate_gain(_sweeps(np.random.default_rng(3), 1000, gain))
+    assert abs(g.offset) < 0.02 * gain**2
+
+
 def test_read_noise_shows_as_the_offset_not_the_gain():
     read_sd = 0.3
     g = estimate_gain(_sweeps(np.random.default_rng(4), 1000, 0.58, read_sd=read_sd))
