@@ -451,7 +451,7 @@ class CrossSection:
         about 1.5 keV — for those at HAXPES energies use
         ``table="scofield"``), and a few occupied valence lines Yeh-Lindau
         Table I does not print (K 4s, Ga 4p, Rb 5s, In 5p, Cs 6s, Ce 5d,
-        Fr 7s, Lr 7p), for which no bundled table covers UPS energies.
+        Fr 7s), for which no bundled table covers UPS energies.
 
         Args:
             element: Element symbol (e.g., 'Si', 'Au')

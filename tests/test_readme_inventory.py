@@ -155,3 +155,16 @@ def test_contract_and_reproduction_split(readme, collected):
         if abs(int(match.group(2)) - share) >= 1.0:
             problems.append(f"{label}: README {match.group(2)}%, actual {share:.1f}%")
     assert not problems, "\n".join(problems)
+
+
+def test_not_perf_count(readme, collected):
+    """``-m "not perf"`` is quoted with a count in both READMEs."""
+    ids, _ = collected
+    expected = len(_collect("-m", "not perf"))
+    root = (ROOT / "README.md").read_text(encoding="utf-8")
+    stated = {"tests/README.md": re.search(r'-m "not perf"` drops them and leaves ([\d,]+)', readme),
+              "README.md": re.search(r"want the other ([\d,]+) tests", root)}
+    assert all(stated.values()), "the not-perf sentence changed shape"
+    problems = [f"{where}: says {m.group(1)}, `-m 'not perf'` collects {expected:,}"
+                for where, m in stated.items() if _number(m.group(1)) != expected]
+    assert not problems, "\n".join(problems)

@@ -360,7 +360,7 @@ than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
 for deep levels at HAXPES energies use `table="scofield"`, whose bundled
 copy covers 1–30 keV and Z = 1–100. A few occupied valence lines are not
 printed in Yeh–Lindau's Table I either (K 4s, Ga 4p, Rb 5s, In 5p, Cs 6s,
-Ce 5d, Fr 7s, Lr 7p), and no bundled table covers them at UPS energies. Up to v0.3.1 `lookup()` fitted one
+Ce 5d, Fr 7s), and no bundled table covers them at UPS energies. Up to v0.3.1 `lookup()` fitted one
 polynomial through all the cells of a line and estimated absent
 subshells across Z; `set_interpolation("polyfit")` restores the first
 for reproducing earlier numbers, and the second is gone.

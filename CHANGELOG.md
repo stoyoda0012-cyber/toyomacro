@@ -38,12 +38,20 @@ archived on Zenodo for a citable DOI.
   round-off, 424 values by more than 2x at the 16 tabulated energies and
   Mg, Al, Cr, Cu and Ga Kα; of the changes above 10% at those five
   sources, 643 moved closer to Scofield and 166 further (C 2p at Al Kα,
-  for one, from 1.69 to 0.47 of it). Scofield values move by 0.17% at
-  the median, Trzhaskovskaya by 0.8%; on Scofield the largest moves,
-  up to 3.4x, lie at or between the first two cells of a line just
-  above an absorption edge (3d of Lu to Tl; Ir 3d5/2 at 2062.5 eV);
-  holding out the first interior cell of every line, PCHIP predicts it
-  better (median 0.19% against 0.29%). Trzhaskovskaya does not improve
+  for one, from 1.69 to 0.47 of it). Not all of those 166 are the
+  table's doing: 69 are at Cr Kα, which Yeh–Lindau does not tabulate
+  (it lies between its 1486.6 and 8047.8 eV cells), and 22 of them fall
+  outside the range of the two neighbouring cells' ratios to Scofield
+  widened by 5% — there the interpolation itself moved the value away
+  (Al 3p from 0.94 to 1.77 of Scofield, Mo 5s from 0.89 to 1.56). At
+  Cr Kα prefer `table="scofield"`. Scofield values move by 0.18% at the
+  median over its full grid and the midpoints, Trzhaskovskaya by 0.8%;
+  on Scofield 74 values move by more than 2x, all on the 3d lines of Gd
+  to Tl at or between the first two cells above their edge, at most
+  4.1x (Ir 3d5/2 at 2058.8 eV, where the new value is the cell);
+  holding out the first interior cell of every line with at least five
+  cells, PCHIP predicts it better (median 0.19% against 0.29%).
+  Trzhaskovskaya does not improve
   everywhere: predicting the second and third cell above a line's first
   tabulated energy, PCHIP misses by 2.0% at the median against 1.2% for
   the polynomial (better on 38% of 2,480 cells). Its changes above 10% at
@@ -51,7 +59,9 @@ archived on Zenodo for a citable DOI.
   (144 against 92, after dividing out the median Trzhaskovskaya/Scofield
   factor of 898): in every one of the 144 the new value is within 5% of
   the table's own ratio to Scofield at the neighbouring cells, so there
-  the table, not the interpolation, differs from Scofield. Beyond the
+  the bundled table as read here — its photoelectron-energy grid is
+  read as photon energy (see `docs/DATA_SOURCES.md`) — not the
+  interpolation, differs from Scofield. Beyond the
   tabulated energies nothing changes: a least-squares power law through
   the last few cells, as before (checked line by line, on all three
   tables). The release notes list the lines that change most.
@@ -64,17 +74,22 @@ archived on Zenodo for a citable DOI.
   subshells Yeh–Lindau lacks, only Ce 5d lay inside the Z range of the
   elements that fit drew on; the rest were extrapolations in Z. Against
   Scofield at Al, Cr, Cu and Ga Kα, above 1.05 times the binding energy,
-  it put 1s 4.3x and 2p 3.9x too high at the median, with none of the
-  1s and 5% of the 2p within 20% (other samples give 2.8–4.5x and
-  3.6–4.3x); only 3s was fair (median 0.93x). It also returned numbers
+  it put 1s and 2p about 3–4x too high at the median, depending on how
+  the sample is drawn (1s 2.7–4.5x, 2p 3.0–4.3x), with none of the 1s
+  and under 10% of the 2p within 20%; only 3s was fair (median 0.93x). It also returned numbers
   for subshells with no electrons (737 on Yeh–Lindau, up to 1e227 Mb,
   and `inf`), and for bare doublets below their threshold. Now `None`
   is returned for: unoccupied subshells; deep levels Yeh–Lindau leaves
   out — it lists no level bound by more than about 1.5 keV, so Si 1s at
-  Cr Kα and Au 3d at Cu Kα need `table="scofield"`; and a few occupied
-  valence lines its Table I does not print (K 4s, Ga 4p, Rb 5s, In 5p,
-  Cs 6s, Ce 5d, Fr 7s, Lr 7p), which no bundled table covers at UPS
-  energies. Nothing any table carries became `None`. This resolves the
+  Cr Kα and Au 3d at Cu Kα need `table="scofield"`; deep levels the
+  bundled Trzhaskovskaya table leaves out (2s and 2p from Cs, 3s from
+  Dy, 3p from Er, 3d from Os, so Au 3d there too), for which use
+  `scofield`;
+  a few occupied valence lines Yeh–Lindau's Table I does not print (K
+  4s, Ga 4p, Rb 5s, In 5p, Cs 6s, Ce 5d, Fr 7s), which no bundled table
+  covers at UPS energies; and Ir 6s on Scofield, whose report lists no
+  6s state for Ir (UCRL-51326, Z = 77, 21 states against 22 for Os and
+  Pt). Nothing any table carries became `None`. This resolves the
   three `lookup()` known issues of v0.3.1 and the one about grid values;
   the Cu 3d misprint is unaffected.
 - **`fermi_edge_identifiability`: tau's per-parameter status agrees with
@@ -105,6 +120,20 @@ archived on Zenodo for a citable DOI.
 
 ### Known issues
 
+- **Below a line's first tabulated energy `lookup()` extrapolates, and
+  the result can be far off.** Between the binding energy and a line's
+  first cell, and below a table's lowest energy (Scofield 1 keV,
+  Trzhaskovskaya 100 eV), it returns a power law through the line's
+  first four cells. Where a table's own threshold lies above the
+  experimental binding energy, the table is silent there and the power
+  law is not: Tl 5d at He I (21.2 eV) comes out at 796 Mb on Yeh–Lindau,
+  whose Table I prints Tl 5d only from 40.8 eV (53 Mb); Pb 5d and In
+  4d likewise. Below a table's start the factor over the first cell reaches
+  10⁹ (Scofield's lanthanide 4f near threshold). Where `BindingEnergy`
+  has no value for a level no threshold applies at all, so Scofield's
+  deep levels of Np to Fm return numbers at Al Kα (Fm 2p3/2 about 1,500
+  times its first cell). Unchanged from v0.3.1. Treat a value below the
+  first tabulated energy of the line as unsupported.
 - **`fit_fermi_edge`'s errors assume independent channels, and on one
   real detector they are not.** On repeated sweeps of a laboratory HAXPES
   Au Fermi edge, adjacent energy channels were correlated (+0.16), and
