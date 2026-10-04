@@ -8,7 +8,7 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-04
+## [0.4.0] - 2026-10-05
 
 ### Added
 
