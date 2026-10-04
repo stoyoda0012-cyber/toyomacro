@@ -91,7 +91,9 @@ def test_the_bound_is_not_the_spread_at_the_boundary(record_property):
     0.536 over 300 draws) and the spread of the rest is several times the
     bound (3.7).
 
-    A nested bootstrap at the same point (200 trials x 200 draws,
+    History (v0.3.0; superseded by the v0.4.0 remeasurement in design
+    record section 7, 600 trials x 1000 draws: tau 89.1 / 90.0%, v 97.8 /
+    95.0%). A nested bootstrap at the same point (200 trials x 200 draws,
     binomial se 1.56%) shows what that does to an interval a user would
     quote. 98.5% of the 95% percentile intervals for v begin at the
     bound, so they hold the true zero 98.5% of the time (97.4%
@@ -123,7 +125,10 @@ def test_where_the_width_cannot_be_split_the_distribution_is_recorded(record_pro
     the bound (0.82 and 0.81 measured) because the likelihood is not
     quadratic there. Recorded, not judged.
 
-    A nested bootstrap at the same point (200 x 200, se 1.56%): E_F, the
+    History (v0.3.0; the gap below did not reproduce in the v0.4.0
+    remeasurement, design record section 7: v and tau 99.0 / 99.2%
+    parametric, 93.3 / 94.1% nonparametric). A nested bootstrap at the
+    same point (200 x 200, se 1.56%): E_F, the
     amplitude, the DOS slope and the background cover 92.9 to 95.4%
     either way, but v and tau cover 95.4% parametric against 86.2%
     nonparametric -- the one place measured where the two versions part

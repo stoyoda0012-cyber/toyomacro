@@ -72,6 +72,19 @@ archived on Zenodo for a citable DOI.
   so the new code does not occur in its arrays. This resolves the
   v0.3.0 known issue.
 
+### Fixed
+
+- **The Fermi-edge design record's bootstrap coverage figures were
+  remeasured, and one finding is withdrawn.** v0.3.0 reported that
+  where the width split is not separable, the nonparametric bootstrap
+  covered v and tau 86.2% against 95.4% parametric. On 600 trials per
+  point, 1000 draws and the corrected quantile convention it covers
+  93.3 / 94.1% (parametric 99.0 / 99.2%): the gap does not reproduce.
+  The same runs measured BCa, which is not adopted (it drops v to 67%
+  there), and a profile-likelihood interval, which covers at nominal at
+  an interior point and with v on its bound; neither is public.
+  `docs/design/fermi-edge-identifiability.md` §7 has the table.
+
 ## [0.3.1] - 2026-10-03
 
 Archived on Zenodo:

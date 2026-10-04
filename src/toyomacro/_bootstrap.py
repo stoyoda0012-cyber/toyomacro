@@ -56,13 +56,12 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import brentq
-from scipy.special import ndtr, ndtri, xlogy
+from scipy.special import xlogy
 from scipy.stats import chi2
 
 __all__ = [
     "BootstrapResult",
     "MLEResult",
-    "bca_acceleration",
     "bootstrap",
     "draw_poisson",
     "fit_poisson_mle",
@@ -279,81 +278,6 @@ class BootstrapResult:
         """
         return np.quantile(self.estimates, np.atleast_1d(q), axis=0, method=method)
 
-    def interval(self, level: float = 0.95, *, method: str = "percentile",
-                 estimate: np.ndarray | None = None,
-                 acceleration: np.ndarray | None = None) -> np.ndarray:
-        """Two-sided interval per parameter, shape (2, p).
-
-        ``method='percentile'``: the ``(1-level)/2`` and ``(1+level)/2``
-        quantiles at the (B+1) plotting position (see :meth:`quantiles`).
-
-        ``method='bca'`` (Efron 1987; Efron & Tibshirani 1993, ch. 14):
-        the same quantiles read at levels shifted by a bias correction
-        ``z0`` and an acceleration ``a``. ``z0`` is the normal quantile of
-        the share of draws below ``estimate``, counting draws equal to it
-        as half (a mid-rank, so that an atom of draws held at a bound
-        does not count wholly on one side), clipped to the share one draw
-        can resolve. ``acceleration`` comes from :func:`bca_acceleration`.
-
-        BCa assumes the estimator's distribution is a smooth monotone
-        transform of a normal one. Where draws pile up on a bound that
-        assumption fails, and the interval is not corrected by it.
-        """
-        if not 0.0 < level < 1.0:
-            raise ValueError("level must be in (0, 1)")
-        lo_q, hi_q = (1.0 - level) / 2.0, (1.0 + level) / 2.0
-        if method == "percentile":
-            return self.quantiles([lo_q, hi_q])
-        if method != "bca":
-            raise ValueError(f"Unknown method '{method}'")
-        if estimate is None or acceleration is None:
-            raise ValueError("method='bca' needs the estimate and the acceleration")
-        est = np.asarray(estimate, dtype=np.float64)
-        acc = np.asarray(acceleration, dtype=np.float64)
-        n = self.estimates.shape[0]
-        below = (self.estimates < est).sum(axis=0) + 0.5 * (self.estimates == est).sum(axis=0)
-        share = np.clip(below / n, 1.0 / (n + 1), n / (n + 1))
-        z0 = ndtri(share)
-        out = np.empty((2, est.size))
-        for row, q in enumerate((lo_q, hi_q)):
-            zq = z0 + ndtri(q)
-            adjusted = ndtr(z0 + zq / (1.0 - acc * zq))
-            for j in range(est.size):
-                out[row, j] = np.quantile(self.estimates[:, j], adjusted[j], method="weibull")
-        return out
-
-
-def bca_acceleration(model: ModelBatch, params: np.ndarray, source: np.ndarray) -> np.ndarray:
-    """BCa acceleration per parameter, from the skewness of the score.
-
-    For independent Poisson channels resampled from ``source`` (the fitted
-    mean for the parametric bootstrap, the observed counts for the
-    nonparametric one), the score along the least-favourable direction
-    for parameter j, ``u = I^-1 e_j``, is ``sum_i (y_i - mu_i) g_i`` with
-    ``g_i = (J u)_i / mu_i``. A Poisson's variance and third cumulant both
-    equal its mean, so ``a_j = sum c g^3 / (6 (sum c g^2)^(3/2))`` with
-    ``c = source`` (Efron 1987, eq. 6.7, in its least-favourable-family
-    form; DiCiccio & Efron 1996). No refits are needed. For one channel
-    with mean theta this is ``1 / (6 sqrt(theta))``, the textbook value
-    for a Poisson mean.
-
-    Args:
-        model: Mean and Jacobian for a batch of parameter vectors
-        params: (p,) the estimate the bootstrap was drawn around
-        source: (n_channels,) what each channel is resampled from
-    """
-    theta = np.asarray(params, dtype=np.float64)[None, :]
-    mean, jac = model(theta)
-    mu = np.maximum(mean[0], 1e-300)
-    jac = jac[0]
-    c = np.asarray(source, dtype=np.float64)
-    info = jac.T @ (jac / mu[:, None])
-    directions = np.linalg.pinv(info)
-    g = (jac @ directions) / mu[:, None]
-    k2 = (c[:, None] * g**2).sum(axis=0)
-    k3 = (c[:, None] * g**3).sum(axis=0)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        return np.where(k2 > 0, k3 / (6.0 * k2**1.5), 0.0)
 
 
 def bootstrap(
@@ -439,6 +363,11 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
     exact for one parameter on its bound with the others interior; when a
     nuisance parameter also sits on a bound the mixture changes, and it is
     not applied.
+
+    Measured on the Fermi edge (design record section 7): nominal coverage
+    at an interior point and with v on its bound; over-wide (98%) where
+    the width split is ``not_separable``, where an interval for v or tau
+    should be withheld as ``sd_tau`` is.
 
     Args:
         counts: (n_channels,) one spectrum
