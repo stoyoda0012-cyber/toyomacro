@@ -279,7 +279,6 @@ class BootstrapResult:
         return np.quantile(self.estimates, np.atleast_1d(q), axis=0, method=method)
 
 
-
 def bootstrap(
     source: np.ndarray,
     fit: Callable[[np.ndarray], MLEResult],
@@ -336,11 +335,15 @@ class ProfileInterval:
             so it can be False while ``low`` equals the bound: the set is
             then open at the bound. This is what decides coverage when the
             true value sits exactly on the bound.
+        n_unconverged: How many of the constrained refits behind the
+            profile did not report convergence. Not zero means the
+            profile was read from fits that stopped at ``max_iter``.
     """
 
     low: float
     high: float
     bound_included: bool
+    n_unconverged: int = 0
 
     def covers(self, value: float, lower_bound: float = -np.inf) -> bool:
         if value == lower_bound:
@@ -359,15 +362,23 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
     degree of freedom (3.84 at 95%). At the lower bound itself the null
     distribution of the statistic is the 50:50 mixture of chi2_0 and chi2_1
     (Self & Liang 1987), so the bound is in the set when the excess is under
-    the ``2*level - 1`` quantile of chi2_1 (2.71 at 95%). That correction is
-    exact for one parameter on its bound with the others interior; when a
-    nuisance parameter also sits on a bound the mixture changes, and it is
-    not applied.
+    the ``2*level - 1`` quantile of chi2_1 (2.71 at 95%). That threshold is
+    always used at the bound, and it is exact only for one parameter on its
+    bound with the others interior; when a nuisance parameter sits on a
+    bound too the true mixture differs and ``bound_included`` is
+    approximate.
 
-    Measured on the Fermi edge (design record section 7): nominal coverage
-    at an interior point and with v on its bound; over-wide (98%) where
-    the width split is ``not_separable``, where an interval for v or tau
-    should be withheld as ``sd_tau`` is.
+    ``estimate`` must be the constrained MLE for ``counts``: ``D_min`` is
+    taken there and nothing checks it. The result is the connected set
+    around the estimate; a separate region elsewhere under the threshold
+    is not reported.
+
+    Measured on the Fermi edge for E_F, v and tau (design record section
+    7): nominal at an interior point, and for tau with v on its bound; for
+    v there 98.1% at the true value and 94.6% judged at the bound, a
+    reading chosen after the measurement. Over-wide (98%) where the width
+    split is ``not_separable``, where an interval for v or tau should be
+    withheld as ``sd_tau`` is.
 
     Args:
         counts: (n_channels,) one spectrum
@@ -393,8 +404,11 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
             return mean, np.delete(jac, index, axis=2)
         return m
 
+    unconverged = [0]
+
     def excess(t):
         fit = fit_poisson_mle(counts, reduced(t), theta[keep], lower=lo_b[keep], max_iter=max_iter)
+        unconverged[0] += int(not fit.converged[0])
         return float(fit.deviance[0]) - d_min
 
     mean, jac = model(theta[None])
@@ -419,13 +433,15 @@ def profile_interval(counts: np.ndarray, model: ModelBatch, estimate: np.ndarray
             else brentq(lambda t: excess(t) - c_in, theta[index], hi_edge, xtol=step * 1e-4))
 
     bound_included = False
-    if np.isfinite(lo_b[index]) and excess(lo_b[index]) <= c_in:
+    at_bound = excess(lo_b[index]) if np.isfinite(lo_b[index]) else np.inf
+    if at_bound <= c_in:
         low = float(lo_b[index])
-        bound_included = excess(lo_b[index]) <= c_bound
+        bound_included = at_bound <= c_bound
     else:
         lo_edge = bracket(-1.0)
         if lo_edge is None:
             lo_edge = lo_b[index]
         low = (lo_edge if not np.isfinite(lo_edge)
                else brentq(lambda t: excess(t) - c_in, lo_edge, theta[index], xtol=step * 1e-4))
-    return ProfileInterval(low=float(low), high=float(high), bound_included=bool(bound_included))
+    return ProfileInterval(low=float(low), high=float(high), bound_included=bool(bound_included),
+                           n_unconverged=unconverged[0])

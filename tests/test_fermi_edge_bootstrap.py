@@ -432,8 +432,11 @@ def test_the_least_squares_fitter_scatters_as_its_sandwich_says():
 
 def test_one_singular_replica_does_not_abort_the_batch():
     """Two parameters with identical Jacobian columns make the Fisher
-    system singular for every replica. The solver used to raise
-    LinAlgError and lose the whole batch; it must return instead."""
+    system singular. The solver used to raise LinAlgError and lose the
+    whole batch; it must return instead. On that ridge the split between
+    the two parameters is not unique (the least-norm step picks one), so
+    only their sum is checked; a regular replica in the same batch must
+    come out exactly as it does on its own."""
     def model(theta):
         theta = np.asarray(theta, dtype=float)
         mean = np.repeat((theta[:, 0] + theta[:, 1])[:, None], 3, axis=1)
@@ -443,3 +446,26 @@ def test_one_singular_replica_does_not_abort_the_batch():
     out = fit_poisson_mle(counts, model, np.array([5.0, 5.0]), max_iter=50)
     assert out.params.shape == (2, 2)
     assert np.allclose(out.params.sum(axis=1), counts.mean(axis=1), rtol=1e-6)
+
+    def mixed(theta):
+        theta = np.asarray(theta, dtype=float)
+        n = theta.shape[0]
+        mean = np.stack([theta[:, 0] + theta[:, 1], 2 * theta[:, 0] + theta[:, 1],
+                         theta[:, 0] + 3 * theta[:, 1]], axis=1)
+        jac = np.broadcast_to(np.array([[1.0, 1.0], [2.0, 1.0], [1.0, 3.0]]), (n, 3, 2)).copy()
+        return mean, jac
+
+    regular = np.array([[12.0, 17.0, 26.0]])
+    alone = fit_poisson_mle(regular, mixed, np.array([4.0, 6.0]), max_iter=50)
+
+    def switch(theta):  # replica 0 singular (model), replica 1 regular (mixed)
+        theta = np.asarray(theta, dtype=float)
+        m0, j0 = model(theta)
+        m1, j1 = mixed(theta)
+        sel = np.zeros((theta.shape[0], 1), dtype=bool)
+        sel[-1] = True
+        return np.where(sel, m1, m0), np.where(sel[:, :, None], j1, j0)
+
+    both = fit_poisson_mle(np.vstack([counts[:1], regular]), switch, np.array([4.0, 6.0]), max_iter=50)
+    assert np.array_equal(both.params[1], alone.params[0])
+
