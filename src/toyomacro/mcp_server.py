@@ -118,7 +118,9 @@ def calculate_sensitivity(
     method, valid range and threshold of each j component) say where
     the value came from. `cross_section_table_range_eV` is the table's
     whole grid, kept for reference; it is not what the flag is judged
-    on. Within the range, sigma is a monotone piecewise cubic through
+    on. On 'trzhaskovskaya' the range is judged on that table's own axis,
+    a photoelectron-energy grid read as photon energy, so a value can be
+    'tabulated' below the source's first kinetic energy. Within the range, sigma is a monotone piecewise cubic through
     the tabulated cells in log-log space, so at a tabulated energy it
     is the tabulated value. An orbital the default table does not carry returns an error,
     not an estimate: Yeh & Lindau lists no level bound by more than about

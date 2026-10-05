@@ -165,7 +165,10 @@ def _split_orbital(orbital: str) -> tuple[str, str | None]:
 
 #: Where a cross-section value came from, per j component and summarised
 #: per request. The range is the component's own valid cells (non-None,
-#: > 0), never the table's whole energy grid.
+#: > 0), never the table's whole energy grid, and it is judged on the axis
+#: the table is interpolated on. For Trzhaskovskaya that is a photoelectron-
+#: energy grid read as photon energy (see the module docstring), so there
+#: ``tabulated`` does not mean the source tabulates that kinetic energy.
 LookupStatus = Literal[
     "tabulated",            # a valid cell, or interpolation between valid cells
     "extrapolated_above",   # above the last valid cell: power law (value given)
@@ -199,7 +202,10 @@ class ComponentLookup:
         at_tabulated_cell: True when the photon energy is one of the line's
             valid cells (to 1e-12 relative). With ``"pchip"`` the value is
             then the stored cell to round-off; with ``"polyfit"`` it is not.
-        valid_range_eV: First and last valid cell of this line, or None.
+        valid_range_eV: First and last valid cell of this line, or None,
+            on the axis the table is interpolated on (photon energy as read;
+            for Trzhaskovskaya a photoelectron-energy grid read as photon
+            energy).
         threshold_eV: The binding energy used as the ionization threshold,
             or None when ``BindingEnergy`` has no value for this level — in
             which case no threshold was applied, and a value below the
@@ -598,10 +604,23 @@ class CrossSection:
         The ionization threshold is the :class:`BindingEnergy` value of
         each component, not the table's own binding-energy column. Where
         ``BindingEnergy`` has no value no threshold applies
-        (``threshold_eV`` is None); ``outside_range_below`` then does not
-        mean the energy is above threshold. Known limits of that source
-        apply to ``below_threshold`` too (Co 3p1/2 and 3p3/2 are stored as
-        59 and 60 eV, in the reverse of the usual order).
+        (``threshold_eV`` is None) — 147 of 754 Yeh-Lindau lines, 286 of
+        1,562 Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly valence
+        levels plus Scofield's deep levels of Np to Fm — and
+        ``outside_range_below`` then does not mean the energy is above
+        threshold. ``below_threshold`` overrides the table where the two
+        disagree: it withholds cells the table prints below the
+        ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
+        73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on
+        Trzhaskovskaya, from its energy axis), as v0.4.0 did. Known limits
+        of that source apply too (Co 3p1/2 and 3p3/2 are stored as 59 and
+        60 eV, the reverse of the usual order).
+
+        On Trzhaskovskaya the range is judged on the axis it is
+        interpolated on, a photoelectron-energy grid read as photon energy:
+        Au 4f at 150 eV is ``tabulated`` although its kinetic energy (about
+        65 eV) is below the table's first cell (1,170 such components over
+        the table's grid and 19 source energies).
 
         Returns:
             A :class:`CrossSectionLookup`.

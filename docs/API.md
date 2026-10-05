@@ -359,9 +359,14 @@ threshold region, where shape resonances and Cooper minima move the
 cross-section by orders of magnitude and a power law has no support
 (Tl 5d at He I came out at 796 Mb on Yeh–Lindau, whose Table I prints it
 from 40.8 eV at 53 Mb). `extrapolate_below=True` restores the earlier
-value for that call only. A line with a single valid cell answers at that
-cell's energy and nowhere else. "Range" means the line's own valid cells,
-not the table's energy grid. A subshell
+value for that call only. A line with a single valid cell (only
+Yeh–Lindau Lr 4p) answers at that cell's energy, and below it only with
+`extrapolate_below=True`; above it never. "Range" means the line's own
+valid cells, not the table's energy grid, on the axis the table is
+interpolated on — for Trzhaskovskaya a photoelectron-energy grid read as
+photon energy, so there a value can be `tabulated` below the source's
+first kinetic energy (Au 4f at 150 eV; 1,170 components over the
+table's grid and 19 source energies). A subshell
 the table does not carry for that element returns `None` — it is not
 estimated from other elements. Yeh–Lindau lists no level bound by more
 than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
@@ -397,9 +402,19 @@ tabulated, 2p1/2 is above its threshold but below its first cell). When
 every component is a known zero the status value is `0.0`, while
 `lookup()` keeps returning `None`. The threshold is the `BindingEnergy`
 value of each component, not a table's own binding-energy column; where
-`BindingEnergy` has no value, `threshold_eV` is `None`, no threshold was
-applied, and `outside_range_below` does not mean the energy is above
-threshold. `get_rsf()` does not carry the state; call
+`BindingEnergy` has no value — 147 of 754 Yeh–Lindau lines, 286 of 1,562
+Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly valence levels
+plus Scofield's deep levels of Np–Fm — `threshold_eV` is `None`, no
+threshold was applied, and `outside_range_below` does not mean the
+energy is above threshold. Where the two disagree the threshold wins, as
+in v0.4.0: `below_threshold` withholds cells the table prints below the
+`BindingEnergy` value (47 on Yeh–Lindau, e.g. As 2s at Al Kα; 73 on
+Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on Trzhaskovskaya, from its
+energy axis), and the known limits of that source apply (Co 3p1/2 and
+3p3/2 are stored as 59 and 60 eV, the reverse of the usual order).
+`CrossSectionLookup` and `ComponentLookup` are exported from
+`toyomacro.data` and are Supported, so the status and method vocabularies
+above change only with a minor version. `get_rsf()` does not carry the state; call
 `lookup_with_status()` on each line.
 
 `CrossSection.to_dict(table)` returns the table as loaded, in the

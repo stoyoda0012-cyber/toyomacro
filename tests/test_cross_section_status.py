@@ -142,6 +142,46 @@ def test_trzhaskovskaya_lines_that_stop_early_extrapolate_inside_the_grid():
     assert r.status == "extrapolated_above"
 
 
+@pytest.mark.parametrize("table", AVAILABLE_TABLES)
+def test_the_last_cell_is_tabulated_and_just_above_is_extrapolated(table):
+    d = CrossSection.to_dict(table)
+    element, orbital = ("Si", "2p") if table == "yeh_lindau" else ("Si", "2p3/2")
+    line = d["data"][element][orbital]["cross_sections"]
+    hi = max(e for e, v in zip(d["photon_energies"], line) if v)
+    at = CrossSection.lookup_with_status(element, orbital, hi, table).components[0]
+    assert (at.status, at.at_tabulated_cell) == ("tabulated", True)
+    assert at.method != "power_law_above"
+    above = CrossSection.lookup_with_status(element, orbital, hi * 1.001, table).components[0]
+    assert (above.status, above.method) == ("extrapolated_above", "power_law_above")
+
+
+def test_get_rsf_passes_extrapolate_below_to_both_lines():
+    """Tl 5d at He I over Au 5d: Tl 5d is below its first cell, Au 5d is not."""
+    assert CrossSection.get_rsf("Tl", "5d", "Au", "5d", 21.2, table="yeh_lindau") is None
+    ratio = CrossSection.get_rsf("Tl", "5d", "Au", "5d", 21.2, table="yeh_lindau",
+                                 extrapolate_below=True)
+    assert ratio == pytest.approx(
+        TL_5D_HE_I_V040 / CrossSection.lookup("Au", "5d", 21.2, table="yeh_lindau"), rel=1e-12)
+    # And the reference line too.
+    assert CrossSection.get_rsf("Au", "5d", "Tl", "5d", 21.2, table="yeh_lindau") is None
+    assert CrossSection.get_rsf("Au", "5d", "Tl", "5d", 21.2, table="yeh_lindau",
+                                extrapolate_below=True) > 0
+
+
+def test_trzhaskovskaya_range_is_judged_on_the_axis_it_is_interpolated_on():
+    """Documented limit, pinned so a change to it is deliberate.
+
+    The table is gridded in photoelectron energy (first cell 100 eV) but
+    read as photon energy. Au 4f at hv = 150 eV has a kinetic energy of
+    about 65 eV, below the source's first cell, and is still reported
+    ``tabulated`` because the range is judged on the axis as read.
+    """
+    r = CrossSection.lookup_with_status("Au", "4f", 150.0, "trzhaskovskaya")
+    assert r.status == "tabulated"
+    assert all(p.valid_range_eV[0] == 100.0 for p in r.components)
+    assert all(150.0 - p.threshold_eV < 100.0 for p in r.components)
+
+
 def test_method_reports_the_interpolation_in_use():
     CrossSection.set_interpolation("polyfit")
     r = CrossSection.lookup_with_status("Si", "2p", 1486.6, "yeh_lindau")

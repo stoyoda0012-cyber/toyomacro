@@ -59,11 +59,23 @@ archived on Zenodo for a citable DOI.
 ### Fixed
 
 - The v0.4.0 known issue "below a line's first tabulated energy
-  `lookup()` extrapolates". Two parts remain: where `BindingEnergy` has
-  no value for a level (Scofield's deep levels of Np to Fm) no threshold
-  applies, now visible as `threshold_eV=None`; and the threshold source
-  stores Co 3p1/2 and 3p3/2 as 59 and 60 eV, the reverse of the usual
-  order (unchanged, to be checked against a primary source).
+  `lookup()` extrapolates", on Yeh–Lindau and Scofield. What remains:
+  - On Trzhaskovskaya the range is judged on the axis the table is
+    interpolated on, a photoelectron-energy grid read as photon energy,
+    so the 3,139 withheld values are counted on that axis, and 1,170
+    components over its grid and 19 source energies are still
+    `tabulated` below the source's first kinetic energy (Au 4f at
+    150 eV). The axis itself is the documented caveat of that table.
+  - `BindingEnergy` has no value for 147 of 754 Yeh–Lindau lines, 286 of
+    1,562 Scofield and 190 of 1,240 Trzhaskovskaya lines — mostly
+    valence levels, plus Scofield's deep levels of Np to Fm. No threshold
+    applies to them (now visible as `threshold_eV=None`), which matters
+    with `extrapolate_below=True`.
+  - The threshold still overrides cells the tables print below the
+    `BindingEnergy` value (47 on Yeh–Lindau, 73 on Scofield), as in
+    v0.4.0, and that source stores Co 3p1/2 and 3p3/2 as 59 and 60 eV,
+    the reverse of the usual order (unchanged, to be checked against a
+    primary source).
 
 ## [0.4.0] - 2026-10-05
 
