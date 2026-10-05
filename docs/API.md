@@ -353,7 +353,15 @@ it — so pass `table=` explicitly whenever the choice matters, and read
 **What `lookup()` returns, and what it does not.** Inside a line's
 tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
 in log–log space, so a tabulated energy returns the tabulated value;
-beyond the range it uses a power law through the end cells. A subshell
+above the range it uses a power law through the last cells. **Below a
+line's first valid cell it returns `None`** (since v0.5.0): that is the
+threshold region, where shape resonances and Cooper minima move the
+cross-section by orders of magnitude and a power law has no support
+(Tl 5d at He I came out at 796 Mb on Yeh–Lindau, whose Table I prints it
+from 40.8 eV at 53 Mb). `extrapolate_below=True` restores the earlier
+value for that call only. A line with a single valid cell answers at that
+cell's energy and nowhere else. "Range" means the line's own valid cells,
+not the table's energy grid. A subshell
 the table does not carry for that element returns `None` — it is not
 estimated from other elements. Yeh–Lindau lists no level bound by more
 than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
@@ -364,6 +372,35 @@ Ce 5d, Fr 7s), and no bundled table covers them at UPS energies. Up to v0.3.1 `l
 polynomial through all the cells of a line and estimated absent
 subshells across Z; `set_interpolation("polyfit")` restores the first
 for reproducing earlier numbers, and the second is gone.
+
+**Where a value came from.** `CrossSection.lookup_with_status()` takes
+the same arguments and returns a `CrossSectionLookup`: the value, a
+summary `status`, and one `ComponentLookup` per j component with its
+`status`, the `method` that produced it (`pchip`, `polyfit`,
+`single_cell`, `power_law_above`, `power_law_below`), whether the energy
+is one of its cells, its valid range and the threshold applied.
+
+| status | meaning | value |
+|---|---|---|
+| `tabulated` | a valid cell, or between valid cells | yes |
+| `extrapolated_above` | above the line's last valid cell | yes, power law |
+| `outside_range_above` | above a line's *only* valid cell | no |
+| `outside_range_below` | below the line's first valid cell | no, unless `extrapolate_below=True` |
+| `below_threshold` | photon energy below the `BindingEnergy` value | known zero |
+| `unoccupied` | absent component the table's rule says is empty (no bundled table has such a rule confirmed yet) | known zero |
+| `not_in_table` | no value, not established to be empty | no |
+
+A bare doublet is summed only when every component has a value or is a
+known zero; one component out of range or missing makes the sum `None`
+rather than a silent under-count (Zn 2p at 1048 eV on Scofield: 2p3/2 is
+tabulated, 2p1/2 is above its threshold but below its first cell). When
+every component is a known zero the status value is `0.0`, while
+`lookup()` keeps returning `None`. The threshold is the `BindingEnergy`
+value of each component, not a table's own binding-energy column; where
+`BindingEnergy` has no value, `threshold_eV` is `None`, no threshold was
+applied, and `outside_range_below` does not mean the energy is above
+threshold. `get_rsf()` does not carry the state; call
+`lookup_with_status()` on each line.
 
 `CrossSection.to_dict(table)` returns the table as loaded, in the
 shape the bundled JSON has for all three tables:
