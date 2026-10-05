@@ -689,6 +689,8 @@ class CrossSection:
                     threshold_eV=cls._get_binding_energy(element, key),
                 ))
 
+        # A stored line with no valid cell is `not_in_table` and blocks the
+        # sum (v0.4.0 skipped it); no bundled line has none.
         for blocking in ("not_in_table", "outside_range_above", "outside_range_below"):
             if any(p.status == blocking and p.value is None for p in parts):
                 return done(None, blocking, parts)

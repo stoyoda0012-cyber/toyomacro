@@ -120,9 +120,10 @@ def calculate_sensitivity(
     whole grid, kept for reference; it is not what the flag is judged
     on. On 'trzhaskovskaya' the range is judged on that table's own axis,
     a photoelectron-energy grid read as photon energy, so a value can be
-    'tabulated' below the source's first kinetic energy. Within the range, sigma is a monotone piecewise cubic through
-    the tabulated cells in log-log space, so at a tabulated energy it
-    is the tabulated value. An orbital the default table does not carry returns an error,
+    'tabulated' below the source's first kinetic energy. Within the
+    range, sigma is a monotone piecewise cubic through the tabulated
+    cells in log-log space, so at a tabulated energy it is the tabulated
+    value. An orbital the default table does not carry returns an error,
     not an estimate: Yeh & Lindau lists no level bound by more than about
     1.5 keV, so deep levels at HAXPES energies are not in it.
 

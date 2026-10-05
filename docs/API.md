@@ -366,7 +366,7 @@ valid cells, not the table's energy grid, on the axis the table is
 interpolated on — for Trzhaskovskaya a photoelectron-energy grid read as
 photon energy, so there a value can be `tabulated` below the source's
 first kinetic energy (Au 4f at 150 eV; 1,170 components over the
-table's grid and 19 source energies). A subshell
+table's grid and photon energies commonly used in XPS). A subshell
 the table does not carry for that element returns `None` — it is not
 estimated from other elements. Yeh–Lindau lists no level bound by more
 than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
