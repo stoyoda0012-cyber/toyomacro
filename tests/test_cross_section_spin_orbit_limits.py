@@ -202,14 +202,26 @@ def test_a_bare_label_is_not_gated_on_the_subshell_binding_energy(table):
     assert BindingEnergy.lookup("Co", "3p") == 60.0
     assert BindingEnergy.lookup("Co", "3p1/2") == 59.0
 
-    lower = CrossSection.lookup("Co", "3p1/2", 59.0, table=table)
-    assert lower is not None and lower > 0
-    assert CrossSection.lookup("Co", "3p3/2", 59.0, table=table) is None
+    # 59 eV is below both tables' first cell (Scofield 1 keV,
+    # Trzhaskovskaya 100 eV), so by default there is no value at all
+    # (v0.5.0). The gate logic is checked with the range rule lifted.
+    assert CrossSection.lookup("Co", "3p", 59.0, table=table) is None
+    assert (CrossSection.lookup_with_status("Co", "3p", 59.0, table).status
+            == "outside_range_below")
 
-    bare = CrossSection.lookup("Co", "3p", 59.0, table=table)
+    lower = CrossSection.lookup("Co", "3p1/2", 59.0, table=table, extrapolate_below=True)
+    assert lower is not None and lower > 0
+    assert CrossSection.lookup(
+        "Co", "3p3/2", 59.0, table=table, extrapolate_below=True) is None
+
+    bare = CrossSection.lookup("Co", "3p", 59.0, table=table, extrapolate_below=True)
     assert bare == pytest.approx(lower), (
         "bare 3p was refused at 59 eV although 3p1/2 is open"
     )
+    parts = CrossSection.lookup_with_status(
+        "Co", "3p", 59.0, table, extrapolate_below=True).components
+    assert {p.orbital: p.status for p in parts} == {
+        "3p1/2": "outside_range_below", "3p3/2": "below_threshold"}
 
 
 def test_a_bare_label_is_still_refused_below_every_component_threshold():
