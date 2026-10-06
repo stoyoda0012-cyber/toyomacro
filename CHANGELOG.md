@@ -98,7 +98,30 @@ archived on Zenodo for a citable DOI.
   `ensure_h5` now passes so that a multi-region file is parsed once
   rather than once per region.
 
+- **`toyomacro.composition` (Experimental): homogeneous-equivalent
+  composition from peak areas, with what it rests on.** `composition(lines,
+  conditions)` divides each line's background-subtracted window area by
+  σ × λ (cross-section from `lookup_with_status`, TPP-2M IMFP in a matrix
+  the caller names with its source) and normalises over the declared
+  elements. The result keeps the estimate, the statistical uncertainty
+  (not evaluated in this version), the assumptions and what was not
+  evaluated apart, and has a status: `refused` (no number) when a fact is
+  missing and no assumption is named — exposure for integrated counts,
+  the transmission state, the intensity meaning, a cross-section, an
+  element of the declared set; `conditional` when it rests on a named
+  assumption, a subset denominator (recorded with the excluded elements
+  and the reason) or an input outside its tabulated or fitted range;
+  `supported` otherwise. Transmission is divided out only when stated or
+  assumed not applied, never twice. `condition_dependence` recomputes it
+  over a table × background grid and reports differences and, for 2 × 2,
+  the interaction — not an uncertainty. σ × λ is not a complete AMRSF,
+  and instrument RSF tables are not part of this route.
+
 ### Changed
+
+- **API.md: an Experimental module may be used by an example.** The
+  tier said no documented workflow depends on one; examples/06 and 09
+  already did. An example is a demonstration, not a stability promise.
 
 - **`CrossSection.lookup()` returns None below a line's first valid
   cell.** This is the threshold region, where shape resonances and

@@ -54,7 +54,9 @@ import …`) is not exported — see the next tier before depending on it.
 **Experimental.** Research modules that are deliberately *not*
 re-exported from any `__init__`, reachable only by explicit submodule
 import. They are tested, but their API may change or disappear in any
-release, and no CLI or documented workflow depends on them:
+release. Examples may use them (examples/06 and 09 do); an example is a
+demonstration, not a promise that the API it uses is stable, and no CLI
+depends on them:
 
 | Module | What it is |
 |---|---|
@@ -71,6 +73,7 @@ release, and no CLI or documented workflow depends on them:
 | `data.elastic_scattering` | overlayer-thickness effective attenuation length, mean escape depth and information depth from the single-scattering albedo; requires caller-supplied IMFP *and* TRMFP, no TRMFP or albedo data bundled |
 | `fitting.fermi_edge` | Fermi-edge fit (Fermi-Dirac × low-order DOS ⊗ Gaussian + background): E_F and instrumental resolution with 1σ errors, energy-axis calibration to E_F = 0. The `*_err` fields are statistical and do not cover the DOS-model choice; `poisson_err` gives the same estimator's sandwich 1σ when the intensities are raw counts, and `compare_dos_forms` refits with each DOS form and returns the spread as a guide to the systematic that choice carries — read it beside the statistical error, never combined with it (see the module docstring and `examples/06`) |
 | `fitting.fermi_edge_identifiability` | how much a counting Fermi edge says about the instrumental variance `v` and the thermal scale `tau = (kT)^2`, which are weighed together as `kappa_2 = v + (pi^2/3) tau` and separated only by the fourth cumulant: Poisson Fisher matrix with the temperature free, fixed or given a normal prior, effective versus conditional information, labels `separable` / `not_separable` / `assumed` / `undersampled`, the Cramér–Rao bound *and* the sandwich covariance of the least-squares estimator `fitting.fermi_edge` actually is, d(sigma)/dT for a temperature that is assumed, and a scan over seven measurement conditions. NumPy/SciPy float64 only. Model bounds, not confidence intervals — design record in [`docs/design/fermi-edge-identifiability.md`](design/fermi-edge-identifiability.md), worked through in `examples/09` |
+| `composition` | homogeneous-equivalent composition from peak areas: `composition(lines, conditions)` returns the estimate, the statistical uncertainty (not evaluated in this version), the assumptions it rests on and what was not evaluated, kept apart — never one combined "±". Status `supported` / `conditional` / `refused`: an unknown exposure, transmission state or intensity meaning refuses unless an assumption is named, and an element without a value is never dropped from the denominator. `condition_dependence` recomputes it over a table × background grid and reports differences, not an uncertainty. σ × λ is an intrinsic sensitivity, not a complete AMRSF |
 | `data.sessa` | reads an IMFP/TRMFP pair out of a `sam_par.txt` the user generated with their own SESSA licence; no SESSA dependency, no SESSA data bundled |
 
 Likewise `multipeak_solver`'s `newton_jacobian_mode` is experimental for
