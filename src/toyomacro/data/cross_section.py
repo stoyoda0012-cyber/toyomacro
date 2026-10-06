@@ -46,7 +46,8 @@ import json
 import math
 import os
 import warnings
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import numpy as np
 from scipy.interpolate import PchipInterpolator
@@ -160,6 +161,87 @@ def _split_orbital(orbital: str) -> tuple[str, str | None]:
         if orbital.endswith(suffix) and len(orbital) > len(suffix):
             return orbital[: -len(suffix)], suffix
     return orbital, None
+
+
+#: Where a cross-section value came from, per j component and summarised
+#: per request. The range is the component's own valid cells (non-None,
+#: > 0), never the table's whole energy grid, and it is judged on the axis
+#: the table is interpolated on. For Trzhaskovskaya that is a photoelectron-
+#: energy grid read as photon energy (see the module docstring), so there
+#: ``tabulated`` does not mean the source tabulates that kinetic energy.
+LookupStatus = Literal[
+    "tabulated",            # a valid cell, or interpolation between valid cells
+    "extrapolated_above",   # above the last valid cell: power law (value given)
+    "outside_range_above",  # above the only valid cell: no basis to extrapolate
+    "outside_range_below",  # below the first valid cell: no value by default
+    "below_threshold",      # hv < BindingEnergy value: known zero contribution
+    "unoccupied",           # absent component the table rule says is empty
+    "not_in_table",         # no value, and not established to be empty
+]
+
+#: How a value was computed. ``None`` when no value was computed.
+LookupMethod = Literal["pchip", "polyfit", "single_cell", "power_law_above",
+                       "power_law_below"]
+
+_KNOWN_ZERO: frozenset[str] = frozenset({"below_threshold", "unoccupied"})
+
+
+@dataclass(frozen=True)
+class ComponentLookup:
+    """How one stored line of a table answered at one photon energy.
+
+    Attributes:
+        orbital: The table key evaluated (``'2p3/2'``; ``'2p'`` where the
+            table stores the subshell total, as Yeh-Lindau does).
+        status: See :data:`LookupStatus`.
+        value: Cross-section in the table's unit; ``0.0`` for a known zero
+            (``below_threshold``, ``unoccupied``); ``None`` when there is
+            no value. An ``outside_range_below`` value exists only when the
+            caller asked for ``extrapolate_below=True``.
+        method: See :data:`LookupMethod`; ``None`` when nothing was computed.
+        at_tabulated_cell: True when the photon energy is one of the line's
+            valid cells (to 1e-12 relative). With ``"pchip"`` the value is
+            then the stored cell to round-off; with ``"polyfit"`` it is not.
+        valid_range_eV: First and last valid cell of this line, or None,
+            on the axis the table is interpolated on (photon energy as read;
+            for Trzhaskovskaya a photoelectron-energy grid read as photon
+            energy).
+        threshold_eV: The binding energy used as the ionization threshold,
+            or None when ``BindingEnergy`` has no value for this level — in
+            which case no threshold was applied, and a value below the
+            range is not known to be above threshold.
+    """
+
+    orbital: str
+    status: LookupStatus
+    value: float | None
+    method: LookupMethod | None
+    at_tabulated_cell: bool
+    valid_range_eV: tuple[float, float] | None
+    threshold_eV: float | None
+
+
+@dataclass(frozen=True)
+class CrossSectionLookup:
+    """A cross-section with the state of every component behind it.
+
+    ``value`` is the sum over ``components`` when every component either
+    has a value or is a known zero; otherwise None. When all components
+    are known zeros it is ``0.0`` (where :meth:`CrossSection.lookup`
+    returns None). ``status`` summarises the components: a blocking state
+    (``not_in_table``, ``outside_range_below`` without a value,
+    ``outside_range_above``) wins, then the least supported state among
+    the components that contributed a value. ``components`` is empty when
+    the table does not carry the element or the subshell at all.
+    """
+
+    element: str
+    orbital: str
+    photon_energy: float
+    table: str
+    value: float | None
+    status: LookupStatus
+    components: tuple[ComponentLookup, ...]
 
 
 class CrossSection:
@@ -434,15 +516,27 @@ class CrossSection:
         orbital: str,
         photon_energy: float,
         table: str | None = None,
+        *,
+        extrapolate_below: bool = False,
     ) -> float | None:
         """
         Look up cross-section for an element, orbital, and photon energy.
 
         Inside a line's tabulated range the value is a monotone piecewise
         cubic (PCHIP) through the tabulated cells in log-log space, so at a
-        tabulated energy it is the tabulated value. Beyond the range it is a
-        power law through the end cells. See :meth:`set_interpolation` for
-        the earlier whole-line polynomial, kept as ``"polyfit"``.
+        tabulated energy it is the tabulated value. Above the range it is a
+        power law through the last cells. **Below a line's first valid cell
+        it returns None** (since v0.5.0): that is the threshold region,
+        where shape resonances and Cooper minima move the cross-section by
+        orders of magnitude and a power law has no support — Tl 5d at
+        21.2 eV came out at 796 Mb on Yeh-Lindau, whose Table I prints it
+        from 40.8 eV (53 Mb). ``extrapolate_below=True`` restores the
+        earlier power law for this call only. A line with a single valid
+        cell answers only at that cell's energy. The range is each line's
+        own valid cells, not the table's energy grid. See
+        :meth:`lookup_with_status` for which of these applied, and
+        :meth:`set_interpolation` for the earlier whole-line polynomial,
+        kept as ``"polyfit"``.
 
         Only what the table carries is returned. A subshell the table does
         not list for this element returns None; it is not estimated from
@@ -463,41 +557,243 @@ class CrossSection:
                 splitting the total by an assumed branching ratio.
             photon_energy: Photon energy in eV (e.g., 1486.6 for Al K-α)
             table: Which table to use (default: current default table)
+            extrapolate_below: Return the pre-v0.5.0 power law below a
+                line's first valid cell instead of None. For reproducing
+                earlier numbers; the value is unsupported by the table.
 
         Returns:
             Cross-section in the unit reported by :meth:`unit_info` for
             ``table`` — Mb for 'yeh_lindau' and 'scofield', ~10³ larger
             (inferred kb, unconfirmed) for 'trzhaskovskaya' — or None if
-            the table does not carry the subshell for this element, or the
-            photon energy is below its binding energy. Do not compare
-            across tables without converting.
+            the table does not carry the subshell for this element, the
+            photon energy is below its binding energy, or it is below the
+            line's first valid cell. Do not compare across tables without
+            converting.
         """
-        # Physical threshold. Gate a *bare* label per component instead,
-        # inside `_lookup_direct`: a subshell-level binding energy is the
-        # main line's, so gating on it here discards the other component
-        # in the window between the two thresholds. Co 3p is the case —
-        # bare BE 60 eV, 3p1/2 BE 59 eV — where a subshell gate returns
-        # None at 59 eV although 3p1/2 is ionizable and the spectrum
-        # contains it.
-        base, j = _split_orbital(orbital)
-        is_bare_doublet = j is None and len(base) == 2 and base[-1] in "pdf"
-        if not is_bare_doublet:
-            be = cls._get_binding_energy(element, orbital)
-            if be is not None and photon_energy < be:
-                return None  # Cannot ionize: hν < BE
-
-        result = cls._lookup_direct(element, orbital, photon_energy, table)
-        if result is _REFUSED or result is None:
-            # Either the table covers this subshell and cannot answer (a
-            # component missing for an unestablished reason, or nothing
-            # ionizable at this energy), or it does not carry the subshell
-            # at all. Until v0.4.0 the second case fell back to a fit
-            # across Z; against Scofield that put 1s 4.3x and 2p 3.9x too
-            # high at the median, and returned numbers for subshells with
-            # no electrons. Nothing is returned that the table does not
-            # carry.
+        result = cls.lookup_with_status(
+            element, orbital, photon_energy, table,
+            extrapolate_below=extrapolate_below,
+        )
+        # A known zero (nothing ionizable here) stays None, as before
+        # v0.5.0; only lookup_with_status reports it as 0.0.
+        if result.value is None or result.value <= 0.0:
             return None
-        return result
+        return result.value
+
+    @classmethod
+    def lookup_with_status(
+        cls,
+        element: str,
+        orbital: str,
+        photon_energy: float,
+        table: str | None = None,
+        *,
+        extrapolate_below: bool = False,
+    ) -> CrossSectionLookup:
+        """Look up a cross-section and say where every part of it came from.
+
+        Same arguments and the same numbers as :meth:`lookup`, returned as
+        a :class:`CrossSectionLookup` that carries the state of each j
+        component (see :data:`LookupStatus`). A bare doublet label is
+        summed only when every component either has a value or is a known
+        zero (``below_threshold``, ``unoccupied``); one component outside
+        its range or missing for an unestablished reason makes the sum
+        None rather than a silent under-count. When every component is a
+        known zero the value is ``0.0``.
+
+        The ionization threshold is the :class:`BindingEnergy` value of
+        each component, not the table's own binding-energy column. Where
+        ``BindingEnergy`` has no value no threshold applies
+        (``threshold_eV`` is None) — 147 of 754 Yeh-Lindau lines, 286 of
+        1,562 Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly valence
+        levels plus Scofield's deep levels of Np to Fm — and
+        ``outside_range_below`` then does not mean the energy is above
+        threshold. ``below_threshold`` overrides the table where the two
+        disagree: it withholds cells the table prints below the
+        ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
+        73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on
+        Trzhaskovskaya, from its energy axis), as v0.4.0 did. Known limits
+        of that source apply too (Co 3p1/2 and 3p3/2 are stored as 59 and
+        60 eV, the reverse of the usual order).
+
+        On Trzhaskovskaya the range is judged on the axis it is
+        interpolated on, a photoelectron-energy grid read as photon energy:
+        Au 4f at 150 eV is ``tabulated`` although its kinetic energy (about
+        65 eV) is below the table's first cell (1,170 such components over
+        the table's grid and 19 source energies).
+
+        Returns:
+            A :class:`CrossSectionLookup`.
+        """
+        table_name = table or cls._default_table
+        data = cls._get_data(table)
+
+        def done(value, status, components=()):
+            return CrossSectionLookup(
+                element=element, orbital=orbital,
+                photon_energy=float(photon_energy), table=table_name,
+                value=value, status=status, components=tuple(components),
+            )
+
+        elem_data = data.get("data", {}).get(element)
+        if elem_data is None:
+            return done(None, "not_in_table")
+
+        base, j = _split_orbital(orbital)
+        if j is not None:
+            # A j-resolved request. Tables that store only bare subshells
+            # cannot answer it, and splitting the total by an assumed
+            # branching ratio would invent a number indistinguishable
+            # from a tabulated one — the statistical ratio is not exact
+            # (Scofield's own Si 2p3/2 : 2p1/2 is 1.966, not 2).
+            keys: tuple[str, ...] = (orbital,)
+        else:
+            components = _J_COMPONENTS.get(base[-1:]) if len(base) == 2 else None
+            if components is None or base in elem_data:
+                # A non-doublet label, or a bare subshell the table stores
+                # directly (Yeh-Lindau): that entry already *is* the total.
+                keys = (base,)
+            else:
+                keys = tuple(f"{base}{s}" for s in components)
+
+        if not any(k in elem_data for k in keys):
+            # Nothing of this subshell in the table (or a j-resolved request
+            # on a table keyed by bare subshells).
+            return done(None, "not_in_table")
+
+        parts = []
+        for key in keys:
+            if key in elem_data:
+                # Each component carries its own threshold. Between the two
+                # thresholds of a split doublet only the lower-BE member is
+                # ionizable, and that is exactly what a measured envelope
+                # contains — so gate per component, not on the subshell.
+                parts.append(cls._evaluate_component(
+                    element, key, elem_data[key], data, photon_energy,
+                    extrapolate_below,
+                ))
+            elif _absent_component_is_unoccupied(table_name):
+                # The table lists a component iff it is occupied, so an
+                # absent one carries no electrons and contributes zero.
+                parts.append(ComponentLookup(
+                    orbital=key, status="unoccupied", value=0.0, method=None,
+                    at_tabulated_cell=False, valid_range_eV=None,
+                    threshold_eV=cls._get_binding_energy(element, key),
+                ))
+            else:
+                # Absent for a reason this package has not established.
+                # Summing what is left would be a silent under-count.
+                parts.append(ComponentLookup(
+                    orbital=key, status="not_in_table", value=None, method=None,
+                    at_tabulated_cell=False, valid_range_eV=None,
+                    threshold_eV=cls._get_binding_energy(element, key),
+                ))
+
+        # A stored line with no valid cell is `not_in_table` and blocks the
+        # sum (v0.4.0 skipped it); no bundled line has none.
+        for blocking in ("not_in_table", "outside_range_above", "outside_range_below"):
+            if any(p.status == blocking and p.value is None for p in parts):
+                return done(None, blocking, parts)
+
+        contributing = [p for p in parts if p.status not in _KNOWN_ZERO]
+        if not contributing:
+            zero = "below_threshold" if any(
+                p.status == "below_threshold" for p in parts) else "unoccupied"
+            return done(0.0, zero, parts)
+
+        total = 0.0
+        for p in parts:
+            total += p.value
+        for weakest in ("outside_range_below", "extrapolated_above"):
+            if any(p.status == weakest for p in contributing):
+                return done(total, weakest, parts)
+        return done(total, "tabulated", parts)
+
+    @classmethod
+    def _evaluate_component(
+        cls,
+        element: str,
+        key: str,
+        orbital_data: dict[str, Any],
+        data: dict[str, Any],
+        photon_energy: float,
+        extrapolate_below: bool,
+    ) -> ComponentLookup:
+        """Evaluate one stored line: threshold first, then its own range."""
+        threshold = cls._get_binding_energy(element, key)
+        if threshold is not None and photon_energy < threshold:
+            return ComponentLookup(
+                orbital=key, status="below_threshold", value=0.0, method=None,
+                at_tabulated_cell=False, valid_range_eV=cls._valid_range(orbital_data, data),
+                threshold_eV=threshold,
+            )
+        status, value, method, at_cell, valid = cls._evaluate_range(
+            orbital_data, data, photon_energy, extrapolate_below,
+        )
+        return ComponentLookup(
+            orbital=key, status=status, value=value, method=method,
+            at_tabulated_cell=at_cell, valid_range_eV=valid, threshold_eV=threshold,
+        )
+
+    @staticmethod
+    def _valid_points(
+        orbital_data: dict[str, Any] | None, data: dict[str, Any]
+    ) -> list[tuple[float, float]]:
+        if orbital_data is None:
+            return []
+        photon_energies = data.get("photon_energies", [])
+        cross_sections = orbital_data.get("cross_sections", [])
+        return sorted(
+            (e, sigma)
+            for e, sigma in zip(photon_energies, cross_sections)
+            if sigma is not None and sigma > 0
+        )
+
+    @classmethod
+    def _valid_range(
+        cls, orbital_data: dict[str, Any], data: dict[str, Any]
+    ) -> tuple[float, float] | None:
+        points = cls._valid_points(orbital_data, data)
+        return (points[0][0], points[-1][0]) if points else None
+
+    @classmethod
+    def _evaluate_range(
+        cls,
+        orbital_data: dict[str, Any] | None,
+        data: dict[str, Any],
+        photon_energy: float,
+        extrapolate_below: bool,
+    ) -> tuple[LookupStatus, float | None, LookupMethod | None, bool, tuple[float, float] | None]:
+        """Place ``photon_energy`` against one line's own valid cells.
+
+        Returns (status, value, method, at_tabulated_cell, valid_range).
+        """
+        points = cls._valid_points(orbital_data, data)
+        if not points:
+            return "not_in_table", None, None, False, None
+        lo, hi = points[0][0], points[-1][0]
+        at_cell = any(math.isclose(photon_energy, e, rel_tol=1e-12) for e, _ in points)
+
+        if len(points) == 1:
+            # One cell carries no slope: it answers at its own energy only.
+            if at_cell:
+                return "tabulated", points[0][1], "single_cell", True, (lo, hi)
+            if photon_energy > hi:
+                return "outside_range_above", None, None, False, (lo, hi)
+            if extrapolate_below:
+                # Pre-v0.5.0 behaviour: the single value at every energy.
+                return "outside_range_below", points[0][1], "single_cell", False, (lo, hi)
+            return "outside_range_below", None, None, False, (lo, hi)
+
+        if photon_energy < lo and not at_cell:
+            if not extrapolate_below:
+                return "outside_range_below", None, None, False, (lo, hi)
+            value = cls._interpolate_log_log(points, photon_energy)
+            return "outside_range_below", value, "power_law_below", False, (lo, hi)
+        value = cls._interpolate_log_log(points, photon_energy)
+        if photon_energy > hi and not at_cell:
+            return "extrapolated_above", value, "power_law_above", False, (lo, hi)
+        return "tabulated", value, cls._interpolation, at_cell, (lo, hi)
 
     @classmethod
     def _lookup_direct(
@@ -507,90 +803,16 @@ class CrossSection:
         photon_energy: float,
         table: str | None = None,
     ) -> float | _Refused | None:
-        """Direct table lookup without extrapolation fallback.
+        """:meth:`lookup_with_status` reduced to the pre-v0.5.0 return.
 
-        Returns a value, ``None`` when the table has no data for this
-        subshell at all, or
-        ``_REFUSED`` when the table covers the subshell and still cannot
-        answer — a component missing for a reason this package has not
-        established, or nothing ionizable at this energy.
-
-        A bare subshell label is the sum over its j components, each
-        evaluated **independently at** ``photon_energy`` and then added.
-        Summing the stored arrays first and interpolating once is not
-        equivalent: where the two components are listed on different
-        grids — routine just above a split threshold — the summed array has
-        points where only one component is present, and interpolating it
-        mixes the two lines.
+        Returns the value, ``None`` when the table has no data for this
+        subshell at all, or ``_REFUSED`` when the table covers the
+        subshell and still cannot answer here.
         """
-        data = cls._get_data(table)
-        elements_data = data.get("data", {})
-
-        elem_data = elements_data.get(element)
-        if elem_data is None:
-            return None
-
-        base, j = _split_orbital(orbital)
-        if j is not None:
-            # A j-resolved request. Tables that store only bare subshells
-            # cannot answer it, and splitting the total by an assumed
-            # branching ratio would invent a number indistinguishable
-            # from a tabulated one — the statistical ratio is not exact
-            # (Scofield's own Si 2p3/2 : 2p1/2 is 1.966, not 2).
-            if orbital in elem_data:
-                return cls._interp_one(elem_data[orbital], data, photon_energy)
-            siblings = _J_COMPONENTS.get(base[-1:], ())
-            if any(f"{base}{s}" in elem_data for s in siblings):
-                # The table carries this subshell and omits this component.
-                # Whatever the reason, it is not a coverage gap.
-                return _REFUSED
-            return None
-
-        components = _J_COMPONENTS.get(base[-1:]) if len(base) == 2 else None
-        if components is None:
-            return cls._interp_one(elem_data.get(base), data, photon_energy)
-
-        # A bare label. If the table stores it directly (Yeh-Lindau), that
-        # entry already *is* the subshell total. `lookup` skips its
-        # threshold gate for bare doublets so that per-component gating
-        # can work below, so apply the subshell threshold here.
-        if base in elem_data:
-            be = cls._get_binding_energy(element, base)
-            if be is not None and photon_energy < be:
-                return _REFUSED
-            return cls._interp_one(elem_data[base], data, photon_energy)
-
-        if not any(f"{base}{s}" in elem_data for s in components):
-            return None  # subshell absent entirely
-
-        total = 0.0
-        contributed = False
-        for suffix in components:
-            key = f"{base}{suffix}"
-            if key in elem_data:
-                # Each component carries its own threshold. Between the two
-                # thresholds of a split doublet only the lower-BE member is
-                # ionizable, and that is exactly what a measured envelope
-                # contains — so gate per component, not on the subshell.
-                component_be = cls._get_binding_energy(element, key)
-                if component_be is not None and photon_energy < component_be:
-                    continue
-                value = cls._interp_one(elem_data[key], data, photon_energy)
-                if value is None:
-                    continue
-                total += value
-                contributed = True
-            elif _absent_component_is_unoccupied(table or cls._default_table):
-                # The table lists a component iff it is occupied, so an
-                # absent one carries no electrons and contributes zero.
-                continue
-            else:
-                # Absent for a reason this package has not established.
-                # Summing what is left would be a silent under-count, so
-                # refuse the whole subshell rather than guess.
-                return _REFUSED
-
-        return total if contributed else _REFUSED
+        result = cls.lookup_with_status(element, orbital, photon_energy, table)
+        if result.value is not None and result.value > 0.0:
+            return result.value
+        return _REFUSED if result.components else None
 
     @classmethod
     def _interp_one(
@@ -599,24 +821,12 @@ class CrossSection:
         data: dict[str, Any],
         photon_energy: float,
     ) -> float | None:
-        """Interpolate one stored orbital entry at ``photon_energy``."""
-        if orbital_data is None:
-            return None
-        photon_energies = data.get("photon_energies", [])
-        cross_sections = orbital_data.get("cross_sections", [])
-        if not cross_sections or not photon_energies:
-            return None
+        """Value of one stored line at ``photon_energy``, no threshold applied.
 
-        valid_points: list[tuple[float, float]] = []
-        for e, sigma in zip(photon_energies, cross_sections):
-            if sigma is not None and sigma > 0:
-                valid_points.append((e, sigma))
-
-        if len(valid_points) >= 2:
-            return cls._interpolate_log_log(valid_points, photon_energy)
-        if len(valid_points) == 1:
-            return valid_points[0][1]
-        return None
+        None below the line's first valid cell, or above a single cell.
+        """
+        _, value, _, _, _ = cls._evaluate_range(orbital_data, data, photon_energy, False)
+        return value
 
     @classmethod
     def get_rsf(
@@ -627,15 +837,19 @@ class CrossSection:
         orbital2: str,
         photon_energy: float,
         table: str | None = None,
+        *,
+        extrapolate_below: bool = False,
     ) -> float | None:
         """
         Photoionization-cross-section ratio relative to a reference line.
 
         Returns ``sigma1 / sigma2`` at the given photon energy, both from
         the same table. Each is whatever ``lookup()`` returns, so either
-        may be a power-law extrapolation beyond the tabulated energies —
-        see ``lookup()``; that is not signalled here. None if either
-        line is not in the table or is below its binding energy.
+        may be a power-law extrapolation above a line's tabulated
+        energies; this ratio does not say so. Call
+        :meth:`lookup_with_status` on each line to see the state. None if
+        either line is not in the table, is below its binding energy, or
+        is below its first valid cell (unless ``extrapolate_below``).
 
         Despite the historical method name, this is **not** a complete
         relative sensitivity factor and **not** an average-matrix RSF. It
@@ -666,13 +880,16 @@ class CrossSection:
             orbital2: Reference orbital (typically '1s')
             photon_energy: Photon energy in eV
             table: Which table to use
+            extrapolate_below: Passed to :meth:`lookup` for both lines.
 
         Returns:
             The cross-section ratio, or None if either cross-section is
             unavailable.
         """
-        sigma1 = cls.lookup(element1, orbital1, photon_energy, table)
-        sigma2 = cls.lookup(element2, orbital2, photon_energy, table)
+        sigma1 = cls.lookup(element1, orbital1, photon_energy, table,
+                            extrapolate_below=extrapolate_below)
+        sigma2 = cls.lookup(element2, orbital2, photon_energy, table,
+                            extrapolate_below=extrapolate_below)
 
         if sigma1 is None or sigma2 is None or sigma2 == 0:
             return None

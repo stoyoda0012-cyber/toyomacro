@@ -353,7 +353,20 @@ it — so pass `table=` explicitly whenever the choice matters, and read
 **What `lookup()` returns, and what it does not.** Inside a line's
 tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
 in log–log space, so a tabulated energy returns the tabulated value;
-beyond the range it uses a power law through the end cells. A subshell
+above the range it uses a power law through the last cells. **Below a
+line's first valid cell it returns `None`** (since v0.5.0): that is the
+threshold region, where shape resonances and Cooper minima move the
+cross-section by orders of magnitude and a power law has no support
+(Tl 5d at He I came out at 796 Mb on Yeh–Lindau, whose Table I prints it
+from 40.8 eV at 53 Mb). `extrapolate_below=True` restores the earlier
+value for that call only. A line with a single valid cell (only
+Yeh–Lindau Lr 4p) answers at that cell's energy, and below it only with
+`extrapolate_below=True`; above it never. "Range" means the line's own
+valid cells, not the table's energy grid, on the axis the table is
+interpolated on — for Trzhaskovskaya a photoelectron-energy grid read as
+photon energy, so there a value can be `tabulated` below the source's
+first kinetic energy (Au 4f at 150 eV; 1,170 components over the
+table's grid and photon energies commonly used in XPS). A subshell
 the table does not carry for that element returns `None` — it is not
 estimated from other elements. Yeh–Lindau lists no level bound by more
 than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
@@ -364,6 +377,45 @@ Ce 5d, Fr 7s), and no bundled table covers them at UPS energies. Up to v0.3.1 `l
 polynomial through all the cells of a line and estimated absent
 subshells across Z; `set_interpolation("polyfit")` restores the first
 for reproducing earlier numbers, and the second is gone.
+
+**Where a value came from.** `CrossSection.lookup_with_status()` takes
+the same arguments and returns a `CrossSectionLookup`: the value, a
+summary `status`, and one `ComponentLookup` per j component with its
+`status`, the `method` that produced it (`pchip`, `polyfit`,
+`single_cell`, `power_law_above`, `power_law_below`), whether the energy
+is one of its cells, its valid range and the threshold applied.
+
+| status | meaning | value |
+|---|---|---|
+| `tabulated` | a valid cell, or between valid cells | yes |
+| `extrapolated_above` | above the line's last valid cell | yes, power law |
+| `outside_range_above` | above a line's *only* valid cell | no |
+| `outside_range_below` | below the line's first valid cell | no, unless `extrapolate_below=True` |
+| `below_threshold` | photon energy below the `BindingEnergy` value | known zero |
+| `unoccupied` | absent component the table's rule says is empty (no bundled table has such a rule confirmed yet) | known zero |
+| `not_in_table` | no value, not established to be empty | no |
+
+A bare doublet is summed only when every component has a value or is a
+known zero; one component out of range or missing makes the sum `None`
+rather than a silent under-count (Zn 2p at 1048 eV on Scofield: 2p3/2 is
+tabulated, 2p1/2 is above its threshold but below its first cell). When
+every component is a known zero the status value is `0.0`, while
+`lookup()` keeps returning `None`. The threshold is the `BindingEnergy`
+value of each component, not a table's own binding-energy column; where
+`BindingEnergy` has no value — 147 of 754 Yeh–Lindau lines, 286 of 1,562
+Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly valence levels
+plus Scofield's deep levels of Np–Fm — `threshold_eV` is `None`, no
+threshold was applied, and `outside_range_below` does not mean the
+energy is above threshold. Where the two disagree the threshold wins, as
+in v0.4.0: `below_threshold` withholds cells the table prints below the
+`BindingEnergy` value (47 on Yeh–Lindau, e.g. As 2s at Al Kα; 73 on
+Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on Trzhaskovskaya, from its
+energy axis), and the known limits of that source apply (Co 3p1/2 and
+3p3/2 are stored as 59 and 60 eV, the reverse of the usual order).
+`CrossSectionLookup` and `ComponentLookup` are exported from
+`toyomacro.data` and are Supported, so the status and method vocabularies
+above change only with a minor version. `get_rsf()` does not carry the state; call
+`lookup_with_status()` on each line.
 
 `CrossSection.to_dict(table)` returns the table as loaded, in the
 shape the bundled JSON has for all three tables:

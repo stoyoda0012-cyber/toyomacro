@@ -28,7 +28,11 @@ Usage:
 from toyomacro.data.angular_correction import AngularCorrection
 from toyomacro.data.binding_energy import BindingEnergy
 from toyomacro.data.compound_db import CompoundDB
-from toyomacro.data.cross_section import CrossSection
+from toyomacro.data.cross_section import (
+    ComponentLookup,
+    CrossSection,
+    CrossSectionLookup,
+)
 from toyomacro.data.imfp import IMFP
 from toyomacro.data.paths import (
     clear_cache,
@@ -42,6 +46,8 @@ __all__ = [
     "AngularCorrection",
     "BindingEnergy",
     "CrossSection",
+    "CrossSectionLookup",
+    "ComponentLookup",
     "CompoundDB",
     "IMFP",
     # Utility functions

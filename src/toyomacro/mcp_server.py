@@ -105,13 +105,22 @@ def calculate_sensitivity(
       effective attenuation length. TPP-2M is fitted over 50-2000 eV
       kinetic energy; outside that the returned lambda is an
       extrapolation, flagged as `imfp_extrapolated`.
-    - sigma is interpolated from a finite table grid, reported as
-      `cross_section_table_range_eV`. Above the top grid energy the
-      value is a power law fitted to the last few points, flagged as
+    - sigma is interpolated between the valid cells of the requested
+      line. Above a line's last valid cell the value is a power law
+      fitted to its last few cells, flagged as
       `cross_section_extrapolated`. The default Yeh & Lindau table
-      stops at 8047.8 eV, below the 9251.7 eV default.
+      stops at 8047.8 eV, below the 9251.7 eV default. Below a line's
+      first valid cell there is no value, and the call returns an error
+      naming that state.
 
-    `cross_section_extrapolated` covers the energy axis. Within the
+    The range is each line's own, not the table's energy grid:
+    `cross_section_status` and `cross_section_components` (status,
+    method, valid range and threshold of each j component) say where
+    the value came from. `cross_section_table_range_eV` is the table's
+    whole grid, kept for reference; it is not what the flag is judged
+    on. On 'trzhaskovskaya' the range is judged on that table's own axis,
+    a photoelectron-energy grid read as photon energy, so a value can be
+    'tabulated' below the source's first kinetic energy. Within the
     range, sigma is a monotone piecewise cubic through the tabulated
     cells in log-log space, so at a tabulated energy it is the tabulated
     value. An orbital the default table does not carry returns an error,
@@ -148,20 +157,35 @@ def calculate_sensitivity(
     if be is None:
         return json.dumps({"error": f"No binding energy for {element} {orbital}"})
     ke = photon_energy - be
-    sigma = CrossSection.lookup(element, orbital, photon_energy, table=table_name)
-    if sigma is None:
+    found = CrossSection.lookup_with_status(element, orbital, photon_energy, table_name)
+    sigma = found.value
+    if sigma is None or sigma <= 0.0:
+        why = {
+            "not_in_table": "the subshell is not tabulated there",
+            "below_threshold": "the energy is below its binding energy",
+            "unoccupied": "the subshell is empty in the table's ground state",
+            "outside_range_below": (
+                "the energy is below the line's first tabulated cell, where "
+                "a power law has no support (threshold region)"),
+            "outside_range_above": (
+                "the line has a single tabulated cell and the energy is above it"),
+        }[found.status]
         return json.dumps({
             "error": (f"No cross-section for {element} {orbital} at {photon_energy} eV "
-                      f"in the '{table_name}' table: the subshell is not tabulated there, "
-                      "or the energy is below its binding energy"
+                      f"in the '{table_name}' table: {why}"
                       + ("" if table_name == "scofield" else "; for deep levels at HAXPES "
-                         "energies try table='scofield'"))
+                         "energies try table='scofield'")),
+            "cross_section_status": found.status,
+            "cross_section_components": _components_json(found),
         })
     lam = IMFP.tpp2m(kinetic_energy=ke, compound=compound)
     lo, hi = TPP2M_FITTED_RANGE_EV
-    # Report sigma's grid limits alongside lambda's. Flagging only the
-    # IMFP would imply the cross-section is on firmer ground at the same
-    # energy, and at the HAXPES default it is not.
+    # Report sigma's state alongside lambda's. Flagging only the IMFP
+    # would imply the cross-section is on firmer ground at the same
+    # energy, and at the HAXPES default it is not. The flag is judged on
+    # the line's own cells: the table grid (kept below for reference)
+    # called Tl 5d at He I "not extrapolated" although Yeh-Lindau prints
+    # it only from 40.8 eV.
     grid = CrossSection.get_available_photon_energies(table=table_name)
     cs_lo, cs_hi = (min(grid), max(grid)) if grid else (None, None)
     # Carry the unit through with its status intact. Collapsing an
@@ -186,9 +210,9 @@ def calculate_sensitivity(
         "cross_section_inferred_unit": units["inferred_unit"],
         "cross_section_unit_status": units["status"],
         "cross_section_table_range_eV": [cs_lo, cs_hi],
-        "cross_section_extrapolated": (
-            cs_lo is None or not (cs_lo <= photon_energy <= cs_hi)
-        ),
+        "cross_section_status": found.status,
+        "cross_section_extrapolated": found.status != "tabulated",
+        "cross_section_components": _components_json(found),
         "imfp_nm": lam,
         "imfp_model": "TPP-2M (Tanuma, Powell & Penn 1994); inelastic only",
         "imfp_fitted_range_eV": [lo, hi],
@@ -204,6 +228,21 @@ def calculate_sensitivity(
         ),
         "compound": compound,
     })
+
+
+def _components_json(found) -> list[dict]:
+    """The per-component states of a CrossSectionLookup, JSON-ready."""
+    return [
+        {
+            "orbital": p.orbital,
+            "status": p.status,
+            "value": p.value,
+            "method": p.method,
+            "valid_range_eV": list(p.valid_range_eV) if p.valid_range_eV else None,
+            "threshold_eV": p.threshold_eV,
+        }
+        for p in found.components
+    ]
 
 
 @mcp.tool()

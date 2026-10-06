@@ -8,6 +8,75 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`CrossSection.lookup_with_status()` says where a cross-section came
+  from.** Same arguments and numbers as `lookup()`, returned as a
+  `CrossSectionLookup` (exported from `toyomacro.data` with
+  `ComponentLookup`): the value, a summary status, and for every j
+  component its status — `tabulated`, `extrapolated_above`,
+  `outside_range_above`, `outside_range_below`, `below_threshold`,
+  `unoccupied`, `not_in_table` — the method that produced it, its valid
+  range and the threshold applied. The range is each line's own valid
+  cells, not the table's energy grid. `docs/API.md` §5 has the table.
+- **`extrapolate_below=True` on `lookup()` and `get_rsf()`** restores,
+  for that call only, the power law below a line's first cell that
+  v0.4.0 returned.
+
+### Changed
+
+- **`CrossSection.lookup()` returns None below a line's first valid
+  cell.** This is the threshold region, where shape resonances and
+  Cooper minima move the cross-section by orders of magnitude and a
+  power law through the first cells has no support; v0.4.0 listed it as
+  a known issue (Tl 5d at He I, 796 Mb on Yeh–Lindau, whose Table I
+  prints it from 40.8 eV at 53 Mb). A line with a single valid cell
+  (Yeh–Lindau Lr 4p) now answers only at that cell's energy. Every
+  other value is unchanged bit for bit. Compared with v0.4.0 over every
+  element, every stored, bare and j-resolved label, and each table's
+  grid plus 19 source energies (2.78 million inputs with PCHIP; every
+  7th energy with `"polyfit"`), the two differ only where the new
+  status is `outside_range_below` or `outside_range_above`, and
+  `extrapolate_below=True` reproduces v0.4.0 everywhere except above
+  that single cell. Values that now return None: Yeh–Lindau 308 (+1),
+  Scofield 99,724, Trzhaskovskaya 3,139 — the largest withheld being
+  Scofield Cm 2p at 10.2 eV, where v0.4.0 returned 3.2 × 10⁷ Mb
+  because `BindingEnergy` has no Cm 2p threshold. None of these is a
+  move towards a reference value; they are output withheld.
+- **A doublet sum is refused when one component is out of its range.**
+  Zn 2p at 1048 eV on Scofield: 2p3/2 is tabulated, 2p1/2 is above its
+  1045 eV threshold but below Scofield's first cell for it (1057.9 eV).
+  v0.4.0 added a power-law 2p1/2 to it; adding 2p3/2 alone would have
+  been an under-count that looks complete. Both now give None (counted
+  above).
+- **The MCP `calculate_sensitivity` judges `cross_section_extrapolated`
+  on the requested line, not the table grid**, and reports
+  `cross_section_status` and `cross_section_components`. The grid-wide
+  test called Tl 5d at 21.2 eV "not extrapolated"; that call is now an
+  error naming the state. `cross_section_table_range_eV` is kept for
+  reference.
+
+### Fixed
+
+- The v0.4.0 known issue "below a line's first tabulated energy
+  `lookup()` extrapolates", on Yeh–Lindau and Scofield. What remains:
+  - On Trzhaskovskaya the range is judged on the axis the table is
+    interpolated on, a photoelectron-energy grid read as photon energy,
+    so the 3,139 withheld values are counted on that axis, and 1,170
+    components over its grid and 19 source energies are still
+    `tabulated` below the source's first kinetic energy (Au 4f at
+    150 eV). The axis itself is the documented caveat of that table.
+  - `BindingEnergy` has no value for 147 of 754 Yeh–Lindau lines, 286 of
+    1,562 Scofield and 190 of 1,240 Trzhaskovskaya lines — mostly
+    valence levels, plus Scofield's deep levels of Np to Fm. No threshold
+    applies to them (now visible as `threshold_eV=None`), which matters
+    with `extrapolate_below=True`.
+  - The threshold still overrides cells the tables print below the
+    `BindingEnergy` value (47 on Yeh–Lindau, 73 on Scofield), as in
+    v0.4.0, and that source stores Co 3p1/2 and 3p3/2 as 59 and 60 eV,
+    the reverse of the usual order (unchanged, to be checked against a
+    primary source).
+
 ## [0.4.0] - 2026-10-05
 
 ### Added
