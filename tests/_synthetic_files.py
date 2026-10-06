@@ -156,6 +156,7 @@ def vamas_iso_block(
     year: str = "2026",
     source_energy: str = "1486.6",
     pass_energy: str = "50",
+    analyser_mode: str = "FAT",
     work_function: str = "1e+037",
     n_scans: str = "4",
     collection_time: str = "0.05",
@@ -173,7 +174,9 @@ def vamas_iso_block(
     lines = [block_id, "sample", year, "1", "15", "10", "30", "0", "0",
              str(len(comments)), *comments, technique, *exp_values,
              "Al", source_energy, "1e+037", "1e+037", "1e+037", "1e+037", "1e+037",
-             "FAT", pass_energy, "1e+037", work_function, "1e+037", "1e+037", "1e+037",
+             analyser_mode, pass_energy,
+             *(["0.5"] if technique == "AES diff" else []),  # differential width
+             "1e+037", work_function, "1e+037", "1e+037", "1e+037",
              "1e+037", "1e+037", "C", transition, "-1",
              x_label, "eV", str(x_start), str(x_step), str(n_var)]
     for label, unit in variables:
@@ -195,6 +198,8 @@ def write_vamas_iso(
     exp_mode: str = "NORM",
     scan_mode: str = "REGULAR",
     n_exp_vars: int = 1,
+    manual_items: tuple[str, ...] = (),
+    inclusion: tuple[str, ...] = (),
     terminator: str = "end of experiment",
 ) -> Path:
     """Write an ISO 14976 VAMAS file in the layout CasaXPS exports.
@@ -211,7 +216,8 @@ def write_vamas_iso(
              str(n_exp_vars)]
     for k in range(n_exp_vars):
         lines += [f"Exp Variable {k + 1}", "d"]
-    lines += ["0", "0", "0", "0", str(len(blocks))]
+    lines += [str(len(inclusion)), *inclusion, str(len(manual_items)), *manual_items,
+              "0", "0", str(len(blocks))]
     for block in blocks:
         lines += block
     lines.append(terminator)

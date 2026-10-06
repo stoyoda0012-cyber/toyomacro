@@ -34,10 +34,14 @@ archived on Zenodo for a citable DOI.
   `transmission_curve_normalisation`, and `transmission_basis` — because
   a curve stored with the data does not say whether the intensity was
   divided by it. Also `signal_mode` and `signal_collection_time`, as
-  written in the file.
+  written in the file. These and `corresponding_variables` are held in
+  memory; `import_file` does not yet write them to HDF5.
 - **`RegionImportWarning`**: `ensure_h5` warns, naming the region and
   the error, when a region of a multi-region file fails to import. It
   used to print and go on.
+- **`import_file(..., reader=)`** takes an already-parsed reader, which
+  `ensure_h5` now passes so that a multi-region file is parsed once
+  rather than once per region.
 
 ### Changed
 
@@ -81,10 +85,15 @@ archived on Zenodo for a citable DOI.
   Thermo K-Alpha and Kratos Axis Ultra data written by CasaXPS) failed in
   their first block, and now read (60 to 753 blocks each). Supported:
   experiment mode NORM, scan mode REGULAR, blocks of technique XPS on a
-  kinetic- or binding-energy axis. Other modes, a parameter inclusion
-  list or a count that does not parse stop the file with a ValueError;
-  a block that is read but out of scope, or whose values do not parse,
-  is listed in `VAMASReader.skipped_blocks` with a warning. Excitation
+  kinetic- or binding-energy axis. The file stops with a ValueError when
+  its block boundaries can no longer be trusted: another mode, a
+  parameter inclusion list, future-upgrade entries, a technique with
+  sputtering-ion fields (SIMS, ISS, ...), a count that does not parse or
+  that does not fit the variables it interleaves, or lines left over
+  after the last block. A block that is read but out of scope, or whose
+  values do not parse, is listed in `VAMASReader.skipped_blocks`
+  (exported with `SkippedBlock`) with a warning. Error messages do not
+  repeat the file's text, which can include paths from comments. Excitation
   energy, pass energy, number of scans, signal mode and collection time
   are read; `1e37`, which CasaXPS writes for a value not known, is read
   as unknown; a two-digit year is not given a century. Intensity
@@ -92,13 +101,25 @@ archived on Zenodo for a citable DOI.
   recorded as `transmission_curve="embedded"` with
   `transmission_applied="unknown"`. Regions are the returned blocks, named
   by their block identifier; `metadata.source_region_index` is the
-  block's position in the file. The old layout is kept as
+  block's position in the file. The MCP `fit_spectrum_file` reports both
+  as `region_name` and `source_region_index`, since its `region` index
+  counts returned blocks. Block identifiers are free text in the file;
+  they become the HDF5 `region_name` and part of output file names. The old layout is kept as
   `VAMASReader(path, layout="legacy_fixed")`; no real file for it is
   available to this repository, so it is unverified, and a file it read
   may now read differently or not at all.
 
 ### Fixed
 
+- **`ensure_h5` gives every region its own file.** Regions were made
+  unique by name, but distinct names can produce the same output file
+  ("C 1s/3" and "C 1s/6" both normalise to C1s), and the later region
+  then overwrote the earlier without a warning; with the new VAMAS block
+  names that would have left 2 files for each 132-block Kratos file.
+  Names are now made unique by the file they produce. Region names are
+  reduced to `[A-Za-z0-9._-]` before they become part of a file name, so
+  a name read from a file (`../x`, `a/b`) cannot place a file outside
+  the output directory.
 - The v0.4.0 known issue "below a line's first tabulated energy
   `lookup()` extrapolates", on Yeh–Lindau and Scofield. What remains:
   - On Trzhaskovskaya the range is judged on the axis the table is

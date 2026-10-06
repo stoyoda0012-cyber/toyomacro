@@ -277,7 +277,11 @@ def fit_spectrum_file(
         path: Path to the spectrum file.
         element: XPS label for template-based fitting (e.g. 'Si2p',
             'Ta4f', 'C1s'). Empty = automatic peak detection.
-        region: Region index for multi-region files.
+        region: Region index for multi-region files. For VAMAS this counts
+            the blocks the reader returns, which can differ from the
+            block's position in the file when out-of-scope blocks are
+            skipped; the result reports both (`region_name`,
+            `source_region_index`).
     """
     import numpy as np
 
@@ -312,6 +316,8 @@ def fit_spectrum_file(
         for c in fit.components
     ]
     return json.dumps({
+        "region_name": raw.metadata.region,
+        "source_region_index": raw.metadata.source_region_index,
         "success": result.success,
         "message": result.message,
         "r_squared": result.r_squared,

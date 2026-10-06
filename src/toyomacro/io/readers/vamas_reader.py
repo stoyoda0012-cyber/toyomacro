@@ -11,11 +11,16 @@ Supported (v0.5.0): experiment mode ``NORM``, scan mode ``REGULAR``, an
 empty parameter-inclusion list and no future-upgrade entries; within such
 a file, blocks whose technique is ``XPS``, whose abscissa is kinetic or
 binding energy in eV, and which carry at least one corresponding
-variable. Verified on the 15 files of Zenodo 10.5281/zenodo.7074887
+variable. The first corresponding variable is taken as the intensity,
+as CasaXPS writes it; ISO 14976 does not require that order. Verified on the 15 files of Zenodo 10.5281/zenodo.7074887
 (Thermo K-Alpha and Kratos Axis Ultra data written by CasaXPS 2.3.24 and
 2.3.25, and three without a version line). Any other experiment or scan
-mode, or a count that cannot be read, stops the whole file with a
-ValueError, because the block boundaries can no longer be known. A block
+mode, a parameter-inclusion list, future-upgrade entries, a technique
+with sputtering-ion fields (SIMS, ISS, ...), a count that cannot be read
+or that disagrees with the variables it interleaves, or lines left over
+after the last block stop the whole file with a ValueError, because the
+block boundaries can no longer be known. Error messages do not repeat
+the file's text, which may include paths or names from comments. A block
 whose structure is read but whose content is outside that scope, or
 whose ordinate values do not parse, is not returned and is listed in
 :attr:`VAMASReader.skipped_blocks` with the reason.
@@ -50,6 +55,13 @@ from toyomacro.io.readers.base_reader import (
 _NOT_KNOWN = 1e37
 
 _ENERGY_AXES = {"kinetic energy": "Kinetic", "binding energy": "Binding"}
+
+_EXPERIMENT_MODES = frozenset(
+    {"MAP", "MAPDP", "MAPSV", "MAPSVDP", "NORM", "SDP", "SDPSV", "SEM", "NOEXP"})
+_SCAN_MODES = frozenset({"REGULAR", "IRREGULAR", "MAPPING"})
+_SPUTTER_ION_TECHNIQUES = frozenset({
+    "FABMS", "FABMS energy spec", "ISS", "SIMS", "SIMS energy spec",
+    "SNMS", "SNMS energy spec"})
 
 
 @dataclass(frozen=True)
@@ -87,8 +99,10 @@ class _Lines:
         try:
             n = int(raw)
         except ValueError:
+            # The line is not echoed: a misaligned read lands on comment
+            # text, which may hold paths or names.
             raise ValueError(
-                f"{self._source}: {what} is {raw!r}, not an integer; "
+                f"{self._source}: {what} is not an integer; "
                 "the block boundaries cannot be determined"
             ) from None
         if n < 0:
@@ -143,9 +157,11 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
     exp_mode = lines.next("experiment mode")
     scan_mode = lines.next("scan mode")
     if exp_mode != "NORM" or scan_mode != "REGULAR":
+        known = _EXPERIMENT_MODES | _SCAN_MODES
+        shown = " / ".join(m if m in known else "(unrecognised)" for m in (exp_mode, scan_mode))
         raise ValueError(
-            f"{src}: experiment mode {exp_mode!r} / scan mode {scan_mode!r} is not "
-            "supported (NORM / REGULAR only)"
+            f"{src}: experiment mode / scan mode {shown} is not supported "
+            "(NORM / REGULAR only)"
         )
     lines.count("number of spectral regions")
     n_exp = lines.count("number of experimental variables")
@@ -153,7 +169,9 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
                 for _ in range(n_exp)]
     if lines.count("number of parameter-inclusion entries") != 0:
         raise ValueError(f"{src}: a parameter inclusion/exclusion list is not supported")
-    lines.count("number of manually entered items")
+    # Prefix numbers of the manually entered items; they do not change
+    # the structure of a block.
+    lines.take(lines.count("number of manually entered items"), "manually entered item")
     n_future_exp = lines.count("number of future upgrade experiment entries")
     n_future_block = lines.count("number of future upgrade block entries")
     if n_future_exp or n_future_block:
@@ -170,6 +188,13 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         gmt_offset = lines.next(f"{where} GMT offset")
         block_comment = lines.take(lines.count(f"{where} comment line count"), f"{where} comment")
         technique = lines.next(f"{where} technique")
+        if technique in _SPUTTER_ION_TECHNIQUES:
+            # ISO 14976 adds sputtering-ion lines for these techniques; that
+            # layout is not implemented, so the boundary would be a guess.
+            raise ValueError(
+                f"{src}: {where} has technique {technique}, whose block layout "
+                "is not supported"
+            )
         exp_values = lines.take(n_exp, f"{where} experimental variable values")
         source_label = lines.next(f"{where} source label")
         source_energy = _known_float(lines.next(f"{where} source energy"))
@@ -208,6 +233,13 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
             for _ in range(n_add)
         ]
         n_ord = lines.count(f"{where} number of ordinate values")
+        if n_corr == 0 or n_ord % n_corr:
+            # The count disagrees with the variables it interleaves, so it
+            # cannot be trusted to find the end of this block.
+            raise ValueError(
+                f"{src}: {where} has {n_ord} ordinate values for {n_corr} "
+                "corresponding variables; the block boundary cannot be determined"
+            )
         lines.take(2 * n_corr, f"{where} ordinate min/max")
         raw_values = lines.take(n_ord, f"{where} ordinate values")
 
@@ -223,12 +255,6 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         if scale is None or x_unit != "eV":
             skip(f"abscissa {x_label!r} [{x_unit}] is not kinetic or binding energy in eV")
             continue
-        if n_corr == 0:
-            skip("no corresponding variable")
-            continue
-        if n_ord % n_corr:
-            skip(f"{n_ord} ordinate values do not divide into {n_corr} variables")
-            continue
         try:
             x_start, x_step = float(x_start_raw), float(x_step_raw)
             values = np.array([float(v) for v in raw_values], dtype=np.float64)
@@ -241,6 +267,8 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         try:
             n_scans: int | None = int(n_scans_raw)
         except ValueError:
+            n_scans = None
+        if n_scans is not None and n_scans < 1:
             n_scans = None
 
         n_points = n_ord // n_corr
@@ -273,6 +301,9 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
                 label: value for (label, _), value in zip(exp_vars, exp_values)
             },
             "additional_parameters": additional,
+            # n_sweeps holds the structural default 1 when this is not a
+            # positive integer; the raw value says which case it is.
+            "n_scans_raw": n_scans_raw,
             "date_raw": " ".join(date_fields) + f" (GMT offset {gmt_offset})",
             "date_note": date_note,
             "header": header_ids,
@@ -315,9 +346,17 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         results.append((data, block_id))
 
     trailer = lines.rest()
-    if not trailer or trailer[0].lower() != "end of experiment":
+    if trailer and trailer[0].lower() != "end of experiment":
+        # Lines left over mean a count somewhere was wrong, and the last
+        # block may have been cut short: nothing here can be trusted.
+        raise ValueError(
+            f"{src}: {len(trailer)} line(s) remain after {n_blocks} blocks and the "
+            "'end of experiment' line is missing; the counts are inconsistent"
+        )
+    if not trailer:
         warnings.warn(
-            f"{src}: no 'end of experiment' line after {n_blocks} blocks",
+            f"{src}: no 'end of experiment' line after {n_blocks} blocks "
+            "(the file ends exactly at a block boundary)",
             ReaderWarning,
             stacklevel=3,
         )
@@ -459,7 +498,7 @@ class VAMASReader(BaseReader):
             warnings.warn(
                 f"{self.filepath.name}: {len(self._skipped)} block(s) not returned "
                 "(see VAMASReader.skipped_blocks): "
-                + "; ".join(f"#{b.index} {b.block_id!r}: {b.reason}" for b in self._skipped[:3])
+                + "; ".join(f"block {b.index}: {b.reason}" for b in self._skipped[:3])
                 + (" ..." if len(self._skipped) > 3 else ""),
                 ReaderWarning,
                 stacklevel=3,

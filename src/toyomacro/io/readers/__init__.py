@@ -15,7 +15,7 @@ from toyomacro.io.readers.mat_reader import MATReader, detect_mat_version
 from toyomacro.io.readers.npl_reader import NPLReader
 from toyomacro.io.readers.pxt_reader import PXTReader
 from toyomacro.io.readers.ses_reader import SESTxtReader
-from toyomacro.io.readers.vamas_reader import VAMASReader
+from toyomacro.io.readers.vamas_reader import SkippedBlock, VAMASReader
 
 __all__ = [
     # Base
@@ -31,6 +31,7 @@ __all__ = [
     "PXTReader",
     "SESTxtReader",
     "VAMASReader",
+    "SkippedBlock",
     "NPLReader",
     # Existing
     "LazySpectrum",
