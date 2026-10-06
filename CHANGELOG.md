@@ -42,13 +42,20 @@ archived on Zenodo for a citable DOI.
     `n_slices`, the signal fields and the transmission-curve fields are
     written to `/provenance` only with their origin (`<field>_origin`),
     so a structural default such as `n_sweeps=1` is never stored as a
-    measurement, and an absent field reads back as unknown. The VAMAS
-    reader records origins; the other readers do not yet, so for them
-    these fields stay unwritten as before.
+    measurement, and an absent field reads back as unknown.
+    `excitation_energy` and `pass_energy` are the exception: as before
+    they are written whenever a reader stated them, origin or not. The
+    VAMAS reader records origins (`transmission_curve="none"` beside
+    series with other labels is `inferred`); the other readers do not
+    yet, so for them these fields stay unwritten as before.
   - `RawSpectrumData.declare(field, value, reason)` sets a fact on the
     user's authority: the origin becomes `user` and a
     `user_declaration` record keeps the previous value and origin.
     Declaring `transmission_applied` sets `transmission_basis="user"`.
+    The value is checked first (`DECLARABLE_FIELDS`: positive numbers,
+    integer counts, the transmission vocabularies; NumPy scalars are
+    converted, bools rejected), so a declaration either stands or
+    changes nothing.
   - `transmission_applied` and `transmission_basis` are written when not
     unknown; every stored ordinate series (`corresponding_variables`) is
     written under `/provenance/corresponding` as float64 together with
@@ -58,9 +65,21 @@ archived on Zenodo for a citable DOI.
   - These come back through compression and the streaming writer, and
     through `repack_file`, which no longer downcasts datasets under
     `/provenance` to float32.
+  - What is written includes text from the file and the user: series
+    labels and units, the signal mode, the curve's label, and
+    declaration reasons. Comment lines are never written.
   - A 1.0 file reads with no origins, no series and transmission
-    unknown. A v0.4.0 installation reads a 1.1 file and ignores what it
-    does not know, but rewriting the group there drops the additions.
+    unknown. `ensure_h5` reuses an existing .h5 newer than its source,
+    so a file imported before this version keeps its 1.0 group until it
+    is imported again.
+  - A v0.4.0 installation reads a 1.1 file without warnings, but: it
+    shows the origin-tracked fields without their origin (a declared
+    `n_sweeps=8` reads as a bare 8), its `repack_file` downcasts the
+    stored series to float32, and rewriting the group drops the
+    additions.
+  - `StoredSeries`, `ValueOrigin`, `ORIGIN_FIELDS` and
+    `DECLARABLE_FIELDS` are exported from `toyomacro.io`;
+    `docs/API.md` §8 describes all of this.
 - **`RegionImportWarning`**: `ensure_h5` warns, naming the region and
   the error, when a region of a multi-region file fails to import. It
   used to print and go on.

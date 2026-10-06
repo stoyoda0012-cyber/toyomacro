@@ -207,7 +207,9 @@ class SpectrumMetadata:
     #: Origin of each field in :data:`ORIGIN_FIELDS` whose value is known:
     #: ``"file"`` (read from the file), ``"user"`` (declared, see
     #: :meth:`RawSpectrumData.declare`) or ``"inferred"``. A field absent
-    #: here is not a known fact, whatever its value.
+    #: here is not a known fact, whatever its value — except
+    #: ``excitation_energy`` and ``pass_energy``, which every reader sets
+    #: only from the file (``None`` when not stated), origin or not.
     field_origins: Mapping[str, ValueOrigin] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -260,6 +262,7 @@ class RawSpectrumData:
             raise ValueError(f"{field_name!r} cannot be declared; one of {DECLARABLE_FIELDS}")
         if not reason:
             raise ValueError("a declaration needs a reason")
+        value = _declared_value(field_name, value)
         md = self.metadata
         previous = getattr(md, field_name)
         previous_origin = (md.transmission_basis if field_name == "transmission_applied"
@@ -294,6 +297,44 @@ class RawSpectrumData:
                 reason=reason,
             ),
         )
+
+
+_DECLARED_FLOATS = frozenset({"excitation_energy", "pass_energy", "signal_collection_time"})
+_DECLARED_INTS = frozenset({"n_sweeps", "n_slices"})
+_DECLARED_VOCABULARIES = {
+    "transmission_applied": ("applied", "not_applied", "unknown"),
+    "transmission_curve": ("embedded", "user_supplied", "none"),
+}
+
+
+def _declared_value(field_name: str, value: Any) -> Any:
+    """Check and normalise a declared value before anything is changed.
+
+    A value that could not be stored as the field's type is rejected here,
+    rather than skipped later when the file is written.
+    """
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name}: a bool is not a valid value")
+    if field_name in _DECLARED_FLOATS:
+        if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{field_name}: expected a positive finite number, got {value!r}")
+        return float(value)
+    if field_name in _DECLARED_INTS:
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        if not isinstance(value, int) or value < 1:
+            raise ValueError(f"{field_name}: expected a positive integer, got {value!r}")
+        return value
+    allowed = _DECLARED_VOCABULARIES.get(field_name)
+    if allowed is not None:
+        if value not in allowed:
+            raise ValueError(f"{field_name}: expected one of {allowed}, got {value!r}")
+        return value
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_name}: expected a non-empty string, got {value!r}")
+    return value
 
 
 # --- Type-safe metadata coercion helpers (shared by format readers) ---

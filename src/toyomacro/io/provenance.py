@@ -117,10 +117,14 @@ class HDF5Provenance:
 
     ``None`` (or ``()`` for tuple fields) means the corresponding
     attribute/dataset is absent or unreadable, i.e. the fact is unknown.
-    ``lens_mode`` / ``n_sweeps`` / ``n_slices`` are reserved fields that
-    B-1 never writes (Phase A cannot guarantee they were explicitly read
-    from the file, see design doc §3); when absent they stay ``None`` —
-    structural defaults like 1 are never restored.
+    ``lens_mode`` / ``n_sweeps`` / ``n_slices`` and the other
+    origin-tracked fields are written only with an origin (schema 1.1),
+    which ``field_origins`` returns; when absent they stay ``None`` —
+    structural defaults like 1 are never restored. ``excitation_energy``
+    and ``pass_energy`` are the exception: as in schema 1.0 they are
+    written whenever a reader stated them, so a value without an origin
+    there means "read from the file by a reader that records no origins",
+    not "unknown".
     ``transforms`` holds the parsed JSON records in application order;
     ``dropped_transform_records`` counts records lost at write time plus
     records that could not be parsed at read time (both also set
@@ -136,10 +140,10 @@ class HDF5Provenance:
     pass_energy: float | None = None  # eV
     intensity_semantics: str = "unknown"
     intensity_unit: str = "unknown"
-    lens_mode: str | None = None  # reserved; not persisted in B-1
+    lens_mode: str | None = None  # written only with an origin (1.1)
     acquisition_mode: str | None = None  # persisted only when explicitly non-empty
-    n_sweeps: int | None = None  # reserved; not persisted in B-1
-    n_slices: int | None = None  # reserved; not persisted in B-1
+    n_sweeps: int | None = None  # written only with an origin (1.1)
+    n_slices: int | None = None  # written only with an origin (1.1)
     datetime: str | None = None  # ISO 8601; persisted only on opt-in
     original_shape: tuple[int, ...] = ()
     dimension_roles: tuple[str, ...] = ()
@@ -239,8 +243,16 @@ def _write_origin_fields(attrs: h5py.AttributeManager, metadata: SpectrumMetadat
         if value is None or origin not in _ORIGINS:
             continue
         key = _ATTR_NAMES.get(name, name)
+        if isinstance(value, np.generic):
+            value = value.item()
         if name not in _ALWAYS_WRITTEN:
             if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                warnings.warn(
+                    f"provenance: {name}={value!r} cannot be stored; neither it nor "
+                    "its origin was written",
+                    ProvenanceWarning,
+                    stacklevel=4,
+                )
                 continue
             attrs[key] = np.int64(value) if isinstance(value, int) else (
                 np.float64(value) if isinstance(value, float) else str(value))

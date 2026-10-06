@@ -326,7 +326,6 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
             "n_sweeps": n_scans is not None,
             "signal_mode": bool(signal_mode),
             "signal_collection_time": collection_time is not None,
-            # Whether a curve is in the file is itself read from the file.
             "transmission_curve": True,
             "transmission_curve_variable": transmission is not None,
         }
@@ -352,7 +351,15 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
             transmission_curve_variable=transmission,
             transmission_curve_normalisation="unknown",
             transmission_basis="unknown",
-            field_origins={name: "file" for name, known in stated.items() if known},
+            field_origins={
+                **{name: "file" for name, known in stated.items() if known},
+                # A variable labelled "Transmission" is in the file, and so is
+                # a file with a single series; "none" beside other unlabelled
+                # series is this reader's reading of their labels.
+                "transmission_curve": (
+                    "file" if transmission is not None or len(variables) == 1
+                    else "inferred"),
+            },
         )
         data = RawSpectrumData(
             specdata=variables[0].values.reshape(-1, 1),

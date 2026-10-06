@@ -21,6 +21,7 @@ CLI:
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import time
 import warnings
@@ -318,7 +319,13 @@ def import_file(
     # 1. Create reader and read data
     if reader is None:
         reader = create_reader(input_path, config.format)
-    data = reader.read(config.region_index)
+    # A shallow copy of the record and its metadata: the steps below rebind
+    # arrays and change metadata, and a reader passed in by the caller
+    # returns its cached object, which would otherwise carry the converted
+    # axis into the next import as if it were the file's. The arrays are
+    # rebound, never written into, so they are not copied.
+    raw = reader.read(config.region_index)
+    data = dataclasses.replace(raw, metadata=dataclasses.replace(raw.metadata))
     # The file's own axis, before any conversion: stored series align with it.
     file_energy = np.array(data.energy, dtype=np.float64, copy=True)
 

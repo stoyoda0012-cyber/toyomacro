@@ -194,3 +194,76 @@ def test_a_malformed_series_is_ignored_with_a_warning(imported):
         with pytest.warns(ProvenanceWarning, match="corresponding"):
             prov = read_provenance(h5)
     assert prov.series is None
+
+
+# --- what the first audit found -------------------------------------------------
+
+def test_reusing_a_reader_keeps_the_files_axis_in_every_import(tmp_path):
+    """The importer must not convert the reader's cached data in place."""
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[vamas_iso_block(n_energy=12)])
+    reader = VAMASReader(f)
+    file_axis = reader.read(0).energy.copy()
+    cfg = ImportConfig(element="C1s", compress=False, energy_scale="BE")
+    first = import_file(f, tmp_path / "a", cfg, reader=reader)
+    second = import_file(f, tmp_path / "b", cfg, reader=reader)
+    np.testing.assert_array_equal(reader.read(0).energy, file_axis)
+    for result in (first, second):
+        np.testing.assert_array_equal(_prov(result.output_path).series.energy, file_axis)
+    assert _prov(second.output_path) == _prov(first.output_path)
+
+
+@pytest.mark.parametrize(("value", "stored"), [(np.int64(8), 8), (8.0, 8)])
+def test_numpy_and_integral_declarations_are_stored(tmp_path, value, stored):
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[vamas_iso_block(n_energy=12)])
+    reader = VAMASReader(f)
+    reader.read(0).declare("n_sweeps", value, "acquisition log")
+    result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
+                         reader=reader)
+    prov = _prov(result.output_path)
+    assert (prov.n_sweeps, prov.field_origins["n_sweeps"]) == (stored, "user")
+    assert not prov.transform_history_incomplete
+
+
+@pytest.mark.parametrize(("field_name", "value"), [
+    ("n_sweeps", True), ("n_sweeps", 8.5), ("n_sweeps", 0), ("excitation_energy", "abc"),
+    ("excitation_energy", float("nan")), ("transmission_applied", "yes please"),
+    ("transmission_curve", "somewhere"), ("lens_mode", ""),
+])
+def test_an_unstorable_declaration_changes_nothing(tmp_path, field_name, value):
+    data = VAMASReader(write_vamas_iso(tmp_path / "a.vms")).read(0)
+    before = (getattr(data.metadata, field_name), dict(data.metadata.field_origins),
+              data.metadata.transmission_basis, data.transforms)
+    with pytest.raises(ValueError):
+        data.declare(field_name, value, "because")
+    after = (getattr(data.metadata, field_name), dict(data.metadata.field_origins),
+             data.metadata.transmission_basis, data.transforms)
+    assert after == before
+
+
+def test_no_curve_beside_other_series_is_inferred_not_stated(tmp_path):
+    f = write_vamas_iso(tmp_path / "a.vms", blocks=[
+        vamas_iso_block("A", variables=(("Counts", "d"), ("T(E)", "d"))),
+        vamas_iso_block("B", variables=(("Counts", "d"),))])
+    two, one = VAMASReader(f).read(0).metadata, VAMASReader(f).read(1).metadata
+    assert (two.transmission_curve, two.field_origins["transmission_curve"]) == ("none", "inferred")
+    assert (one.transmission_curve, one.field_origins["transmission_curve"]) == ("none", "file")
+
+
+def test_an_unknown_origin_on_disk_is_dropped_with_a_warning(imported):
+    with h5py.File(imported.output_path, "a") as h5:
+        h5["provenance"].attrs["n_sweeps_origin"] = "guessed"
+    with h5py.File(imported.output_path) as h5:
+        with pytest.warns(ProvenanceWarning, match="n_sweeps_origin"):
+            prov = read_provenance(h5)
+    assert "n_sweeps" not in prov.field_origins
+
+
+def test_series_keep_file_order_past_ten_variables(tmp_path):
+    names = tuple((f"v{k}", "d") for k in range(12))
+    ords = [str(float(100 * i + k)) for i in range(4) for k in range(12)]
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[
+        vamas_iso_block(n_energy=4, variables=names, ordinates=ords)])
+    result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False))
+    series = _prov(result.output_path).series
+    assert [v.label for v in series.variables] == [f"v{k}" for k in range(12)]
+    assert series.variables[10].values[1] == pytest.approx(110.0)
