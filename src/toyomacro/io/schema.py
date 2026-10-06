@@ -50,7 +50,7 @@ class ToyomacroSchema:
     PATH_PROVENANCE: Final[str] = "/provenance"
 
     # Version of the /provenance group schema (independent of VERSION)
-    PROVENANCE_SCHEMA_VERSION: Final[str] = "1.0"
+    PROVENANCE_SCHEMA_VERSION: Final[str] = "1.1"
 
     # Data types (all float32 for MATLAB compatibility)
     DTYPE_SPECDATA = np.float32

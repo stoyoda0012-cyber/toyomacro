@@ -21,6 +21,7 @@ CLI:
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import time
 import warnings
@@ -30,6 +31,7 @@ from typing import Any
 
 import numpy as np
 
+from toyomacro.io.provenance import StoredSeries
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
@@ -75,7 +77,7 @@ class ImportResult:
     output_path: Path
     n_spectra: int
     n_energy: int
-    n_regions: int
+    n_regions: int | None  # None when imported from data= without a reader
     energy_range: tuple[float, float]
     compressed: bool
     file_size_mb: float
@@ -292,6 +294,7 @@ def import_file(
     config: ImportConfig,
     *,
     reader: BaseReader | None = None,
+    data: RawSpectrumData | None = None,
 ) -> ImportResult:
     """Import a single raw data file to HDF5.
 
@@ -304,6 +307,14 @@ def import_file(
         config: Import configuration
         reader: An already-parsed reader for ``input_path``, so that a
             multi-region file is not parsed again for every region.
+        data: The region to import, already read from ``input_path`` —
+            for example after :meth:`RawSpectrumData.declare`. Takes the
+            place of reading (``config.region_index`` is then unused, and
+            without ``reader`` the file is not parsed again, so
+            ``ImportResult.n_regions`` is None). It must have been read
+            from ``input_path``; this is not checked. Pass the data rather
+            than only the reader to keep a declaration: some readers
+            return a new object on every read.
 
     Returns:
         ImportResult with output path and statistics
@@ -315,9 +326,22 @@ def import_file(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Create reader and read data
-    if reader is None:
+    if reader is None and data is None:
         reader = create_reader(input_path, config.format)
-    data = reader.read(config.region_index)
+    if reader is not None and reader.filepath.resolve() != input_path.resolve():
+        raise ValueError(
+            f"reader is for {reader.filepath.name}, not {input_path.name}; "
+            "the output would be attributed to the wrong file"
+        )
+    # A shallow copy of the record and its metadata: the steps below rebind
+    # arrays and change metadata, and a reader passed in by the caller
+    # returns its cached object, which would otherwise carry the converted
+    # axis into the next import as if it were the file's. The arrays are
+    # rebound, never written into, so they are not copied.
+    raw = data if data is not None else reader.read(config.region_index)
+    data = dataclasses.replace(raw, metadata=dataclasses.replace(raw.metadata))
+    # The file's own axis, before any conversion: stored series align with it.
+    file_energy = np.array(data.energy, dtype=np.float64, copy=True)
 
     # 2. Validate
     _validate_data(data)
@@ -424,6 +448,8 @@ def import_file(
             persist_datetime=config.persist_datetime,
             persist_vendor_metadata=config.persist_vendor_metadata,
             vendor_metadata_allowlist=config.vendor_metadata_allowlist,
+            series=(StoredSeries(energy=file_energy, variables=data.corresponding_variables)
+                    if data.corresponding_variables else None),
         )
 
         # Write spectra
@@ -484,7 +510,7 @@ def import_file(
         output_path=final_path,
         n_spectra=n_spectra,
         n_energy=n_energy,
-        n_regions=reader.n_regions,
+        n_regions=reader.n_regions if reader is not None else None,
         energy_range=(float(energy.min()), float(energy.max())),
         compressed=compressed,
         file_size_mb=file_size_mb,

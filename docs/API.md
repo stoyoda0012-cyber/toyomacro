@@ -900,3 +900,59 @@ Every benchmark writes machine-readable records (timestamp, git
 commit, OS, library versions, problem size, individual timings,
 median + range) so numbers in the paper can be re-derived on any
 host.
+
+## 8. What an imported file said
+
+```python
+from toyomacro.io import VAMASReader, import_file, ImportConfig, read_provenance
+```
+
+Readers return `RawSpectrumData`. Besides the spectrum, it carries every
+ordinate series the file stored (`corresponding_variables`, label and
+unit as written) and a `SpectrumMetadata` that records, per field,
+where a value came from (`field_origins`: `"file"`, `"user"` or
+`"inferred"`; the fields are `ORIGIN_FIELDS`). A field with no origin
+is not a known fact, whatever its value: `n_sweeps=1` may be a
+structural default. `excitation_energy` and `pass_energy` are the
+exception — every reader sets them only from the file and leaves them
+`None` otherwise. Only the VAMAS reader records origins so far.
+
+Analyzer transmission is four facts, not one: whether the intensity was
+divided by a curve (`transmission_applied`), what that rests on
+(`transmission_basis`), whether a curve came with the data
+(`transmission_curve`, `transmission_curve_variable`) and what it is
+normalised to (`transmission_curve_normalisation`). A curve in the file
+does not say it was, or was not, applied.
+
+A fact the file does not hold can be declared, with a reason:
+
+```python
+data = VAMASReader("PTFE.vms").read(0)  # region 0 of this file is F 1s
+data.declare("transmission_applied", "not_applied", "exported raw from the acquisition software")
+import_file("PTFE.vms", "out/", ImportConfig(element="F1s"), data=data)
+```
+
+Pass the declared `data` itself: some readers (PXT/IBW) build a new
+object on every `read()`, so passing only the reader would import the
+file without the declaration. The origin becomes `"user"` and a
+`user_declaration` record keeps the previous value and origin. Values
+are checked before anything changes (`DECLARABLE_FIELDS`; numbers
+positive, counts integer, transmission states from their vocabulary,
+no `"unknown"` placeholder); declaring a curve that is not embedded
+clears `transmission_curve_variable`.
+
+`import_file` writes all of this to the HDF5 `/provenance` group
+(schema 1.1), and `read_provenance` returns it as `HDF5Provenance`,
+including `series` (`StoredSeries`: the stored series on the energy axis
+as read from the file, before any importer conversion). Fields are
+written only with their origin, so an unknown value reads back as
+`None`. Compression, `repack_file` and the streaming writer keep the
+group as it is. What is written: the values above, the series with
+their labels and units, the signal mode, and declaration reasons — all
+text the file or the user supplied, as are the region name (a VAMAS
+block identifier, a PXT region name), the format version line and the
+input file name, as in schema 1.0. Comment lines are never written, and
+other vendor fields only on opt-in.
+`misc/numberofslice` in the HDF5 layout is a structural default, not a
+fact. A 1.0 file (v0.4.0 and earlier) reads with no origins and no
+series.

@@ -34,8 +34,63 @@ archived on Zenodo for a citable DOI.
   `transmission_curve_normalisation`, and `transmission_basis` — because
   a curve stored with the data does not say whether the intensity was
   divided by it. Also `signal_mode` and `signal_collection_time`, as
-  written in the file. These and `corresponding_variables` are held in
-  memory; `import_file` does not yet write them to HDF5.
+  written in the file.
+- **What a file said now survives HDF5 (`/provenance` schema 1.1).**
+  - `SpectrumMetadata.field_origins` records, per field, whether a value
+    was read from the file, declared by the user or inferred; a field
+    without an origin is not a known fact. `lens_mode`, `n_sweeps`,
+    `n_slices`, the signal fields and the transmission-curve fields are
+    written to `/provenance` only with their origin (`<field>_origin`),
+    so a structural default such as `n_sweeps=1` is never stored as a
+    measurement, and an absent field reads back as unknown.
+    `excitation_energy` and `pass_energy` are the exception: as before
+    they are written whenever a reader stated them, origin or not. The
+    VAMAS reader records origins (`transmission_curve="none"` beside
+    series with other labels is `inferred`); the other readers do not
+    yet, so for them these fields stay unwritten as before.
+  - `RawSpectrumData.declare(field, value, reason)` sets a fact on the
+    user's authority: the origin becomes `user` and a
+    `user_declaration` record keeps the previous value and origin.
+    Declaring `transmission_applied` sets `transmission_basis="user"`.
+    The value is checked first (`DECLARABLE_FIELDS`: positive numbers,
+    integer counts, the transmission vocabularies, no `"unknown"`
+    placeholder; NumPy scalars are converted, bools rejected), so a
+    declaration either stands or changes nothing. Declaring a curve that
+    is not embedded clears `transmission_curve_variable`.
+  - `import_file(..., data=)` imports a region already read — the way to
+    keep a declaration, since the PXT/IBW reader builds a new object on
+    every `read()` and `reader=` alone would import without it. Without
+    `reader=` the file is not parsed again and `ImportResult.n_regions`
+    is None. A `reader=` for a different file than `input_path` is
+    refused. Clearing the curve variable records its previous value
+    and origin; `transmission_applied="unknown"` cannot be declared,
+    nor a curve variable unless the curve is declared embedded.
+  - `transmission_applied` and `transmission_basis` are written when not
+    unknown; every stored ordinate series (`corresponding_variables`) is
+    written under `/provenance/corresponding` as float64 together with
+    the energy axis as read from the file, which stays put when the
+    importer converts the main axis. `read_provenance` returns them in
+    `HDF5Provenance.series` and the new fields.
+  - These come back through compression and the streaming writer, and
+    through `repack_file`, which no longer downcasts datasets under
+    `/provenance` to float32.
+  - What is written includes text from the file and the user: series
+    labels and units, the signal mode, the curve's label, and
+    declaration reasons, besides the region name, format version line
+    and input file name that 1.0 already wrote. Comment lines are never
+    written.
+  - A 1.0 file reads with no origins, no series and transmission
+    unknown. `ensure_h5` reuses an existing .h5 newer than its source,
+    so a file imported before this version keeps its 1.0 group until it
+    is imported again.
+  - A v0.4.0 installation reads a 1.1 file without warnings, but: it
+    shows the origin-tracked fields without their origin (a declared
+    `n_sweeps=8` reads as a bare 8), its `repack_file` downcasts the
+    stored series to float32, and rewriting the group drops the
+    additions.
+  - `StoredSeries`, `ValueOrigin`, `ORIGIN_FIELDS` and
+    `DECLARABLE_FIELDS` are exported from `toyomacro.io`;
+    `docs/API.md` §8 describes all of this.
 - **`RegionImportWarning`**: `ensure_h5` warns, naming the region and
   the error, when a region of a multi-region file fails to import. It
   used to print and go on.

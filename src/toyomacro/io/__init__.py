@@ -56,6 +56,7 @@ from toyomacro.io.importer import (
 from toyomacro.io.provenance import (
     HDF5Provenance,
     ProvenanceWarning,
+    StoredSeries,
     read_provenance,
     write_provenance,
 )
@@ -77,6 +78,11 @@ from toyomacro.io.readers import (
     create_reader,
     detect_format,
     detect_mat_version,
+)
+from toyomacro.io.readers.base_reader import (
+    DECLARABLE_FIELDS,
+    ORIGIN_FIELDS,
+    ValueOrigin,
 )
 from toyomacro.io.recovery import (
     clear_incomplete_marker,
@@ -212,6 +218,10 @@ __all__ = [
     "ReaderWarning",
     # Provenance (Toyomacro-local HDF5 schema)
     "HDF5Provenance",
+    "StoredSeries",
+    "ValueOrigin",
+    "ORIGIN_FIELDS",
+    "DECLARABLE_FIELDS",
     "ProvenanceWarning",
     "read_provenance",
     "write_provenance",

@@ -274,6 +274,7 @@ class HDF5Writer:
         persist_datetime: bool = False,
         persist_vendor_metadata: bool = False,
         vendor_metadata_allowlist=(),
+        series=None,
     ) -> None:
         """Write the /provenance group from Phase A reader output.
 
@@ -290,6 +291,7 @@ class HDF5Writer:
             persist_datetime=persist_datetime,
             persist_vendor_metadata=persist_vendor_metadata,
             vendor_metadata_allowlist=vendor_metadata_allowlist,
+            series=series,
         )
 
     # ------------------------------------------------------------------

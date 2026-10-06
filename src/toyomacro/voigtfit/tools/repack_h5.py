@@ -287,7 +287,12 @@ def repack_file(
 
                     # Determine target dtype
                     target_dtype = None
-                    if force_float32 and obj.dtype == np.float64:
+                    if name.startswith("provenance/"):
+                        # /provenance holds facts as the file stated them;
+                        # its series must come back exactly, so keep the
+                        # dtype (None would let repack_dataset downcast).
+                        target_dtype = obj.dtype
+                    elif force_float32 and obj.dtype == np.float64:
                         target_dtype = np.float32
 
                     repack_dataset(

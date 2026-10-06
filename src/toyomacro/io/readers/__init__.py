@@ -7,6 +7,7 @@ from toyomacro.io.readers.base_reader import (
     ReaderTransform,
     ReaderWarning,
     SpectrumMetadata,
+    ValueOrigin,
     create_reader,
     detect_format,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "ReaderTransform",
     "ReaderWarning",
     "SpectrumMetadata",
+    "ValueOrigin",
     "create_reader",
     "detect_format",
     # Format readers

@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,501 automated tests** across **92 files**, in two
+This suite has **2,539 automated tests** across **93 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 54 | 1,421 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 55 | 1,459 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,069 tests, 83%) — guarantee the library
+- **Contract / regression** (2,107 tests, 83%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,489. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,527. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,421)
+## Library body — `tests/` (1,459)
 
 ### Claim guards — noise model, versions, backends, comparisons (140)
 | Tests | File | Guards |
@@ -120,12 +120,13 @@ them would take real coverage with them:
 | 4 | `test_example_data.py` | `examples/data/` generator reproduces the shipped file |
 | 2 | `test_gvrt_cli.py` | `gvrt` CLI subcommand (smoke) |
 
-### I/O & readers (179)
+### I/O & readers (217)
 | Tests | File | Guards |
 |--:|---|---|
 | 68 | `test_readers.py` | Format detection + reader factory (`.pxt` / `.vms` / `.npl`) |
 | 38 | `test_readers_synthetic.py` | Reader behaviour on synthetic files — runs without local instrument data |
 | 33 | `test_vamas_iso.py` | VAMAS read by ISO 14976 counts, not line positions: variable comments, empty fields, every corresponding variable; 1e37 and two-digit years left unknown; a transmission curve in the file is not taken as applied; out-of-scope blocks (AES diff included) listed with a reason; unsupported modes, sputter-ion techniques, inclusion lists, broken or inconsistent counts and lines left after the last block stop the file without echoing comment text; a retard ratio is not a pass energy; comments never reach HDF5; `ensure_h5` writes one file per block even when names normalise alike, keeps names inside the output directory, and warns about a region it could not import; the 15 public files of Zenodo 7074887 when a local copy is present |
+| 38 | `test_provenance_round_trip.py` | Schema 1.1 round trip: a value the file states comes back confirmed, an unknown stays unknown (no structural default stored), a user declaration comes back with its origin and history, a 1.0 group gains no facts, and every stored series comes back exactly on the file's own axis through import, compression, repack and the streaming writer; reusing a reader keeps the file's axis; declarations are checked before anything changes; an inferred "no curve" is marked inferred; an unknown origin on disk is dropped; series keep file order past ten; a declaration on a PXT region reaches the file through `data=`; declaring no curve clears its variable; a value that cannot be stored warns; `data=` does not parse the file again; a reader for another file is refused |
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 

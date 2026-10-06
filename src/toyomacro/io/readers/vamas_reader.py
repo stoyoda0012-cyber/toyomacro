@@ -319,13 +319,23 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         if analyser_mode != "FAT":
             vendor["retard_ratio"] = pass_or_ratio
 
+        pass_energy = pass_or_ratio if analyser_mode == "FAT" else None
+        stated = {
+            "excitation_energy": source_energy is not None,
+            "pass_energy": pass_energy is not None,
+            "n_sweeps": n_scans is not None,
+            "signal_mode": bool(signal_mode),
+            "signal_collection_time": collection_time is not None,
+            "transmission_curve": True,
+            "transmission_curve_variable": transmission is not None,
+        }
         metadata = SpectrumMetadata(
             region=block_id,
             datetime=dt,
             excitation_energy=source_energy,
             energy_scale=scale,
             n_sweeps=n_scans if n_scans is not None else 1,
-            pass_energy=pass_or_ratio if analyser_mode == "FAT" else None,
+            pass_energy=pass_energy,
             source_format="vamas",
             source_format_version=format_id,
             source_region_index=index,
@@ -341,6 +351,15 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
             transmission_curve_variable=transmission,
             transmission_curve_normalisation="unknown",
             transmission_basis="unknown",
+            field_origins={
+                **{name: "file" for name, known in stated.items() if known},
+                # A variable labelled "Transmission" is in the file, and so is
+                # a file with a single series; "none" beside other unlabelled
+                # series is this reader's reading of their labels.
+                "transmission_curve": (
+                    "file" if transmission is not None or len(variables) == 1
+                    else "inferred"),
+            },
         )
         data = RawSpectrumData(
             specdata=variables[0].values.reshape(-1, 1),
