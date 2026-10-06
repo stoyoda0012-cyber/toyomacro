@@ -2,6 +2,7 @@
 
 from toyomacro.io.readers.base_reader import (
     BaseReader,
+    CorrespondingVariable,
     RawSpectrumData,
     ReaderTransform,
     ReaderWarning,
@@ -19,6 +20,7 @@ from toyomacro.io.readers.vamas_reader import VAMASReader
 __all__ = [
     # Base
     "BaseReader",
+    "CorrespondingVariable",
     "RawSpectrumData",
     "ReaderTransform",
     "ReaderWarning",

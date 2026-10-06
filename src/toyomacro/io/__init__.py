@@ -47,6 +47,7 @@ from toyomacro.io.importer import (
     RAW_EXTENSIONS,
     ImportConfig,
     ImportResult,
+    RegionImportWarning,
     detect_element,
     ensure_h5,
     import_file,
@@ -60,6 +61,7 @@ from toyomacro.io.provenance import (
 )
 from toyomacro.io.readers import (
     BaseReader,
+    CorrespondingVariable,
     DatasetInfo,
     LazySpectrum,
     MATReader,
@@ -203,6 +205,7 @@ __all__ = [
     "detect_mat_version",
     # Raw data readers
     "BaseReader",
+    "CorrespondingVariable",
     "RawSpectrumData",
     "ReaderTransform",
     "ReaderWarning",
@@ -222,6 +225,7 @@ __all__ = [
     "ImportConfig",
     "ImportResult",
     "RAW_EXTENSIONS",
+    "RegionImportWarning",
     "detect_element",
     "ensure_h5",
     "import_file",

@@ -380,7 +380,10 @@ as data — are written up in
   DepthProfiler depth-estimate format ([`toyomacro.io.writers`](src/toyomacro/io/writers/)).
 - **MATLAB `.mat`**: read via [`toyomacro.io.readers.mat_reader`](src/toyomacro/io/readers/mat_reader.py).
 - **XPS analyzer files**: PXT, IBW, VAMAS, NPL, SES TXT — all under
-  [`toyomacro.io.readers`](src/toyomacro/io/readers/).
+  [`toyomacro.io.readers`](src/toyomacro/io/readers/). VAMAS is read by its
+  ISO 14976 structure for experiment mode NORM, scan mode REGULAR and XPS
+  blocks, verified on CasaXPS exports from Thermo and Kratos instruments;
+  other modes stop with an error, and out-of-scope blocks are listed.
 
 ## Development
 
@@ -396,7 +399,7 @@ Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,455 tests to mean what they say; do not use it to
+want the other 2,472 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 

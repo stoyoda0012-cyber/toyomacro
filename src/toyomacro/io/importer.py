@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,15 @@ from toyomacro.io.readers.base_reader import (
     detect_format,
 )
 from toyomacro.io.writers.hdf5_writer import HDF5CreateOptions, HDF5Writer
+
+
+class RegionImportWarning(UserWarning):
+    """A region of a multi-region file was not imported.
+
+    :func:`ensure_h5` imports the other regions and returns their paths;
+    the warning names the region index, its name and the error, so a
+    caller can tell an incomplete import from a complete one.
+    """
 
 
 @dataclass
@@ -611,7 +621,8 @@ def ensure_h5(
     - .h5/.hdf5 files are returned as-is
     - Raw formats (.pxt, .ibw, .txt, .vms, .npl) are auto-converted
     - Previously converted files are reused (mtime-based check)
-    - Multi-region files produce one .h5 per region
+    - Multi-region files produce one .h5 per region; a region that fails
+      to import is left out with a :class:`RegionImportWarning`
 
     Args:
         filepath: Path to any supported XPS data file
@@ -695,6 +706,10 @@ def ensure_h5(
                 result = import_file(filepath, out_dir, config)
                 results.append(result.output_path)
             except Exception as e:
-                print(f"Warning: region {i} ({rname}) import failed: {e}")
+                warnings.warn(
+                    f"{filepath.name}: region {i} ({rname!r}) was not imported: {e}",
+                    RegionImportWarning,
+                    stacklevel=2,
+                )
 
     return results

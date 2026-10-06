@@ -15,6 +15,8 @@ The expected layout under that root is::
     <root>/Fitting/readtest/{pxt,ibw,txt,vms,npl}/   # reader round-trip
     <root>/Fitting/arpes/Si2p_arpes.txt              # Si 2p ARXPS
     <root>/Fitting/maptest/Si2p_maptest.h5           # Si 2p chemical map
+    <root>/zenodo-7074887/Degradation Polymers.zip   # public VAMAS (CC BY 4.0),
+                                                     # or TOYOMACRO_VAMAS_POLYMER_ZIP
 
 When the variable is unset it defaults to ``~/xps-testdata`` so the
 public source carries no machine-specific path.

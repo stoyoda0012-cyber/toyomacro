@@ -18,7 +18,7 @@ import h5py
 import numpy as np
 import pytest
 
-from tests._synthetic_files import make_notes, write_pxt, write_vamas
+from tests._synthetic_files import make_notes, write_pxt, write_vamas_iso
 from tests.test_readers_synthetic import FULL_NOTES, _spectrum_1d, _spectrum_2d
 from toyomacro.io.importer import ImportConfig, import_file
 from toyomacro.io.provenance import (
@@ -136,7 +136,7 @@ class TestTransformHistory:
         assert prov.dropped_transform_records == 0
 
     def test_empty_history_has_no_dataset(self, tmp_path):
-        f_in = write_vamas(tmp_path / "a.vms")
+        f_in = write_vamas_iso(tmp_path / "a.vms")
         result = import_file(
             f_in, tmp_path / "out", ImportConfig(element="Test1s", compress=False)
         )

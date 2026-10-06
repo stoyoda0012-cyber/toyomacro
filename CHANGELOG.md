@@ -22,6 +22,22 @@ archived on Zenodo for a citable DOI.
 - **`extrapolate_below=True` on `lookup()` and `get_rsf()`** restores,
   for that call only, the power law below a line's first cell that
   v0.4.0 returned.
+- **`RawSpectrumData.corresponding_variables`** holds every ordinate
+  series a file stores for a spectrum, as `CorrespondingVariable`
+  (label and unit as written, values aligned with the energy axis); the
+  first is the one in `specdata`. VAMAS files exported by CasaXPS carry a
+  `Transmission` series here.
+- **`SpectrumMetadata` records analyzer transmission as four separate
+  facts** — `transmission_applied` (`applied` / `not_applied` /
+  `unknown`), `transmission_curve` (`embedded` / `user_supplied` /
+  `none`) with `transmission_curve_variable` and
+  `transmission_curve_normalisation`, and `transmission_basis` — because
+  a curve stored with the data does not say whether the intensity was
+  divided by it. Also `signal_mode` and `signal_collection_time`, as
+  written in the file.
+- **`RegionImportWarning`**: `ensure_h5` warns, naming the region and
+  the error, when a region of a multi-region file fails to import. It
+  used to print and go on.
 
 ### Changed
 
@@ -55,6 +71,31 @@ archived on Zenodo for a citable DOI.
   test called Tl 5d at 21.2 eV "not extrapolated"; that call is now an
   error naming the state. `cross_section_table_range_eV` is kept for
   reference.
+
+- **`VAMASReader` follows the ISO 14976 structure.** It reads the counts
+  that precede comment lines, experimental variables, corresponding
+  variables and additional parameters, and keeps empty fields as
+  fields. The reader carried over from MATLAB assumed fixed line counts
+  and read the comment-line count as the number of regions; all 15 VAMAS
+  files of the public polymer dataset (Zenodo 10.5281/zenodo.7074887;
+  Thermo K-Alpha and Kratos Axis Ultra data written by CasaXPS) failed in
+  their first block, and now read (60 to 753 blocks each). Supported:
+  experiment mode NORM, scan mode REGULAR, blocks of technique XPS on a
+  kinetic- or binding-energy axis. Other modes, a parameter inclusion
+  list or a count that does not parse stop the file with a ValueError;
+  a block that is read but out of scope, or whose values do not parse,
+  is listed in `VAMASReader.skipped_blocks` with a warning. Excitation
+  energy, pass energy, number of scans, signal mode and collection time
+  are read; `1e37`, which CasaXPS writes for a value not known, is read
+  as unknown; a two-digit year is not given a century. Intensity
+  semantics stay `unknown`, and an embedded transmission curve is
+  recorded as `transmission_curve="embedded"` with
+  `transmission_applied="unknown"`. Regions are the returned blocks, named
+  by their block identifier; `metadata.source_region_index` is the
+  block's position in the file. The old layout is kept as
+  `VAMASReader(path, layout="legacy_fixed")`; no real file for it is
+  available to this repository, so it is unverified, and a file it read
+  may now read differently or not at all.
 
 ### Fixed
 

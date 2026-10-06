@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,467 automated tests** across **91 files**, in two
+This suite has **2,484 automated tests** across **92 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 53 | 1,387 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 54 | 1,404 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,11 +21,11 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,035 tests, 82%) — guarantee the library
+- **Contract / regression** (2,052 tests, 83%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 18%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 17%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,455. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,472. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,387)
+## Library body — `tests/` (1,404)
 
 ### Claim guards — noise model, versions, backends, comparisons (140)
 | Tests | File | Guards |
@@ -120,11 +120,12 @@ them would take real coverage with them:
 | 4 | `test_example_data.py` | `examples/data/` generator reproduces the shipped file |
 | 2 | `test_gvrt_cli.py` | `gvrt` CLI subcommand (smoke) |
 
-### I/O & readers (145)
+### I/O & readers (162)
 | Tests | File | Guards |
 |--:|---|---|
 | 68 | `test_readers.py` | Format detection + reader factory (`.pxt` / `.vms` / `.npl`) |
-| 37 | `test_readers_synthetic.py` | Reader behaviour on synthetic files — runs without local instrument data |
+| 38 | `test_readers_synthetic.py` | Reader behaviour on synthetic files — runs without local instrument data |
+| 16 | `test_vamas_iso.py` | VAMAS read by ISO 14976 counts, not line positions: variable comments, empty fields, every corresponding variable; 1e37 and two-digit years left unknown; a transmission curve in the file is not taken as applied; out-of-scope blocks listed with a reason, unsupported modes and broken counts stop the file; comments never reach HDF5; `ensure_h5` warns about a region it could not import; the 15 public files of Zenodo 7074887 when a local copy is present |
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
