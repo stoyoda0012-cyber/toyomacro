@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,11 +31,21 @@ from typing import Any
 import numpy as np
 
 from toyomacro.io.readers.base_reader import (
+    BaseReader,
     RawSpectrumData,
     create_reader,
     detect_format,
 )
 from toyomacro.io.writers.hdf5_writer import HDF5CreateOptions, HDF5Writer
+
+
+class RegionImportWarning(UserWarning):
+    """A region of a multi-region file was not imported.
+
+    :func:`ensure_h5` imports the other regions and returns their paths;
+    the warning names the region index, its name and the error, so a
+    caller can tell an incomplete import from a complete one.
+    """
 
 
 @dataclass
@@ -73,6 +84,22 @@ class ImportResult:
 
 
 _DEDUP_SUFFIX_RE = re.compile(r"^(.+?)(_\d+)$")
+_PATH_SEPARATORS_RE = re.compile(r"[/\\\x00]+")
+
+
+def _safe_name(name: str, *, spaces: bool = True) -> str:
+    """A name from a file made safe to use as part of a file name.
+
+    Region names come from the file (a VAMAS block identifier is free
+    text). Path separators and NUL become ``_`` and leading dots are
+    dropped, so a name can never leave the output directory; spaces
+    become ``_`` as they always did for region names. Everything else is
+    kept, so ordinary names map to the same files as before.
+    """
+    out = _PATH_SEPARATORS_RE.sub("_", name)
+    if spaces:
+        out = out.replace(" ", "_")
+    return out.lstrip(".") or "region"
 
 
 def _generate_output_filename(
@@ -263,6 +290,8 @@ def import_file(
     input_path: str | Path,
     output_dir: str | Path,
     config: ImportConfig,
+    *,
+    reader: BaseReader | None = None,
 ) -> ImportResult:
     """Import a single raw data file to HDF5.
 
@@ -273,6 +302,8 @@ def import_file(
         input_path: Path to input file (.pxt, .ibw, .txt, .vms, .npl)
         output_dir: Output directory for HDF5 files
         config: Import configuration
+        reader: An already-parsed reader for ``input_path``, so that a
+            multi-region file is not parsed again for every region.
 
     Returns:
         ImportResult with output path and statistics
@@ -284,7 +315,8 @@ def import_file(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Create reader and read data
-    reader = create_reader(input_path, config.format)
+    if reader is None:
+        reader = create_reader(input_path, config.format)
     data = reader.read(config.region_index)
 
     # 2. Validate
@@ -330,12 +362,14 @@ def import_file(
     be_sign = 1 if data.metadata.energy_scale.startswith("B") else 0
 
     # 6. Generate output filename
-    if config.region_name_override is not None:
-        region_name = config.region_name_override.replace(" ", "_").replace("\x00", "")
-    else:
-        region_name = data.metadata.region.replace(" ", "_").replace("\x00", "") if data.metadata.region else ""
-    output_filename = _generate_output_filename(config.element, input_path, region_name)
+    raw_region = (config.region_name_override if config.region_name_override is not None
+                  else data.metadata.region)
+    region_name = _safe_name(raw_region) if raw_region else ""
+    output_filename = _generate_output_filename(
+        _safe_name(config.element, spaces=False), input_path, region_name)
     output_path = output_dir / output_filename
+    if output_path.parent.resolve() != output_dir.resolve():
+        raise ValueError(f"output name {output_filename!r} leaves the output directory")
 
     # 7. Write HDF5
     # dim_shape: non-energy dimensions of the original data before flattening
@@ -611,7 +645,8 @@ def ensure_h5(
     - .h5/.hdf5 files are returned as-is
     - Raw formats (.pxt, .ibw, .txt, .vms, .npl) are auto-converted
     - Previously converted files are reused (mtime-based check)
-    - Multi-region files produce one .h5 per region
+    - Multi-region files produce one .h5 per region; a region that fails
+      to import is left out with a :class:`RegionImportWarning`
 
     Args:
         filepath: Path to any supported XPS data file
@@ -661,29 +696,32 @@ def ensure_h5(
             compress=compress,
             region_index=0,
         )
-        result = import_file(filepath, out_dir, config)
+        result = import_file(filepath, out_dir, config, reader=reader)
         results.append(result.output_path)
     else:
         # Multi-region: import each region as a separate .h5
         # Each region gets its own element detection — no fallback to
         # a file-level element (which can be wrong for Survey/Overview).
-        seen_names: dict[str, int] = {}
+        # Names are made unique by the *output file* they produce, not by
+        # the region name: distinct names can normalise to the same file
+        # ("C 1s/3" and "C 1s/6" both give C1s_...), and one would
+        # silently overwrite the other.
+        used: set[str] = set()
         for i in range(n_regions):
             rname = reader.region_names[i]
+            base = _safe_name(rname)
 
             # Per-region element: detect from region name
             region_element = detect_element(rname)
             if region_element is None:
                 # Survey / Overview / Wide / unknown → keep region name
-                region_element = rname.replace(" ", "_")
+                region_element = base
 
-            # De-duplicate: same region name appearing more than once
-            name_key = rname
-            count = seen_names.get(name_key, 0)
-            seen_names[name_key] = count + 1
-            region_suffix = rname
-            if count > 0:
-                region_suffix = f"{rname}_{count + 1}"
+            region_suffix, k = base, 1
+            while _generate_output_filename(region_element, filepath, region_suffix) in used:
+                k += 1
+                region_suffix = f"{base}_{k}"
+            used.add(_generate_output_filename(region_element, filepath, region_suffix))
 
             config = ImportConfig(
                 element=region_element,
@@ -692,9 +730,13 @@ def ensure_h5(
                 region_name_override=region_suffix,
             )
             try:
-                result = import_file(filepath, out_dir, config)
+                result = import_file(filepath, out_dir, config, reader=reader)
                 results.append(result.output_path)
             except Exception as e:
-                print(f"Warning: region {i} ({rname}) import failed: {e}")
+                warnings.warn(
+                    f"{filepath.name}: region {i} ({base!r}) was not imported: {e}",
+                    RegionImportWarning,
+                    stacklevel=2,
+                )
 
     return results

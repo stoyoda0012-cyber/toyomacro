@@ -144,6 +144,89 @@ def write_vamas(
     return path
 
 
+def vamas_iso_block(
+    block_id: str = "C 1s/1",
+    n_energy: int = 16,
+    x_start: float = 1186.6,
+    x_step: float = 0.1,
+    technique: str = "XPS",
+    x_label: str = "Kinetic Energy",
+    comments: tuple[str, ...] = ("comment one", "comment two"),
+    transition: str = "",
+    year: str = "2026",
+    source_energy: str = "1486.6",
+    pass_energy: str = "50",
+    analyser_mode: str = "FAT",
+    work_function: str = "1e+037",
+    n_scans: str = "4",
+    collection_time: str = "0.05",
+    exp_values: tuple[str, ...] = ("0",),
+    variables: tuple[tuple[str, str], ...] = (("Counts", "d"), ("Transmission", "d")),
+    ordinates: list[str] | None = None,
+) -> list[str]:
+    """One ISO 14976 block (NORM / REGULAR), as the lines CasaXPS writes."""
+    n_var = len(variables)
+    if ordinates is None:
+        ordinates = []
+        for i in range(n_energy):
+            ordinates.append(str(1000.0 + 10.5 * i))
+            ordinates += [str(0.9 + 0.001 * i)] * (n_var - 1)
+    lines = [block_id, "sample", year, "1", "15", "10", "30", "0", "0",
+             str(len(comments)), *comments, technique, *exp_values,
+             "Al", source_energy, "1e+037", "1e+037", "1e+037", "1e+037", "1e+037",
+             analyser_mode, pass_energy,
+             *(["0.5"] if technique == "AES diff" else []),  # differential width
+             "1e+037", work_function, "1e+037", "1e+037", "1e+037",
+             "1e+037", "1e+037", "C", transition, "-1",
+             x_label, "eV", str(x_start), str(x_step), str(n_var)]
+    for label, unit in variables:
+        lines += [label, unit]
+    lines += ["pulse counting", collection_time, n_scans, "1e+037",
+              "1e+037", "1e+037", "1e+037",
+              "1", "MFP Exponent", "d", "0",
+              str(len(ordinates))]
+    lines += ["0", "1"] * n_var
+    lines += ordinates
+    return lines
+
+
+def write_vamas_iso(
+    path: Path,
+    blocks: list[list[str]] | None = None,
+    file_comments: tuple[str, ...] = ("Casa Info Follows CasaXPS Version 2.3.25PR1.0", "0",
+                                      "", "C:\\Users\\someone\\data.vms"),
+    exp_mode: str = "NORM",
+    scan_mode: str = "REGULAR",
+    n_exp_vars: int = 1,
+    manual_items: tuple[str, ...] = (),
+    inclusion: tuple[str, ...] = (),
+    terminator: str = "end of experiment",
+) -> Path:
+    """Write an ISO 14976 VAMAS file in the layout CasaXPS exports.
+
+    Variable-length parts are written with their counts, an empty line is
+    a field, and the default file comment contains a path (as real files
+    do) so that tests can check it is not persisted.
+    """
+    if blocks is None:
+        blocks = [vamas_iso_block()]
+    lines = ["VAMAS Surface Chemical Analysis Standard Data Transfer Format 1988 May 4",
+             "Not Specified", "Not Specified", "Not Specified", "Not Specified",
+             str(len(file_comments)), *file_comments, exp_mode, scan_mode, "0",
+             str(n_exp_vars)]
+    for k in range(n_exp_vars):
+        lines += [f"Exp Variable {k + 1}", "d"]
+    lines += [str(len(inclusion)), *inclusion, str(len(manual_items)), *manual_items,
+              "0", "0", str(len(blocks))]
+    for block in blocks:
+        lines += block
+    lines.append(terminator)
+    # Bytes, not write_text: on Windows text mode would turn each "\n" of
+    # the CRLF into another CRLF and double every line break.
+    path.write_bytes(("\r\n".join(lines) + "\r\n").encode("utf-8"))
+    return path
+
+
 def write_npl(
     path: Path,
     n_energy: int = 16,

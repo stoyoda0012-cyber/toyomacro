@@ -38,6 +38,37 @@ IntensitySemantics = Literal[
     "unknown",
 ]
 
+#: Whether the analyzer transmission has been divided out of the stored
+#: intensity. "unknown" unless a file states it or the user declares it.
+TransmissionApplied = Literal["applied", "not_applied", "unknown"]
+#: Where a transmission curve for this spectrum comes from, if anywhere.
+TransmissionCurve = Literal["embedded", "user_supplied", "none"]
+#: What the applied state rests on.
+TransmissionBasis = Literal["file", "user", "vendor_convention", "unknown"]
+
+
+@dataclass(frozen=True)
+class CorrespondingVariable:
+    """One ordinate series stored alongside the energy axis in a file.
+
+    VAMAS calls these "corresponding variables": a block may carry several
+    (intensity, a transmission curve, ...), each with its own label and
+    unit, point for point on the same abscissa.
+
+    Attributes:
+        label: The label as written in the file (e.g. ``"Counts"``,
+            ``"Transmission"``).
+        unit: The unit as written in the file (e.g. ``"d"``), not
+            interpreted.
+        values: One value per energy point, aligned with
+            ``RawSpectrumData.energy``.
+    """
+
+    label: str
+    unit: str
+    values: NDArray[np.float64]
+
+
 #: Vocabulary for SpectrumMetadata.dimension_roles entries.
 DIMENSION_ROLES = (
     "energy",
@@ -123,6 +154,25 @@ class SpectrumMetadata:
     #: Physical role of each original dimension (see DIMENSION_ROLES).
     #: "unknown" when the file metadata cannot confirm the role.
     dimension_roles: tuple[str, ...] = ()
+    # --- Acquisition facts as written, not interpreted ---
+    #: Signal mode as written (VAMAS: e.g. "pulse counting"). Says how the
+    #: detector worked, not what the stored numbers are.
+    signal_mode: str | None = None
+    #: Signal collection time in seconds as written (VAMAS). Whether it is
+    #: per scan or summed over ``n_sweeps`` is not stated by the format.
+    signal_collection_time: float | None = None
+    # --- Analyzer transmission: four separate facts ---
+    #: Whether the stored intensity has been divided by a transmission curve.
+    #: A curve stored with the data does not by itself say this.
+    transmission_applied: TransmissionApplied = "unknown"
+    #: Whether a curve accompanies the data, and from where.
+    transmission_curve: TransmissionCurve = "none"
+    #: Label of the corresponding variable holding the curve, when embedded.
+    transmission_curve_variable: str | None = None
+    #: What the curve is normalised to ("unknown" unless stated).
+    transmission_curve_normalisation: str = "unknown"
+    #: What ``transmission_applied`` rests on.
+    transmission_basis: TransmissionBasis = "unknown"
 
     def __post_init__(self):
         # Defensive copy: mutating the caller's dict must not change us.
@@ -142,6 +192,8 @@ class RawSpectrumData:
         metadata: Parsed metadata
         transforms: Operations applied to the arrays since reading the file,
             in application order (reader conventions first, importer last).
+        corresponding_variables: All ordinate series stored for the
+            spectrum (see :class:`CorrespondingVariable`).
     """
 
     specdata: NDArray[np.float64]
@@ -149,6 +201,10 @@ class RawSpectrumData:
     angle: NDArray[np.float64]
     metadata: SpectrumMetadata
     transforms: tuple[ReaderTransform, ...] = ()
+    #: Every ordinate series the file stores for this spectrum, in file
+    #: order; the first is the one in ``specdata``. Empty for formats that
+    #: store a single series.
+    corresponding_variables: tuple[CorrespondingVariable, ...] = ()
 
     def record_transform(
         self,

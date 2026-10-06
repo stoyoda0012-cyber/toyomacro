@@ -23,11 +23,13 @@ import pytest
 
 from tests._synthetic_files import (
     make_notes,
+    vamas_iso_block,
     write_ibw,
     write_npl,
     write_pxt,
     write_ses_txt,
     write_vamas,
+    write_vamas_iso,
 )
 from toyomacro.io.readers.base_reader import (
     RawSpectrumData,
@@ -281,16 +283,17 @@ class TestSyntheticIBW:
 
 
 class TestSyntheticVAMAS:
-    def test_unknowns_are_none(self, tmp_path):
-        f = write_vamas(tmp_path / "a.vms")
+    def test_unknowns_stay_unknown(self, tmp_path):
+        f = write_vamas_iso(tmp_path / "a.vms", blocks=[vamas_iso_block(
+            source_energy="1e+037", pass_energy="1e+037")])
         md = VAMASReader(f).read(0).metadata
-        # The parsed block layout does not carry hv / pass energy
+        # 1e37 is the not-known value CasaXPS writes: unknown, never a number
         assert md.excitation_energy is None
         assert md.pass_energy is None
         assert md.intensity_semantics == "unknown"
 
     def test_provenance_and_shape(self, tmp_path):
-        f = write_vamas(tmp_path / "a.vms", n_energy=16, n_sweeps=4)
+        f = write_vamas_iso(tmp_path / "a.vms", blocks=[vamas_iso_block(n_energy=16)])
         md = VAMASReader(f).read(0).metadata
         assert md.source_format == "vamas"
         assert md.source_format_version is not None
@@ -300,6 +303,15 @@ class TestSyntheticVAMAS:
         assert md.dimension_roles == ("energy",)
         assert md.n_sweeps == 4
         assert md.datetime is not None and md.datetime.year == 2026
+
+    def test_legacy_fixed_layout_only_on_request(self, tmp_path):
+        """The MATLAB-era layout is not ISO 14976 and is not the default."""
+        f = write_vamas(tmp_path / "a.vms", n_energy=16, n_sweeps=4)
+        with pytest.raises(ValueError):
+            VAMASReader(f).read(0)
+        md = VAMASReader(f, layout="legacy_fixed").read(0).metadata
+        assert md.n_sweeps == 4
+        assert md.original_shape == (16,)
 
 
 # ============================================================
