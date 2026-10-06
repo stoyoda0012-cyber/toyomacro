@@ -84,17 +84,22 @@ class ImportResult:
 
 
 _DEDUP_SUFFIX_RE = re.compile(r"^(.+?)(_\d+)$")
-_UNSAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+_PATH_SEPARATORS_RE = re.compile(r"[/\\\x00]+")
 
 
-def _safe_name(name: str) -> str:
-    """A region name reduced to characters safe in a file name.
+def _safe_name(name: str, *, spaces: bool = True) -> str:
+    """A name from a file made safe to use as part of a file name.
 
     Region names come from the file (a VAMAS block identifier is free
-    text): separators, ``..`` and anything else outside ``[A-Za-z0-9._-]``
-    become ``_``, so a name can never leave the output directory.
+    text). Path separators and NUL become ``_`` and leading dots are
+    dropped, so a name can never leave the output directory; spaces
+    become ``_`` as they always did for region names. Everything else is
+    kept, so ordinary names map to the same files as before.
     """
-    return _UNSAFE_NAME_RE.sub("_", name).strip("._") or "region"
+    out = _PATH_SEPARATORS_RE.sub("_", name)
+    if spaces:
+        out = out.replace(" ", "_")
+    return out.lstrip(".") or "region"
 
 
 def _generate_output_filename(
@@ -360,9 +365,10 @@ def import_file(
     raw_region = (config.region_name_override if config.region_name_override is not None
                   else data.metadata.region)
     region_name = _safe_name(raw_region) if raw_region else ""
-    output_filename = _generate_output_filename(_safe_name(config.element), input_path, region_name)
+    output_filename = _generate_output_filename(
+        _safe_name(config.element, spaces=False), input_path, region_name)
     output_path = output_dir / output_filename
-    if output_path.resolve().parent != output_dir.resolve():
+    if output_path.parent.resolve() != output_dir.resolve():
         raise ValueError(f"output name {output_filename!r} leaves the output directory")
 
     # 7. Write HDF5

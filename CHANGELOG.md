@@ -116,10 +116,11 @@ archived on Zenodo for a citable DOI.
   ("C 1s/3" and "C 1s/6" both normalise to C1s), and the later region
   then overwrote the earlier without a warning; with the new VAMAS block
   names that would have left 2 files for each 132-block Kratos file.
-  Names are now made unique by the file they produce. Region names are
-  reduced to `[A-Za-z0-9._-]` before they become part of a file name, so
-  a name read from a file (`../x`, `a/b`) cannot place a file outside
-  the output directory.
+  Names are now made unique by the file they produce. Path separators
+  and leading dots in a region or element name become `_` before it is
+  part of a file name, so a name read from a file (`../x`, `a/b`) cannot
+  place a file outside the output directory; such names, and only they,
+  now give a different file name than before.
 - The v0.4.0 known issue "below a line's first tabulated energy
   `lookup()` extrapolates", on Yeh–Lindau and Scofield. What remains:
   - On Trzhaskovskaya the range is judged on the axis the table is

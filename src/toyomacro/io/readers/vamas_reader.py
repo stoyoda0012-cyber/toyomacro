@@ -255,6 +255,12 @@ def _read_iso(filepath: Path) -> tuple[list[tuple[RawSpectrumData, str]], list[S
         if scale is None or x_unit != "eV":
             skip(f"abscissa {x_label!r} [{x_unit}] is not kinetic or binding energy in eV")
             continue
+        if any(v.lower() == "end of experiment" for v in raw_values):
+            # The count ran past the end of the file's blocks.
+            raise ValueError(
+                f"{src}: {where} counts more ordinate values than the file holds; "
+                "the block boundary cannot be determined"
+            )
         try:
             x_start, x_step = float(x_start_raw), float(x_step_raw)
             values = np.array([float(v) for v in raw_values], dtype=np.float64)

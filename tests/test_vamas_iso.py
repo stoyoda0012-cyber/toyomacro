@@ -213,10 +213,30 @@ def test_a_non_finite_ordinate_rejects_the_block(tmp_path):
     assert "non-finite" in r.skipped_blocks[0].reason
 
 
-def test_an_unreadable_scan_count_is_kept_raw(tmp_path):
-    f = write_vamas_iso(tmp_path / "a.vms", blocks=[vamas_iso_block(n_scans="x")])
+@pytest.mark.parametrize("raw", ["x", "0", "-2"])
+def test_an_unusable_scan_count_is_kept_raw_and_not_taken(tmp_path, raw):
+    f = write_vamas_iso(tmp_path / "a.vms", blocks=[vamas_iso_block(n_scans=raw)])
     md = VAMASReader(f).read(0).metadata
-    assert md.vendor_metadata["n_scans_raw"] == "x"
+    assert md.vendor_metadata["n_scans_raw"] == raw
+    assert md.n_sweeps == 1  # the structural default, not the file's value
+
+
+def test_a_count_past_the_last_block_stops_the_file(tmp_path):
+    """Overstating the last block's count by the terminator's own line."""
+    block = vamas_iso_block(n_energy=8)
+    block[block.index("16")] = "18"
+    f = write_vamas_iso(tmp_path / "a.vms", blocks=[block])
+    with pytest.raises(ValueError, match="more ordinate values than the file holds"):
+        _ = VAMASReader(f).n_regions
+
+
+def test_a_count_error_does_not_repeat_the_line(tmp_path):
+    block = vamas_iso_block()
+    block[block.index("Counts") - 1] = "C:\\Users\\someone\\x.vms"
+    f = write_vamas_iso(tmp_path / "a.vms", blocks=[block])
+    with pytest.raises(ValueError, match="not an integer") as err:
+        _ = VAMASReader(f).n_regions
+    assert "someone" not in str(err.value)
 
 
 def test_errors_do_not_repeat_comment_text(tmp_path):
@@ -264,6 +284,18 @@ def test_ensure_h5_writes_one_file_per_block_when_names_normalise_alike(tmp_path
     assert len(set(paths)) == len(ids) == len(list(out.glob("*.h5")))
     with h5py.File(out / "C1s_6_PVC.h5") as h5:
         assert read_provenance(h5).source_region_index == 3
+
+
+def test_ordinary_names_keep_their_file_names(tmp_path):
+    """Only separators and leading dots are rewritten."""
+    from toyomacro.io.importer import _generate_output_filename, _safe_name
+
+    for name, expected in [("O1s(2)", "O1s(2)"), ("表面", "表面"), ("Wide Scan", "Wide_Scan"),
+                           ("../../x", "_.._x"), ("Survey/1", "Survey_1")]:
+        assert _safe_name(name) == expected
+    assert _safe_name("ptfe 40v t60", spaces=False) == "ptfe 40v t60"
+    assert _generate_output_filename(
+        _safe_name("ptfe 40v t60", spaces=False), Path("ptfe 40v t60.vms")) == "ptfe 40v t60.h5"
 
 
 def test_a_block_id_cannot_leave_the_output_directory(tmp_path):
@@ -337,7 +369,7 @@ def test_the_15_public_files(tmp_path):
         "Thermo KAlpha/ptfe 30v iteration.vms": 502, "Thermo KAlpha/ptfe 40v t60.vms": 60,
         "Thermo KAlpha/pvp.vms": 753,
     }
-    # The example's pair (ASTRA_ANSWERS Q1): source blocks 0 and 1.
+    # The first F 1s / C 1s pair of the file: source blocks 0 and 1.
     assert (f1s.metadata.region, c1s.metadata.region) == ("F 1s/2", "C 1s/3")
     assert (f1s.energy.size, c1s.energy.size) == (301, 251)
     assert f1s.metadata.pass_energy == 20.0 and f1s.metadata.n_sweeps == 4
