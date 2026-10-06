@@ -221,7 +221,9 @@ def write_vamas_iso(
     for block in blocks:
         lines += block
     lines.append(terminator)
-    path.write_text("\r\n".join(lines) + "\r\n")
+    # Bytes, not write_text: on Windows text mode would turn each "\n" of
+    # the CRLF into another CRLF and double every line break.
+    path.write_bytes(("\r\n".join(lines) + "\r\n").encode("utf-8"))
     return path
 
 
