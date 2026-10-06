@@ -47,7 +47,7 @@ TransmissionCurve = Literal["embedded", "user_supplied", "none"]
 TransmissionBasis = Literal["file", "user", "vendor_convention", "unknown"]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class CorrespondingVariable:
     """One ordinate series stored alongside the energy axis in a file.
 
@@ -67,6 +67,37 @@ class CorrespondingVariable:
     label: str
     unit: str
     values: NDArray[np.float64]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, CorrespondingVariable):
+            return NotImplemented
+        return (self.label == other.label and self.unit == other.unit
+                and np.array_equal(self.values, other.values))
+
+    __hash__ = None  # type: ignore[assignment]  # holds an array
+
+
+#: Where a metadata value came from. A field with no recorded origin is
+#: not known to be a fact: it may be a structural default (``n_sweeps=1``).
+ValueOrigin = Literal["file", "user", "inferred"]
+
+#: Fields whose origin is recorded and which are persisted to HDF5 only
+#: together with that origin.
+ORIGIN_FIELDS = (
+    "excitation_energy",
+    "pass_energy",
+    "lens_mode",
+    "n_sweeps",
+    "n_slices",
+    "signal_mode",
+    "signal_collection_time",
+    "transmission_curve",
+    "transmission_curve_variable",
+    "transmission_curve_normalisation",
+)
+
+#: Fields a user may declare with :meth:`RawSpectrumData.declare`.
+DECLARABLE_FIELDS = (*ORIGIN_FIELDS, "transmission_applied")
 
 
 #: Vocabulary for SpectrumMetadata.dimension_roles entries.
@@ -173,10 +204,16 @@ class SpectrumMetadata:
     transmission_curve_normalisation: str = "unknown"
     #: What ``transmission_applied`` rests on.
     transmission_basis: TransmissionBasis = "unknown"
+    #: Origin of each field in :data:`ORIGIN_FIELDS` whose value is known:
+    #: ``"file"`` (read from the file), ``"user"`` (declared, see
+    #: :meth:`RawSpectrumData.declare`) or ``"inferred"``. A field absent
+    #: here is not a known fact, whatever its value.
+    field_origins: Mapping[str, ValueOrigin] = field(default_factory=dict)
 
     def __post_init__(self):
         # Defensive copy: mutating the caller's dict must not change us.
         self.vendor_metadata = copy.deepcopy(dict(self.vendor_metadata))
+        self.field_origins = dict(self.field_origins)
         self.original_shape = tuple(int(d) for d in self.original_shape)
         self.dimension_roles = tuple(str(r) for r in self.dimension_roles)
 
@@ -205,6 +242,40 @@ class RawSpectrumData:
     #: order; the first is the one in ``specdata``. Empty for formats that
     #: store a single series.
     corresponding_variables: tuple[CorrespondingVariable, ...] = ()
+
+    def declare(self, field_name: str, value: Any, reason: str) -> None:
+        """Set a metadata fact on the user's authority, and record it.
+
+        The field's origin becomes ``"user"`` and a ``user_declaration``
+        transform keeps the previous value and origin, so the override is
+        never mistaken for something the file said. Declaring
+        ``transmission_applied`` also sets ``transmission_basis="user"``.
+
+        Args:
+            field_name: One of :data:`DECLARABLE_FIELDS`.
+            value: The declared value (JSON-safe).
+            reason: Why the user knows it (kept in the record).
+        """
+        if field_name not in DECLARABLE_FIELDS:
+            raise ValueError(f"{field_name!r} cannot be declared; one of {DECLARABLE_FIELDS}")
+        if not reason:
+            raise ValueError("a declaration needs a reason")
+        md = self.metadata
+        previous = getattr(md, field_name)
+        previous_origin = (md.transmission_basis if field_name == "transmission_applied"
+                           else md.field_origins.get(field_name))
+        setattr(md, field_name, value)
+        if field_name == "transmission_applied":
+            md.transmission_basis = "user"
+        else:
+            md.field_origins[field_name] = "user"
+        self.record_transform(
+            "user_declaration",
+            parameters={"field": field_name, "value": value, "previous": previous,
+                        "previous_origin": previous_origin},
+            source="user",
+            reason=reason,
+        )
 
     def record_transform(
         self,

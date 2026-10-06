@@ -23,6 +23,20 @@ The rules it fixes, which this module implements:
   - reading is best-effort: malformed types/shapes/JSON in known fields
     degrade to warnings and safe defaults, never exceptions. Provenance
     problems must never block reading the spectra themselves.
+
+Schema 1.1 (v0.5.0) adds, all optional and absent in 1.0 files:
+  - ``<field>_origin`` next to a value (``file`` / ``user`` / ``inferred``).
+    ``lens_mode``, ``n_sweeps``, ``n_slices``, the signal and the
+    transmission-curve fields are written only with an origin, so a
+    structural default is never stored as a fact; an absent field reads
+    back as unknown.
+  - ``transmission_applied`` / ``transmission_basis`` when not unknown.
+  - ``corresponding/``: every ordinate series the file stored (``var0``,
+    ``var1``, ... with ``label`` / ``unit`` attributes) and ``energy``,
+    the file's own axis they align with — kept even when the importer
+    converts or reverses the main energy axis.
+A 1.0 reader reads a 1.1 group and ignores what it does not know; a 1.0
+writer rewriting the group drops the 1.1 additions.
 """
 
 from __future__ import annotations
@@ -30,12 +44,13 @@ from __future__ import annotations
 import json
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import h5py
 import numpy as np
 
+from toyomacro.io.readers.base_reader import ORIGIN_FIELDS, CorrespondingVariable
 from toyomacro.io.schema import ToyomacroSchema
 
 if TYPE_CHECKING:
@@ -51,6 +66,41 @@ _GROUP = ToyomacroSchema.PATH_PROVENANCE.lstrip("/")
 _NEVER_PERSIST_VENDOR_KEYS = frozenset({"unparsed_notes"})
 
 VENDOR_POLICY_VERSION = "1.0"
+
+_ORIGINS = frozenset({"file", "user", "inferred"})
+
+#: HDF5 attribute name of each origin-tracked metadata field.
+_ATTR_NAMES = {
+    "excitation_energy": "excitation_energy_eV",
+    "pass_energy": "pass_energy_eV",
+    "signal_collection_time": "signal_collection_time_s",
+}
+
+#: Fields that 1.0 already wrote whenever known; 1.1 adds only their origin.
+_ALWAYS_WRITTEN = frozenset({"excitation_energy", "pass_energy"})
+
+_SERIES_GROUP = "corresponding"
+
+
+@dataclass(frozen=True, eq=False)
+class StoredSeries:
+    """Every ordinate series a file stored, on the file's own energy axis.
+
+    Attributes:
+        energy: The energy axis as read from the file, before any importer
+            conversion; ``variables[k].values[i]`` belongs to ``energy[i]``.
+        variables: The series in file order (the first is the intensity).
+    """
+
+    energy: np.ndarray
+    variables: tuple[CorrespondingVariable, ...]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StoredSeries):
+            return NotImplemented
+        return np.array_equal(self.energy, other.energy) and self.variables == other.variables
+
+    __hash__ = None  # type: ignore[assignment]
 
 
 class ProvenanceWarning(UserWarning):
@@ -99,6 +149,16 @@ class HDF5Provenance:
     vendor_metadata: dict[str, Any] | None = None  # None = not persisted
     vendor_policy_version: str | None = None
     vendor_allowlist: tuple[str, ...] = ()
+    # --- schema 1.1; None = not recorded (unknown) ---
+    field_origins: dict[str, str] = field(default_factory=dict)
+    signal_mode: str | None = None
+    signal_collection_time: float | None = None  # s, as written in the file
+    transmission_applied: str | None = None
+    transmission_basis: str | None = None
+    transmission_curve: str | None = None
+    transmission_curve_variable: str | None = None
+    transmission_curve_normalisation: str | None = None
+    series: StoredSeries | None = None
 
 
 # ----------------------------------------------------------------------
@@ -114,18 +174,21 @@ def write_provenance(
     persist_datetime: bool = False,
     persist_vendor_metadata: bool = False,
     vendor_metadata_allowlist: Sequence[str] = (),
+    series: StoredSeries | None = None,
 ) -> None:
     """Write the ``/provenance`` group from Phase A reader output.
 
     Unknown values are represented by *absent* attributes (design §5).
     ``datetime`` and vendor metadata are opt-in (design §3, §7).
 
-    ``n_sweeps`` / ``n_slices`` / ``lens_mode`` are NOT persisted: Phase A
-    metadata cannot distinguish "the file said 1" from its structural
-    default (n_sweeps=1), and NPL/VAMAS ``lens_mode="Angular"`` is a
-    legacy fixed value — none of these are guaranteed acquisition facts.
-    Persisting them requires an explicit "was read from the file" marker
-    in Phase A metadata first (design §3).
+    ``n_sweeps`` / ``n_slices`` / ``lens_mode`` (and the other fields in
+    ``ORIGIN_FIELDS``) are persisted only when ``metadata.field_origins``
+    records where they came from: without that, "the file said 1" cannot
+    be told from the structural default ``n_sweeps=1``, and the legacy
+    ``lens_mode="Angular"`` is not an acquisition fact.
+
+    ``series`` (optional) stores every ordinate series on the file's own
+    energy axis, as float64.
     """
     if _GROUP in h5file:
         del h5file[_GROUP]
@@ -146,6 +209,12 @@ def write_provenance(
     attrs["intensity_unit"] = str(metadata.intensity_unit)
     if metadata.acquisition_mode:
         attrs["acquisition_mode"] = str(metadata.acquisition_mode)
+    _write_origin_fields(attrs, metadata)
+    if metadata.transmission_applied != "unknown":
+        attrs["transmission_applied"] = str(metadata.transmission_applied)
+        attrs["transmission_basis"] = str(metadata.transmission_basis)
+    if series is not None and series.variables:
+        _write_series(grp, series)
     if persist_datetime and metadata.datetime is not None:
         attrs["datetime"] = metadata.datetime.isoformat()
     if metadata.original_shape:
@@ -161,6 +230,31 @@ def write_provenance(
 
     if persist_vendor_metadata and vendor_metadata_allowlist:
         _write_vendor_metadata(grp, metadata, vendor_metadata_allowlist)
+
+
+def _write_origin_fields(attrs: h5py.AttributeManager, metadata: SpectrumMetadata) -> None:
+    for name in ORIGIN_FIELDS:
+        origin = metadata.field_origins.get(name)
+        value = getattr(metadata, name)
+        if value is None or origin not in _ORIGINS:
+            continue
+        key = _ATTR_NAMES.get(name, name)
+        if name not in _ALWAYS_WRITTEN:
+            if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                continue
+            attrs[key] = np.int64(value) if isinstance(value, int) else (
+                np.float64(value) if isinstance(value, float) else str(value))
+        attrs[f"{name}_origin"] = origin
+
+
+def _write_series(grp: h5py.Group, series: StoredSeries) -> None:
+    sub = grp.create_group(_SERIES_GROUP)
+    sub.create_dataset("energy", data=np.asarray(series.energy, dtype=np.float64))
+    for k, var in enumerate(series.variables):
+        ds = sub.create_dataset(f"var{k}", data=np.asarray(var.values, dtype=np.float64))
+        ds.attrs["label"] = str(var.label)
+        ds.attrs["unit"] = str(var.unit)
+        ds.attrs["index"] = np.int64(k)
 
 
 def _write_transform_history(
@@ -420,7 +514,58 @@ def read_provenance(h5file: h5py.File | h5py.Group) -> HDF5Provenance | None:
         vendor_metadata=vendor,
         vendor_policy_version=policy_version,
         vendor_allowlist=allowlist,
+        field_origins=_read_origins(attrs, src),
+        signal_mode=_attr_str(attrs, "signal_mode", src),
+        signal_collection_time=_attr_float(attrs, "signal_collection_time_s", src),
+        transmission_applied=_attr_str(attrs, "transmission_applied", src),
+        transmission_basis=_attr_str(attrs, "transmission_basis", src),
+        transmission_curve=_attr_str(attrs, "transmission_curve", src),
+        transmission_curve_variable=_attr_str(attrs, "transmission_curve_variable", src),
+        transmission_curve_normalisation=_attr_str(
+            attrs, "transmission_curve_normalisation", src),
+        series=_read_series(grp, src),
     )
+
+
+def _read_origins(attrs: h5py.AttributeManager, src: str) -> dict[str, str]:
+    origins: dict[str, str] = {}
+    for name in ORIGIN_FIELDS:
+        origin = _attr_str(attrs, f"{name}_origin", src)
+        if origin is None:
+            continue
+        if origin not in _ORIGINS:
+            _warn_malformed(src, f"{name}_origin", f"unknown origin {origin!r} ignored")
+            continue
+        origins[name] = origin
+    return origins
+
+
+def _read_series(grp: h5py.Group, src: str) -> StoredSeries | None:
+    if _SERIES_GROUP not in grp:
+        return None
+    sub = grp[_SERIES_GROUP]
+    try:
+        energy = np.asarray(sub["energy"][()], dtype=np.float64)
+        keys = sorted((k for k in sub if k.startswith("var")),
+                      key=lambda k: int(sub[k].attrs["index"]))
+        variables = tuple(
+            CorrespondingVariable(
+                label=str(_decode(sub[k].attrs["label"])),
+                unit=str(_decode(sub[k].attrs["unit"])),
+                values=np.asarray(sub[k][()], dtype=np.float64),
+            )
+            for k in keys
+        )
+        if energy.ndim != 1 or any(v.values.shape != energy.shape for v in variables):
+            raise ValueError("series and energy axis differ in shape")
+    except (KeyError, TypeError, ValueError, AttributeError) as e:
+        _warn_malformed(src, _SERIES_GROUP, f"unreadable ({e}); ignored")
+        return None
+    return StoredSeries(energy=energy, variables=variables)
+
+
+def _decode(value: Any) -> Any:
+    return value.decode("utf-8") if isinstance(value, bytes) else value
 
 
 def _read_transform_history(

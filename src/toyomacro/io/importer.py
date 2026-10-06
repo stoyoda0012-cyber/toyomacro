@@ -30,6 +30,7 @@ from typing import Any
 
 import numpy as np
 
+from toyomacro.io.provenance import StoredSeries
 from toyomacro.io.readers.base_reader import (
     BaseReader,
     RawSpectrumData,
@@ -318,6 +319,8 @@ def import_file(
     if reader is None:
         reader = create_reader(input_path, config.format)
     data = reader.read(config.region_index)
+    # The file's own axis, before any conversion: stored series align with it.
+    file_energy = np.array(data.energy, dtype=np.float64, copy=True)
 
     # 2. Validate
     _validate_data(data)
@@ -424,6 +427,8 @@ def import_file(
             persist_datetime=config.persist_datetime,
             persist_vendor_metadata=config.persist_vendor_metadata,
             vendor_metadata_allowlist=config.vendor_metadata_allowlist,
+            series=(StoredSeries(energy=file_energy, variables=data.corresponding_variables)
+                    if data.corresponding_variables else None),
         )
 
         # Write spectra
