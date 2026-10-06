@@ -59,7 +59,12 @@ archived on Zenodo for a citable DOI.
     is not embedded clears `transmission_curve_variable`.
   - `import_file(..., data=)` imports a region already read — the way to
     keep a declaration, since the PXT/IBW reader builds a new object on
-    every `read()` and `reader=` alone would import without it.
+    every `read()` and `reader=` alone would import without it. Without
+    `reader=` the file is not parsed again and `ImportResult.n_regions`
+    is None. A `reader=` for a different file than `input_path` is
+    refused. Clearing the curve variable records its previous value
+    and origin; `transmission_applied="unknown"` cannot be declared,
+    nor a curve variable unless the curve is declared embedded.
   - `transmission_applied` and `transmission_basis` are written when not
     unknown; every stored ordinate series (`corresponding_variables`) is
     written under `/provenance/corresponding` as float64 together with

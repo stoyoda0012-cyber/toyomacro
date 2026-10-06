@@ -264,11 +264,15 @@ class RawSpectrumData:
             raise ValueError("a declaration needs a reason")
         value = _declared_value(field_name, value)
         md = self.metadata
+        if field_name == "transmission_curve_variable" and md.transmission_curve != "embedded":
+            raise ValueError(
+                "transmission_curve_variable names an embedded curve; declare "
+                "transmission_curve='embedded' first")
         previous = getattr(md, field_name)
         previous_origin = (md.transmission_basis if field_name == "transmission_applied"
                            else md.field_origins.get(field_name))
         setattr(md, field_name, value)
-        cleared: list[str] = []
+        cleared: dict[str, dict[str, Any]] = {}
         if field_name == "transmission_applied":
             md.transmission_basis = "user"
         else:
@@ -276,9 +280,11 @@ class RawSpectrumData:
         if field_name == "transmission_curve" and value != "embedded" \
                 and md.transmission_curve_variable is not None:
             # A curve that is not in the data has no variable in it.
+            cleared["transmission_curve_variable"] = {
+                "previous": md.transmission_curve_variable,
+                "previous_origin": md.field_origins.pop("transmission_curve_variable", None),
+            }
             md.transmission_curve_variable = None
-            md.field_origins.pop("transmission_curve_variable", None)
-            cleared.append("transmission_curve_variable")
         self.record_transform(
             "user_declaration",
             parameters={"field": field_name, "value": value, "previous": previous,
@@ -336,7 +342,7 @@ def _declared_value(field_name: str, value: Any) -> Any:
         return value
     allowed = _DECLARED_VOCABULARIES.get(field_name)
     if allowed is not None:
-        if value not in allowed:
+        if value not in allowed or value == "unknown":
             raise ValueError(f"{field_name}: expected one of {allowed}, got {value!r}")
         return value
     if not isinstance(value, str) or not value.strip() or value.strip().lower() == "unknown":

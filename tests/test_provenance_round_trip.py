@@ -297,7 +297,53 @@ def test_declaring_no_curve_clears_the_curve_variable(tmp_path):
     md = data.metadata
     assert md.transmission_curve_variable is None
     assert "transmission_curve_variable" not in md.field_origins
-    assert data.transforms[-1].parameters["cleared"] == ["transmission_curve_variable"]
+    assert data.transforms[-1].parameters["cleared"] == {
+        "transmission_curve_variable": {"previous": "Transmission", "previous_origin": "file"}}
+
+
+def test_declaring_an_embedded_curve_keeps_its_variable(tmp_path):
+    data = VAMASReader(write_vamas_iso(tmp_path / "a.vms")).read(0)
+    data.declare("transmission_curve", "embedded", "confirmed with the vendor")
+    assert data.metadata.transmission_curve_variable == "Transmission"
+    assert data.transforms[-1].parameters["cleared"] == {}
+
+
+def test_inconsistent_or_empty_transmission_declarations_are_refused(tmp_path):
+    data = VAMASReader(write_vamas_iso(tmp_path / "a.vms", blocks=[
+        vamas_iso_block(variables=(("Counts", "d"),))])).read(0)
+    with pytest.raises(ValueError, match="unknown"):
+        data.declare("transmission_applied", "unknown", "not sure")
+    with pytest.raises(ValueError, match="embedded"):
+        data.declare("transmission_curve_variable", "Counts", "it is the curve")
+
+
+def test_data_without_a_reader_does_not_parse_the_file_again(tmp_path):
+    """Importing from data= neither re-parses (no second warning) nor
+    needs the default layout (a legacy-layout read imports as is)."""
+    from tests._synthetic_files import write_vamas
+    from toyomacro.io.readers.base_reader import ReaderWarning
+
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[
+        vamas_iso_block("A", technique="AES dir"), vamas_iso_block("B", n_energy=12)])
+    with pytest.warns(ReaderWarning):
+        data = VAMASReader(f).read(0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ReaderWarning)
+        result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
+                             data=data)
+    assert result.n_regions is None
+
+    legacy = write_vamas(tmp_path / "old.vms", n_energy=16)
+    old = VAMASReader(legacy, layout="legacy_fixed").read(0)
+    import_file(legacy, tmp_path / "out2", ImportConfig(element="C1s", compress=False), data=old)
+
+
+def test_a_reader_for_another_file_is_refused(tmp_path):
+    f = write_vamas_iso(tmp_path / "in.vms")
+    other = write_vamas_iso(tmp_path / "other.vms")
+    with pytest.raises(ValueError, match="wrong file"):
+        import_file(other, tmp_path / "out", ImportConfig(element="C1s", compress=False),
+                    reader=VAMASReader(f))
 
 
 def test_a_numpy_value_set_by_a_reader_is_stored(tmp_path):
