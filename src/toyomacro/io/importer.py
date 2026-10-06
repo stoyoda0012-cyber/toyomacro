@@ -294,6 +294,7 @@ def import_file(
     config: ImportConfig,
     *,
     reader: BaseReader | None = None,
+    data: RawSpectrumData | None = None,
 ) -> ImportResult:
     """Import a single raw data file to HDF5.
 
@@ -306,6 +307,11 @@ def import_file(
         config: Import configuration
         reader: An already-parsed reader for ``input_path``, so that a
             multi-region file is not parsed again for every region.
+        data: The region to import, already read from ``input_path`` —
+            for example after :meth:`RawSpectrumData.declare`. Takes the
+            place of reading (``config.region_index`` is then unused).
+            Pass the data rather than only the reader to keep a
+            declaration: some readers return a new object on every read.
 
     Returns:
         ImportResult with output path and statistics
@@ -324,7 +330,7 @@ def import_file(
     # returns its cached object, which would otherwise carry the converted
     # axis into the next import as if it were the file's. The arrays are
     # rebound, never written into, so they are not copied.
-    raw = reader.read(config.region_index)
+    raw = data if data is not None else reader.read(config.region_index)
     data = dataclasses.replace(raw, metadata=dataclasses.replace(raw.metadata))
     # The file's own axis, before any conversion: stored series align with it.
     file_energy = np.array(data.energy, dtype=np.float64, copy=True)

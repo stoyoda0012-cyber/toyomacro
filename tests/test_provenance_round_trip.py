@@ -80,7 +80,7 @@ def test_a_user_override_comes_back_with_origin_and_history(tmp_path):
     data.declare("n_sweeps", 8, "acquisition log: 8 sweeps, file records the export")
     data.declare("transmission_applied", "not_applied", "exported raw from the vendor software")
     result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
-                         reader=reader)
+                         data=data)
     prov = _prov(result.output_path)
     assert prov.n_sweeps == 8 and prov.field_origins["n_sweeps"] == "user"
     assert (prov.transmission_applied, prov.transmission_basis) == ("not_applied", "user")
@@ -216,9 +216,10 @@ def test_reusing_a_reader_keeps_the_files_axis_in_every_import(tmp_path):
 def test_numpy_and_integral_declarations_are_stored(tmp_path, value, stored):
     f = write_vamas_iso(tmp_path / "in.vms", blocks=[vamas_iso_block(n_energy=12)])
     reader = VAMASReader(f)
-    reader.read(0).declare("n_sweeps", value, "acquisition log")
+    data = reader.read(0)
+    data.declare("n_sweeps", value, "acquisition log")
     result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
-                         reader=reader)
+                         data=data)
     prov = _prov(result.output_path)
     assert (prov.n_sweeps, prov.field_origins["n_sweeps"]) == (stored, "user")
     assert not prov.transform_history_incomplete
@@ -227,7 +228,9 @@ def test_numpy_and_integral_declarations_are_stored(tmp_path, value, stored):
 @pytest.mark.parametrize(("field_name", "value"), [
     ("n_sweeps", True), ("n_sweeps", 8.5), ("n_sweeps", 0), ("excitation_energy", "abc"),
     ("excitation_energy", float("nan")), ("transmission_applied", "yes please"),
-    ("transmission_curve", "somewhere"), ("lens_mode", ""),
+    ("transmission_curve", "somewhere"), ("lens_mode", ""), ("lens_mode", "unknown"),
+    ("transmission_curve_normalisation", "Unknown"), ("excitation_energy", 0.0),
+    ("pass_energy", -20.0),
 ])
 def test_an_unstorable_declaration_changes_nothing(tmp_path, field_name, value):
     data = VAMASReader(write_vamas_iso(tmp_path / "a.vms")).read(0)
@@ -267,3 +270,51 @@ def test_series_keep_file_order_past_ten_variables(tmp_path):
     series = _prov(result.output_path).series
     assert [v.label for v in series.variables] == [f"v{k}" for k in range(12)]
     assert series.variables[10].values[1] == pytest.approx(110.0)
+
+
+# --- what the re-audit found ------------------------------------------------------
+
+def test_a_declaration_on_a_pxt_region_reaches_the_file(tmp_path):
+    """The PXT reader builds a new object on each read; pass the data."""
+    from toyomacro.io.readers.pxt_reader import PXTReader
+
+    f = write_pxt(tmp_path / "in.pxt", [(_spectrum_1d(), make_notes(FULL_NOTES))])
+    reader = PXTReader(f)
+    assert reader.read(0) is not reader.read(0)
+    data = reader.read(0)
+    data.declare("n_sweeps", 8, "acquisition log")
+    data.declare("transmission_applied", "applied", "vendor export setting")
+    result = import_file(f, tmp_path / "out", ImportConfig(element="Si2p", compress=False),
+                         data=data)
+    prov = _prov(result.output_path)
+    assert (prov.n_sweeps, prov.field_origins["n_sweeps"]) == (8, "user")
+    assert (prov.transmission_applied, prov.transmission_basis) == ("applied", "user")
+
+
+def test_declaring_no_curve_clears_the_curve_variable(tmp_path):
+    data = VAMASReader(write_vamas_iso(tmp_path / "a.vms")).read(0)
+    data.declare("transmission_curve", "none", "the column is a different quantity")
+    md = data.metadata
+    assert md.transmission_curve_variable is None
+    assert "transmission_curve_variable" not in md.field_origins
+    assert data.transforms[-1].parameters["cleared"] == ["transmission_curve_variable"]
+
+
+def test_a_numpy_value_set_by_a_reader_is_stored(tmp_path):
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[vamas_iso_block(n_energy=12)])
+    data = VAMASReader(f).read(0)
+    data.metadata.n_sweeps = np.int64(3)  # as a reader might set it
+    result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
+                         data=data)
+    assert _prov(result.output_path).n_sweeps == 3
+
+
+def test_a_value_that_cannot_be_stored_warns_and_writes_no_origin(tmp_path):
+    f = write_vamas_iso(tmp_path / "in.vms", blocks=[vamas_iso_block(n_energy=12)])
+    data = VAMASReader(f).read(0)
+    data.metadata.n_sweeps = [3]  # not a scalar
+    with pytest.warns(ProvenanceWarning, match="cannot be stored"):
+        result = import_file(f, tmp_path / "out", ImportConfig(element="C1s", compress=False),
+                             data=data)
+    prov = _prov(result.output_path)
+    assert prov.n_sweeps is None and "n_sweeps" not in prov.field_origins

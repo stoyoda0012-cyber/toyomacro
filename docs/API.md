@@ -927,16 +927,19 @@ does not say it was, or was not, applied.
 A fact the file does not hold can be declared, with a reason:
 
 ```python
-reader = VAMASReader("PTFE.vms")
-data = reader.read(0)
+data = VAMASReader("PTFE.vms").read(0)  # region 0 of this file is F 1s
 data.declare("transmission_applied", "not_applied", "exported raw from the acquisition software")
-import_file("PTFE.vms", "out/", ImportConfig(element="F1s"), reader=reader)
+import_file("PTFE.vms", "out/", ImportConfig(element="F1s"), data=data)
 ```
 
-The origin becomes `"user"` and a `user_declaration` record keeps the
-previous value and origin. Values are checked before anything changes
-(`DECLARABLE_FIELDS`; numbers positive, counts integer, transmission
-states from their vocabulary).
+Pass the declared `data` itself: some readers (PXT/IBW) build a new
+object on every `read()`, so passing only the reader would import the
+file without the declaration. The origin becomes `"user"` and a
+`user_declaration` record keeps the previous value and origin. Values
+are checked before anything changes (`DECLARABLE_FIELDS`; numbers
+positive, counts integer, transmission states from their vocabulary,
+no `"unknown"` placeholder); declaring a curve that is not embedded
+clears `transmission_curve_variable`.
 
 `import_file` writes all of this to the HDF5 `/provenance` group
 (schema 1.1), and `read_provenance` returns it as `HDF5Provenance`,
@@ -946,8 +949,10 @@ written only with their origin, so an unknown value reads back as
 `None`. Compression, `repack_file` and the streaming writer keep the
 group as it is. What is written: the values above, the series with
 their labels and units, the signal mode, and declaration reasons — all
-text the file or the user supplied. Comment lines and other free text
-from the file are never written; other vendor fields only on opt-in.
+text the file or the user supplied, as are the region name (a VAMAS
+block identifier, a PXT region name), the format version line and the
+input file name, as in schema 1.0. Comment lines are never written, and
+other vendor fields only on opt-in.
 `misc/numberofslice` in the HDF5 layout is a structural default, not a
 fact. A 1.0 file (v0.4.0 and earlier) reads with no origins and no
 series.

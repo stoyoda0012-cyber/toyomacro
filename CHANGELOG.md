@@ -53,9 +53,13 @@ archived on Zenodo for a citable DOI.
     `user_declaration` record keeps the previous value and origin.
     Declaring `transmission_applied` sets `transmission_basis="user"`.
     The value is checked first (`DECLARABLE_FIELDS`: positive numbers,
-    integer counts, the transmission vocabularies; NumPy scalars are
-    converted, bools rejected), so a declaration either stands or
-    changes nothing.
+    integer counts, the transmission vocabularies, no `"unknown"`
+    placeholder; NumPy scalars are converted, bools rejected), so a
+    declaration either stands or changes nothing. Declaring a curve that
+    is not embedded clears `transmission_curve_variable`.
+  - `import_file(..., data=)` imports a region already read — the way to
+    keep a declaration, since the PXT/IBW reader builds a new object on
+    every `read()` and `reader=` alone would import without it.
   - `transmission_applied` and `transmission_basis` are written when not
     unknown; every stored ordinate series (`corresponding_variables`) is
     written under `/provenance/corresponding` as float64 together with
@@ -67,7 +71,9 @@ archived on Zenodo for a citable DOI.
     `/provenance` to float32.
   - What is written includes text from the file and the user: series
     labels and units, the signal mode, the curve's label, and
-    declaration reasons. Comment lines are never written.
+    declaration reasons, besides the region name, format version line
+    and input file name that 1.0 already wrote. Comment lines are never
+    written.
   - A 1.0 file reads with no origins, no series and transmission
     unknown. `ensure_h5` reuses an existing .h5 newer than its source,
     so a file imported before this version keeps its 1.0 group until it

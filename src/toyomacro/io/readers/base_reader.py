@@ -268,14 +268,21 @@ class RawSpectrumData:
         previous_origin = (md.transmission_basis if field_name == "transmission_applied"
                            else md.field_origins.get(field_name))
         setattr(md, field_name, value)
+        cleared: list[str] = []
         if field_name == "transmission_applied":
             md.transmission_basis = "user"
         else:
             md.field_origins[field_name] = "user"
+        if field_name == "transmission_curve" and value != "embedded" \
+                and md.transmission_curve_variable is not None:
+            # A curve that is not in the data has no variable in it.
+            md.transmission_curve_variable = None
+            md.field_origins.pop("transmission_curve_variable", None)
+            cleared.append("transmission_curve_variable")
         self.record_transform(
             "user_declaration",
             parameters={"field": field_name, "value": value, "previous": previous,
-                        "previous_origin": previous_origin},
+                        "previous_origin": previous_origin, "cleared": cleared},
             source="user",
             reason=reason,
         )
@@ -332,8 +339,9 @@ def _declared_value(field_name: str, value: Any) -> Any:
         if value not in allowed:
             raise ValueError(f"{field_name}: expected one of {allowed}, got {value!r}")
         return value
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{field_name}: expected a non-empty string, got {value!r}")
+    if not isinstance(value, str) or not value.strip() or value.strip().lower() == "unknown":
+        # "unknown" is the absence of a fact, not a fact to declare.
+        raise ValueError(f"{field_name}: expected a non-empty, known string, got {value!r}")
     return value
 
 
