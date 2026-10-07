@@ -25,12 +25,27 @@ and never combines them into one "±":
 
 Its ``status`` is ``"refused"`` (no number: a required fact is missing
 and no assumption was given, or the numbers do not determine a result),
-``"conditional"`` (a number that rests on the listed assumptions or on
-an extrapolated input) or ``"supported"`` (every input is a stated fact
-within its range). Nothing is filled in by default: an unknown exposure,
-transmission state or intensity meaning refuses unless the caller names
-an assumption, and an element missing from the declared set is never
-dropped from the denominator silently.
+``"conditional"`` (a number that rests on the listed assumptions, on a
+subset denominator or on an input outside its tabulated or fitted range)
+or ``"inputs_stated"`` (no named assumption, no subset and no
+extrapolated input). ``"inputs_stated"`` is not "validated": the number
+still rests on the homogeneous σ × λ model and on the chosen matrix,
+table, background and window. Nothing is filled in by default: the
+declared elements, the exposure and its basis, the transmission state,
+the intensity meaning and the matrix with its source are required; an
+unknown one refuses unless the caller names an assumption, and an element
+is never dropped from the denominator silently.
+
+The expression is the standard one for a homogeneous sample,
+``x_i = (A_i/S_i) / Σ_j (A_j/S_j)`` (as in ISO 18118:2015, there with
+experimentally determined relative sensitivity factors S), here with the
+intrinsic S = σ × λ. It is not validated in this version against a
+measured stoichiometry.
+
+Limits. All lines share one intensity meaning and one transmission state
+(split the call otherwise). Shirley weights points, not eV, so it is
+refused on a non-uniform energy grid. The window must lie inside the
+data and contain the line.
 
 Area. Each line's area is the trapezoidal integral over its window of
 ``I/(t·T) − B`` in eV, where ``t`` is the line's exposure (only for
@@ -54,7 +69,7 @@ from toyomacro.data.cross_section import CrossSection, CrossSectionLookup
 from toyomacro.data.imfp import IMFP, TPP2M_FITTED_RANGE_EV
 
 Background = Literal["shirley", "linear"]
-Status = Literal["supported", "conditional", "refused"]
+Status = Literal["inputs_stated", "conditional", "refused"]
 IntensityAssumption = Literal["integrated_counts", "count_rate"]
 TransmissionAssumption = Literal["divide_by_curve", "equal_across_lines"]
 
@@ -137,7 +152,8 @@ class Conditions:
             normalisation) or ``"equal_across_lines"`` (T is the same for
             every line, so it cancels). Makes the result conditional.
         declared_elements: Every element the sample is taken to contain;
-            the denominator. Defaults to the lines' elements.
+            the denominator. Required, and every line's element must be
+            in it.
         normalise_over: A subset to normalise over instead. Elements left
             out are recorded with ``exclusion_reason``; conditional.
         exclusion_reason: Required with ``normalise_over``.
@@ -189,6 +205,8 @@ class CompositionResult:
     assumptions: tuple[str, ...]
     reasons: tuple[str, ...]
     not_evaluated: tuple[str, ...]
+    extrapolated_inputs: tuple[str, ...] = ()
+    notes: tuple[str, ...] = ()
     statistical_uncertainty: None = None
     conditions: Conditions | None = field(default=None, repr=False)
 
@@ -199,32 +217,57 @@ QUANTITY = (
 )
 
 
-def _line_area(line: Line, background: str, divide_t: bool, exposure: float | None):
+def _matrix_problem(m: Matrix) -> str | None:
+    if not m.name or not m.source:
+        return "matrix needs a name and a source"
+    if m.compound is None and any(v is None for v in (m.Nv, m.density, m.Mw, m.Eg)):
+        return "matrix needs a compound or all four TPP-2M parameters (Nv, density, Mw, Eg)"
+    return None
+
+
+def _line_area(line: Line, background: str, divide_t: bool, exposure: float | None,
+               photon_energy: float):
     """(area, definition, problem or None) for one line."""
     e = np.asarray(line.energy, dtype=np.float64)
     y = np.asarray(line.intensity, dtype=np.float64)
+    t = None if line.transmission is None else np.asarray(line.transmission, dtype=np.float64)
+    if e.ndim != 1 or y.shape != e.shape or (t is not None and t.shape != e.shape):
+        return None, "", "energy, intensity and transmission differ in shape"
+    if not (np.all(np.isfinite(e)) and np.all(np.isfinite(y))):
+        return None, "", "non-finite energy or intensity"
+    order = np.argsort(e)  # integrate on an ascending axis: the sign then means something
+    e, y = e[order], y[order]
+    t = None if t is None else t[order]
     lo, hi = sorted(line.window)
+    if lo < e[0] or hi > e[-1]:
+        return None, "", f"window [{lo:g}, {hi:g}] eV extends beyond the data"
+    position = (line.binding_energy if line.energy_scale == "binding"
+                else photon_energy - line.binding_energy)
+    if not lo <= position <= hi:
+        return None, "", f"the line ({position:g} eV) is outside its window"
     inside = (e >= lo) & (e <= hi)
     if inside.sum() < 3:
         return None, "", "fewer than 3 points inside the window"
     e, y = e[inside], y[inside]
+    steps = np.diff(e)
+    if background == "shirley" and np.ptp(steps) > 1e-6 * np.mean(steps):
+        return None, "", "Shirley here weights points, not eV; the grid is not uniform"
     terms = ["I"]
     if exposure is not None:
         y = y / exposure
         terms.append("/t")
     if divide_t:
-        t = np.asarray(line.transmission, dtype=np.float64)[inside]
+        t = t[inside]
         if np.any(~np.isfinite(t)) or np.any(t <= 0):
             return None, "", "transmission curve is not positive and finite in the window"
         y = y / t
         terms.append("/T")
-    bg = _BACKGROUNDS[background]().calculate(e, y)
-    net = y - bg
-    area = float(abs(np.trapezoid(net, e)))
+    net = y - _BACKGROUNDS[background]().calculate(e, y)
+    area = float(np.trapezoid(net, e))
     definition = (f"trapezoidal integral over [{lo:g}, {hi:g}] eV of "
                   f"{''.join(terms)} - {background} background, in eV x intensity unit")
-    if not np.isfinite(area) or area <= 0:
-        return None, definition, "area is not positive"
+    if not area > 0:
+        return None, definition, f"net area is not positive ({area:.4g})"
     return area, definition, None
 
 
@@ -236,6 +279,8 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     c = conditions
     reasons: list[str] = []
     assumptions: list[str] = []
+    notes: list[str] = []
+    extrapolated: list[str] = []
     not_evaluated = [
         "statistical uncertainty: not evaluated in this version",
         "elastic scattering, angular distribution, polarization and geometry: "
@@ -245,23 +290,40 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     elements = [ln.element for ln in lines]
     if len(set(elements)) != len(elements):
         reasons.append("more than one line per element is not supported")
-    declared = tuple(c.declared_elements) if c.declared_elements else tuple(elements)
+    declared = tuple(c.declared_elements or ())
+    if not declared:
+        reasons.append("declared_elements is required (the denominator is never implied)")
+    elif len(set(declared)) != len(declared):
+        reasons.append("declared_elements has duplicates")
     missing = [el for el in declared if el not in elements]
     if missing:
         reasons.append(f"declared elements without a line: {missing}")
+    undeclared = [el for el in elements if el not in declared]
+    if declared and undeclared:
+        reasons.append(f"lines for undeclared elements: {undeclared}; declare them "
+                       "(and exclude with normalise_over if intended)")
     excluded: dict[str, str] = {}
     denominator = declared
     if c.normalise_over is not None:
-        if not c.exclusion_reason:
-            reasons.append("normalise_over needs an exclusion_reason")
-        bad = [el for el in c.normalise_over if el not in declared]
+        subset = tuple(c.normalise_over)
+        if not subset:
+            reasons.append("normalise_over is empty: there is no denominator")
+        elif len(set(subset)) != len(subset):
+            reasons.append("normalise_over has duplicates")
+        bad = [el for el in subset if el not in declared]
         if bad:
             reasons.append(f"normalise_over includes undeclared elements: {bad}")
-        denominator = tuple(c.normalise_over)
-        excluded = {el: c.exclusion_reason for el in declared if el not in denominator}
+        denominator = subset
+        excluded = {el: c.exclusion_reason for el in declared if el not in subset}
         if excluded:
+            if not c.exclusion_reason:
+                reasons.append("normalise_over excludes elements; give an exclusion_reason")
             assumptions.append(
-                f"normalised over {list(denominator)} only, out of {list(declared)}")
+                f"normalised over {list(subset)} only, out of {list(declared)}")
+
+    problem = _matrix_problem(c.matrix)
+    if problem:
+        reasons.append(problem)
 
     # What the stored intensity is, and so whether exposure divides it.
     semantics = c.intensity_semantics
@@ -283,8 +345,8 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
         handling = "divided by the curve (stated not applied)"
     elif c.assume_transmission == "divide_by_curve":
         divide_t = True
-        handling = "divided by the curve (assumed not applied, common normalisation)"
-        assumptions.append("transmission curves not yet applied and on a common normalisation")
+        handling = "divided by the curve (assumed not applied)"
+        assumptions.append("transmission curves not yet applied to the intensity")
     elif c.assume_transmission == "equal_across_lines":
         handling = "not divided (assumed equal across lines)"
         assumptions.append("transmission equal for every line, so it cancels")
@@ -292,38 +354,52 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     else:
         handling = "unknown"
         reasons.append("transmission state is unknown; name assume_transmission to proceed")
+    if divide_t:
+        # Nothing in a file states that two lines' curves share a scale.
+        assumptions.append("transmission curves share one normalisation across lines "
+                           "(not checked)")
 
     if c.background not in _BACKGROUNDS:
         reasons.append(f"background {c.background!r} is not one of {sorted(_BACKGROUNDS)}")
 
     reports: list[LineReport] = []
-    extrapolated = False
     for ln in lines:
         problems: list[str] = []
         exposure = ln.exposure_s if use_exposure else None
-        if use_exposure and (ln.exposure_s is None or not ln.exposure_s > 0):
-            problems.append("exposure unknown for integrated counts")
+        if use_exposure:
+            if ln.exposure_s is None:
+                problems.append("exposure unknown for integrated counts")
+            elif not (math.isfinite(ln.exposure_s) and ln.exposure_s > 0):
+                problems.append(f"exposure must be positive, got {ln.exposure_s!r}")
+            elif not ln.exposure_basis:
+                problems.append("exposure_basis is required (how exposure_s was obtained)")
+        elif ln.exposure_s is not None:
+            notes.append(f"{ln.element} {ln.orbital}: exposure_s ignored, the intensity is a "
+                         "count rate")
         if divide_t and ln.transmission is None:
             problems.append("no transmission curve to divide by")
-        area, definition, area_problem = (None, "", None)
+        area, definition = None, ""
         if not problems and c.background in _BACKGROUNDS:
-            area, definition, area_problem = _line_area(ln, c.background, divide_t, exposure)
+            area, definition, area_problem = _line_area(
+                ln, c.background, divide_t, exposure, c.photon_energy)
             if area_problem:
                 problems.append(area_problem)
         sigma = CrossSection.lookup_with_status(ln.element, ln.orbital, c.photon_energy, c.table)
         if sigma.value is None or sigma.value <= 0:
             problems.append(f"no cross-section ({sigma.status})")
         elif sigma.status != "tabulated":
-            extrapolated = True
+            extrapolated.append(f"{ln.element} {ln.orbital}: cross-section {sigma.status}")
         ke = c.photon_energy - ln.binding_energy
         lam: float | None = None
-        try:
-            lam = c.matrix.imfp_nm(ke)
-        except Exception as err:  # noqa: BLE001 - reported, not raised
-            problems.append(f"IMFP unavailable: {type(err).__name__}")
+        if not problem:
+            try:
+                lam = c.matrix.imfp_nm(ke)
+            except Exception as err:  # noqa: BLE001 - reported, not raised
+                problems.append(f"IMFP unavailable: {type(err).__name__}")
         lam_extrap = not (TPP2M_FITTED_RANGE_EV[0] <= ke <= TPP2M_FITTED_RANGE_EV[1])
         if lam_extrap:
-            extrapolated = True
+            extrapolated.append(f"{ln.element} {ln.orbital}: IMFP at {ke:g} eV, outside "
+                                "TPP-2M's 50-2000 eV")
         if problems and ln.element in denominator:
             reasons += [f"{ln.element} {ln.orbital}: {p}" for p in problems]
         reports.append(LineReport(
@@ -333,12 +409,10 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
             exposure_s=exposure, exposure_basis=ln.exposure_basis if use_exposure else "",
             problems=tuple(problems)))
 
-    if extrapolated:
-        assumptions.append("an input lies outside its tabulated or fitted range")
     base = dict(quantity=QUANTITY, lines=tuple(reports), denominator=denominator,
                 declared_elements=declared, excluded=excluded,
                 assumptions=tuple(assumptions), not_evaluated=tuple(not_evaluated),
-                conditions=c)
+                extrapolated_inputs=tuple(extrapolated), notes=tuple(notes), conditions=c)
     if reasons:
         return CompositionResult(status="refused", fractions=None,
                                  reasons=tuple(reasons), **base)
@@ -346,7 +420,7 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
                for r in reports if r.element in denominator}
     total = math.fsum(weights.values())
     fractions = {el: weights[el] / total for el in denominator}
-    status: Status = "conditional" if assumptions else "supported"
+    status: Status = "conditional" if (assumptions or extrapolated) else "inputs_stated"
     return CompositionResult(status=status, fractions=fractions, reasons=(), **base)
 
 
@@ -387,6 +461,8 @@ def condition_dependence(
     The baseline is ``conditions`` itself; each pair changes only the
     table and the background. A pair that refuses is reported as such.
     """
+    if len(set(tables)) != len(tables) or len(set(backgrounds)) != len(backgrounds):
+        raise ValueError("tables and backgrounds must not repeat")
     baseline = composition(lines, conditions)
     changes = []
     grid: dict[tuple[str, str], dict[str, float] | None] = {}
