@@ -540,17 +540,39 @@ def _resampled(lines: Sequence[Line], rng: np.random.Generator) -> list[Line]:
                     .astype(np.float64)) for ln in lines]
 
 
-def _bootstrap(lines: Sequence[Line], conditions: Conditions, n_boot: int,
-               rng: np.random.Generator, elements: Sequence[str]):
-    """(fractions array (n_ok, n_el), n_refused) over Poisson replicates."""
-    rows, refused = [], 0
+def _bootstrap_detail(lines: Sequence[Line], conditions: Conditions, n_boot: int,
+                      rng: np.random.Generator, elements: Sequence[str]):
+    """(fractions (n_ok, n_el), n_refused, areas (n_ok, n_el)) over Poisson replicates.
+
+    The areas are each replicate's line areas in the order of ``elements``,
+    on the corrected scale composition() uses (a constant exposure does not
+    change their relative spread).
+    """
+    rows, areas, refused = [], [], 0
     for _ in range(n_boot):
         r = composition(_resampled(lines, rng), conditions)
         if r.fractions is None:
             refused += 1
         else:
             rows.append([r.fractions[el] for el in elements])
-    return np.asarray(rows, dtype=np.float64).reshape(-1, len(elements)), refused
+            by_el = {x.element: x.area for x in r.lines}
+            areas.append([by_el[el] for el in elements])
+    shape = (-1, len(elements))
+    return (np.asarray(rows, dtype=np.float64).reshape(shape), refused,
+            np.asarray(areas, dtype=np.float64).reshape(shape))
+
+
+def _bootstrap(lines: Sequence[Line], conditions: Conditions, n_boot: int,
+               rng: np.random.Generator, elements: Sequence[str]):
+    """(fractions array (n_ok, n_el), n_refused) over Poisson replicates."""
+    rows, refused, _ = _bootstrap_detail(lines, conditions, n_boot, rng, elements)
+    return rows, refused
+
+
+def _relative_area_noise(areas: np.ndarray, observed: Sequence[float]) -> float:
+    """r: the largest, over lines, of SD over replicates / observed net area."""
+    return float(max(np.std(areas[:, k], ddof=1) / observed[k]
+                     for k in range(areas.shape[1])))
 
 
 def _raw_net_area(line: Line, background: str, photon_energy: float) -> float | None:
