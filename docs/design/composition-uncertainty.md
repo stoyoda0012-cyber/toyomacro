@@ -68,8 +68,11 @@ spread it claims to describe.
   the bias of the estimate against the composition of μ itself.
 - **Runs.** A pilot with M = 200, B = 200 is used only to check cost and
   Monte Carlo error. The decision uses M = 2,000, B = 1,000.
-- **Scenarios.** 241 channels over 24 eV around each line, window ±10 eV,
-  Si 2p and O 1s at Al Kα, Scofield table, SiO₂ matrix, exposure 1 s:
+- **Scenarios.** 241 channels 0.1 eV apart over 24 eV around each line,
+  window ±10 eV, Gaussian σ = 0.6 eV, Si 2p and O 1s at Al Kα, Scofield
+  table, SiO₂ matrix, exposure 1 s. Areas are integrals in counts × eV
+  (a 30,000 area holds 300,000 counts at 0.1 eV per channel); the base
+  is counts per channel:
 
   | name | Si 2p area | O 1s area | base per channel | background | role |
   |---|---|---|---|---|---|

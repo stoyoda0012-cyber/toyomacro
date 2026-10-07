@@ -489,3 +489,127 @@ def condition_dependence(
             interaction = {el: by[el] - bx[el] - ay[el] + ax[el] for el in ax}
     return ConditionDependence(baseline=baseline, changes=tuple(changes),
                                interaction=interaction)
+
+
+# ---------------------------------------------------------------------------
+# Statistical uncertainty (docs/design/composition-uncertainty.md)
+# ---------------------------------------------------------------------------
+
+NOISE_MODEL = "independent Poisson counts per channel (intensity stated as raw counts)"
+RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, "
+              "transmission and background; background, areas and composition recomputed")
+
+#: The scope in which the reported standard uncertainty was validated on
+#: synthetic data (design record §5). None until a validation has passed.
+VALIDATED_SCOPE: dict | None = None
+
+
+@dataclass(frozen=True)
+class CompositionUncertainty:
+    """Standard uncertainty of each atomic fraction, or why there is none.
+
+    ``status`` is ``"evaluated"``, ``"withheld"`` (computed or computable,
+    but outside the validated scope or with refused replicates) or
+    ``"not_evaluated"`` (the noise model does not apply). The standard
+    uncertainty is one standard deviation of the estimator under
+    :data:`NOISE_MODEL`; it is not a confidence interval and does not
+    cover condition dependence.
+    """
+
+    status: Literal["evaluated", "withheld", "not_evaluated"]
+    reasons: tuple[str, ...]
+    elements: tuple[str, ...]
+    standard_uncertainty: dict[str, float] | None
+    covariance: tuple[tuple[float, ...], ...] | None
+    n_boot: int
+    n_refused: int
+    seed: int | None
+    noise_model: str = NOISE_MODEL
+    resampling: str = RESAMPLING
+    validated_scope: dict | None = None
+
+
+def _resampled(lines: Sequence[Line], rng: np.random.Generator) -> list[Line]:
+    return [replace(ln, intensity=rng.poisson(np.asarray(ln.intensity, dtype=np.float64))
+                    .astype(np.float64)) for ln in lines]
+
+
+def _bootstrap(lines: Sequence[Line], conditions: Conditions, n_boot: int,
+               rng: np.random.Generator, elements: Sequence[str]):
+    """(fractions array (n_ok, n_el), n_refused) over Poisson replicates."""
+    rows, refused = [], 0
+    for _ in range(n_boot):
+        r = composition(_resampled(lines, rng), conditions)
+        if r.fractions is None:
+            refused += 1
+        else:
+            rows.append([r.fractions[el] for el in elements])
+    return np.asarray(rows, dtype=np.float64).reshape(-1, len(elements)), refused
+
+
+def _raw_net_area(line: Line, background: str, photon_energy: float) -> float | None:
+    area, _, problem = _line_area(line, background, False, None, photon_energy)
+    return None if problem else area
+
+
+def composition_uncertainty(
+    lines: Sequence[Line],
+    conditions: Conditions,
+    n_boot: int = 1000,
+    seed: int | None = None,
+) -> CompositionUncertainty:
+    """Bootstrap standard uncertainty of the composition, inside its validated scope.
+
+    Each replicate redraws every channel at the count stage and recomputes
+    background, areas and composition (design record §2). Reported only
+    when the intensity is stated as raw counts, every replicate succeeds,
+    and the case lies in :data:`VALIDATED_SCOPE`; otherwise ``withheld``
+    or ``not_evaluated`` with the reason.
+    """
+    c = conditions
+    base = composition(lines, c)
+    elements = base.denominator
+
+    def result(status, reasons, se=None, cov=None, refused=0):
+        return CompositionUncertainty(
+            status=status, reasons=tuple(reasons), elements=tuple(elements),
+            standard_uncertainty=se, covariance=cov, n_boot=n_boot, n_refused=refused,
+            seed=seed, validated_scope=VALIDATED_SCOPE)
+
+    if base.fractions is None:
+        return result("not_evaluated", ["the composition itself is refused"])
+    if c.intensity_semantics != "raw_counts":
+        return result("not_evaluated", [
+            f"intensity is {c.intensity_semantics!r}, not stated raw counts; the Poisson "
+            "noise model does not apply"])
+    if any(np.any(np.asarray(ln.intensity) < 0) for ln in lines):
+        return result("not_evaluated", ["negative counts"])
+    if n_boot < 2:
+        raise ValueError("n_boot must be at least 2")
+
+    rows, refused = _bootstrap(lines, c, n_boot, np.random.default_rng(seed), elements)
+    if refused:
+        return result("withheld", [f"{refused} of {n_boot} replicates were refused; a "
+                                   "standard deviation over the rest would be conditional "
+                                   "on success"], refused=refused)
+    cov = np.atleast_2d(np.cov(rows, rowvar=False, ddof=1))
+    se = {el: float(math.sqrt(cov[i, i])) for i, el in enumerate(elements)}
+    cov_t = tuple(tuple(float(v) for v in row) for row in cov)
+
+    reasons = []
+    scope = VALIDATED_SCOPE
+    if scope is None:
+        reasons.append("no validated scope")
+    else:
+        if c.background not in scope["backgrounds"]:
+            reasons.append(f"background {c.background!r} was not validated")
+        for ln in lines:
+            if ln.element not in elements:
+                continue
+            area = _raw_net_area(ln, c.background, c.photon_energy)
+            if area is None or area < scope["min_raw_area"]:
+                reasons.append(f"{ln.element} {ln.orbital}: raw net area below the "
+                               f"validated {scope['min_raw_area']:g} counts x eV")
+    if reasons:
+        return result("withheld", reasons, se=None, cov=None)
+    return result("evaluated", [], se=se, cov=cov_t)
