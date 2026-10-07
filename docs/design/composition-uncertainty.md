@@ -127,6 +127,15 @@ the channel spacing, the base level and two lines at Al Kα, none of
 which the check sees. Outside these synthetic conditions the reported
 value is the same calculation without a validation behind it.
 
+**Reading the first record.** In `composition-uncertainty-results.json`,
+`R` is over the data sets that have a standard uncertainty (all 2,000 in
+S1 and S2, 1,997 in S3) while `sd_estimate` and `bias` are over every
+data set with an estimate, so R is not `rms_se / sd_estimate` in S3. Its
+`verdict` is the band test of §3 for every scenario; S3's "pass" there
+does not change its "reported" role. Commit 807ec13, which states the
+area unit in §3, also carries the first version of
+`composition_uncertainty`; no run had been made at that point.
+
 **Not validated.** Real detectors (see §2 on channel correlation); more
 than two elements; other photon energies, tables and matrices; Tougaard;
 transmission division in the resampled pipeline; and whether the

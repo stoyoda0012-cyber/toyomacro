@@ -130,3 +130,29 @@ def test_the_harness_runs_and_resumes(tmp_path):
     assert sorted(p.read_text() for p in out.glob("chunk_*.json")) == first
     s = val.summarize(out, n_resample=50)
     assert s["n_outer_attempted"] == 6 and set(s["elements"]) == {"Si", "O"}
+
+
+def test_the_seed_is_respected_and_changes_the_draws(scoped):
+    lines, cond = _case()
+    a = comp.composition_uncertainty(lines, cond, n_boot=60, seed=11)
+    b = comp.composition_uncertainty(lines, cond, n_boot=60, seed=12)
+    assert a.standard_uncertainty != b.standard_uncertainty
+
+
+def test_negative_counts_are_not_evaluated_rather_than_raising(scoped):
+    lines, cond = _case()
+    bad = replace(lines[0], intensity=lines[0].intensity - 1e6)
+    u = comp.composition_uncertainty([bad, lines[1]], cond, n_boot=10, seed=1)
+    assert u.status == "not_evaluated"
+
+
+def test_the_standard_uncertainty_is_the_sample_sd_of_the_replicates(scoped):
+    """ddof = 1: the same seed reproduces the replicates through _bootstrap."""
+    import numpy as np
+
+    lines, cond = _case()
+    u = comp.composition_uncertainty(lines, cond, n_boot=40, seed=21)
+    rows, refused = comp._bootstrap(lines, cond, 40, np.random.default_rng(21), u.elements)
+    assert refused == 0
+    for k, el in enumerate(u.elements):
+        assert u.standard_uncertainty[el] == pytest.approx(np.std(rows[:, k], ddof=1), rel=1e-12)
