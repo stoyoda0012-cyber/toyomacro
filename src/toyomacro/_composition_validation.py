@@ -180,9 +180,6 @@ def main() -> None:
         print(text)
 
 
-if __name__ == "__main__":
-    main()
-
 
 # ---------------------------------------------------------------------------
 # Second validation (design record §6)
@@ -407,3 +404,7 @@ def summarize2(out: Path) -> dict:
 def _combine(verdicts) -> str:
     v = set(verdicts)
     return "pass" if v == {"pass"} else "fail" if "fail" in v else "undecided"
+
+
+if __name__ == "__main__":
+    main()
