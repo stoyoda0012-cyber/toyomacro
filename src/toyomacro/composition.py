@@ -37,14 +37,17 @@ unknown one refuses unless the caller names an assumption, and an element
 is never dropped from the denominator silently.
 
 The expression is the standard one for a homogeneous sample,
-``x_i = (A_i/S_i) / Σ_j (A_j/S_j)`` (as in ISO 18118:2015, there with
-experimentally determined relative sensitivity factors S), here with the
+``x_i = (A_i/S_i) / Σ_j (A_j/S_j)`` (the subject of ISO 18118, a guide
+to experimentally determined relative sensitivity factors S for
+homogeneous materials; 2015 edition, superseded by ISO 18118:2024), here
+with the
 intrinsic S = σ × λ. It is not validated in this version against a
 measured stoichiometry.
 
 Limits. All lines share one intensity meaning and one transmission state
 (split the call otherwise). Shirley weights points, not eV, so it is
-refused on a non-uniform energy grid. The window must lie inside the
+refused on a grid whose steps differ by more than 1 % (a float32 axis,
+as the HDF5 cache stores it, stays well inside that). The window must lie inside the
 data and contain the line.
 
 Area. Each line's area is the trapezoidal integral over its window of
@@ -218,7 +221,7 @@ QUANTITY = (
 
 
 def _matrix_problem(m: Matrix) -> str | None:
-    if not m.name or not m.source:
+    if not m.name.strip() or not m.source.strip():
         return "matrix needs a name and a source"
     if m.compound is None and any(v is None for v in (m.Nv, m.density, m.Mw, m.Eg)):
         return "matrix needs a compound or all four TPP-2M parameters (Nv, density, Mw, Eg)"
@@ -233,8 +236,8 @@ def _line_area(line: Line, background: str, divide_t: bool, exposure: float | No
     t = None if line.transmission is None else np.asarray(line.transmission, dtype=np.float64)
     if e.ndim != 1 or y.shape != e.shape or (t is not None and t.shape != e.shape):
         return None, "", "energy, intensity and transmission differ in shape"
-    if not (np.all(np.isfinite(e)) and np.all(np.isfinite(y))):
-        return None, "", "non-finite energy or intensity"
+    if not np.all(np.isfinite(e)):
+        return None, "", "non-finite energy"
     order = np.argsort(e)  # integrate on an ascending axis: the sign then means something
     e, y = e[order], y[order]
     t = None if t is None else t[order]
@@ -249,8 +252,10 @@ def _line_area(line: Line, background: str, divide_t: bool, exposure: float | No
     if inside.sum() < 3:
         return None, "", "fewer than 3 points inside the window"
     e, y = e[inside], y[inside]
+    if not np.all(np.isfinite(y)):
+        return None, "", "non-finite intensity inside the window"
     steps = np.diff(e)
-    if background == "shirley" and np.ptp(steps) > 1e-6 * np.mean(steps):
+    if background == "shirley" and np.ptp(steps) > 1e-2 * np.mean(steps):
         return None, "", "Shirley here weights points, not eV; the grid is not uniform"
     terms = ["I"]
     if exposure is not None:
@@ -371,7 +376,7 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
                 problems.append("exposure unknown for integrated counts")
             elif not (math.isfinite(ln.exposure_s) and ln.exposure_s > 0):
                 problems.append(f"exposure must be positive, got {ln.exposure_s!r}")
-            elif not ln.exposure_basis:
+            elif not ln.exposure_basis.strip():
                 problems.append("exposure_basis is required (how exposure_s was obtained)")
         elif ln.exposure_s is not None:
             notes.append(f"{ln.element} {ln.orbital}: exposure_s ignored, the intensity is a "
@@ -387,7 +392,7 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
         sigma = CrossSection.lookup_with_status(ln.element, ln.orbital, c.photon_energy, c.table)
         if sigma.value is None or sigma.value <= 0:
             problems.append(f"no cross-section ({sigma.status})")
-        elif sigma.status != "tabulated":
+        elif sigma.status != "tabulated" and ln.element in denominator:
             extrapolated.append(f"{ln.element} {ln.orbital}: cross-section {sigma.status}")
         ke = c.photon_energy - ln.binding_energy
         lam: float | None = None
@@ -397,7 +402,7 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
             except Exception as err:  # noqa: BLE001 - reported, not raised
                 problems.append(f"IMFP unavailable: {type(err).__name__}")
         lam_extrap = not (TPP2M_FITTED_RANGE_EV[0] <= ke <= TPP2M_FITTED_RANGE_EV[1])
-        if lam_extrap:
+        if lam_extrap and ln.element in denominator:
             extrapolated.append(f"{ln.element} {ln.orbital}: IMFP at {ke:g} eV, outside "
                                 "TPP-2M's 50-2000 eV")
         if problems and ln.element in denominator:

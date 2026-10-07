@@ -167,7 +167,7 @@ def test_a_negative_net_area_refuses():
     (lambda ln: replace(ln, window=(ln.window[0] - 50, ln.window[1])), "beyond the data"),
     (lambda ln: replace(ln, window=(ln.window[0], ln.window[0] + 5)), "outside its window"),
     (lambda ln: replace(ln, transmission=np.ones(3)), "differ in shape"),
-    (lambda ln: replace(ln, intensity=np.where(np.arange(ln.energy.size) == 5, np.nan,
+    (lambda ln: replace(ln, intensity=np.where(np.arange(ln.energy.size) == 240, np.nan,
                                                ln.intensity)), "non-finite"),
 ])
 def test_ill_formed_lines_refuse(change, why):
@@ -187,6 +187,39 @@ def test_shirley_is_refused_on_a_non_uniform_grid():
     assert any("not uniform" in reason for reason in r.reasons)
     assert composition([replace(lines[0], energy=warped), lines[1]],
                        _conditions(background="linear")).status == "inputs_stated"
+
+
+def test_shirley_accepts_a_uniform_axis_stored_as_float32():
+    """The HDF5 cache stores energy as float32; rounding jitter is not
+    non-uniformity."""
+    lines = [replace(ln, energy=ln.energy.astype(np.float32).astype(np.float64))
+             for ln in _lines()]
+    assert composition(lines, _conditions(background="shirley")).status == "inputs_stated"
+
+
+@pytest.mark.parametrize("kw", [dict(declared_elements=("Si", "O", "O")),
+                                dict(normalise_over=("Si", "Si", "O"))])
+def test_duplicated_element_sets_refuse(kw):
+    assert composition(_lines(), _conditions(**kw)).status == "refused"
+
+
+def test_blank_strings_do_not_count_as_stated():
+    r = composition(_lines(exposure_basis="   "), _conditions(
+        matrix=Matrix(name=" ", source="x", compound="SiO2")))
+    assert r.status == "refused"
+    assert any("exposure_basis" in x for x in r.reasons)
+    assert any("name and a source" in x for x in r.reasons)
+
+
+def test_an_excluded_line_does_not_make_the_result_conditional():
+    """An extrapolated input on a line outside the denominator is not used."""
+    lines = [*_lines(), _line("N", "1s", 400.0, 500.0, hv=HV)]
+    lines[2] = replace(lines[2], binding_energy=HV - 30.0,
+                       window=(20.0, 40.0), energy=np.linspace(10, 50, 201),
+                       intensity=np.full(201, 10.0))
+    r = composition(lines, _conditions(declared_elements=("Si", "O", "N"),
+                                       normalise_over=("Si", "O"), exclusion_reason="r"))
+    assert r.extrapolated_inputs == ()
 
 
 def test_a_missing_cross_section_refuses_rather_than_dropping_the_element():

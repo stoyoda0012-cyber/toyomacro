@@ -117,9 +117,12 @@ archived on Zenodo for a citable DOI.
   `inputs_stated` otherwise, which is not "validated". Transmission is
   divided out only when stated or assumed not applied, never twice.
   Shirley is refused on a non-uniform grid (it weights points, not eV).
-  The expression is the homogeneous-sample one of ISO 18118 with the
-  intrinsic σ × λ in place of measured sensitivity factors; it is not
-  validated against a measured stoichiometry in this version. `condition_dependence` recomputes it
+  Grid steps may differ by up to 1 %, which a float32 axis (as the HDF5
+  cache stores it) stays inside. The expression is the
+  homogeneous-sample one ISO 18118 is about (2015 edition, superseded by
+  2024) with the intrinsic σ × λ in place of measured sensitivity
+  factors; it is not validated against a measured stoichiometry in this
+  version. `condition_dependence` recomputes it
   over a table × background grid and reports differences and, for 2 × 2,
   the interaction — not an uncertainty. σ × λ is not a complete AMRSF,
   and instrument RSF tables are not part of this route.
