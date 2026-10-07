@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,578 automated tests** across **94 files**, in two
+This suite has **2,587 automated tests** across **95 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 56 | 1,498 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 57 | 1,507 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,146 tests, 83%) — guarantee the library
+- **Contract / regression** (2,155 tests, 83%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,566. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,575. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,498)
+## Library body — `tests/` (1,507)
 
 ### Claim guards — noise model, versions, backends, comparisons (140)
 | Tests | File | Guards |
@@ -130,13 +130,14 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (615)
+### Quantification data (624)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
 | 45 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
 | 21 | `test_cross_section_status.py` | `lookup_with_status()`: the state of every j component (tabulated, extrapolated above, outside the range below or above, below threshold, unoccupied, not in table) judged on the line's own cells; below the first cell `lookup()` is None and `extrapolate_below=True` restores the v0.4.0 value for one call; one out-of-range component refuses the doublet sum (Zn 2p at 1048 eV on Scofield); `lookup`, the status value and the components agree over each table's grid; the MCP tool refuses below the first cell and judges its flag per line; the last cell is tabulated and just above it extrapolated; `get_rsf` passes `extrapolate_below` to both lines; the Trzhaskovskaya axis limit is pinned |
 | 39 | `test_composition.py` | Homogeneous-equivalent composition: area / (σ × λ) normalised over the declared elements on synthetic peaks of known area; exposure divides integrated counts only, a transmission curve only when not applied; axis direction and scale do not change it; every missing fact (declared set, exposure basis, matrix source, a positive net area, a window inside the data that contains the line) refuses with a reason and never shrinks the denominator; assumptions, divided curves, a subset denominator and an extrapolated cross-section or IMFP make the result conditional; condition dependence over a 2 × 2 grid with its interaction |
+| 9 | `test_composition_uncertainty.py` | Bootstrap standard uncertainty of a composition: not evaluated unless the intensity is stated raw counts, withheld when a replicate is refused or outside the validated scope, covariance consistent with fractions that sum to one; the scope constant follows from the committed validation record (passing scenarios, per background, MC half-width within target); the validation harness runs and resumes |
 | 25 | `test_cross_section_interpolation.py` | `lookup()` returns every tabulated cell at its own energy (PCHIP), `"polyfit"` reproduces v0.3.1 bit for bit, a subshell the table does not carry returns None rather than an estimate across Z, a leave-one-out comparison of the two methods, and nothing non-finite anywhere in the output space |
 | 19 | `test_cross_section_yeh_lindau_transcription.py` | Thirteen cells of the bundled Yeh–Lindau table where two transcriptions disagreed, pinned to what Table I prints; every key an element of Z = 1–103 and a `nl` subshell; the two lines that were present under wrong keys found by `lookup()` rather than extrapolated |
 | 26 | `test_element_dedup.py` | Element-name dedup + `ElementInfo` utilities |
