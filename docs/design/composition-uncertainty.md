@@ -132,3 +132,72 @@ than two elements; other photon energies, tables and matrices; Tougaard;
 transmission division in the resampled pipeline; and whether the
 estimate is right — this checks only that the reported spread matches
 the spread of the estimator.
+
+## 6. Second validation: a scope on the right axis (pre-registered)
+
+*Written after the independent audit of §5 and before any of the
+runs below. Committed before they start; not changed after.*
+
+The audit found the §4 guard on the wrong axis. Net area in counts × eV
+is not how hard a case is: at a fixed area, a larger background or wider
+channels make the bootstrap worse, and a case with the peak at 11 % of a
+large base gave R = 1.11 [1.06, 1.17] while the guard said "evaluated".
+It also cut half of the validated scenarios' own data sets, because the
+threshold sat at their expected area. §3's mechanism (resampling about
+the observed counts) overstates by an amount that grows with the
+relative noise of the net areas (+5 % at S3). So the guard moves to that
+quantity, measured by the bootstrap itself.
+
+**Guard quantity.** For each data set, r = the largest, over the lines
+in the denominator, of (standard deviation over the replicates of the
+line's raw net area) / (its raw net area). It is computed from the same
+replicates as the standard uncertainty, so it costs nothing extra and
+needs no expected value.
+
+**Scenarios.** Si 2p and O 1s (and C 1s at 285 eV where stated), Gaussian
+σ = 0.6 eV, window ±10 eV, Scofield, SiO₂ matrix, exposure 1 s, no
+transmission division. Four configurations × two backgrounds (linear,
+Shirley) × five noise levels = 40 scenarios:
+
+| config | lines | photon energy | channel | peak height / base |
+|---|---|---|---|---|
+| P | Si, O | Al Kα | 0.1 eV | about 100 |
+| B | Si, O | Al Kα | 0.1 eV | about 0.1 (background-dominated) |
+| T | Si, O, C | Al Kα | 0.5 eV | about 10 |
+| G | Si, O | Ga Kα (9251.7 eV) | 0.1 eV | about 10 |
+
+Noise levels: r = 0.005, 0.01, 0.02, 0.04, 0.08. For each scenario the
+counts are scaled (all channels by one factor, keeping the shape) so
+that the median r over 50 draws is within 10 % of the level. This sets
+the counts only; R is not computed at this step.
+
+**Runs.** M = 2,000 data sets, B = 1,000 replicates, as in §3, with a new
+seed (20261008).
+
+**Decision rule.**
+
+1. Each scenario gets R over all data sets with a standard uncertainty,
+   its 95 % Monte Carlo interval and a verdict, as in §3.
+2. For each background, r\* is the highest level at which every
+   configuration passes at that level and at every lower level. If the
+   lowest level does not pass in every configuration, that background
+   has no scope.
+3. The published guard admits a data set when r ≤ the 95th percentile of
+   r over all data sets of the scenarios at level r\* (pooled over
+   configurations), and the case is structurally inside what was run:
+   at most three lines in the denominator, no transmission divided out,
+   a validated background, intensities that are integers (raw counts
+   that are not integers are not evaluated).
+4. **Published-population check.** For every scenario at levels ≤ r\*, R
+   is recomputed over the data sets the guard admits; its interval must
+   also lie in [0.9, 1.1]. If any does not, r\* drops one level and steps
+   3–4 repeat.
+5. Reported per scenario: data sets attempted, with an estimate, with a
+   standard uncertainty, admitted by the guard; R over all and over the
+   admitted; both intervals; bias against the composition of μ with its
+   standard error; the realised median r.
+
+**What this does not cover.** Real detectors (channel correlation), more
+than three lines, Tougaard, transmission divided in the resampled
+pipeline, other tables or matrices, peak shapes other than a Gaussian.
+These stay withheld or not evaluated.
