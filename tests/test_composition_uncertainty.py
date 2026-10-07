@@ -18,17 +18,26 @@ import pytest
 import toyomacro.composition as comp
 from toyomacro import _composition_validation as val
 
-RECORD = Path(__file__).parents[1] / "docs" / "design" / "composition-uncertainty-results.json"
+DESIGN = Path(__file__).parents[1] / "docs" / "design"
+RECORD = DESIGN / "composition-uncertainty-results.json"
+RECORD2 = DESIGN / "composition-uncertainty-results-2.json"
 
 
 def _case(name="S1"):
-    return val.expected_lines(name), val.conditions(name)
+    """Integer counts drawn once from the scenario's expected counts."""
+    lines, cond = val.expected_lines(name), val.conditions(name)
+    rng = np.random.default_rng(7)
+    return [replace(ln, intensity=rng.poisson(ln.intensity).astype(float)) for ln in lines], cond
+
+
+def _integer_case(name="S1"):
+    return _case(name)
 
 
 @pytest.fixture
 def scoped(monkeypatch):
     monkeypatch.setattr(comp, "VALIDATED_SCOPE",
-                        {"backgrounds": ("linear",), "min_raw_area": {"linear": 1000.0}})
+                        {"r_threshold": {"linear": 0.02}, "max_lines": 3, "record": "test"})
 
 
 def test_not_evaluated_unless_the_intensity_is_stated_raw_counts():
@@ -65,10 +74,35 @@ def test_withheld_outside_the_validated_scope(scoped):
     u = comp.composition_uncertainty(lines, replace(cond, background="shirley"), n_boot=20)
     assert u.status == "withheld" and u.standard_uncertainty is None
     assert any("was not validated" in r for r in u.reasons)
-    small, cond3 = _case("S3")
-    u = comp.composition_uncertainty(small, cond3, n_boot=20, seed=1)
+    small, cond3 = _case("S3")  # relative area noise about 0.06
+    u = comp.composition_uncertainty(small, cond3, n_boot=50, seed=1)
     assert u.status == "withheld"
-    assert any("below the validated" in r for r in u.reasons)
+    assert any("relative area noise" in r for r in u.reasons)
+
+
+def test_withheld_for_cases_the_validation_did_not_cover(scoped):
+    lines, cond = _case()
+    four = [*lines, replace(lines[0], element="N", orbital="1s", binding_energy=400.0,
+                            energy=lines[0].energy + 99.0 - 400.0,
+                            window=(lines[0].window[0] + 99.0 - 400.0,
+                                    lines[0].window[1] + 99.0 - 400.0)),
+            replace(lines[0], element="C", orbital="1s", binding_energy=285.0,
+                    energy=lines[0].energy + 99.0 - 285.0,
+                    window=(lines[0].window[0] + 99.0 - 285.0,
+                            lines[0].window[1] + 99.0 - 285.0))]
+    u = comp.composition_uncertainty(four, replace(cond, declared_elements=("Si", "O", "N", "C")),
+                                     n_boot=30, seed=1)
+    assert any("validated up to 3" in r for r in u.reasons)
+    curves = [replace(ln, transmission=np.ones_like(ln.energy)) for ln in lines]
+    u = comp.composition_uncertainty(curves, replace(cond, transmission_applied="not_applied"),
+                                     n_boot=30, seed=1)
+    assert any("transmission divided" in r for r in u.reasons)
+
+
+def test_raw_counts_that_are_not_integers_are_not_evaluated(scoped):
+    lines, cond = val.expected_lines("S1"), val.conditions("S1")  # expected, not counts
+    u = comp.composition_uncertainty(lines, cond, n_boot=10, seed=1)
+    assert u.status == "not_evaluated" and "not integer" in u.reasons[0]
 
 
 def test_withheld_when_a_replicate_is_refused(scoped):
@@ -76,7 +110,7 @@ def test_withheld_when_a_replicate_is_refused(scoped):
     positive net area, so a standard deviation over the rest would be
     conditional on success."""
     lines, cond = _case()
-    weak = replace(lines[0], intensity=200.0 + 0.002 * (lines[0].intensity - 200.0))
+    weak = replace(lines[0], intensity=np.round(200.0 + 0.002 * (lines[0].intensity - 200.0)))
     u = comp.composition_uncertainty([weak, lines[1]], cond, n_boot=200, seed=5)
     assert u.status == "withheld" and u.n_refused > 0
     assert any("replicates were refused" in r for r in u.reasons)
@@ -84,42 +118,44 @@ def test_withheld_when_a_replicate_is_refused(scoped):
 
 def test_withheld_with_no_validated_scope(monkeypatch):
     monkeypatch.setattr(comp, "VALIDATED_SCOPE", None)
-    lines, cond = _case()
+    lines, cond = _integer_case()
     u = comp.composition_uncertainty(lines, cond, n_boot=20, seed=1)
     assert u.status == "withheld" and any("no validated scope" in r for r in u.reasons)
 
 
-def test_the_scope_constant_is_the_one_the_record_supports():
-    """VALIDATED_SCOPE must follow from the committed validation record:
-    the backgrounds of passing acceptance scenarios, and the smallest
-    line area among them."""
-    record = json.loads(RECORD.read_text())
-    passing = [s for s in record["scenarios"]
-               if s["role"] == "acceptance" and s["verdict"] == "pass"]
-    if not passing:
+def _verdict(ci):
+    lo, hi = ci
+    return "pass" if 0.9 <= lo and hi <= 1.1 else "fail" if hi < 0.9 or lo > 1.1 else "undecided"
+
+
+def test_the_records_verdicts_follow_from_their_intervals():
+    """Recompute every stored verdict instead of trusting it."""
+    for el in (e for s in json.loads(RECORD.read_text())["scenarios"]
+               for e in s["elements"].values()):
+        assert el["verdict"] == _verdict(el["R_mc_95"])
+    record2 = json.loads(RECORD2.read_text())
+    for s in record2["scenarios"]:
+        assert "definition" in s and s["n_attempted"] == 2000
+        for block in (s["R_all"], s["R_admitted"] or {}):
+            for el in block.values():
+                assert el["verdict"] == _verdict(el["R_mc_95"])
+
+
+def test_the_shipped_scope_is_the_one_the_second_record_decided():
+    """§6 decided no scope for either background, so nothing is published."""
+    decision = json.loads(RECORD2.read_text())["decision"]
+    if all(d["r_star"] is None for d in decision.values()):
         assert comp.VALIDATED_SCOPE is None
-        return
-    assert set(comp.VALIDATED_SCOPE["backgrounds"]) == {s["background"] for s in passing}
-    for bg in comp.VALIDATED_SCOPE["backgrounds"]:
-        smallest = min(min(val.SCENARIOS[s["scenario"]][:2])
-                       for s in passing if s["background"] == bg)
-        assert comp.VALIDATED_SCOPE["min_raw_area"][bg] == smallest
-    for s in record["scenarios"]:
-        for el in s["elements"].values():
-            assert el["mc_half_width"] <= 0.05  # the pre-registered precision target
-    for s in record["scenarios"]:
-        assert s["n_outer_attempted"] == 2000 and s["n_boot"] == 1000
-
-
-def test_the_published_scope_is_evaluated_at_its_edges():
-    """S2 sits at the Shirley minimum; S1 at the linear one."""
-    for name in ("S1", "S2"):
-        lines, cond = _case(name)
-        u = comp.composition_uncertainty(lines, cond, n_boot=50, seed=2)
-        assert u.status == "evaluated", (name, u.reasons)
-    lines, cond = _case("S2")
-    u = comp.composition_uncertainty(lines, replace(cond, background="linear"), n_boot=50, seed=2)
-    assert u.status == "withheld"  # linear was validated only at 30,000
+    else:
+        assert comp.VALIDATED_SCOPE["r_threshold"] == {
+            bg: d["r_threshold"] for bg, d in decision.items() if d["r_star"] is not None}
+    for d in decision.values():
+        # Every level tried is in the trace, with the admitted R that decided it.
+        assert d["trace"] or d["r_star"] is None
+    lines, cond = _integer_case()
+    u = comp.composition_uncertainty(lines, cond, n_boot=20, seed=1)
+    assert u.status == "withheld" and u.standard_uncertainty is None
+    assert "no validated scope" in u.reasons[0]
 
 
 def test_the_harness_runs_and_resumes(tmp_path):

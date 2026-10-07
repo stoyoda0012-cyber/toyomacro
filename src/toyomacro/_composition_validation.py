@@ -361,17 +361,23 @@ def summarize2(out: Path) -> dict:
             else:
                 break
         threshold = None
+        trace = []
         while r_star is not None:
             at = [p["r"] for s in mine if s["spec"]["level"] == r_star for p in s["paired"]]
             threshold = float(np.quantile(at, 0.95))
-            checks = [stats(s, threshold) for s in mine if s["spec"]["level"] <= r_star]
+            checked = [(s, stats(s, threshold)) for s in mine if s["spec"]["level"] <= r_star]
+            trace.append({"r_star": r_star, "r_threshold": threshold, "admitted": [
+                {"config": s["spec"]["config"], "level": s["spec"]["level"],
+                 "n_admitted": int(sum(p["r"] <= threshold for p in s["paired"])),
+                 "R": None if c is None else {el: v for el, v in c.items()}}
+                for s, c in checked]})
             if all(c is not None and _combine([v["verdict"] for v in c.values()]) == "pass"
-                   for c in checks):
+                   for _, c in checked):
                 break
             lower = [lv for lv in LEVELS if lv < r_star]
             r_star = lower[-1] if lower else None
             threshold = None
-        decision[bg] = {"r_star": r_star, "r_threshold": threshold}
+        decision[bg] = {"r_star": r_star, "r_threshold": threshold, "trace": trace}
 
     record = []
     for s in scen:
