@@ -500,8 +500,14 @@ RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, 
               "transmission and background; background, areas and composition recomputed")
 
 #: The scope in which the reported standard uncertainty was validated on
-#: synthetic data (design record §5). None until a validation has passed.
-VALIDATED_SCOPE: dict | None = None
+#: synthetic data (design record §5): per background, the smallest raw net
+#: line area (counts x eV) of the passing scenario. A necessary guard, not
+#: a sufficient one — the scenarios fix much more than these two numbers.
+VALIDATED_SCOPE: dict | None = {
+    "backgrounds": ("linear", "shirley"),
+    "min_raw_area": {"linear": 30_000.0, "shirley": 3_000.0},
+    "record": "docs/design/composition-uncertainty-results.json",
+}
 
 
 @dataclass(frozen=True)
@@ -603,13 +609,14 @@ def composition_uncertainty(
     else:
         if c.background not in scope["backgrounds"]:
             reasons.append(f"background {c.background!r} was not validated")
+        minimum = scope["min_raw_area"].get(c.background)
         for ln in lines:
-            if ln.element not in elements:
+            if ln.element not in elements or minimum is None:
                 continue
             area = _raw_net_area(ln, c.background, c.photon_energy)
-            if area is None or area < scope["min_raw_area"]:
+            if area is None or area < minimum:
                 reasons.append(f"{ln.element} {ln.orbital}: raw net area below the "
-                               f"validated {scope['min_raw_area']:g} counts x eV")
+                               f"validated {minimum:g} counts x eV for {c.background}")
     if reasons:
         return result("withheld", reasons, se=None, cov=None)
     return result("evaluated", [], se=se, cov=cov_t)

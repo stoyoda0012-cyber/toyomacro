@@ -127,6 +127,25 @@ archived on Zenodo for a citable DOI.
   the interaction — not an uncertainty. σ × λ is not a complete AMRSF,
   and instrument RSF tables are not part of this route.
 
+- **`composition_uncertainty` (Experimental): the standard uncertainty
+  of a composition, inside the scope where it was validated.** Each
+  replicate redraws every channel from Poisson(observed count) at the
+  count stage and recomputes background, areas and composition; the
+  result gives each fraction's standard uncertainty and the covariance
+  of the vector. It is not evaluated unless the intensity is stated raw
+  counts (an assumed one does not count), and withheld when any replicate
+  is refused or the case is outside the validated scope. The scope comes
+  from a validation pre-registered in
+  `docs/design/composition-uncertainty.md` and run on synthetic spectra
+  (2,000 data sets x 1,000 replicates per scenario): the reported spread
+  matches the estimator's own within the pre-set band — R = 1.003
+  [0.973, 1.036] with a linear background at 30,000 counts x eV per line,
+  1.005 [0.975, 1.036] with Shirley at 3,000 — so it is published there,
+  per background. At 300 it overstates by about 5 % and is not used. It
+  assumes independent channels, which one real detector did not have
+  (v0.4.0 known issue), and it is a model standard uncertainty, not a
+  confidence interval and not a check that the composition is right.
+
 ### Changed
 
 - **API.md: an Experimental module may be used by an example.** The

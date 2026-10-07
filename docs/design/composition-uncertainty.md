@@ -91,4 +91,44 @@ to the record by a test.
 
 ## 5. Results
 
-To be filled from the committed record after the runs.
+From `composition-uncertainty-results.json` (runs at commit c298bcd,
+M = 2,000 outer data sets, B = 1,000 replicates each, seed 20261007).
+With two elements the fractions sum to one, so Si and O share one R;
+one row per scenario.
+
+| scenario | role | background | R | 95 % MC interval | verdict |
+|---|---|---|---|---|---|
+| S1 high | acceptance | linear | 1.003 | [0.973, 1.036] | pass |
+| S2 medium | acceptance | Shirley | 1.005 | [0.975, 1.036] | pass |
+| S3 low | reported | linear | 1.051 | [1.021, 1.084] | inside the band, not used |
+
+- Monte Carlo half-widths are 0.030–0.032, inside the 0.05 target.
+- In S1 and S2 every outer data set had a standard uncertainty (no
+  refused replicate). In S3, 3 of 2,000 had refused replicates; the
+  published function would withhold those, and R is over the other
+  1,997, so S3's R is conditional on success.
+- S3 overstates the spread by about 5 %. It lies inside the ±10 % band,
+  but by §3 it was registered as "reported", so it does not widen the
+  scope.
+- Bias of the Si fraction against the composition of μ (the estimator
+  applied to the expected counts — the estimator's own bias, not a model
+  error): S1 −0.7 × 10⁻⁵ ± 4.1 × 10⁻⁵, S2 −3.7 × 10⁻⁴ ± 2.0 × 10⁻⁴
+  (1.9 standard errors), S3 −3.5 × 10⁻⁴ ± 6.4 × 10⁻⁴. The standard
+  uncertainty in S2 is about 9 × 10⁻³, so this bias is about 4 % of it.
+
+**Scope adopted.** §4 says "a background type whose scenario passed,
+and every line's raw net area at or above the smallest area of a
+passing scenario". Read across backgrounds, that would let a linear
+background through at 3,000 although linear passed only at 30,000. The
+module reads it per background, the narrower reading: linear at
+≥ 30,000 counts × eV, Shirley at ≥ 3,000. This is a necessary guard and
+not a sufficient one: the scenarios also fix the peak shape, the window,
+the channel spacing, the base level and two lines at Al Kα, none of
+which the check sees. Outside these synthetic conditions the reported
+value is the same calculation without a validation behind it.
+
+**Not validated.** Real detectors (see §2 on channel correlation); more
+than two elements; other photon energies, tables and matrices; Tougaard;
+transmission division in the resampled pipeline; and whether the
+estimate is right — this checks only that the reported spread matches
+the spread of the estimator.

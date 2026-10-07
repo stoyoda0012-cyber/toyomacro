@@ -1,0 +1,138 @@
+{
+ "design": "docs/design/composition-uncertainty.md",
+ "provenance": {
+  "git_commit": "c298bcdb1de470d07be488890076043491662f54",
+  "numpy": "2.3.5",
+  "python": "3.12.11",
+  "machine": "arm64",
+  "date": "2026-10-07"
+ },
+ "scenarios": [
+  {
+   "scenario": "S1",
+   "role": "acceptance",
+   "background": "linear",
+   "n_outer_attempted": 2000,
+   "n_outer_with_estimate": 2000,
+   "n_outer_with_se": 2000,
+   "n_outer_with_refused_replicates": 0,
+   "n_boot": 1000,
+   "seed": 20261007,
+   "elements": {
+    "Si": {
+     "R": 1.0029344736366133,
+     "R_mc_95": [
+      0.9729559711718085,
+      1.0362797005120397
+     ],
+     "mc_half_width": 0.03166186467011556,
+     "verdict": "pass",
+     "sd_estimate": 0.0018227513261368311,
+     "rms_se": 0.0018281001418494814,
+     "truth": 0.47154329624101454,
+     "bias": -7.291438217482682e-06,
+     "bias_se": 4.075795871319843e-05
+    },
+    "O": {
+     "R": 1.0029344736366141,
+     "R_mc_95": [
+      0.9724755507339756,
+      1.0360812102290633
+     ],
+     "mc_half_width": 0.03180282974754384,
+     "verdict": "pass",
+     "sd_estimate": 0.0018227513261368294,
+     "rms_se": 0.0018281001418494814,
+     "truth": 0.5284567037589855,
+     "bias": 7.291438217538193e-06,
+     "bias_se": 4.07579587131984e-05
+    }
+   },
+   "verdict": "pass"
+  },
+  {
+   "scenario": "S2",
+   "role": "acceptance",
+   "background": "shirley",
+   "n_outer_attempted": 2000,
+   "n_outer_with_estimate": 2000,
+   "n_outer_with_se": 2000,
+   "n_outer_with_refused_replicates": 0,
+   "n_boot": 1000,
+   "seed": 20261007,
+   "elements": {
+    "Si": {
+     "R": 1.004551601356913,
+     "R_mc_95": [
+      0.9753846445392876,
+      1.0356796620461666
+     ],
+     "mc_half_width": 0.030147508753439467,
+     "verdict": "pass",
+     "sd_estimate": 0.008995467274000662,
+     "rms_se": 0.009036411055051069,
+     "truth": 0.47154329624101465,
+     "bias": -0.000374483279097948,
+     "bias_se": 0.00020114476314040208
+    },
+    "O": {
+     "R": 1.0045516013569131,
+     "R_mc_95": [
+      0.9759632191394202,
+      1.0358068727140217
+     ],
+     "mc_half_width": 0.029921826787300765,
+     "verdict": "pass",
+     "sd_estimate": 0.00899546727400066,
+     "rms_se": 0.009036411055051069,
+     "truth": 0.5284567037589855,
+     "bias": 0.00037448327909783696,
+     "bias_se": 0.00020114476314040202
+    }
+   },
+   "verdict": "pass"
+  },
+  {
+   "scenario": "S3",
+   "role": "reported",
+   "background": "linear",
+   "n_outer_attempted": 2000,
+   "n_outer_with_estimate": 2000,
+   "n_outer_with_se": 1997,
+   "n_outer_with_refused_replicates": 3,
+   "n_boot": 1000,
+   "seed": 20261007,
+   "elements": {
+    "Si": {
+     "R": 1.0511807233303125,
+     "R_mc_95": [
+      1.0211292057656016,
+      1.084197149179058
+     ],
+     "mc_half_width": 0.031533971706728225,
+     "verdict": "pass",
+     "sd_estimate": 0.02883370525996748,
+     "rms_se": 0.029926233860033312,
+     "truth": 0.47154329624101465,
+     "bias": -0.00034699835039880833,
+     "bias_se": 0.0006447412500448053
+    },
+    "O": {
+     "R": 1.0511807233303125,
+     "R_mc_95": [
+      1.0211412460303766,
+      1.0834283571352703
+     ],
+     "mc_half_width": 0.031143555552446855,
+     "verdict": "pass",
+     "sd_estimate": 0.02883370525996748,
+     "rms_se": 0.029926233860033312,
+     "truth": 0.5284567037589853,
+     "bias": 0.00034699835039886384,
+     "bias_se": 0.0006447412500448053
+    }
+   },
+   "verdict": "pass"
+  }
+ ]
+}
