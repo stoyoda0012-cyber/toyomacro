@@ -116,7 +116,10 @@ one row per scenario.
   (1.9 standard errors), S3 −3.5 × 10⁻⁴ ± 6.4 × 10⁻⁴. The standard
   uncertainty in S2 is about 9 × 10⁻³, so this bias is about 4 % of it.
 
-**Scope adopted.** §4 says "a background type whose scenario passed,
+**Scope adopted, then withdrawn.** (The independent audit of this
+section found the guard below on the wrong axis and selecting the
+validated scenarios' own data sets; §6–7 replace it, and no scope is
+published.) §4 says "a background type whose scenario passed,
 and every line's raw net area at or above the smallest area of a
 passing scenario". Read across backgrounds, that would let a linear
 background through at 3,000 although linear passed only at 30,000. The
@@ -210,3 +213,41 @@ seed (20261008).
 than three lines, Tougaard, transmission divided in the resampled
 pipeline, other tables or matrices, peak shapes other than a Gaussian.
 These stay withheld or not evaluated.
+
+## 7. Second validation: results
+
+From `composition-uncertainty-results-2.json` (runs at commit ead01d4;
+summary and decision trace at 59c5332; seed 20261008; M = 2,000, B =
+1,000 for each of the 40 scenarios). The realised median r was within
+10 % of every level.
+
+**The standard uncertainty is calibrated.** 39 of the 40 scenarios pass
+the §3 rule over all their data sets with a standard uncertainty, in
+every configuration (peak- and background-dominated, three lines with
+0.5 eV channels, Ga Kα) and both backgrounds, up to r = 0.08. The one
+failure is peak-dominated, Shirley, r = 0.08: R = 1.24 [1.20, 1.28],
+with 301 of 2,000 data sets withheld for refused replicates.
+
+**Admitting data sets by their own r is not.** Step 4 recomputes R over
+the data sets the guard would admit. At every level tried, for both
+backgrounds, the peak-dominated configuration fails it: R over the
+admitted subset is 1.25 (r\* = 0.08), 1.23, 1.21, 1.12 and 1.08
+(r\* = 0.005) with a linear background, and 1.07–1.25 with Shirley; at
+r\* = 0.02 with a linear background the Ga Kα configuration fails too
+(1.07). In
+that configuration r is measured on the same peak as the estimate, so a
+cut on r removes the data sets with the smallest areas and narrows the
+spread of the estimate the standard uncertainty is compared with. This is
+the selection the first audit found for the area cut (§5), on another
+quantity. By the rule, r\* falls through every level: **no scope for
+either background, and nothing is published in this version.**
+`VALIDATED_SCOPE` is None, and `composition_uncertainty` returns
+`withheld` with that reason.
+
+**What would open a scope.** A guard whose admission does not depend on
+the data set's own fluctuations — r of the expected counts supplied by
+the user, or a threshold set so far above the operating range that it
+admits essentially every data set of a passing scenario — evaluated the
+same way, on the admitted population, in a new pre-registered round.
+This is not attempted here: changing the rule after these results would
+make it post hoc.
