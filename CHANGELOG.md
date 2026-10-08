@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
 ### Added
 
 - **`CrossSection.lookup_with_status()` says where a cross-section came
@@ -2164,7 +2166,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0
