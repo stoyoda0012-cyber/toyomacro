@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.5.0] - 2026-10-08
 
+Archived on Zenodo:
+[10.5281/zenodo.23239556](https://doi.org/10.5281/zenodo.23239556).
+
 ### Added
 
 - **`CrossSection.lookup_with_status()` says where a cross-section came
