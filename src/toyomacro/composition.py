@@ -17,7 +17,9 @@ What is returned. A :class:`CompositionResult` keeps four things apart
 and never combines them into one "±":
 
 - the estimate (``fractions``),
-- the statistical uncertainty — not evaluated in this version,
+- the statistical uncertainty — withheld in this version: the scope in
+  which it was validated on synthetic data is empty
+  (docs/design/composition-uncertainty.md §7),
 - condition dependence — how the estimate moves when a choice is changed
   (:func:`condition_dependence`), a difference between conditions and not
   an uncertainty,
@@ -287,7 +289,11 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     notes: list[str] = []
     extrapolated: list[str] = []
     not_evaluated = [
-        "statistical uncertainty: not evaluated in this version",
+        ("statistical uncertainty: withheld; the scope validated on synthetic data is "
+         "empty in this version (docs/design/composition-uncertainty.md §7)")
+        if c.intensity_semantics == "raw_counts" else
+        ("statistical uncertainty: not evaluated; the intensity is not stated raw counts, "
+         "so the Poisson noise model does not apply"),
         "elastic scattering, angular distribution, polarization and geometry: "
         "not in the sensitivity",
     ]
@@ -489,3 +495,163 @@ def condition_dependence(
             interaction = {el: by[el] - bx[el] - ay[el] + ax[el] for el in ax}
     return ConditionDependence(baseline=baseline, changes=tuple(changes),
                                interaction=interaction)
+
+
+# ---------------------------------------------------------------------------
+# Statistical uncertainty (docs/design/composition-uncertainty.md)
+# ---------------------------------------------------------------------------
+
+_NOISE_MODEL = "independent Poisson counts per channel (intensity stated as raw counts)"
+_RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, "
+              "transmission and background; background, areas and composition recomputed")
+
+#: The scope in which the reported standard uncertainty is published:
+#: ``{"r_threshold": {background: r}, "max_lines": n, "record": path}``.
+#: None — nothing is published in this version. The second, pre-registered
+#: validation (design record §6–7) found the standard uncertainty itself
+#: calibrated in 39 of 40 scenarios, but admitting data sets by their
+#: measured relative area noise r miscalibrates the admitted subset
+#: (R about 1.2), so its decision rule gave no scope.
+_VALIDATED_SCOPE: dict | None = None
+
+
+@dataclass(frozen=True)
+class _CompositionUncertainty:
+    """Standard uncertainty of each atomic fraction, or why there is none.
+
+    ``status`` is ``"evaluated"``, ``"withheld"`` (computed or computable,
+    but outside the validated scope or with refused replicates) or
+    ``"not_evaluated"`` (the noise model does not apply). The standard
+    uncertainty is one standard deviation of the estimator under
+    :data:`_NOISE_MODEL`; it is not a confidence interval and does not
+    cover condition dependence.
+    """
+
+    status: Literal["evaluated", "withheld", "not_evaluated"]
+    reasons: tuple[str, ...]
+    elements: tuple[str, ...]
+    standard_uncertainty: dict[str, float] | None
+    covariance: tuple[tuple[float, ...], ...] | None
+    n_boot: int
+    n_refused: int
+    seed: int | None
+    noise_model: str = _NOISE_MODEL
+    resampling: str = _RESAMPLING
+    validated_scope: dict | None = None
+
+
+def _resampled(lines: Sequence[Line], rng: np.random.Generator) -> list[Line]:
+    return [replace(ln, intensity=rng.poisson(np.asarray(ln.intensity, dtype=np.float64))
+                    .astype(np.float64)) for ln in lines]
+
+
+def _bootstrap_detail(lines: Sequence[Line], conditions: Conditions, n_boot: int,
+                      rng: np.random.Generator, elements: Sequence[str]):
+    """(fractions (n_ok, n_el), n_refused, areas (n_ok, n_el)) over Poisson replicates.
+
+    The areas are each replicate's line areas in the order of ``elements``,
+    on the corrected scale composition() uses (a constant exposure does not
+    change their relative spread).
+    """
+    rows, areas, refused = [], [], 0
+    for _ in range(n_boot):
+        r = composition(_resampled(lines, rng), conditions)
+        if r.fractions is None:
+            refused += 1
+        else:
+            rows.append([r.fractions[el] for el in elements])
+            by_el = {x.element: x.area for x in r.lines}
+            areas.append([by_el[el] for el in elements])
+    shape = (-1, len(elements))
+    return (np.asarray(rows, dtype=np.float64).reshape(shape), refused,
+            np.asarray(areas, dtype=np.float64).reshape(shape))
+
+
+def _bootstrap(lines: Sequence[Line], conditions: Conditions, n_boot: int,
+               rng: np.random.Generator, elements: Sequence[str]):
+    """(fractions array (n_ok, n_el), n_refused) over Poisson replicates."""
+    rows, refused, _ = _bootstrap_detail(lines, conditions, n_boot, rng, elements)
+    return rows, refused
+
+
+def _relative_area_noise(areas: np.ndarray, observed: Sequence[float]) -> float:
+    """r: the largest, over lines, of SD over replicates / observed net area."""
+    return float(max(np.std(areas[:, k], ddof=1) / observed[k]
+                     for k in range(areas.shape[1])))
+
+
+def _composition_uncertainty(
+    lines: Sequence[Line],
+    conditions: Conditions,
+    n_boot: int = 1000,
+    seed: int | None = None,
+) -> _CompositionUncertainty:
+    """Bootstrap standard uncertainty of the composition, inside its validated scope.
+
+    Private while :data:`_VALIDATED_SCOPE` is empty: a public function that
+    always withholds would only invite reading its output as an answer.
+    In this version the scope is empty (:data:`_VALIDATED_SCOPE` is None):
+    the result is always ``withheld`` or ``not_evaluated``, with the reason.
+    The calculation and its checks are in place for a later scope.
+
+    Each replicate redraws every channel at the count stage and recomputes
+    background, areas and composition (design record §2). Reported only
+    when the intensity is stated as raw counts, every replicate succeeds,
+    and the case lies in :data:`_VALIDATED_SCOPE`; otherwise ``withheld``
+    or ``not_evaluated`` with the reason.
+    """
+    c = conditions
+    base = composition(lines, c)
+    elements = base.denominator
+
+    def result(status, reasons, se=None, cov=None, refused=0):
+        return _CompositionUncertainty(
+            status=status, reasons=tuple(reasons), elements=tuple(elements),
+            standard_uncertainty=se, covariance=cov, n_boot=n_boot, n_refused=refused,
+            seed=seed, validated_scope=_VALIDATED_SCOPE)
+
+    if base.fractions is None:
+        return result("not_evaluated", ["the composition itself is refused"])
+    if c.intensity_semantics != "raw_counts":
+        return result("not_evaluated", [
+            f"intensity is {c.intensity_semantics!r}, not stated raw counts; the Poisson "
+            "noise model does not apply"])
+    if any(np.any(np.asarray(ln.intensity) < 0) for ln in lines):
+        return result("not_evaluated", ["negative counts"])
+    if n_boot < 2:
+        raise ValueError("n_boot must be at least 2")
+
+    if any(not np.array_equal(np.asarray(ln.intensity), np.round(np.asarray(ln.intensity)))
+           for ln in lines):
+        return result("not_evaluated", ["intensity stated as raw counts is not integer"])
+    rows, refused, areas = _bootstrap_detail(
+        lines, c, n_boot, np.random.default_rng(seed), elements)
+    if refused:
+        return result("withheld", [f"{refused} of {n_boot} replicates were refused; a "
+                                   "standard deviation over the rest would be conditional "
+                                   "on success"], refused=refused)
+    cov = np.atleast_2d(np.cov(rows, rowvar=False, ddof=1))
+    se = {el: float(math.sqrt(cov[i, i])) for i, el in enumerate(elements)}
+    cov_t = tuple(tuple(float(v) for v in row) for row in cov)
+
+    reasons = []
+    scope = _VALIDATED_SCOPE
+    if scope is None:
+        reasons.append("no validated scope in this version (design record "
+                       "docs/design/composition-uncertainty.md §7)")
+    else:
+        threshold = scope["r_threshold"].get(c.background)
+        if threshold is None:
+            reasons.append(f"background {c.background!r} was not validated")
+        else:
+            observed = {x.element: x.area for x in base.lines}
+            r = _relative_area_noise(areas, [observed[el] for el in elements])
+            if r > threshold:
+                reasons.append(f"relative area noise {r:.3g} above the validated {threshold:g}")
+        if len(elements) > scope["max_lines"]:
+            reasons.append(f"{len(elements)} lines; validated up to {scope['max_lines']}")
+        if any(x.transmission_handling.startswith("divided") for x in base.lines):
+            reasons.append("transmission divided out: not validated")
+    if reasons:
+        return result("withheld", reasons, se=None, cov=None)
+    return result("evaluated", [], se=se, cov=cov_t)

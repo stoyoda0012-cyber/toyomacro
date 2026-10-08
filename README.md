@@ -333,8 +333,16 @@ These utilities provide peak observables and declared sensitivity terms for rela
 They do not claim traceable absolute composition from a universal sensitivity factor. In
 particular, `cross-section × IMFP`, even with transmission applied, omits factors such as
 elastic-scattering/EAL, detector response, angular distribution, polarization, geometry, and
-matrix assumptions. A future composition workflow will require an explicit input contract,
-uncertainty/assumption reporting, and redistributable validation data.
+matrix assumptions.
+
+`toyomacro.composition` (experimental) turns peak areas into a homogeneous-equivalent
+composition under an explicit input contract, and reports what it rests on rather than one
+"±": the estimate, how it moves when the table or the background is changed (condition
+dependence, not an uncertainty), the assumptions it needed, and what was not evaluated. The
+statistical part is withheld for now: its validation on synthetic data left no scope in
+which it could be reported (see
+[docs/design/composition-uncertainty.md](docs/design/composition-uncertainty.md)). It refuses
+rather than fill in a missing exposure, transmission state or denominator.
 
 GUI front-ends and a depth-profiling solver built on this engine are
 maintained separately; nothing in this repository depends on them.
@@ -399,7 +407,7 @@ Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,566 tests to mean what they say; do not use it to
+want the other 2,580 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 

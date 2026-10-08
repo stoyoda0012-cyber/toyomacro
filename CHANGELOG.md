@@ -127,6 +127,26 @@ archived on Zenodo for a citable DOI.
   the interaction — not an uncertainty. σ × λ is not a complete AMRSF,
   and instrument RSF tables are not part of this route.
 
+- **The statistical uncertainty of a composition is withheld in this
+  version, for a recorded reason.** `composition()` lists it as withheld
+  in `not_evaluated`, pointing to the design record. A count-level
+  bootstrap — every channel redrawn from Poisson(observed count),
+  background, areas and composition recomputed — is implemented
+  privately and was tested in two pre-registered validations on
+  synthetic spectra (`docs/design/composition-uncertainty.md`, records
+  committed). Its standard uncertainty is calibrated in 39 of 40
+  scenarios — two backgrounds, peak- and background-dominated spectra,
+  three lines, 0.5 eV channels and Ga Kα, up to a relative area noise of
+  0.08 — but every rule tried for choosing which data sets to report it
+  for (a minimum area, then the data set's own relative area noise)
+  miscalibrates the ones it admits: chosen by how clean the data set
+  came out, the reported spread no longer matches the spread of the
+  estimates it is reported for (here it overstates it by up to 25 %).
+  The registered rule
+  therefore gave no scope, and nothing is published. It would also
+  assume independent channels, which one real detector did not have
+  (v0.4.0 known issue).
+
 ### Changed
 
 - **API.md: an Experimental module may be used by an example.** The
