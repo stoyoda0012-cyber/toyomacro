@@ -8,10 +8,13 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
 ### Added
 
 - **`CrossSection.lookup_with_status()` says where a cross-section came
-  from.** Same arguments and numbers as `lookup()`, returned as a
+  from.** Same arguments and numbers as `lookup()` (except that a known
+  zero is 0.0 where `lookup()` returns None), returned as a
   `CrossSectionLookup` (exported from `toyomacro.data` with
   `ComponentLookup`): the value, a summary status, and for every j
   component its status — `tabulated`, `extrapolated_above`,
@@ -141,7 +144,8 @@ archived on Zenodo for a citable DOI.
   for (a minimum area, then the data set's own relative area noise)
   miscalibrates the ones it admits: chosen by how clean the data set
   came out, the reported spread no longer matches the spread of the
-  estimates it is reported for (here it overstates it by up to 25 %).
+  estimates it is reported for (here it overstated it — by up to 25 %
+  under the second rule).
   The registered rule
   therefore gave no scope, and nothing is published. It would also
   assume independent channels, which one real detector did not have
@@ -178,14 +182,15 @@ archived on Zenodo for a citable DOI.
   tier said no documented workflow depends on one; examples/06 and 09
   already did. An example is a demonstration, not a stability promise.
 
-- **`CrossSection.lookup()` returns None below a line's first valid
-  cell.** This is the threshold region, where shape resonances and
+- **Breaking: `CrossSection.lookup()` (and `get_rsf()`) returns None
+  below a line's first valid cell.** This is the threshold region, where shape resonances and
   Cooper minima move the cross-section by orders of magnitude and a
   power law through the first cells has no support; v0.4.0 listed it as
   a known issue (Tl 5d at He I, 796 Mb on Yeh–Lindau, whose Table I
   prints it from 40.8 eV at 53 Mb). A line with a single valid cell
   (Yeh–Lindau Lr 4p) now answers only at that cell's energy. Every
-  other value is unchanged bit for bit. Compared with v0.4.0 over every
+  other value is unchanged bit for bit on the same platform (to about
+  1e-13 across platforms, as for v0.4.0). Compared with v0.4.0 over every
   element, every stored, bare and j-resolved label, and each table's
   grid plus 19 source energies (2.78 million inputs with PCHIP; every
   7th energy with `"polyfit"`), the two differ only where the new
@@ -196,20 +201,22 @@ archived on Zenodo for a citable DOI.
   Scofield Cm 2p at 10.2 eV, where v0.4.0 returned 3.2 × 10⁷ Mb
   because `BindingEnergy` has no Cm 2p threshold. None of these is a
   move towards a reference value; they are output withheld.
-- **A doublet sum is refused when one component is out of its range.**
+- **Breaking: a doublet sum is refused when one component is out of its
+  range.**
   Zn 2p at 1048 eV on Scofield: 2p3/2 is tabulated, 2p1/2 is above its
   1045 eV threshold but below Scofield's first cell for it (1057.9 eV).
   v0.4.0 added a power-law 2p1/2 to it; adding 2p3/2 alone would have
   been an under-count that looks complete. Both now give None (counted
   above).
-- **The MCP `calculate_sensitivity` judges `cross_section_extrapolated`
+- **Breaking: the MCP `calculate_sensitivity` judges `cross_section_extrapolated`
   on the requested line, not the table grid**, and reports
   `cross_section_status` and `cross_section_components`. The grid-wide
   test called Tl 5d at 21.2 eV "not extrapolated"; that call is now an
   error naming the state. `cross_section_table_range_eV` is kept for
   reference.
 
-- **`VAMASReader` follows the ISO 14976 structure.** It reads the counts
+- **Breaking: `VAMASReader` follows the ISO 14976 structure** — regions,
+  their indices and names are now the file's ISO blocks. It reads the counts
   that precede comment lines, experimental variables, corresponding
   variables and additional parameters, and keeps empty fields as
   fields. The reader carried over from MATLAB assumed fixed line counts
@@ -244,7 +251,7 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
-- **`ensure_h5` gives every region its own file.** Regions were made
+- **Breaking (file names): `ensure_h5` gives every region its own file.** Regions were made
   unique by name, but distinct names can produce the same output file
   ("C 1s/3" and "C 1s/6" both normalise to C1s), and the later region
   then overwrote the earlier without a warning; with the new VAMAS block
@@ -252,8 +259,10 @@ archived on Zenodo for a citable DOI.
   Names are now made unique by the file they produce. Path separators
   and leading dots in a region or element name become `_` before it is
   part of a file name, so a name read from a file (`../x`, `a/b`) cannot
-  place a file outside the output directory; such names, and only they,
-  now give a different file name than before.
+  place a file outside the output directory. Names with separators now
+  give a different file name than before, and distinct names that
+  normalise alike ("C 1s", "C1s") now get their own files instead of
+  overwriting.
 - The v0.4.0 known issue "below a line's first tabulated energy
   `lookup()` extrapolates", on Yeh–Lindau and Scofield. What remains:
   - On Trzhaskovskaya the range is judged on the axis the table is
@@ -272,6 +281,22 @@ archived on Zenodo for a citable DOI.
     v0.4.0, and that source stores Co 3p1/2 and 3p3/2 as 59 and 60 eV,
     the reverse of the usual order (unchanged, to be checked against a
     primary source).
+
+### Known issues
+
+- **Unchanged from v0.4.0:** Yeh–Lindau Cu 3d at 8047.8 eV is still the
+  suspected misprint recorded in v0.3.1 (30x Scofield); and
+  `fit_fermi_edge`'s errors still assume independent channels, which one
+  real detector did not have (+0.16 adjacent-channel correlation; see the
+  v0.4.0 entry).
+- **What remains of the low-energy `lookup()` issue** is listed under
+  Fixed: on Trzhaskovskaya the range is judged on the axis the table is
+  interpolated on; `BindingEnergy` gives no threshold for a part of each
+  table's lines; and it stores Co 3p1/2 and 3p3/2 in reverse order.
+- **The statistical uncertainty of a composition is not available** in
+  this version (see Added), and every composition result says so.
+- **The VAMAS reader's legacy fixed-line layout** (`layout="legacy_fixed"`)
+  is unverified: no real file for it is available to this repository.
 
 ## [0.4.0] - 2026-10-05
 
@@ -2164,7 +2189,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.2.0...v0.3.0

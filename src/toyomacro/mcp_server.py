@@ -173,8 +173,8 @@ def calculate_sensitivity(
         return json.dumps({
             "error": (f"No cross-section for {element} {orbital} at {photon_energy} eV "
                       f"in the '{table_name}' table: {why}"
-                      + ("" if table_name == "scofield" else "; for deep levels at HAXPES "
-                         "energies try table='scofield'")),
+                      + ("" if table_name == "scofield" or found.status != "not_in_table"
+                         else "; for deep levels at HAXPES energies try table='scofield'")),
             "cross_section_status": found.status,
             "cross_section_components": _components_json(found),
         })

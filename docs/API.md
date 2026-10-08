@@ -40,7 +40,8 @@ rule that separates them:
 `toyomacro.guides` and `toyomacro.voigtfit`, plus the submodule entry points given with a
 call signature in the sections below (`dictionary_solver`,
 `multipeak_solver`, `gvrt_service`, `spectra_generator`). These are
-covered by the test suite, exercised by `examples/`, and will not
+covered by the test suite, exercised by `examples/` where one applies
+(§9 notes the exception), and will not
 change signature or semantics without a minor-version bump and a
 changelog entry. A supported class's public methods (no leading
 underscore) are supported with it, whether or not this page names

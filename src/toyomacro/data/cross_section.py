@@ -592,7 +592,8 @@ class CrossSection:
     ) -> CrossSectionLookup:
         """Look up a cross-section and say where every part of it came from.
 
-        Same arguments and the same numbers as :meth:`lookup`, returned as
+        Same arguments and the same numbers as :meth:`lookup` (except that
+        a known zero is ``0.0`` here and None there), returned as
         a :class:`CrossSectionLookup` that carries the state of each j
         component (see :data:`LookupStatus`). A bare doublet label is
         summed only when every component either has a value or is a known
