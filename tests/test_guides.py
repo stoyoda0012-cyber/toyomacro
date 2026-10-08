@@ -29,8 +29,8 @@ def test_the_guide_is_readable_from_the_package():
 def test_the_version_line_and_the_links_agree():
     text = read_guide()
     stated = re.search(r"Written for: toyomacro v(\d+\.\d+\.\d+)", text).group(1)
-    tags = set(re.findall(r"/(?:blob|tree)/v(\d+\.\d+\.\d+)/", text))
-    assert tags == {stated}
+    links = re.findall(r"github\.com/[^>\s]+", text)
+    assert links and all(re.search(rf"/(?:blob|tree)/v{re.escape(stated)}/", u) for u in links)
     if toyomacro.__version__ != "0.0.0+unknown":
         assert _version(stated) >= _version(toyomacro.__version__)
 
@@ -40,6 +40,21 @@ def test_the_guide_keeps_what_v050_is_about():
     for phrase in ("never fold them into one", "withheld", "not an uncertainty",
                    "changes what\nthe error bars mean", "not** a complete relative sensitivity"):
         assert phrase in text, phrase
+
+
+def test_the_selection_lesson_keeps_its_direction():
+    """The validation found admitted error bars too wide, not too narrow."""
+    text = read_guide()
+    assert "overstated it by up to 25 %" in text
+    assert "optimistic" not in text and "understated" not in text
+
+
+def test_only_shipped_guides_can_be_read():
+    import pytest
+
+    for name in ("../__init__.py", "/etc/hosts", "nope.md"):
+        with pytest.raises(ValueError, match="no shipped guide"):
+            read_guide(name)
 
 
 def test_python_m_prints_it():

@@ -152,14 +152,18 @@ archived on Zenodo for a citable DOI.
   the polymer-degradation dataset (Zenodo 10.5281/zenodo.7074887, CC BY
   4.0; not bundled — `--data`, `TOYOMACRO_VAMAS_POLYMER_ZIP` or
   `--download`, checked by SHA-256; synthetic stand-in offline) it prints
-  the homogeneous-equivalent F:C, how far the cross-section table, the
-  background, the transmission assumption and the band gap move it, the
-  assumptions it rests on, and the statistical uncertainty withheld with
-  its reason. On the real pair the transmission assumption moves F by
-  about 3 percentage points, the table by about 1 and the background by
-  0.2. It is not a check against PTFE's stoichiometry.
+  the homogeneous-equivalent F:C; how far it moves with the cross-section
+  table, the background, the band gap and the two assumptions about the
+  stored data; the assumptions, windows, exposure basis and matrix source
+  it rests on; and the statistical uncertainty, not evaluated because the
+  file does not state raw counts. On the real pair reading the intensity
+  as a count rate instead of integrated counts moves F by about 4
+  percentage points (the two lines' dwell times differ), the transmission
+  assumption by about 3, the table by about 1 and the background by 0.2.
+  It is not a check against PTFE's stoichiometry.
 - **An AI-agent user guide shipped with the package**
-  (`toyomacro.guides.read_guide()`, `python -m toyomacro.guides`): what to
+  (`toyomacro.guides.read_guide()`, `python -m toyomacro.guides`; a new
+  Supported module): what to
   check before an analysis, what to do when a fact is unknown, how to
   report a result without folding it into one "±", and why choosing which
   data sets get an error bar by how clean they came out changes what the

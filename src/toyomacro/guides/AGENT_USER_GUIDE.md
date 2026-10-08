@@ -71,10 +71,12 @@ batch refused or flagged, instead of quietly dropping it.
 Report these four things separately, and never fold them into one "±":
 
 1. the **estimate**;
-2. the **statistical uncertainty** — in v0.5.0 this is **withheld** for
-   compositions: the bootstrap is calibrated on synthetic data, but no
-   rule for choosing which data sets to report it for kept that
-   calibration, so its validated scope is empty;
+2. the **statistical uncertainty** — in v0.5.0 a composition does not
+   carry one. It is *not evaluated* when the intensity is not stated to
+   be raw counts, and *withheld* when it is: the bootstrap is calibrated
+   on synthetic data, but neither of the two rules tried for choosing
+   which data sets to report it for kept that calibration, so its
+   validated scope is empty;
 3. the **condition dependence** — how the estimate moves when the table,
    the background or an assumption is changed. It is a difference
    between conditions, not an uncertainty, and it tells you what
@@ -89,9 +91,12 @@ Decide what you will report before you look at how well each fit went.
 
 So, to "what is the error bar?", a v0.5.0 answer reads like: "the
 statistical part is not available yet; the result moves by X when the
-cross-section table is changed and by Y with the transmission
-assumption, and the transmission assumption dominates."
-`examples/10_composition_ptfe.py` shows exactly this on public data.
+cross-section table is changed, by Y with the background, and by Z and W
+with the assumptions about the stored data (what the intensity is,
+whether the transmission was applied); these are the ones that matter
+here." `examples/10_composition_ptfe.py` shows this on public data, where
+the two assumptions about the stored data move the answer more than the
+table does.
 
 ## 6. Keep the record with the result
 

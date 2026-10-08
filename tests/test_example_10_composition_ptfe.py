@@ -34,18 +34,32 @@ def _check(res):
     assert b.status == "conditional" and set(b.fractions) == {"F", "C"}
     assert any("integrated_counts" in a for a in b.assumptions)
     assert any("share one normalisation" in a for a in b.assumptions)
-    assert any(n.startswith("statistical uncertainty") and "§7" in n for n in b.not_evaluated)
+    stat = next(n for n in b.not_evaluated if n.startswith("statistical uncertainty"))
+    assert "not evaluated" in stat and "raw counts" in stat and "§7" in stat
     assert len(res["grid"].changes) == 4 and res["grid"].interaction is not None
     assert res["transmission_equal"].status == "conditional"
+    assert res["count_rate"].status == "conditional"
 
 
 def test_offline_run_on_synthetic_spectra(ex, monkeypatch, tmp_path, capsys):
     monkeypatch.delenv("TOYOMACRO_VAMAS_POLYMER_ZIP", raising=False)
     monkeypatch.setattr(ex, "OUT_DIR", tmp_path)
+
+    def no_real_data(*_a, **_k):
+        raise AssertionError("the offline run must not read or fetch the real data")
+
+    monkeypatch.setattr(ex, "load_pair", no_real_data)
+    monkeypatch.setattr(ex, "fetch", no_real_data)
     res = ex.main([])
     _check(res)
     out = capsys.readouterr().out
     assert "SYNTHETIC" in out and "not an uncertainty" in out
+    assert "assumed per scan and point" in out and "Eg 7.7 eV assumed" in out
+    # The seeded stand-in pins the arithmetic offline (windows, exposure, curves);
+    # these numbers say nothing about PTFE.
+    f = res["base"].fractions["F"]
+    assert f == pytest.approx(0.6373, abs=0.0005)
+    assert res["count_rate"].fractions["F"] - f == pytest.approx(-0.0431, abs=0.0005)
     assert (tmp_path / "10_composition_ptfe.png").exists()
 
 
@@ -61,9 +75,14 @@ ARCHIVE = os.environ.get("TOYOMACRO_VAMAS_POLYMER_ZIP")
 
 @pytest.mark.skipif(not ARCHIVE or not Path(ARCHIVE).is_file(),
                     reason="Zenodo 7074887 archive not present")
-def test_the_real_pair(ex, monkeypatch, tmp_path):
+def test_the_real_pair(ex, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(ex, "OUT_DIR", tmp_path)
     res = ex.main(["--data", ARCHIVE])
     _check(res)
-    # Pinned on the record of this version, not a reference value for PTFE.
-    assert res["base"].fractions["F"] == pytest.approx(0.702, abs=0.001)
+    out = capsys.readouterr().out
+    assert "Zenodo 7074887" in out and "SYNTHETIC" not in out
+    # Pinned on the record of this version, not reference values for PTFE.
+    f = res["base"].fractions["F"]
+    assert f == pytest.approx(0.702, abs=0.001)
+    assert res["count_rate"].fractions["F"] - f == pytest.approx(-0.0395, abs=0.001)
+    assert res["transmission_equal"].fractions["F"] - f == pytest.approx(0.0292, abs=0.001)

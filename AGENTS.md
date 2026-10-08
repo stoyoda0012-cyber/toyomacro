@@ -8,6 +8,7 @@ AI-agent user guide instead: `src/toyomacro/guides/AGENT_USER_GUIDE.md`,
 or `python -m toyomacro.guides` for the copy that matches the installed
 version. The rules below apply when you change the package itself or its
 public documents — including during an analysis.
+
 `README.md` and `CONTRIBUTING.md` are the source of record for anything
 user-facing and win wherever this file disagrees with them.
 

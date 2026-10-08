@@ -1,15 +1,17 @@
-"""PTFE composition from public data: the estimate, what moves it, and what is withheld.
+"""PTFE composition from public data: the estimate, what moves it, and what is not evaluated.
 
 The answer to "what is the error bar?" in this version, on one example:
 
 - an **estimate** of the homogeneous-equivalent F:C composition of PTFE,
 - its **condition dependence** — how the estimate moves when the
-  cross-section table, the background or the transmission assumption is
+  cross-section table, the background, or an assumption about the stored
+  data (what the intensity is, whether the transmission was applied) is
   changed (differences between conditions, not an uncertainty),
 - the **assumptions** it rests on, listed beside it,
-- and what is **not evaluated**: the statistical uncertainty is withheld,
-  because its validation on synthetic data left no scope in which it can
-  be reported (docs/design/composition-uncertainty.md §7).
+- and what is **not evaluated**: here the statistical uncertainty, because
+  the file does not state that the intensity is raw counts — and in this
+  version no scope is validated for it in any case
+  (docs/design/composition-uncertainty.md §7).
 
 Data. The first F 1s / C 1s pair (source blocks 0 and 1) of
 ``Kratos Axis Ultra/PTFE.vms`` in the polymer-degradation dataset of
@@ -81,7 +83,8 @@ def fetch(dest: Path = CACHE) -> Path:
         urllib.request.urlretrieve(URL, tmp)
         tmp.rename(dest)
     if hashlib.sha256(dest.read_bytes()).hexdigest() != SHA256:
-        raise ValueError(f"{dest} is not the archive this example was written for")
+        dest.unlink()  # do not keep a wrong file to fail on next time
+        raise ValueError(f"{dest} was not the archive this example was written for; removed")
     return dest
 
 
@@ -92,7 +95,8 @@ def load_pair(archive: Path):
         path.write_bytes(z.read(MEMBER))
         reader = VAMASReader(path)
         f1s, c1s = reader.read(0), reader.read(1)
-    assert (f1s.metadata.region, c1s.metadata.region) == ("F 1s/2", "C 1s/3")
+    if (f1s.metadata.region, c1s.metadata.region) != ("F 1s/2", "C 1s/3"):
+        raise ValueError("the first two blocks are not the F 1s / C 1s pair expected")
     return {"F": f1s, "C": c1s}
 
 
@@ -173,9 +177,11 @@ def analyse(lines: list[Line]) -> dict:
     grid = condition_dependence(lines, conditions(), tables=("scofield", "yeh_lindau"),
                                 backgrounds=("shirley", "linear"))
     no_t = composition(lines, conditions(assume_transmission="equal_across_lines"))
+    rate = composition(lines, conditions(assume_intensity="count_rate"))
     eg = {g: composition(lines, conditions(matrix=replace(PTFE, Eg=g))).fractions["F"]
           for g in (6.7, 8.7)}
-    return {"base": base, "grid": grid, "transmission_equal": no_t, "eg": eg}
+    return {"base": base, "grid": grid, "transmission_equal": no_t, "count_rate": rate,
+            "eg": eg}
 
 
 def report(res: dict, synthetic: bool) -> None:
@@ -193,6 +199,8 @@ def report(res: dict, synthetic: bool) -> None:
         print(f"  table {ch.table:15s} background {ch.background:8s} "
               f"{100 * ch.change['F']:+6.2f}")
     print(f"  2x2 interaction (F): {100 * res['grid'].interaction['F']:+.2f}")
+    print(f"  intensity read as a count rate instead of integrated counts: "
+          f"{100 * (res['count_rate'].fractions['F'] - b.fractions['F']):+.2f}")
     print(f"  transmission assumed equal instead of divided out: "
           f"{100 * (res['transmission_equal'].fractions['F'] - b.fractions['F']):+.2f}")
     print(f"  band gap 6.7 / 8.7 eV instead of 7.7: "
@@ -201,6 +209,10 @@ def report(res: dict, synthetic: bool) -> None:
     print("Assumptions:")
     for a in b.assumptions:
         print(f"  - {a}")
+    for ln, (lo, hi) in zip(b.lines, (WINDOWS_BE["F"], WINDOWS_BE["C"])):
+        print(f"  - {ln.element} {ln.orbital}: window {lo:g}-{hi:g} eV on the stored axis; "
+              f"exposure {ln.exposure_s:g} s ({ln.exposure_basis})")
+    print(f"  - matrix {PTFE.name}: {PTFE.source}")
     print("Not evaluated:")
     for n in b.not_evaluated:
         print(f"  - {n}")

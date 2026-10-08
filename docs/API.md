@@ -973,4 +973,6 @@ to do when a fact is unknown, and how to report a result: the estimate,
 the statistical uncertainty, the condition dependence and what was not
 evaluated, kept apart. It is a recommended starting point to copy and
 adapt, not a required procedure, and it does not widen what the package
-supports.
+supports. `read_guide(name)` reads only the guides listed in
+`toyomacro.guides.GUIDES`. No example uses this module — the guide is the
+content; `tests/test_guides.py` exercises it.
