@@ -410,6 +410,15 @@ directly in source (no external database is extracted or shipped):
 
 ## Deliberately NOT bundled
 
+- **The polymer-degradation XPS data used by `examples/10` and an optional
+  test** (Zenodo 10.5281/zenodo.7074887, "Revisiting Degradation in the
+  XPS Analysis of Polymers Data", CC BY 4.0; data for the Surface and
+  Interface Analysis paper DOI 10.1002/sia.7151). Read from a local copy
+  (`TOYOMACRO_VAMAS_POLYMER_ZIP`) or fetched by `examples/10 --download`,
+  checked against the archive's SHA-256. Nothing from it is in the
+  repository or the package; its file comments contain personal paths and
+  are never written out by the reader.
+
 - **Scienta analyzer transmission functions** (`data/transmission.py`):
   vendor-measured curves are read from a user-supplied directory
   (`TOYOMACRO_SCIENTA_DATA_DIR`); a power-law fallback is used when absent.

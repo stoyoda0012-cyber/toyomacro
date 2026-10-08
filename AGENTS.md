@@ -2,6 +2,12 @@
 
 Instructions for any AI coding agent working in this repository.
 Tool-agnostic, and deliberately short — this is not a development log.
+
+**Using toyomacro for an analysis rather than changing it?** Read the
+AI-agent user guide instead: `src/toyomacro/guides/AGENT_USER_GUIDE.md`,
+or `python -m toyomacro.guides` for the copy that matches the installed
+version. The rules below apply when you change the package itself or its
+public documents — including during an analysis.
 `README.md` and `CONTRIBUTING.md` are the source of record for anything
 user-facing and win wherever this file disagrees with them.
 
@@ -28,6 +34,7 @@ These are the subpackages that exist here:
 | `src/toyomacro/cli/` | command-line entry points |
 | `src/toyomacro/mcp_server.py` | MCP server over the public layer |
 | `src/toyomacro/composition.py` | experimental: homogeneous-equivalent composition with its assumptions and refusals |
+| `src/toyomacro/guides/` | guides shipped with the package (the AI-agent user guide) |
 | `src/toyomacro/_identifiability.py` | private: the lineshape-independent parts of the identifiability diagnostics (Poisson Fisher product, rank rule, effective information, thresholds, linear backgrounds); imports nothing from the package |
 | `tests/` and `src/toyomacro/voigtfit/tests/` | both are collected by pytest |
 | `docs/`, `examples/`, `paper/` | documentation, runnable examples, JOSS paper |
