@@ -275,6 +275,22 @@ archived on Zenodo for a citable DOI.
     the reverse of the usual order (unchanged, to be checked against a
     primary source).
 
+### Known issues
+
+- **Unchanged from v0.4.0:** Yeh–Lindau Cu 3d at 8047.8 eV is still the
+  suspected misprint recorded in v0.3.1 (30x Scofield); and
+  `fit_fermi_edge`'s errors still assume independent channels, which one
+  real detector did not have (+0.16 adjacent-channel correlation; see the
+  v0.4.0 entry).
+- **What remains of the low-energy `lookup()` issue** is listed under
+  Fixed: on Trzhaskovskaya the range is judged on the axis the table is
+  interpolated on; `BindingEnergy` gives no threshold for a part of each
+  table's lines; and it stores Co 3p1/2 and 3p3/2 in reverse order.
+- **The statistical uncertainty of a composition is not available** in
+  this version (see Added), and every composition result says so.
+- **The VAMAS reader's legacy fixed-line layout** (`layout="legacy_fixed"`)
+  is unverified: no real file for it is available to this repository.
+
 ## [0.4.0] - 2026-10-05
 
 Archived on Zenodo:
