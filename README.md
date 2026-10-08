@@ -348,7 +348,8 @@ matrix assumptions.
 composition under an explicit input contract, and reports what it rests on rather than one
 "±": the estimate, how it moves when the table or the background is changed (condition
 dependence, not an uncertainty), the assumptions it needed, and what was not evaluated. The
-statistical part is withheld for now: its validation on synthetic data left no scope in
+statistical part is not available for now (withheld, or not evaluated when the intensity
+is not stated raw counts): its validation on synthetic data left no scope in
 which it could be reported (see
 [docs/design/composition-uncertainty.md](docs/design/composition-uncertainty.md)). It refuses
 rather than fill in a missing exposure, transmission state or denominator.
