@@ -139,11 +139,14 @@ archived on Zenodo for a citable DOI.
   three lines, 0.5 eV channels and Ga Kα, up to a relative area noise of
   0.08 — but every rule tried for choosing which data sets to report it
   for (a minimum area, then the data set's own relative area noise)
-  miscalibrates the ones it admits (R up to 1.25): an error bar given
-  only when a fit came out clean is optimistic. The registered rule
+  miscalibrates the ones it admits: chosen by how clean the data set
+  came out, the reported spread no longer matches the spread of the
+  estimates it is reported for (here it overstates it by up to 25 %).
+  The registered rule
   therefore gave no scope, and nothing is published. It would also
   assume independent channels, which one real detector did not have
   (v0.4.0 known issue).
+
 ### Changed
 
 - **API.md: an Experimental module may be used by an example.** The

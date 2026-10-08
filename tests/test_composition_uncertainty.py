@@ -36,7 +36,7 @@ def _integer_case(name="S1"):
 
 @pytest.fixture
 def scoped(monkeypatch):
-    monkeypatch.setattr(comp, "VALIDATED_SCOPE",
+    monkeypatch.setattr(comp, "_VALIDATED_SCOPE",
                         {"r_threshold": {"linear": 0.02}, "max_lines": 3, "record": "test"})
 
 
@@ -117,7 +117,7 @@ def test_withheld_when_a_replicate_is_refused(scoped):
 
 
 def test_withheld_with_no_validated_scope(monkeypatch):
-    monkeypatch.setattr(comp, "VALIDATED_SCOPE", None)
+    monkeypatch.setattr(comp, "_VALIDATED_SCOPE", None)
     lines, cond = _integer_case()
     u = comp._composition_uncertainty(lines, cond, n_boot=20, seed=1)
     assert u.status == "withheld" and any("no validated scope" in r for r in u.reasons)
@@ -145,9 +145,9 @@ def test_the_shipped_scope_is_the_one_the_second_record_decided():
     """§6 decided no scope for either background, so nothing is published."""
     decision = json.loads(RECORD2.read_text())["decision"]
     if all(d["r_star"] is None for d in decision.values()):
-        assert comp.VALIDATED_SCOPE is None
+        assert comp._VALIDATED_SCOPE is None
     else:
-        assert comp.VALIDATED_SCOPE["r_threshold"] == {
+        assert comp._VALIDATED_SCOPE["r_threshold"] == {
             bg: d["r_threshold"] for bg, d in decision.items() if d["r_star"] is not None}
     for d in decision.values():
         # Every level tried is in the trace, with the admitted R that decided it.

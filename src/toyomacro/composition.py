@@ -289,8 +289,11 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     notes: list[str] = []
     extrapolated: list[str] = []
     not_evaluated = [
-        "statistical uncertainty: withheld; the scope validated on synthetic data is "
-        "empty in this version (docs/design/composition-uncertainty.md §7)",
+        ("statistical uncertainty: withheld; the scope validated on synthetic data is "
+         "empty in this version (docs/design/composition-uncertainty.md §7)")
+        if c.intensity_semantics == "raw_counts" else
+        ("statistical uncertainty: not evaluated; the intensity is not stated raw counts, "
+         "so the Poisson noise model does not apply"),
         "elastic scattering, angular distribution, polarization and geometry: "
         "not in the sensitivity",
     ]
@@ -498,8 +501,8 @@ def condition_dependence(
 # Statistical uncertainty (docs/design/composition-uncertainty.md)
 # ---------------------------------------------------------------------------
 
-NOISE_MODEL = "independent Poisson counts per channel (intensity stated as raw counts)"
-RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, "
+_NOISE_MODEL = "independent Poisson counts per channel (intensity stated as raw counts)"
+_RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, "
               "transmission and background; background, areas and composition recomputed")
 
 #: The scope in which the reported standard uncertainty is published:
@@ -509,7 +512,7 @@ RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, 
 #: calibrated in 39 of 40 scenarios, but admitting data sets by their
 #: measured relative area noise r miscalibrates the admitted subset
 #: (R about 1.2), so its decision rule gave no scope.
-VALIDATED_SCOPE: dict | None = None
+_VALIDATED_SCOPE: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -520,7 +523,7 @@ class _CompositionUncertainty:
     but outside the validated scope or with refused replicates) or
     ``"not_evaluated"`` (the noise model does not apply). The standard
     uncertainty is one standard deviation of the estimator under
-    :data:`NOISE_MODEL`; it is not a confidence interval and does not
+    :data:`_NOISE_MODEL`; it is not a confidence interval and does not
     cover condition dependence.
     """
 
@@ -532,8 +535,8 @@ class _CompositionUncertainty:
     n_boot: int
     n_refused: int
     seed: int | None
-    noise_model: str = NOISE_MODEL
-    resampling: str = RESAMPLING
+    noise_model: str = _NOISE_MODEL
+    resampling: str = _RESAMPLING
     validated_scope: dict | None = None
 
 
@@ -585,16 +588,16 @@ def _composition_uncertainty(
 ) -> _CompositionUncertainty:
     """Bootstrap standard uncertainty of the composition, inside its validated scope.
 
-    Private while :data:`VALIDATED_SCOPE` is empty: a public function that
+    Private while :data:`_VALIDATED_SCOPE` is empty: a public function that
     always withholds would only invite reading its output as an answer.
-    In this version the scope is empty (:data:`VALIDATED_SCOPE` is None):
+    In this version the scope is empty (:data:`_VALIDATED_SCOPE` is None):
     the result is always ``withheld`` or ``not_evaluated``, with the reason.
     The calculation and its checks are in place for a later scope.
 
     Each replicate redraws every channel at the count stage and recomputes
     background, areas and composition (design record §2). Reported only
     when the intensity is stated as raw counts, every replicate succeeds,
-    and the case lies in :data:`VALIDATED_SCOPE`; otherwise ``withheld``
+    and the case lies in :data:`_VALIDATED_SCOPE`; otherwise ``withheld``
     or ``not_evaluated`` with the reason.
     """
     c = conditions
@@ -605,7 +608,7 @@ def _composition_uncertainty(
         return _CompositionUncertainty(
             status=status, reasons=tuple(reasons), elements=tuple(elements),
             standard_uncertainty=se, covariance=cov, n_boot=n_boot, n_refused=refused,
-            seed=seed, validated_scope=VALIDATED_SCOPE)
+            seed=seed, validated_scope=_VALIDATED_SCOPE)
 
     if base.fractions is None:
         return result("not_evaluated", ["the composition itself is refused"])
@@ -632,7 +635,7 @@ def _composition_uncertainty(
     cov_t = tuple(tuple(float(v) for v in row) for row in cov)
 
     reasons = []
-    scope = VALIDATED_SCOPE
+    scope = _VALIDATED_SCOPE
     if scope is None:
         reasons.append("no validated scope in this version (design record "
                        "docs/design/composition-uncertainty.md §7)")

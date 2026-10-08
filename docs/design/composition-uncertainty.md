@@ -1,7 +1,8 @@
 # Statistical uncertainty of a composition — design record
 
-Dated 2026-10-07. Records what `toyomacro.composition.composition_uncertainty`
-(experimental) computes, under which noise model, and how it was checked
+Dated 2026-10-07. Records what the composition bootstrap (private,
+`toyomacro.composition._composition_uncertainty`; first drafted as the
+public `composition_uncertainty`) computes, under which noise model, and how it was checked
 before being published. Every figure here comes from simulation with a
 fixed seed; none is a measurement.
 
@@ -230,19 +231,37 @@ with 301 of 2,000 data sets withheld for refused replicates.
 
 **Admitting data sets by their own r is not.** Step 4 recomputes R over
 the data sets the guard would admit. At every level tried, for both
-backgrounds, the peak-dominated configuration fails it: R over the
-admitted subset is 1.25 (r\* = 0.08), 1.23, 1.21, 1.12 and 1.08
-(r\* = 0.005) with a linear background, and 1.07–1.25 with Shirley; at
-r\* = 0.02 with a linear background the Ga Kα configuration fails too
-(1.07). In
+backgrounds, the peak-dominated configuration does not pass it (fail, or
+undecided at the lower levels): R over the admitted subset is 1.25
+(r\* = 0.08), 1.23, 1.21, 1.11 and 1.07 (r\* = 0.005) with a linear
+background, and 1.07–1.25 with Shirley; at r\* = 0.02 with a linear
+background the Ga Kα configuration does not pass either (1.07,
+undecided). R above 1 means the reported standard uncertainty is larger
+than the spread of the estimates it is reported for: the admitted
+subset is miscalibrated, conservatively here, not optimistically. In
 that configuration r is measured on the same peak as the estimate, so a
 cut on r removes the data sets with the smallest areas and narrows the
 spread of the estimate the standard uncertainty is compared with. This is
 the selection the first audit found for the area cut (§5), on another
 quantity. By the rule, r\* falls through every level: **no scope for
 either background, and nothing is published in this version.**
-`VALIDATED_SCOPE` is None, and `composition_uncertainty` returns
-`withheld` with that reason.
+The scope is None, `composition()` reports the statistical uncertainty
+as withheld with this reason, and the bootstrap stays private. Step 3
+puts the threshold at the 95th percentile, so about 5 % of the pooled
+data sets at r\* are cut by construction; wherever r follows the
+estimated line, step 4 was likely to fail whatever the calibration —
+which is the point of having step 4.
+
+**Choices the harness made that §6 did not state** (none changed the
+outcome): the scaling step used B = 200 replicates, a starting Si area of
+10⁴ counts × eV, the update area × (median r / level)² and at most 8
+steps, with draws seeded [20261008, 999999, d]; the 95th percentile is
+`numpy.quantile` with linear interpolation, over the data sets that have
+an r (those with refused replicates have none — at most one per level
+used for a threshold); an admitted subset under 20 data sets would count
+as not passing (none was). The record names the summary commit
+(59c5332); the runs were at ead01d4, and their per-data-set code is
+unchanged between the two.
 
 **What would open a scope.** A guard whose admission does not depend on
 the data set's own fluctuations — r of the expected counts supplied by
