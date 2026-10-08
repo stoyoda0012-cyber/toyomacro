@@ -306,6 +306,15 @@ python -m toyomacro.mcp_server
 Tools: `lookup_binding_energy`, `calculate_sensitivity`,
 `list_fitting_templates`, `fit_spectrum_file`, `gvrt_run`, `gvrt_sweep`.
 
+For an agent doing analysis with toyomacro there is a user guide, shipped
+with the package so it matches the installed version — what to check
+before an analysis, what to do when something is not known, and how to
+report a result. Print it and give it to the agent, or copy and adapt it:
+
+```bash
+python -m toyomacro.guides
+```
+
 
 ## Scope: what this repository provides
 
@@ -339,7 +348,8 @@ matrix assumptions.
 composition under an explicit input contract, and reports what it rests on rather than one
 "±": the estimate, how it moves when the table or the background is changed (condition
 dependence, not an uncertainty), the assumptions it needed, and what was not evaluated. The
-statistical part is withheld for now: its validation on synthetic data left no scope in
+statistical part is not available for now (withheld, or not evaluated when the intensity
+is not stated raw counts): its validation on synthetic data left no scope in
 which it could be reported (see
 [docs/design/composition-uncertainty.md](docs/design/composition-uncertainty.md)). It refuses
 rather than fill in a missing exposure, transmission state or denominator.
@@ -407,7 +417,7 @@ Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,580 tests to mean what they say; do not use it to
+want the other 2,589 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 

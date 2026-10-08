@@ -293,7 +293,8 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
          "empty in this version (docs/design/composition-uncertainty.md §7)")
         if c.intensity_semantics == "raw_counts" else
         ("statistical uncertainty: not evaluated; the intensity is not stated raw counts, "
-         "so the Poisson noise model does not apply"),
+         "so the Poisson noise model does not apply (and no scope is validated in this "
+         "version: docs/design/composition-uncertainty.md §7)"),
         "elastic scattering, angular distribution, polarization and geometry: "
         "not in the sensitivity",
     ]

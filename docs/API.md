@@ -36,8 +36,8 @@ rule that separates them:
 
 **Supported.** Every name in the `__all__` list of `toyomacro`,
 `toyomacro.core`, `toyomacro.lineshape`, `toyomacro.background`,
-`toyomacro.io`, `toyomacro.data`, `toyomacro.fitting`, and
-`toyomacro.voigtfit`, plus the submodule entry points given with a
+`toyomacro.io`, `toyomacro.data`, `toyomacro.fitting`,
+`toyomacro.guides` and `toyomacro.voigtfit`, plus the submodule entry points given with a
 call signature in the sections below (`dictionary_solver`,
 `multipeak_solver`, `gvrt_service`, `spectra_generator`). These are
 covered by the test suite, exercised by `examples/`, and will not
@@ -959,3 +959,20 @@ other vendor fields only on opt-in.
 `misc/numberofslice` in the HDF5 layout is a structural default, not a
 fact. A 1.0 file (v0.4.0 and earlier) reads with no origins and no
 series.
+
+## 9. The AI-agent user guide
+
+```python
+from toyomacro.guides import read_guide
+print(read_guide())          # or: python -m toyomacro.guides
+```
+
+The guide ships inside the package, so the text an agent reads matches
+the installed version. It covers what to check before an analysis, what
+to do when a fact is unknown, and how to report a result: the estimate,
+the statistical uncertainty, the condition dependence and what was not
+evaluated, kept apart. It is a recommended starting point to copy and
+adapt, not a required procedure, and it does not widen what the package
+supports. `read_guide(name)` reads only the guides listed in
+`toyomacro.guides.GUIDES`. No example uses this module — the guide is the
+content; `tests/test_guides.py` exercises it.

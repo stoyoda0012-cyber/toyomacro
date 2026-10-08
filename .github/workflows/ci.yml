@@ -158,8 +158,11 @@ jobs:
           Y = np.asarray(Phi) @ np.array([[7.0]])
           A, chi2 = pipe.stage1_screening(Y, Wt, Phi)
           assert abs(float(np.asarray(A)[0, 0]) - 7.0) < 1e-2
+          from toyomacro.guides import read_guide
+          assert 'Written for: toyomacro v' in read_guide()
           print('clean-install smoke OK, version', toyomacro.__version__)
           "
+          /tmp/cleanenv/bin/python -m toyomacro.guides | head -1
 
       - name: Validate CITATION.cff
         run: uvx cffconvert --validate
