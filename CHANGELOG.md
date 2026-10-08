@@ -127,24 +127,23 @@ archived on Zenodo for a citable DOI.
   the interaction — not an uncertainty. σ × λ is not a complete AMRSF,
   and instrument RSF tables are not part of this route.
 
-- **`composition_uncertainty` (Experimental), with nothing published
-  yet.** It resamples every channel from Poisson(observed count) at the
-  count stage, recomputes background, areas and composition, and would
-  give each fraction's standard uncertainty and their covariance — but
-  only inside a scope validated on synthetic data, and in this version
-  that scope is empty: it always returns `withheld` (or `not_evaluated`
-  when the intensity is not stated raw counts, or not integer) with the
-  reason. Two pre-registered validations
-  (`docs/design/composition-uncertainty.md`, records committed) found the
-  standard uncertainty calibrated — 39 of 40 scenarios across two
-  backgrounds, peak- and background-dominated spectra, three lines,
-  0.5 eV channels and Ga Kα, up to a relative area noise of 0.08 — but
-  every admission rule tried (a minimum area, then the data set's own
-  relative area noise) selects data sets in a way that miscalibrates the
-  ones it admits (R up to 1.25), so the registered rule gave no scope.
-  The function, its guards and the validation harness are in place for a
-  later round. It assumes independent channels, which one real detector
-  did not have (v0.4.0 known issue), and is not a confidence interval.
+- **The statistical uncertainty of a composition is withheld in this
+  version, for a recorded reason.** `composition()` lists it as withheld
+  in `not_evaluated`, pointing to the design record. A count-level
+  bootstrap — every channel redrawn from Poisson(observed count),
+  background, areas and composition recomputed — is implemented
+  privately and was tested in two pre-registered validations on
+  synthetic spectra (`docs/design/composition-uncertainty.md`, records
+  committed). Its standard uncertainty is calibrated in 39 of 40
+  scenarios — two backgrounds, peak- and background-dominated spectra,
+  three lines, 0.5 eV channels and Ga Kα, up to a relative area noise of
+  0.08 — but every rule tried for choosing which data sets to report it
+  for (a minimum area, then the data set's own relative area noise)
+  miscalibrates the ones it admits (R up to 1.25): an error bar given
+  only when a fit came out clean is optimistic. The registered rule
+  therefore gave no scope, and nothing is published. It would also
+  assume independent channels, which one real detector did not have
+  (v0.4.0 known issue).
 ### Changed
 
 - **API.md: an Experimental module may be used by an example.** The

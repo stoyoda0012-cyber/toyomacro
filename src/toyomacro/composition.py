@@ -17,7 +17,9 @@ What is returned. A :class:`CompositionResult` keeps four things apart
 and never combines them into one "±":
 
 - the estimate (``fractions``),
-- the statistical uncertainty — not evaluated in this version,
+- the statistical uncertainty — withheld in this version: the scope in
+  which it was validated on synthetic data is empty
+  (docs/design/composition-uncertainty.md §7),
 - condition dependence — how the estimate moves when a choice is changed
   (:func:`condition_dependence`), a difference between conditions and not
   an uncertainty,
@@ -287,7 +289,8 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     notes: list[str] = []
     extrapolated: list[str] = []
     not_evaluated = [
-        "statistical uncertainty: not evaluated in this version",
+        "statistical uncertainty: withheld; the scope validated on synthetic data is "
+        "empty in this version (docs/design/composition-uncertainty.md §7)",
         "elastic scattering, angular distribution, polarization and geometry: "
         "not in the sensitivity",
     ]
@@ -510,7 +513,7 @@ VALIDATED_SCOPE: dict | None = None
 
 
 @dataclass(frozen=True)
-class CompositionUncertainty:
+class _CompositionUncertainty:
     """Standard uncertainty of each atomic fraction, or why there is none.
 
     ``status`` is ``"evaluated"``, ``"withheld"`` (computed or computable,
@@ -574,14 +577,16 @@ def _relative_area_noise(areas: np.ndarray, observed: Sequence[float]) -> float:
                      for k in range(areas.shape[1])))
 
 
-def composition_uncertainty(
+def _composition_uncertainty(
     lines: Sequence[Line],
     conditions: Conditions,
     n_boot: int = 1000,
     seed: int | None = None,
-) -> CompositionUncertainty:
+) -> _CompositionUncertainty:
     """Bootstrap standard uncertainty of the composition, inside its validated scope.
 
+    Private while :data:`VALIDATED_SCOPE` is empty: a public function that
+    always withholds would only invite reading its output as an answer.
     In this version the scope is empty (:data:`VALIDATED_SCOPE` is None):
     the result is always ``withheld`` or ``not_evaluated``, with the reason.
     The calculation and its checks are in place for a later scope.
@@ -597,7 +602,7 @@ def composition_uncertainty(
     elements = base.denominator
 
     def result(status, reasons, se=None, cov=None, refused=0):
-        return CompositionUncertainty(
+        return _CompositionUncertainty(
             status=status, reasons=tuple(reasons), elements=tuple(elements),
             standard_uncertainty=se, covariance=cov, n_boot=n_boot, n_refused=refused,
             seed=seed, validated_scope=VALIDATED_SCOPE)
