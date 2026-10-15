@@ -34,6 +34,7 @@ published value, however old it is.
 | **M1** | Apple M3 Max, 128 GB, macOS | MLX (Metal) | The published-benchmark machine. Every number in §2 and §3 is from here. | Metal is not; the macOS job runs MLX force-disabled |
 | **M2** | RTX 5070 Laptop / Ryzen 9 8940HX, Windows 11 + WSL2 | MLX (CUDA) | Correctness validation of the CUDA backend. **No published performance claim.** | No |
 | **M3** | Intel Xeon @ 2.80 GHz, 4 vCPU, no GPU, Linux | NumPy | A control, used once to refute a host-specific hypothesis about two codec speed assertions. | No |
+| **M4** | Intel Core Ultra 5 235U, 15.4 GB, Windows 11 (names owner-stated; the record carries the CPUID string and build 26300, 14 logical cores) | NumPy | A GPU-less thin laptop, measured once with `--runs 3`. **No published performance claim.** The record is graded `unknown`, not `quiet`: Windows reports no load average (§4). | `windows-latest` runs the suite, no benchmarks |
 | — | GitHub Actions: `ubuntu-26.04`, `macos-latest`, `windows-latest`, Python 3.11/3.12 | NumPy | Correctness only. **Runs no benchmarks**; speed assertions skip when `CI=true` (`skip_in_ci` in `test_compression.py`, `skipif(IN_CI, …)` elsewhere). | — |
 
 M2's earlier measurements are prose in
@@ -153,6 +154,31 @@ the `test_decode_speed` assertions fail on M2 because of something
 about M2. They do not — a second, unrelated host missed the same
 thresholds, which points at the thresholds. No performance claim
 anywhere derives from M3.
+
+**M4 — Core Ultra 5 235U laptop (NumPy, Windows).** One `--runs 3`
+record, 2026-10-15, taken from the v0.5.1 tag archive rather than a
+clone, so its `git` fields are null. Medians: `projection_kernel`
+23.1 M, `amp_only_projection` 51.7 M, `dict2d_parabola` 992 k,
+`taylor_4step` 522 k, `multipeak_2comp` 118 k spec/s; each run's own
+range covers the spread across runs (`understates_by` 0.88–0.99, at or
+below 1.00). Against the quiet NumPy records — the population
+`summarize_records` uses for headline figures — it is above the 4-vCPU
+Xeon and the Ryzen/WSL2 hosts on `dict2d_parabola` and `taylor_4step`
+(by 11–58 %), 12 % above the Xeon and level with the Ryzen (within
+6 %) on `multipeak_2comp`, between them on `projection_kernel`, and on
+the BLAS-bound `amp_only_projection` below the Xeon (129 M) and inside
+the Ryzen's wide range of per-record medians (33–89 M). Its verdict is
+`unknown` on every run because the harness establishes quiet only from
+a load average, which Windows does not report; on run 1
+`cpu_percent_before` was 2.3 % and `cpu_percent_others` 25.5 % on 14
+logical cores, and the harness uses the latter only as a contention
+signal (`others_busy_after`, threshold 25 % per logical core, 350 %
+here), never to establish quiet. The CPU and OS names above are the
+owner's statement: the record carries the CPUID string Windows returns
+(`Intel64 Family 6 Model 181`) and the build number (10.0.26300). Its
+`input_sha256` (`4ed0175e…`) differs from both the Linux and the macOS
+hashes: throughput compares, `mae_*` does not. No published number
+derives from M4.
 
 **A Linux-only measurement bug, fixed.** `ru_maxrss` is in kibibytes on
 Linux, and two different mistakes were made about it.
