@@ -57,6 +57,11 @@ jobs:
       - name: Run examples (smoke)
         env:
           MPLBACKEND: Agg
+          # Example output must survive a legacy Windows stdout encoding.
+          # The Windows runner pipes as cp1252; a Japanese-locale Windows
+          # uses cp932, which lacks characters cp1252 has (and the reverse).
+          # Linux and macOS would print UTF-8, so they check cp932 instead.
+          PYTHONIOENCODING: ${{ matrix.os == 'windows-latest' && 'cp1252' || 'cp932' }}
         run: |
           uv run python examples/data/make_example_data.py
           uv run python examples/01_fit_single_spectrum.py
