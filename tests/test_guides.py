@@ -8,6 +8,7 @@ than the package it ships in.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -58,6 +59,12 @@ def test_only_shipped_guides_can_be_read():
 
 
 def test_python_m_prints_it():
+    """Prints the guide as UTF-8 whatever the stdout encoding.
+
+    A redirect on a Japanese-locale Windows encodes stdout as cp932,
+    which has no em dash; the guide has many.
+    """
+    env = {**os.environ, "PYTHONIOENCODING": "cp932"}
     out = subprocess.run([sys.executable, "-m", "toyomacro.guides"], capture_output=True,
-                         text=True, check=True).stdout
+                         encoding="utf-8", env=env, check=True).stdout
     assert out == read_guide()

@@ -18,8 +18,8 @@ requests.
 ```bash
 git clone https://github.com/<your-fork>/toyomacro.git
 cd toyomacro
-uv sync --extra dev          # or: pip install -e ".[dev]"
-pytest                       # run the test suite
+uv sync --extra dev --extra mcp   # or: pip install -e ".[dev,mcp]"
+uv run pytest                     # run the test suite (MCP tests skip without the mcp extra)
 ```
 
 The Voigt-fitting engine (`toyomacro.voigtfit`) is intentionally

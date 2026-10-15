@@ -25,7 +25,8 @@ def get_available_memory_gb() -> float:
     if system == "Darwin":  # macOS
         try:
             result = subprocess.run(
-                ["vm_stat"], capture_output=True, text=True, check=True
+                ["vm_stat"], capture_output=True, text=True, check=True,
+                stdin=subprocess.DEVNULL,
             )
             lines = result.stdout.split("\n")
             page_size = 4096

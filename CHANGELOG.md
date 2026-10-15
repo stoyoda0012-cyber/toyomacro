@@ -8,6 +8,52 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Changed
+
+- README: the MCP section shows a client configuration with an absolute
+  interpreter path, for clients that do not see `uv` on `PATH` (a
+  standalone `uv` on Windows), and says relative paths resolve against
+  the server's working directory. The development commands install
+  `--extra dev --extra mcp`, as CI does; CONTRIBUTING matches.
+- `calculate_sensitivity` states that `compound` defaults to SiO2 and
+  that the sensitivity depends on it; `fit_spectrum_file` says a
+  relative path resolves against the server's working directory.
+
+### Fixed
+
+- **MCP server: imports done before the first request.** A first-call
+  hang was reported on Windows: the first tool call returned only after
+  the client sent another message. The tools import their modules
+  lazily, and that first import ran while the stdio transport held a
+  pending read on stdin. `python -m toyomacro.mcp_server` now imports,
+  before it starts, the modules the tools and the library code they
+  call import lazily, and selects matplotlib's Agg backend; the first
+  figure save still loads the Agg backend module and PIL's image
+  plugins. Importing `toyomacro.mcp_server` as a module stays cheap;
+  the server answers `initialize` only after those imports (seconds).
+  Reproduced on Windows 11 (Python 3.12, mcp 1.28): on v0.5.0 the first
+  `tools/call` over stdio stayed silent for 60 s and returned within
+  three seconds of a `ping`; with this change it returned at once, in
+  two runs of each. The macOS `vm_stat` calls in the memory probes no
+  longer inherit stdin.
+- **`python -m toyomacro.guides` writes UTF-8 whatever the console or
+  redirect encoding.** On a Japanese-locale Windows a redirect
+  (`> guide.txt`) is encoded as cp932, which has no em dash, and the
+  command stopped with `UnicodeEncodeError`. The text is unchanged.
+- **Example 10 and `voigtfit.cli benchmark` print only characters cp932
+  and cp1252 both encode** (an em dash and `χ²`, now `-` and `chi2`).
+  CI runs the examples, example 10 among them, and a small
+  `voigtfit.cli benchmark` with `PYTHONIOENCODING` set to cp932 on
+  Linux and macOS and cp1252 on Windows.
+- **`uv run pytest` without the `mcp` extra runs the suite** instead of
+  stopping at collection: `tests/test_cross_section_status.py` imported
+  the MCP server at module level. Its two MCP tests now skip without
+  `mcp`; the other tests in the file run.
+- A Dict3D cache test failed when little memory was free: the
+  module-level cache sizes itself from free memory at import (one entry
+  below about 7.5 GB). The cache tests now use their own cache of stated
+  size, and the CI skip on that test is removed.
+
 ## [0.5.0] - 2026-10-08
 
 Archived on Zenodo:

@@ -1,14 +1,12 @@
 """Tests for 3D Dictionary Solver."""
 
-import os
-
 import numpy as np
 import pytest
 from scipy.special import wofz
 
-IN_CI = os.environ.get("CI") == "true"
-
+from toyomacro.voigtfit import dictionary_solver_3d
 from toyomacro.voigtfit.dictionary_solver_3d import (
+    _Dict3DLRUCache,
     build_dictionary_3d,
     clear_dict3d_cache,
     dict3d_cache_info,
@@ -538,10 +536,17 @@ class TestSolve2StageHybrid:
 
 
 class TestDict3DCache:
-    """Tests for Dict3D LRU cache."""
+    """Tests for Dict3D LRU cache.
 
-    def setup_method(self):
-        clear_dict3d_cache()
+    The module-level cache sizes itself from the memory free at import
+    (one entry below about 7.5 GB), so a test that holds two entries in
+    it passes or fails with the machine's load. Each test gets its own
+    cache with a stated size instead.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _cache(self, monkeypatch):
+        monkeypatch.setattr(dictionary_solver_3d, "_dict3d_cache", _Dict3DLRUCache(max_size=8))
 
     def test_cache_hit(self):
         """Second call with same params should be a cache hit."""
@@ -564,7 +569,6 @@ class TestDict3DCache:
         # Should be the exact same object
         assert dc1 is dc2
 
-    @pytest.mark.skipif(IN_CI, reason="cache state contamination on Linux CI; passes on macOS dev")
     def test_cache_miss_different_gamma(self):
         """Different gamma should be a cache miss."""
         params = dict(
@@ -596,32 +600,26 @@ class TestDict3DCache:
         assert info["hits"] == 0
         assert info["misses"] == 0
 
-    def test_lru_eviction(self):
-        """Cache should evict oldest entry when full (max_size=4)."""
-        from toyomacro.voigtfit.dictionary_solver_3d import _dict3d_cache
-        # Temporarily set max_size to 2 for this test
-        old_max = _dict3d_cache._max_size
-        _dict3d_cache._max_size = 2
-        try:
-            params = dict(
-                energy=ENERGY, centers=CENTERS, sigmas=SIGMAS,
-                dE_range=(-0.5, 0.5), dE_step=0.1,
-                dsigma_range=(-0.15, 0.15), dsigma_step=0.05,
-                dgamma_range=(-0.04, 0.04), dgamma_step=0.02,
-            )
-            dc1 = get_or_build_dictionary_3d(gamma=0.10, **params)
-            dc2 = get_or_build_dictionary_3d(gamma=0.12, **params)
-            assert dict3d_cache_info()["size"] == 2
+    def test_lru_eviction(self, monkeypatch):
+        """Cache should evict oldest entry when full (max_size=2)."""
+        monkeypatch.setattr(dictionary_solver_3d, "_dict3d_cache", _Dict3DLRUCache(max_size=2))
+        params = dict(
+            energy=ENERGY, centers=CENTERS, sigmas=SIGMAS,
+            dE_range=(-0.5, 0.5), dE_step=0.1,
+            dsigma_range=(-0.15, 0.15), dsigma_step=0.05,
+            dgamma_range=(-0.04, 0.04), dgamma_step=0.02,
+        )
+        dc1 = get_or_build_dictionary_3d(gamma=0.10, **params)
+        dc2 = get_or_build_dictionary_3d(gamma=0.12, **params)
+        assert dict3d_cache_info()["size"] == 2
 
-            # Third entry should evict the first
-            dc3 = get_or_build_dictionary_3d(gamma=0.14, **params)
-            assert dict3d_cache_info()["size"] == 2
+        # Third entry should evict the first
+        dc3 = get_or_build_dictionary_3d(gamma=0.14, **params)
+        assert dict3d_cache_info()["size"] == 2
 
-            # First entry should be evicted (cache miss on re-access)
-            dc1_again = get_or_build_dictionary_3d(gamma=0.10, **params)
-            assert dc1_again is not dc1  # Rebuilt, not same object
-        finally:
-            _dict3d_cache._max_size = old_max
+        # First entry should be evicted (cache miss on re-access)
+        dc1_again = get_or_build_dictionary_3d(gamma=0.10, **params)
+        assert dc1_again is not dc1  # Rebuilt, not same object
 
     def test_2stage_uses_cache(self):
         """solve_2stage_hybrid should benefit from cache on second call."""

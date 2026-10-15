@@ -325,6 +325,31 @@ python -m toyomacro.mcp_server
 Tools: `lookup_binding_energy`, `calculate_sensitivity`,
 `list_fitting_templates`, `fit_spectrum_file`, `gvrt_run`, `gvrt_sweep`.
 
+To register it with a client, give the client an absolute path. A
+client may not start the server with your shell's `PATH` — a standalone
+`uv` on Windows, for one, is often not on it — so a bare `"command": "uv"`
+or `"python"` can fail to start. Use the Python of the environment
+toyomacro is installed in, as below, or the absolute path to `uv` with
+`"args": ["run", "--directory", "<checkout>", "python", "-m",
+"toyomacro.mcp_server"]`. `which uv` / `which python` (macOS, Linux) and
+`where uv` / `where python` (Windows) print the paths:
+
+```json
+{
+  "mcpServers": {
+    "toyomacro": {
+      "command": "/absolute/path/to/toyomacro/.venv/bin/python",
+      "args": ["-m", "toyomacro.mcp_server"]
+    }
+  }
+}
+```
+
+On Windows the interpreter is `.venv\Scripts\python.exe`; in JSON each
+backslash is written twice. Relative file paths passed to `fit_spectrum_file`
+resolve against the server's working directory, which the client
+chooses; pass absolute paths.
+
 For an agent doing analysis with toyomacro there is a user guide, shipped
 with the package so it matches the installed version — what to check
 before an analysis, what to do when something is not known, and how to
@@ -425,18 +450,22 @@ as data — are written up in
 ## Development
 
 ```bash
-uv sync --extra dev --extra mlx
+uv sync --extra dev --extra mcp                  # what CI installs; add --extra mlx on Apple Silicon
 uv run pytest                                    # full suite; inventory in tests/README.md
 uv run pytest -m "not perf"                      # skip the 12 wall-clock gates
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check .                              # lint (what CI runs)
 ```
 
+`--extra dev` is required: it is what installs pytest. Without
+`--extra mcp` the suite still runs, but the MCP server tests are
+skipped.
+
 Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,589 tests to mean what they say; do not use it to
+want the other 2,590 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 

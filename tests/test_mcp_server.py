@@ -212,3 +212,53 @@ def test_sensitivity_table_argument_reaches_deep_levels():
     bad = json.loads(calculate_sensitivity("Si", "2p", table="nope"))
     assert "Unknown table" in bad["error"]
 
+
+
+def _lazy_tool_imports() -> set[str]:
+    """Modules imported inside function bodies of mcp_server.py."""
+    import ast
+
+    tree = ast.parse(open(mcp_server.__file__, encoding="utf-8").read())
+    names: set[str] = set()
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef) or fn.name == "_preload":
+            continue
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Import):
+                names.update(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names.add(node.module)
+    return names
+
+
+def test_preload_imports_every_module_the_tools_import():
+    """The server imports the tools' lazy imports before reading stdin.
+
+    A first tool call that hung on Windows until the client sent another
+    message was reported; the first-time imports ran while the stdio
+    reader held a pending read on stdin. Run in a fresh interpreter so
+    the check sees what _preload loads, not what this test session has.
+    """
+    import subprocess
+    import sys
+
+    wanted = sorted(_lazy_tool_imports())
+    assert "toyomacro.voigtfit.gvrt_service" in wanted and "matplotlib.pyplot" in wanted
+    code = (
+        "import sys, json\n"
+        "from toyomacro import mcp_server\n"
+        f"wanted = {wanted!r}\n"
+        "before = [m for m in wanted if m in sys.modules]\n"
+        "mcp_server._preload()\n"
+        "import matplotlib\n"
+        "print(json.dumps({'before': before,\n"
+        "                  'missing': [m for m in wanted if m not in sys.modules],\n"
+        "                  'backend': matplotlib.get_backend().lower()}))\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         stdin=subprocess.DEVNULL, check=True)
+    got = json.loads(out.stdout.strip().splitlines()[-1])
+    assert got["missing"] == []
+    assert got["backend"] == "agg"
+    # Importing the module alone stays cheap: the heavy modules wait for _preload.
+    assert "toyomacro.voigtfit.gvrt_service" not in got["before"]

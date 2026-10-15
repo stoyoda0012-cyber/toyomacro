@@ -16,7 +16,6 @@ import math
 
 import pytest
 
-from toyomacro import mcp_server
 from toyomacro.data.cross_section import AVAILABLE_TABLES, CrossSection
 
 # Yeh-Lindau Table I prints Tl 5d from 40.8 eV (53.07 Mb); v0.4.0 returned
@@ -229,14 +228,23 @@ def test_lookup_and_status_agree_everywhere(table):
 
 # --- MCP ----------------------------------------------------------------------
 
-def test_mcp_refuses_below_the_first_cell_and_names_the_state():
+@pytest.fixture
+def mcp_server():
+    """The MCP server module; only these tests need the ``mcp`` extra."""
+    pytest.importorskip("mcp")
+    from toyomacro import mcp_server
+
+    return mcp_server
+
+
+def test_mcp_refuses_below_the_first_cell_and_names_the_state(mcp_server):
     out = json.loads(mcp_server.calculate_sensitivity(
         "Tl", "5d", photon_energy=21.2, table="yeh_lindau"))
     assert "error" in out and "first tabulated cell" in out["error"]
     assert out["cross_section_status"] == "outside_range_below"
 
 
-def test_mcp_flag_is_judged_on_the_line_not_the_table_grid():
+def test_mcp_flag_is_judged_on_the_line_not_the_table_grid(mcp_server):
     out = json.loads(mcp_server.calculate_sensitivity(
         "Si", "2p", photon_energy=1486.6, table="yeh_lindau"))
     assert out["cross_section_status"] == "tabulated"
