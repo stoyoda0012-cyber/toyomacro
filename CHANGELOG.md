@@ -14,8 +14,7 @@ archived on Zenodo for a citable DOI.
   interpreter path, for clients that do not see `uv` on `PATH` (a
   standalone `uv` on Windows), and says relative paths resolve against
   the server's working directory. The development commands install
-  `--extra dev --extra mcp`, as CI does; CONTRIBUTING matches. The
-  examples paragraph counts ten examples, not eight.
+  `--extra dev --extra mcp`, as CI does; CONTRIBUTING matches.
 - `calculate_sensitivity` states that `compound` defaults to SiO2 and
   that the sensitivity depends on it; `fit_spectrum_file` says a
   relative path resolves against the server's working directory.

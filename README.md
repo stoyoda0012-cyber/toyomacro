@@ -175,10 +175,21 @@ for the runnable scripts behind each number.
 
 ## Installation
 
-Requires Python **3.11** or newer. We recommend
-[`uv`](https://docs.astral.sh/uv/) for installation.
+Requires Python **3.11** or newer.
+
+Without cloning the repository (needs Git; installs the core package,
+while `examples/` and the benchmarks come with a clone):
 
 ```bash
+pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.5.0"
+```
+
+From a clone — we recommend [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+git clone https://github.com/stoyoda0012-cyber/toyomacro.git
+cd toyomacro
+
 # Voigt engine only (numpy / scipy / h5py / matplotlib / lmfit / lz4 / psutil)
 uv sync
 
@@ -268,14 +279,17 @@ calibrating the energy axis on a metal Fermi edge, mapping how well
 a spectrum can tell the Gaussian from the Lorentzian width of a Voigt
 peak (model bounds, not a fit; see
 [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md)),
-a minimal front end — click a pixel of a fitted map to see its
+and a minimal front end — click a pixel of a fitted map to see its
 fit — as the pattern for putting a viewer or GUI of your own on the
-engine, whether a Fermi edge can tell the instrumental resolution from
-the temperature (model bounds; see
-[`docs/design/fermi-edge-identifiability.md`](docs/design/fermi-edge-identifiability.md)),
-and an experimental homogeneous-equivalent composition of PTFE with
-what moves it and what is not evaluated (public data when given,
-a synthetic stand-in otherwise). They run in CI on every commit.
+engine. Example 09 asks whether a Fermi edge can tell the instrumental
+resolution from the temperature at all, and what fitting the
+temperature costs the resolution's uncertainty (model bounds plus one
+simulated spectrum; see
+[`docs/design/fermi-edge-identifiability.md`](docs/design/fermi-edge-identifiability.md)).
+Example 10 estimates the F:C composition of PTFE from a public Zenodo
+dataset (not bundled; a synthetic stand-in runs offline) and lists
+what moves the estimate, what it assumes and what is not evaluated.
+They run in CI on every commit.
 
 ### GVRT roundtrip demo
 
