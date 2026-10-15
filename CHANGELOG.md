@@ -29,9 +29,13 @@ archived on Zenodo for a citable DOI.
   before it starts, the modules the tools and the library code they
   call import lazily, and selects matplotlib's Agg backend; the first
   figure save still loads the Agg backend module and PIL's image
-  plugins. Importing `toyomacro.mcp_server` as a module stays cheap.
-  Not reproduced or verified on Windows here. The macOS `vm_stat` calls
-  in the memory probes no longer inherit stdin.
+  plugins. Importing `toyomacro.mcp_server` as a module stays cheap;
+  the server answers `initialize` only after those imports (seconds).
+  Reproduced on Windows 11 (Python 3.12, mcp 1.28): on v0.5.0 the first
+  `tools/call` over stdio stayed silent for 60 s and returned within
+  three seconds of a `ping`; with this change it returned at once, in
+  two runs of each. The macOS `vm_stat` calls in the memory probes no
+  longer inherit stdin.
 - **`python -m toyomacro.guides` writes UTF-8 whatever the console or
   redirect encoding.** On a Japanese-locale Windows a redirect
   (`> guide.txt`) is encoded as cp932, which has no em dash, and the
