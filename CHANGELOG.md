@@ -31,6 +31,10 @@ archived on Zenodo for a citable DOI.
   stopping at collection: `tests/test_cross_section_status.py` imported
   the MCP server at module level. Its two MCP tests now skip without
   `mcp`; the other tests in the file run.
+- A Dict3D cache test failed when little memory was free: the
+  module-level cache sizes itself from free memory at import (one entry
+  below about 7.5 GB). The cache tests now use their own cache of stated
+  size, and the CI skip on that test is removed.
 
 ## [0.5.0] - 2026-10-08
 
