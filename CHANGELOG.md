@@ -26,9 +26,11 @@ archived on Zenodo for a citable DOI.
   hang was reported on Windows: the first tool call returned only after
   the client sent another message. The tools import their modules
   lazily, and that first import ran while the stdio transport held a
-  pending read on stdin. `python -m toyomacro.mcp_server` now imports
-  everything the tools use (and selects matplotlib's Agg backend) before
-  it starts; importing `toyomacro.mcp_server` as a module stays cheap.
+  pending read on stdin. `python -m toyomacro.mcp_server` now imports,
+  before it starts, the modules the tools and the library code they
+  call import lazily, and selects matplotlib's Agg backend; the first
+  figure save still loads the Agg backend module and PIL's image
+  plugins. Importing `toyomacro.mcp_server` as a module stays cheap.
   Not reproduced or verified on Windows here. The macOS `vm_stat` calls
   in the memory probes no longer inherit stdin.
 - **`python -m toyomacro.guides` writes UTF-8 whatever the console or

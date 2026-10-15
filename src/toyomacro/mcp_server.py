@@ -497,7 +497,10 @@ def _preload() -> None:
     transport's reader thread held a pending read on stdin. Importing
     up front keeps that work out of the request path. matplotlib is
     switched to the non-interactive Agg backend here, before pyplot is
-    imported, as ``_save_gvrt_figure`` needs.
+    imported, as ``_save_gvrt_figure`` needs. The list covers the tool
+    bodies and the lazy imports of the library code they reach; what
+    the first figure save loads on its own (the Agg backend module,
+    PIL's image plugins) is not in it.
     """
     import matplotlib
 
