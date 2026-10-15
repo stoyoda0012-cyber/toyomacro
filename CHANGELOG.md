@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.5.1] - 2026-10-15
 
+Archived on Zenodo:
+[10.5281/zenodo.23387368](https://doi.org/10.5281/zenodo.23387368).
+
 ### Changed
 
 - README: the MCP section shows a client configuration with an absolute
