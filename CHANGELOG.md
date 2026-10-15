@@ -37,8 +37,9 @@ archived on Zenodo for a citable DOI.
   command stopped with `UnicodeEncodeError`. The text is unchanged.
 - **Example 10 and `voigtfit.cli benchmark` print only characters cp932
   and cp1252 both encode** (an em dash and `χ²`, now `-` and `chi2`).
-  CI runs the examples with `PYTHONIOENCODING` set to cp932 on Linux and
-  macOS and cp1252 on Windows.
+  CI runs the examples, example 10 among them, and a small
+  `voigtfit.cli benchmark` with `PYTHONIOENCODING` set to cp932 on
+  Linux and macOS and cp1252 on Windows.
 - **`uv run pytest` without the `mcp` extra runs the suite** instead of
   stopping at collection: `tests/test_cross_section_status.py` imported
   the MCP server at module level. Its two MCP tests now skip without
