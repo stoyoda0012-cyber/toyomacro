@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-15
+
 ### Changed
 
 - README: the MCP section shows a client configuration with an absolute
@@ -53,6 +55,11 @@ archived on Zenodo for a citable DOI.
   module-level cache sizes itself from free memory at import (one entry
   below about 7.5 GB). The cache tests now use their own cache of stated
   size, and the CI skip on that test is removed.
+
+### Known issues
+
+Those recorded under [0.5.0] stand unchanged; nothing in this patch
+touches them.
 
 ## [0.5.0] - 2026-10-08
 
@@ -2238,7 +2245,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.0...v0.3.1

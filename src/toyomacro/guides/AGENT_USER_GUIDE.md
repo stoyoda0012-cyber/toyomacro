@@ -7,7 +7,7 @@
 > changed and why in your analysis notes. Nothing in it widens what the
 > software supports or makes a result scientifically valid.
 >
-> **Written for: toyomacro v0.5.0.** Read the copy that came with the
+> **Written for: toyomacro v0.5.1.** Read the copy that came with the
 > version you have installed (`python -m toyomacro.guides`), not the
 > repository's main branch, which may describe a newer version.
 
@@ -119,10 +119,10 @@ first tabulated energy.
 
 For the version this guide was written for:
 
-- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/API.md>
-- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/DATA_SOURCES.md>
-- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/design/composition-uncertainty.md>
-- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.5.0/examples>
+- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/API.md>
+- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/DATA_SOURCES.md>
+- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/design/composition-uncertainty.md>
+- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.5.1/examples>
 
 The repository's `AGENTS.md` and `CONTRIBUTING.md` (branches, audits,
 commit practice) apply when you change the package itself or its public
