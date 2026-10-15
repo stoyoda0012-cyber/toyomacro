@@ -27,6 +27,10 @@ archived on Zenodo for a citable DOI.
   and cp1252 both encode** (an em dash and `χ²`, now `-` and `chi2`).
   CI runs the examples with `PYTHONIOENCODING` set to cp932 on Linux and
   macOS and cp1252 on Windows.
+- **`uv run pytest` without the `mcp` extra runs the suite** instead of
+  stopping at collection: `tests/test_cross_section_status.py` imported
+  the MCP server at module level. Its two MCP tests now skip without
+  `mcp`; the other tests in the file run.
 
 ## [0.5.0] - 2026-10-08
 
