@@ -19,6 +19,14 @@ archived on Zenodo for a citable DOI.
   it starts; importing `toyomacro.mcp_server` as a module stays cheap.
   Not reproduced or verified on Windows here. The macOS `vm_stat` calls
   in the memory probes no longer inherit stdin.
+- **`python -m toyomacro.guides` writes UTF-8 whatever the console or
+  redirect encoding.** On a Japanese-locale Windows a redirect
+  (`> guide.txt`) is encoded as cp932, which has no em dash, and the
+  command stopped with `UnicodeEncodeError`. The text is unchanged.
+- **Example 10 and `voigtfit.cli benchmark` print only characters cp932
+  and cp1252 both encode** (an em dash and `χ²`, now `-` and `chi2`).
+  CI runs the examples with `PYTHONIOENCODING` set to cp932 on Linux and
+  macOS and cp1252 on Windows.
 
 ## [0.5.0] - 2026-10-08
 

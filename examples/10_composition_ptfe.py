@@ -193,7 +193,7 @@ def report(res: dict, synthetic: bool) -> None:
     print(f"Status: {b.status}")
     print("Estimate (atomic fraction):",
           ", ".join(f"{el} {100 * f:.1f} %" for el, f in b.fractions.items()),
-          "   [stoichiometric expectation F 66.7 %, C 33.3 % — a reference, not a certificate]")
+          "   [stoichiometric expectation F 66.7 %, C 33.3 % - a reference, not a certificate]")
     print("Condition dependence (change in F, percentage points; not an uncertainty):")
     for ch in res["grid"].changes:
         print(f"  table {ch.table:15s} background {ch.background:8s} "

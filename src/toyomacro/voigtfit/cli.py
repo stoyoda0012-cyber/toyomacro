@@ -137,7 +137,7 @@ def cmd_benchmark(args):
     amp_error = np.abs(result.amplitudes - amplitudes_true).mean()
     amp_relative = amp_error / amplitudes_true.mean() * 100
     print(f"Mean amplitude error: {amp_error:.4f} ({amp_relative:.2f}%)")
-    print(f"Mean χ²: {result.chi2.mean():.6f}")
+    print(f"Mean chi2: {result.chi2.mean():.6f}")
     print(f"Anomalies: {result.anomaly_mask.sum()} ({100*result.anomaly_mask.mean():.2f}%)")
 
     # 8K estimate
