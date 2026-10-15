@@ -8,6 +8,18 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP server: imports done before the first request.** A first-call
+  hang was reported on Windows: the first tool call returned only after
+  the client sent another message. The tools import their modules
+  lazily, and that first import ran while the stdio transport held a
+  pending read on stdin. `python -m toyomacro.mcp_server` now imports
+  everything the tools use (and selects matplotlib's Agg backend) before
+  it starts; importing `toyomacro.mcp_server` as a module stays cheap.
+  Not reproduced or verified on Windows here. The macOS `vm_stat` calls
+  in the memory probes no longer inherit stdin.
+
 ## [0.5.0] - 2026-10-08
 
 Archived on Zenodo:

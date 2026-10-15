@@ -17,6 +17,7 @@ Every tool returns a JSON string so results are directly machine-readable.
 
 from __future__ import annotations
 
+import importlib
 import json
 
 from mcp.server.fastmcp import FastMCP
@@ -449,5 +450,57 @@ def _save_gvrt_figure(result, output_png: str) -> None:
     plt.close(fig)
 
 
+# ---------------------------------------------------------------------------
+# Startup
+# ---------------------------------------------------------------------------
+
+# Everything the tools import lazily. The imports stay inside the tools so
+# that importing this module (tests, introspection) remains cheap; the
+# server imports them once before it starts reading stdin.
+_PRELOAD_MODULES = (
+    "numpy",
+    "scipy.optimize",
+    "scipy.special",
+    "PIL.Image",
+    "toyomacro.core",
+    "toyomacro.data",
+    "toyomacro.data.cross_section",
+    "toyomacro.data.imfp",
+    "toyomacro.background",
+    "toyomacro.lineshape",
+    "toyomacro.fitting",
+    "toyomacro.fitting.autofitter",
+    "toyomacro.fitting.template_bridge",
+    "toyomacro.fitting.templates",
+    "toyomacro.io.readers",
+    "toyomacro.voigtfit.auto_grouping",
+    "toyomacro.voigtfit.dictionary_solver",
+    "toyomacro.voigtfit.gvrt_service",
+    "toyomacro.voigtfit.image_utils",
+    "toyomacro.voigtfit.memory",
+    "toyomacro.voigtfit.multipeak_solver",
+    "toyomacro.voigtfit.spectra_generator",
+)
+
+
+def _preload() -> None:
+    """Import every module the tools need before the stdio loop starts.
+
+    A first tool call that hung on Windows until the client sent another
+    message was reported; the tools' first-time imports ran while the
+    transport's reader thread held a pending read on stdin. Importing
+    up front keeps that work out of the request path. matplotlib is
+    switched to the non-interactive Agg backend here, before pyplot is
+    imported, as ``_save_gvrt_figure`` needs.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    importlib.import_module("matplotlib.pyplot")
+    for name in _PRELOAD_MODULES:
+        importlib.import_module(name)
+
+
 if __name__ == "__main__":
+    _preload()
     mcp.run()
