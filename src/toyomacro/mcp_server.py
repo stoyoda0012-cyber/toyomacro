@@ -141,6 +141,9 @@ def calculate_sensitivity(
         photon_energy: X-ray photon energy in eV.
             Default 9251.7 (Ga Ka); Al Ka is 1486.6.
         compound: Matrix compound for the IMFP (e.g. 'SiO2', 'Si').
+            Default 'SiO2', whatever the element: lambda, and so the
+            sensitivity, depends on it. Pass the actual matrix; the
+            value used is reported back as `compound`.
         table: Cross-section table: 'yeh_lindau', 'scofield' or
             'trzhaskovskaya'. Default: the package default (Yeh & Lindau),
             which carries no level bound by more than about 1.5 keV — pass
@@ -275,7 +278,10 @@ def fit_spectrum_file(
     SES text (.txt). Angle-resolved data is summed over angles.
 
     Args:
-        path: Path to the spectrum file.
+        path: Path to the spectrum file. A relative path resolves
+            against the server process's working directory, which the
+            MCP client chooses and may not be the caller's; prefer an
+            absolute path.
         element: XPS label for template-based fitting (e.g. 'Si2p',
             'Ta4f', 'C1s'). Empty = automatic peak detection.
         region: Region index for multi-region files. For VAMAS this counts

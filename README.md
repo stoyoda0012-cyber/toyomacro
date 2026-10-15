@@ -255,7 +255,7 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains eight self-contained,
+The [`examples/`](examples/) directory contains ten self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
@@ -268,9 +268,14 @@ calibrating the energy axis on a metal Fermi edge, mapping how well
 a spectrum can tell the Gaussian from the Lorentzian width of a Voigt
 peak (model bounds, not a fit; see
 [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md)),
-and a minimal front end — click a pixel of a fitted map to see its
+a minimal front end — click a pixel of a fitted map to see its
 fit — as the pattern for putting a viewer or GUI of your own on the
-engine. They run in CI on every commit.
+engine, whether a Fermi edge can tell the instrumental resolution from
+the temperature (model bounds; see
+[`docs/design/fermi-edge-identifiability.md`](docs/design/fermi-edge-identifiability.md)),
+and an experimental homogeneous-equivalent composition of PTFE with
+what moves it and what is not evaluated (public data when given,
+a synthetic stand-in otherwise). They run in CI on every commit.
 
 ### GVRT roundtrip demo
 
@@ -305,6 +310,31 @@ python -m toyomacro.mcp_server
 
 Tools: `lookup_binding_energy`, `calculate_sensitivity`,
 `list_fitting_templates`, `fit_spectrum_file`, `gvrt_run`, `gvrt_sweep`.
+
+To register it with a client, give the client an absolute path. A
+client may not start the server with your shell's `PATH` — a standalone
+`uv` on Windows, for one, is often not on it — so a bare `"command": "uv"`
+or `"python"` can fail to start. Use the Python of the environment
+toyomacro is installed in, as below, or the absolute path to `uv` with
+`"args": ["run", "--directory", "<checkout>", "python", "-m",
+"toyomacro.mcp_server"]`. `which uv` / `which python` (macOS, Linux) and
+`where uv` / `where python` (Windows) print the paths:
+
+```json
+{
+  "mcpServers": {
+    "toyomacro": {
+      "command": "/absolute/path/to/toyomacro/.venv/bin/python",
+      "args": ["-m", "toyomacro.mcp_server"]
+    }
+  }
+}
+```
+
+On Windows the interpreter is `.venv\Scripts\python.exe`; in JSON each
+backslash is written twice. Relative file paths passed to `fit_spectrum_file`
+resolve against the server's working directory, which the client
+chooses; pass absolute paths.
 
 For an agent doing analysis with toyomacro there is a user guide, shipped
 with the package so it matches the installed version — what to check
@@ -406,12 +436,16 @@ as data — are written up in
 ## Development
 
 ```bash
-uv sync --extra dev --extra mlx
+uv sync --extra dev --extra mcp                  # what CI installs; add --extra mlx on Apple Silicon
 uv run pytest                                    # full suite; inventory in tests/README.md
 uv run pytest -m "not perf"                      # skip the 12 wall-clock gates
 uv run pytest src/toyomacro/voigtfit/tests/      # voigtfit unit tests only
 uv run ruff check .                              # lint (what CI runs)
 ```
+
+`--extra dev` is required: it is what installs pytest. Without
+`--extra mcp` the suite still runs, but the MCP server tests are
+skipped.
 
 Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
