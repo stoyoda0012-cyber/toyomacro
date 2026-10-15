@@ -71,7 +71,7 @@ batch refused or flagged, instead of quietly dropping it.
 Report these four things separately, and never fold them into one "±":
 
 1. the **estimate**;
-2. the **statistical uncertainty** — in v0.5.0 a composition does not
+2. the **statistical uncertainty** — in this version a composition does not
    carry one. It is *not evaluated* when the intensity is not stated to
    be raw counts, and *withheld* when it is: the bootstrap is calibrated
    on synthetic data, but neither of the two rules tried for choosing
@@ -89,7 +89,7 @@ the error bars mean** — on the selected data they no longer match the
 real spread (in toyomacro's test they overstated it by up to 25 %).
 Decide what you will report before you look at how well each fit went.
 
-So, to "what is the error bar?", a v0.5.0 answer reads like: "the
+So, to "what is the error bar?", a v0.5.x answer reads like: "the
 statistical part is not available yet; the result moves by X when the
 cross-section table is changed, by Y with the background, and by Z and W
 with the assumptions about the stored data (what the intensity is,

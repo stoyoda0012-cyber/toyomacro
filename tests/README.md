@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,602 automated tests** across **97 files**, in two
+This suite has **2,603 automated tests** across **97 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 59 | 1,522 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 59 | 1,523 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,170 tests, 83%) — guarantee the library
+- **Contract / regression** (2,171 tests, 83%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,590. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,591. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,9 +70,9 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,522)
+## Library body — `tests/` (1,523)
 
-### Claim guards — noise model, versions, backends, comparisons (146)
+### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
@@ -81,7 +81,7 @@ them would take real coverage with them:
 | 4 | `test_cli_surface.py` | CLI entry points stay importable and keep their documented flags |
 | 52 | `test_benchmarks_doc_citations.py` | Every figure `docs/BENCHMARKS.md` attributes to a committed record is in that record, and an unattributed measurement says "no record" |
 | 5 | `test_readme_inventory.py` | Every count on this page — total, per location, per section, per file, contract / reproduction split, and the `not perf` count here and in the top-level README — against a fresh `pytest --collect-only` |
-| 3 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency |
+| 4 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency, and README's install pin |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
 | 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
 | 14 | `test_fermi_edge_bootstrap.py` | Fermi-edge resampling: the Monte Carlo spread against the bound at an interior point, the boundary and the non-separable region recorded rather than judged, the constrained fit against a different optimiser, a replica held at a bound against the Karush-Kuhn-Tucker condition, the draws against the Poisson law, the deviance against its own value, a per-replica start through the chunked path, whether a nested bootstrap interval covers the truth, whether zero channels split the parametric and nonparametric draws, `fit_fermi_edge`'s own spread against its sandwich covariance, and one singular replica not aborting a batch |
