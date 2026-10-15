@@ -175,10 +175,21 @@ for the runnable scripts behind each number.
 
 ## Installation
 
-Requires Python **3.11** or newer. We recommend
-[`uv`](https://docs.astral.sh/uv/) for installation.
+Requires Python **3.11** or newer.
+
+Without cloning the repository (needs Git; installs the core package,
+while `examples/` and the benchmarks come with a clone):
 
 ```bash
+pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.5.0"
+```
+
+From a clone — we recommend [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+git clone https://github.com/stoyoda0012-cyber/toyomacro.git
+cd toyomacro
+
 # Voigt engine only (numpy / scipy / h5py / matplotlib / lmfit / lz4 / psutil)
 uv sync
 
@@ -255,7 +266,7 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains eight self-contained,
+The [`examples/`](examples/) directory contains ten self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
@@ -270,7 +281,15 @@ peak (model bounds, not a fit; see
 [`docs/design/voigt-width-identifiability.md`](docs/design/voigt-width-identifiability.md)),
 and a minimal front end — click a pixel of a fitted map to see its
 fit — as the pattern for putting a viewer or GUI of your own on the
-engine. They run in CI on every commit.
+engine. Example 09 asks whether a Fermi edge can tell the instrumental
+resolution from the temperature at all, and what fitting the
+temperature costs the resolution's uncertainty (model bounds plus one
+simulated spectrum; see
+[`docs/design/fermi-edge-identifiability.md`](docs/design/fermi-edge-identifiability.md)).
+Example 10 estimates the F:C composition of PTFE from a public Zenodo
+dataset (not bundled; a synthetic stand-in runs offline) and lists
+what moves the estimate, what it assumes and what is not evaluated.
+They run in CI on every commit.
 
 ### GVRT roundtrip demo
 
