@@ -7,7 +7,7 @@
 > changed and why in your analysis notes. Nothing in it widens what the
 > software supports or makes a result scientifically valid.
 >
-> **Written for: toyomacro v0.5.0.** Read the copy that came with the
+> **Written for: toyomacro v0.5.1.** Read the copy that came with the
 > version you have installed (`python -m toyomacro.guides`), not the
 > repository's main branch, which may describe a newer version.
 
@@ -71,7 +71,7 @@ batch refused or flagged, instead of quietly dropping it.
 Report these four things separately, and never fold them into one "±":
 
 1. the **estimate**;
-2. the **statistical uncertainty** — in v0.5.0 a composition does not
+2. the **statistical uncertainty** — in this version a composition does not
    carry one. It is *not evaluated* when the intensity is not stated to
    be raw counts, and *withheld* when it is: the bootstrap is calibrated
    on synthetic data, but neither of the two rules tried for choosing
@@ -89,7 +89,7 @@ the error bars mean** — on the selected data they no longer match the
 real spread (in toyomacro's test they overstated it by up to 25 %).
 Decide what you will report before you look at how well each fit went.
 
-So, to "what is the error bar?", a v0.5.0 answer reads like: "the
+So, to "what is the error bar?", a v0.5.x answer reads like: "the
 statistical part is not available yet; the result moves by X when the
 cross-section table is changed, by Y with the background, and by Z and W
 with the assumptions about the stored data (what the intensity is,
@@ -119,10 +119,10 @@ first tabulated energy.
 
 For the version this guide was written for:
 
-- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/API.md>
-- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/DATA_SOURCES.md>
-- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.0/docs/design/composition-uncertainty.md>
-- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.5.0/examples>
+- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/API.md>
+- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/DATA_SOURCES.md>
+- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/design/composition-uncertainty.md>
+- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.5.1/examples>
 
 The repository's `AGENTS.md` and `CONTRIBUTING.md` (branches, audits,
 commit practice) apply when you change the package itself or its public

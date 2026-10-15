@@ -181,7 +181,7 @@ Without cloning the repository (needs Git; installs the core package,
 while `examples/` and the benchmarks come with a clone):
 
 ```bash
-pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.5.0"
+pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.5.1"
 ```
 
 From a clone — we recommend [`uv`](https://docs.astral.sh/uv/):
@@ -465,7 +465,7 @@ Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,590 tests to mean what they say; do not use it to
+want the other 2,591 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 

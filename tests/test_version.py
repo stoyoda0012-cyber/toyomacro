@@ -4,6 +4,7 @@ Every runtime-visible version must agree with the installed package
 metadata, which in turn comes from ``pyproject.toml``.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,3 +36,14 @@ def test_cli_version_matches_package():
         capture_output=True, text=True)
     printed = (out.stdout + out.stderr).strip()
     assert toyomacro.__version__ in printed
+
+
+def test_readme_install_pin_matches_package():
+    """README's no-clone install command pins the tag of this version."""
+    readme = Path(__file__).resolve().parents[1] / 'README.md'
+    if not readme.exists():
+        import pytest
+        pytest.skip('README.md is not part of this installation')
+    m = re.search(r'toyomacro\.git@v(\d+\.\d+\.\d+)"', readme.read_text(encoding='utf-8'))
+    assert m, 'the no-clone install command changed shape'
+    assert m.group(1) == _pyproject_version()
