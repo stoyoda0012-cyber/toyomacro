@@ -487,7 +487,9 @@ def admission(cid: int, si_area: float, predict=_predict_r) -> list[dict]:  # no
     3 as ``structural`` (two or three lines in the denominator, no
     transmission divided out, a registered background). The declared
     arrays, the conditions, their provenance and the prediction settings
-    are stored, as §8 "Declared input" says they are in this round.
+    are stored, as §8 "Declared input" says they are in this round; the
+    energy grid, the same for every kappa, is stored once per condition
+    by :func:`declared_grid`.
     """
     out = []
     for kappa in KAPPA:
@@ -512,9 +514,15 @@ def admission(cid: int, si_area: float, predict=_predict_r) -> list[dict]:  # no
                            "energy_scale": ln.energy_scale, "window": list(ln.window),
                            "binding_energy": ln.binding_energy, "exposure_s": ln.exposure_s,
                            "exposure_basis": ln.exposure_basis,
-                           "energy": [float(v) for v in ln.energy],
                            "intensity": [float(v) for v in ln.intensity]} for ln in lines]}})
     return out
+
+
+def declared_grid(cid: int, si_area: float) -> list[dict]:
+    """The energy grid of each line, shared by every D_kappa of the condition."""
+    lines, _ = expected(cid, si_area)
+    return [{"element": ln.element, "orbital": ln.orbital, "energy_scale": ln.energy_scale,
+             "energy": [float(v) for v in ln.energy]} for ln in lines]
 
 
 def decide(conds: dict[int, dict]) -> dict:
@@ -606,6 +614,7 @@ def summarize(out: Path, workers: int | None = None) -> dict:
         s["sd_bias_3"] = _sd_bias(s.pop("_e3"), truth_v)
         s["truth"] = dict(zip(cond.declared_elements, truth_v))
         s["admission"] = admissions[cid]
+        s["declared_grid"] = declared_grid(cid, si_area)
         s["implementation_check"] = implementation_check(rows, s)
         if not s["implementation_check"]["ok"]:
             raise RuntimeError(f"condition {cid}: implementation check failed (rule 6)")

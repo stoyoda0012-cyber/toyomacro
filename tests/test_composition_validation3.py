@@ -318,6 +318,8 @@ def test_summary_is_refused_from_another_commit(tmp_path, fake_identity, monkeyp
     rec = v3.summarize(out, workers=1)
     (c,) = rec["conditions"]
     assert all("declared" in a and len(a["declared"]["lines"]) == 2 for a in c["admission"])
+    assert all("energy" not in ln for a in c["admission"] for ln in a["declared"]["lines"])
+    assert [g["element"] for g in c["declared_grid"]] == ["Si", "O"] and len(c["declared_grid"][0]["energy"]) == 241
     assert all(a["structural"] for a in c["admission"])
     run = json.loads((out / "run.json").read_text())
     run["git_commit"] = "other"
