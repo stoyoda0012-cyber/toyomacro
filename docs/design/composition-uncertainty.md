@@ -270,3 +270,338 @@ admits essentially every data set of a passing scenario — evaluated the
 same way, on the admitted population, in a new pre-registered round.
 This is not attempted here: changing the rule after these results would
 make it post hoc.
+
+## 8. Third validation: admission from declared expected counts (pre-registered)
+
+*Written after §7 and before any of the runs below. Committed before
+they start; not changed after. Where this section and the harness
+disagree, this section is the registration and the harness is wrong.*
+
+**Aim.** To find out whether a scope for the statistical uncertainty
+can be opened with an admission rule that does not depend on the
+realised data set at all. §7 named the rule: admission from the
+relative area noise of expected counts supplied by the user, evaluated
+the same way as before on the admitted population. This round runs
+that rule. Nothing in §1–7 changes; this round reuses §2 (noise model
+and resampling), §3 (R, its Monte Carlo interval and the acceptance
+band [0.9, 1.1]) and the §6 conditions.
+
+**What rounds 1 and 2 established.** On the data sets that returned a
+standard uncertainty, the calibration held: S1 and S2 passed, S3 lay
+inside the band at R = 1.051 (over the 1,997 of 2,000 without refused
+replicates), and 39 of the 40 §6 scenarios passed; the one failure was
+P, Shirley, r = 0.08 (R = 1.24, 301 of 2,000 withheld). R has been seen
+to rise with r (+5 % at S3, +24 % at that scenario), but not
+monotonically (B, linear, by level: about 0.978, 1.020, 0.990, 1.009,
+0.996), so monotonicity is not assumed. Admitting data sets by their
+own fluctuations broke the calibration twice (§5, §7).
+
+**Framing.** Write T for the estimate, û for the reported standard
+uncertainty, and S for the event that a data set returns one (an
+estimate exists and a finite standard uncertainty was computed). What
+the harness measures, per condition s and declared spectrum D, is
+
+    R_S = sqrt(E[û² | s, D, S]) / sqrt(Var(T | s, D, S))
+
+- An admission decided from s, D, the prediction's own random numbers
+  (one fixed seed, below) and the analysis conditions (window,
+  background, denominator elements, exposure handling), none of which
+  depends on the realised data set, is the same for every data set of
+  the condition. Adding it changes nothing in R_S.
+- The conditioning on S remains: `composition()` refuses a line whose
+  net area is not positive; `_composition_uncertainty` returns
+  `not_evaluated` for negative or non-integer counts and `withheld`
+  when any replicate is refused. A small rate of these does not bound
+  their effect on the variance, so the pass criterion is R_S itself,
+  the published claim is conditional on S ("calibrated when a standard
+  uncertainty is returned"), the rate is an auxiliary condition, and
+  the size of the remaining selection is recorded, not corrected. A
+  failure of R_S over ③ is a failure: it cannot be rescued afterwards
+  as a matter of the claim's scope ("the selection did it").
+- What is checked is the agreement, per condition, between the
+  root-mean-square reported standard uncertainty and the standard
+  deviation of the estimate. Not checked: that each data set's own
+  standard uncertainty is accurate, that the estimate is unbiased, or
+  that any interval covers.
+- Two questions: (1) with no added selection, up to which predicted r
+  does R_S stay in the band; (2) when the user's prediction is off,
+  does the realised r of an admitted condition still lie in that range.
+  The direction that matters: a prediction that overstates the peak or
+  understates the base predicts a smaller r than the true one (with a
+  linear background, r_pred / r_true ≈ sqrt(κ_p V_p + κ_b V_b) /
+  (κ_p sqrt(V_p + V_b)) for peak and base variances V_p, V_b; about
+  0.354 at (κ_p, κ_b) = (2, 0.5) when the base dominates, 1/sqrt(2)
+  when both are doubled). This is an explanation of direction only;
+  the decision uses the prediction computed through the estimator.
+
+**Declared input.** A declared spectrum D is, per line, the expected
+counts on that line's energy grid (base included): a non-negative,
+finite, real-valued array that is not rounded to integers. D carries
+the same fields as the data's `Line` except `intensity` — `element`,
+`orbital`, the energy grid, `energy_scale`, `window`, `binding_energy`,
+`exposure_s`, `exposure_basis`, `transmission`, `source` — and these, with the `Conditions`
+(background, table, matrix, declared and denominator elements,
+intensity semantics, transmission state), are the analysis conditions,
+fixed before the data set is looked at. The provenance of D is
+declared as one of:
+
+- `planning_model`: a pre-measurement estimate (exposure, count rate,
+  assumed composition);
+- `other_measurement`: another data set that shares nothing with the
+  one evaluated;
+- `this_data`: anything derived from the data set being evaluated (a
+  fit, a smoothing, its areas). **Refused.**
+
+With `planning_model` or `other_measurement` the user also declares
+that D and the analysis conditions were fixed before the data set was
+looked at. Without a declared D the uncertainty is withheld, as now.
+The package cannot tell whether D came from the same data; no partial
+detection is attempted. In this round the declared arrays, conditions,
+provenance and prediction settings are stored in the results record;
+whether and how they go into `/provenance` (HDF5), and the vocabulary
+there, is decided in the publication design after the round.
+
+**The prediction, `predict_r(D, conditions)`.** One function, used for
+the count setting and for admission alike; no other seed or B is used
+for either.
+
+- Checks that every array of D is non-negative, finite and real; in
+  this round a D that fails the check is a run error that stops the
+  run (the synthetic D_κ cannot fail it). What a public function
+  returns for such a D is decided in the publication design.
+- Computes `composition(D)` and records whether it is refused.
+- Passes D unchanged (not integerised) as the Poisson means to
+  `_bootstrap_detail` with B_pred = 1,000 replicates, from a generator
+  freshly seeded with series 2 (below) at every call — a key that does
+  not depend on the condition, level, κ or run kind — so the same D and
+  conditions always give the same r_pred and the same refusal counts,
+  whatever was computed before. The integer check that
+  `_composition_uncertainty` applies to observed data is not applied
+  to D.
+- r is as in §6: over the lines in the denominator, the largest value
+  of (standard deviation over the replicates of the line's net area,
+  ddof = 1) / (the net area of D itself on the same corrected scale —
+  what §6 calls the raw net area; the ratio does not change with the
+  constant exposure factor).
+- Returns r_pred, whether `composition(D)` was refused, and the number
+  of refused replicates.
+
+**Admission.** A case is admitted when all four hold:
+
+1. r_pred ≤ r\*_bg, the threshold of its background (decided below);
+2. `composition(D)` is not refused and the prediction has 0 refused
+   replicates;
+3. the structural conditions of §6 rule 3 — at most three lines in the
+   denominator, no transmission divided out, a validated background,
+   integer intensities in the data — and at least two elements in the
+   denominator (with one, the fraction is always 1 and R is undefined);
+4. the case lies within the registered synthetic conditions (see
+   "Publication").
+
+On the data side the bootstrap uses B = 1,000, and one refused
+replicate withholds the result, as now. Other B, or re-drawing with
+another seed until it succeeds, are outside what is validated.
+
+**Conditions.** The 40 of §6 unchanged: configurations P, B, T, G ×
+backgrounds linear, Shirley × levels 0.005, 0.01, 0.02, 0.04, 0.08,
+with the same lines, photon energies, channel widths, peak-height-to-
+base ratios, Gaussian σ = 0.6 eV, window ±10 eV, Scofield, SiO₂
+matrix, exposure 1 s, and no transmission division. μ(s) is the
+expected counts of condition s; data sets are always drawn from μ(s).
+
+**Levels and the count setting.** A level is the target for r_pred of
+the declared spectrum with κ = (1, 1), i.e. D = μ(s). The median
+realised r over data sets is recorded only as bookkeeping. The counts
+of a condition are set by scaling every channel by one factor; the
+candidate is the Si 2p area A, and "one step" is the evaluation of one
+candidate:
+
+1. A₁ = 10⁴ counts × eV.
+2. For candidate A_k, run the exploratory bootstrap (B = 200, series 1)
+   on μ(A_k). If `composition(μ)` is refused or any replicate is
+   refused, A_{k+1} = 4 A_k. Else if the exploratory r is outside
+   [0.9 × level, level], A_{k+1} = A_k × (r / (0.95 × level))².
+3. Else evaluate the same A_k with `predict_r` (B = 1,000, series 2).
+   If it reports a refusal, A_{k+1} = 4 A_k. Else if r_pred is outside
+   [0.9 × level, level], A_{k+1} = A_k × (r_pred / (0.95 × level))².
+   Else A_k is final.
+4. If no candidate is final after 8 steps, the condition's count
+   setting **has not been established**: the run stops and reports
+   it, as a record distinct from a calibration failure or an empty
+   scope. The condition is not dropped; changing anything here is a
+   revision of this registration.
+
+The acceptance window is one-sided so that the κ = (1, 1) spectrum of
+every established condition satisfies r_pred ≤ level and is admitted
+at its own level; the update aims at the middle of the window. The
+final A, every candidate, its exploratory r, its r_pred and the
+refusals are recorded.
+
+**Prediction error, κ.** D_κ(s) = κ_p × (peak part of μ(s)) + κ_b ×
+(base part of μ(s)), with (κ_p, κ_b) ∈ {0.5, 1, 2}², nine points;
+(1, 1) is μ(s) itself. Data are always drawn from μ(s); κ changes only
+what `predict_r` is given, so the outer runs do not depend on κ and
+the cost is that of round 2. The nine points are fixed sensitivity
+points, not a guarantee over the interval between them or over any
+user's actual prediction error.
+
+**Reference value.** As in §3 and §6, bias is against `composition(μ)`,
+the estimator applied to the expected counts — not a physical truth.
+The nominal-versus-true IMFP is not varied.
+
+**Shirley.** The estimator as it is, with `max_iter = 50`, `tol = 1e-5`
+and `auto_range = False` (the implementation's defaults, checked
+before registration). Refusal counts count `composition()`'s refusals,
+not whether the Shirley iteration converged.
+
+**Runs.** A pilot with M = 200 and B = 200 checks cost and Monte Carlo
+error only. The decision uses M = 2,000 and B = 1,000.
+
+**Decision rule.**
+
+1. *Per condition.* Over the M structurally eligible outer trials,
+   each trial is in exactly one of: ① no estimate (`composition()`
+   refused); ② estimate, no standard uncertainty (`not_evaluated`,
+   `withheld` for refused replicates, or a non-finite standard
+   uncertainty); ③ a finite standard uncertainty. Counts per cause are
+   kept. A missing file or an exception is a run error that stops the
+   run; it is never counted in ① or ②. R_S, its 95 % Monte Carlo
+   interval and the §3 verdict are computed over ③. A condition with
+   at most one trial in ③, a zero standard deviation of the estimate,
+   or a non-finite R or interval is **not evaluable and does not
+   pass**; no other minimum count is imposed. The standard deviation
+   and bias of the estimate are recorded over ② ∪ ③ and over ③ alone,
+   and not used in the decision.
+2. *A condition passes* when R_S passes the §3 verdict (the main
+   condition) and (|①| + |②|) / M ≤ 0.1 % (the auxiliary rate
+   condition). The counts, the denominator and the exact one-sided
+   95 % upper binomial bound on the underlying rate are reported with
+   it; with M = 2,000 and 0 events that bound is 0.1497 %, so a pass
+   does not show the rate to be at most 0.1 %, and the record says so.
+   Under the rate condition |①| + |②| ≤ 2, so |③| ≥ 1,998.
+3. *Admission sets.* The candidates for r\* are, from the largest,
+   {0.04, 0.02, 0.01, 0.005}; 0.08 is not a candidate. For background
+   bg and candidate r\*, A_bg(r\*) is the set of conditions s with
+   that background for which at least one of the nine κ satisfies
+   admission conditions 1 and 2.
+4. *A candidate stands* when all four hold: A_bg(r\*) is not empty;
+   every configuration P, B, T, G has at least one level in A_bg(r\*);
+   every condition in A_bg(r\*) passes rule 2; and for every
+   configuration, the level one above its highest level in A_bg(r\*)
+   also passes rule 2 — if that highest level is 0.08 there is no
+   level above, and the candidate does not stand.
+5. *The scope* of a background is the largest standing candidate; if
+   none stands, that background has no scope.
+6. *Implementation check* (the counterpart of §6 rule 4). For every
+   condition and every admitted κ, the set of trial IDs that the
+   admission would publish and their standard uncertainties are the
+   same as rule 1's ③, and R's point estimate is the same; the Monte
+   Carlo interval is computed once in rule 1 and never recomputed. A
+   mismatch is an implementation error and stops the run. This checks
+   that no further selection crept in; it does not re-examine the
+   selection by S.
+
+**Harness choices, registered here.**
+
+- *Numbering.* Configuration P = 0, B = 1, T = 2, G = 3; background
+  linear = 0, Shirley = 1; level 0.005 = 0, 0.01 = 1, 0.02 = 2,
+  0.04 = 3, 0.08 = 4. Condition ID = 10 × configuration + 5 ×
+  background + level (0–39). Run kind pilot = 0, decision = 1. Element
+  order is the line order of the condition (Si, O, C). Candidate
+  numbers k count from 1 (A₁ is candidate 1); outer trial IDs run from
+  0 to M − 1.
+- *Generator.* `numpy.random.Generator(numpy.random.PCG64(
+  numpy.random.SeedSequence(key)))` with an integer-list key; chunk
+  boundaries and worker counts never enter a key. Base seed 20261014.
+  - series 1, count-setting exploration (B = 200):
+    [20261014, 1, condition ID, candidate k];
+  - series 2, `predict_r` (B = 1,000): [20261014, 2] — no condition,
+    level, κ or run kind;
+  - series 3, outer data generation: [20261014, 3, run kind,
+    condition ID, trial ID] — no κ;
+  - series 4, the data-side bootstrap: [20261014, 4, run kind,
+    condition ID, trial ID] — no κ;
+  - series 5, the Monte Carlo interval of R: [20261014, 5, run kind,
+    condition ID]; the 5,000 resampling index sets are drawn once and
+    shared by the elements.
+- *Other fixed values.* Data-side B = 1,000; B_pred = 1,000; the κ
+  grid {0.5, 1, 2}²; the rate bound 0.1 %; the candidate list {0.04,
+  0.02, 0.01, 0.005}; 5,000 Monte Carlo resamples; sample standard
+  deviations with ddof = 1 throughout (as the §3 and §6 harness
+  computes them, and in r).
+- *Execution identity.* The runs are made from a fixed worktree. At
+  start-up the harness checks that `toyomacro` was imported from that
+  checkout and that the checkout is clean — no tracked file modified;
+  all outputs (chunks, metadata, scales, the record) are written
+  outside the checkout, or under a path git ignores, so they never
+  make it dirty — and stops otherwise. It records, at run time, a hash
+  of every item of this subsection, the implementation commit, the
+  Python, numpy and scipy versions and the generator's name. A resume
+  whose hash, commit or versions differ is refused. Before summarising,
+  every planned trial ID must be present exactly once. A chunk is
+  written to a temporary name and renamed when complete; only renamed
+  chunks count. The pilot and the decision run have separate output
+  directories.
+- *Procedure.* The run writes its record outside the checkout (above);
+  the summary is copied into `docs/design/` as
+  `composition-uncertainty-results-3.json` when it is committed;
+  shells use `set -o pipefail`; the first chunk's existence is checked
+  right after launch (round 2's first launch was a no-op).
+- *Not used.* Round 2's 95th percentile and its minimum admitted count:
+  the decision is per condition.
+
+**Reported per condition** (§6 rule 5 continued): the counts of ①, ②,
+③ with causes, the rate (|①| + |②|) / M and its one-sided 95 % upper
+bound; standard deviation and bias over ② ∪ ③ and over ③; r_pred for
+each κ and whether the condition is admitted under it; the prediction's
+refusal of `composition(D)` and its refused-replicate count; the count
+setting's trace (each candidate's area, exploratory r, r_pred,
+refusals, and the final candidate number); the median realised r
+(bookkeeping only); the result of rule 6; the configuration hash, the
+commit and the versions.
+
+**Publication, if a scope opens.** The claim is "calibrated, when a
+standard uncertainty is returned, within the registered synthetic
+conditions in which it held" and nothing wider. The scope is recorded
+as the pairs (registered condition, κ): the target level set at
+κ = (1, 1); the μ actually established at that level and its r_pred
+(inside [0.9 × level, level]); the nine D_κ and their r_pred; and what
+is outside — unregistered μ, shapes, line sets, tables, matrices and
+photon energies. No single number (0.005, say) decides whether a real
+data set is inside: the κ = (1, 1) point carries a −10 % allowance,
+and at κ ≠ (1, 1) r_pred can fall below the level. The 40 conditions,
+the nine κ and the candidate list are fixed here; a later publication
+design that allows use outside them does not widen what this round
+established. Acceptance conditions split into those the code checks
+(denominator of two or three elements, background type, transmission
+not divided, intensity semantics, B, r_pred and the prediction's
+refusals) and those the user declares (the provenance of D and that it
+was fixed beforehand, channel independence, peak shape); whether the
+table, matrix, photon energies, window and channel width are enforced
+or declared is left to that design. Use below the lowest registered
+level (more counts) is not validated; if it is published at all it is
+labelled as an assumption, "extrapolation to more counts", never as
+established, and where the boundary lies is decided in the
+publication design from the (condition, κ) record. Between levels
+nothing beyond rule 4's bracketing is shown. A scope that opens
+adds public API and ships in the next minor version; an empty scope
+adds nothing, not even the input.
+
+**What this does not cover.** Unconditional calibration including the
+cases that return no standard uncertainty; the accuracy of any single
+data set's standard uncertainty, the bias of the estimate, interval
+coverage; the nominal-versus-true IMFP; errors in the shape of D (κ
+scales amplitudes only); points between or beyond the nine κ, or any
+distribution of real prediction errors; analysis conditions chosen
+after seeing the data; real detectors (adjacent-channel correlation
++0.16, gain, non-integer intensities); data-side B ≠ 1,000 or re-seeded
+retries; Shirley convergence; four or more lines, one element,
+Tougaard, transmission division, other tables, matrices, photon
+energies or peak shapes; behaviour between levels beyond the
+bracketing, and extrapolation to more counts than the lowest level.
+
+## 9. Third validation: results
+
+Not yet written. To be filled from
+`composition-uncertainty-results-3.json` after the decision run, with
+the commit of the runs and of the summary.
