@@ -480,7 +480,11 @@ error only. The decision uses M = 2,000 and B = 1,000.
    does not show the rate to be at most 0.1 %, and the record says so.
    Under the rate condition |①| + |②| ≤ 2, so |③| ≥ 1,998.
 3. *Admission sets.* The candidates for r\* are, from the largest,
-   {0.04, 0.02, 0.01, 0.005}; 0.08 is not a candidate. For background
+   {0.02, 0.01, 0.005}; 0.08 and 0.04 are not candidates. 0.04 was
+   removed before any run, from the design's logic alone: in
+   configuration B the level 0.08 has r_pred ≈ 0.028 at κ = (2, 0.5)
+   and so enters A_bg(0.04), and since no level lies above 0.08, rule 4
+   can never let r\* = 0.04 stand. For background
    bg and candidate r\*, A_bg(r\*) is the set of conditions s with
    that background for which at least one of the nine κ satisfies
    admission conditions 1 and 2.
@@ -525,8 +529,8 @@ error only. The decision uses M = 2,000 and B = 1,000.
     condition ID]; the 5,000 resampling index sets are drawn once and
     shared by the elements.
 - *Other fixed values.* Data-side B = 1,000; B_pred = 1,000; the κ
-  grid {0.5, 1, 2}²; the rate bound 0.1 %; the candidate list {0.04,
-  0.02, 0.01, 0.005}; 5,000 Monte Carlo resamples; sample standard
+  grid {0.5, 1, 2}²; the rate bound 0.1 %; the candidate list {0.02,
+  0.01, 0.005}; 5,000 Monte Carlo resamples; sample standard
   deviations with ddof = 1 throughout (as the §3 and §6 harness
   computes them, and in r).
 - *Execution identity.* The runs are made from a fixed worktree. At
