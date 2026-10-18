@@ -581,6 +581,66 @@ def _relative_area_noise(areas: np.ndarray, observed: Sequence[float]) -> float:
                      for k in range(areas.shape[1])))
 
 
+#: Series 2 of docs/design/composition-uncertainty.md §8: the key the
+#: prediction's generator is seeded with at every call. It names no
+#: condition, level, kappa or run kind, so the same declared spectrum and
+#: conditions always give the same prediction.
+_PREDICTION_SEED_KEY: tuple[int, ...] = (20261014, 2)
+
+
+@dataclass(frozen=True)
+class _Prediction:
+    """What :func:`_predict_r` returns (design record §8, "The prediction")."""
+
+    r_pred: float | None
+    declared_refused: bool
+    declared_reasons: tuple[str, ...]
+    n_refused: int
+    n_boot: int
+    elements: tuple[str, ...]
+
+
+def _predict_r(
+    declared: Sequence[Line],
+    conditions: Conditions,
+    n_boot: int = 1000,
+    key: Sequence[int] = _PREDICTION_SEED_KEY,
+) -> _Prediction:
+    """Predicted relative area noise of a declared expected spectrum (§8).
+
+    ``declared`` carries, per line, the expected counts on the line's own
+    grid (base included) in place of the observed intensity, and every
+    other ``Line`` field as the data would have it. The arrays must be
+    non-negative, finite and real; anything else raises ``ValueError``
+    (a run error in the validation; what a public function would return
+    is not decided here). They are passed as Poisson means to
+    :func:`_bootstrap_detail` **without** rounding, from a generator
+    freshly seeded with ``key`` at every call, and r is as in §6 with
+    ``ddof = 1`` over the replicates and the declared spectrum's own net
+    area (corrected scale) as the divisor. The integer check that
+    :func:`_composition_uncertainty` applies to observed data is not
+    applied here.
+    """
+    for ln in declared:
+        arr = np.asarray(ln.intensity, dtype=np.float64)
+        if arr.ndim != 1 or not np.all(np.isfinite(arr)) or np.any(arr < 0):
+            raise ValueError(f"{ln.element} {ln.orbital}: a declared spectrum must be a 1-D "
+                             "array of non-negative finite reals")
+    base = composition(declared, conditions)
+    if base.fractions is None:
+        return _Prediction(r_pred=None, declared_refused=True, declared_reasons=base.reasons,
+                           n_refused=0, n_boot=n_boot, elements=())
+    elements = base.denominator
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence(list(key))))
+    rows, refused, areas = _bootstrap_detail(declared, conditions, n_boot, rng, elements)
+    r = None
+    if len(rows) >= 2:
+        observed = {x.element: x.area for x in base.lines}
+        r = _relative_area_noise(areas, [observed[el] for el in elements])
+    return _Prediction(r_pred=r, declared_refused=False, declared_reasons=(), n_refused=refused,
+                       n_boot=n_boot, elements=tuple(elements))
+
+
 def _composition_uncertainty(
     lines: Sequence[Line],
     conditions: Conditions,
