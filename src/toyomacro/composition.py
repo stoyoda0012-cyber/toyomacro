@@ -595,7 +595,7 @@ class _Prediction:
     r_pred: float | None
     declared_refused: bool
     declared_reasons: tuple[str, ...]
-    n_refused: int
+    n_refused: int | None  # None: the bootstrap was not run (composition(D) refused)
     n_boot: int
     elements: tuple[str, ...]
 
@@ -622,19 +622,25 @@ def _predict_r(
     applied here.
     """
     for ln in declared:
-        arr = np.asarray(ln.intensity, dtype=np.float64)
+        raw = np.asarray(ln.intensity)
+        if np.iscomplexobj(raw) or raw.dtype.kind not in "biuf":
+            raise ValueError(f"{ln.element} {ln.orbital}: a declared spectrum must be real-valued")
+        arr = raw.astype(np.float64)
         if arr.ndim != 1 or not np.all(np.isfinite(arr)) or np.any(arr < 0):
             raise ValueError(f"{ln.element} {ln.orbital}: a declared spectrum must be a 1-D "
                              "array of non-negative finite reals")
     base = composition(declared, conditions)
     if base.fractions is None:
+        # The bootstrap is not run: n_refused is None, not 0.
         return _Prediction(r_pred=None, declared_refused=True, declared_reasons=base.reasons,
-                           n_refused=0, n_boot=n_boot, elements=())
+                           n_refused=None, n_boot=n_boot, elements=())
     elements = base.denominator
     rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence(list(key))))
     rows, refused, areas = _bootstrap_detail(declared, conditions, n_boot, rng, elements)
+    # r is defined over the full set of replicates only: with a refused
+    # replicate it is None (as round 2 did), and the case is not admitted.
     r = None
-    if len(rows) >= 2:
+    if refused == 0 and len(rows) >= 2:
         observed = {x.element: x.area for x in base.lines}
         r = _relative_area_noise(areas, [observed[el] for el in elements])
     return _Prediction(r_pred=r, declared_refused=False, declared_reasons=(), n_refused=refused,

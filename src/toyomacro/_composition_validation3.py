@@ -37,6 +37,7 @@ import scipy
 import toyomacro
 from toyomacro._composition_validation import _PEAK, CONFIGS
 from toyomacro.composition import (
+    _PREDICTION_SEED_KEY,
     Conditions,
     Line,
     Matrix,
@@ -275,11 +276,17 @@ def _git(root: Path, *args: str) -> str:
 
 
 def identity(root: Path | None = None) -> dict:
-    """What the run records; raises unless the checkout is the one imported from, and clean."""
+    """What the run records; raises unless toyomacro was imported from ``root`` and it is clean.
+
+    ``root`` defaults to the git checkout the command is launched from
+    (the working directory), not to wherever toyomacro happens to be
+    imported from, so an import from another checkout or an installed
+    copy is refused rather than recorded.
+    """
     package = Path(toyomacro.__file__).resolve().parent
-    root = Path(root or _git(package, "rev-parse", "--show-toplevel")).resolve()
+    root = Path(root or _git(Path.cwd(), "rev-parse", "--show-toplevel")).resolve()
     if not package.is_relative_to(root):
-        raise RuntimeError(f"toyomacro was imported from {package}, not from {root}")
+        raise RuntimeError(f"toyomacro was imported from {package}, not from the checkout {root}")
     dirty = _git(root, "status", "--porcelain", "--untracked-files=no")
     if dirty:
         raise RuntimeError(f"the checkout {root} has modified tracked files:\n{dirty}")
@@ -301,9 +308,16 @@ def check_output_dir(out: Path, root: Path) -> None:
         raise RuntimeError(f"{out} is inside the checkout and not ignored; the run would dirty it")
 
 
-def _same_identity(a: dict, b: dict) -> bool:
-    keys = ("config_hash", "git_commit", "python", "numpy", "scipy")
+IDENTITY_KEYS = ("config_hash", "git_commit", "python", "numpy", "scipy", "machine", "generator")
+RUN_KEYS = ("kind", "n_outer", "n_boot")
+
+
+def _same_identity(a: dict, b: dict, keys=IDENTITY_KEYS) -> bool:
     return all(a.get(k) == b.get(k) for k in keys)
+
+
+def _differences(a: dict, b: dict, keys) -> list[str]:
+    return [f"{k}: {a.get(k)!r} vs {b.get(k)!r}" for k in keys if a.get(k) != b.get(k)]
 
 
 def _write_atomic(path: Path, obj) -> None:
@@ -321,6 +335,8 @@ def run(kind: str, out: Path, n_outer: int | None = None, n_boot: int | None = N
         root: Path | None = None) -> None:
     """Resumable; refuses to resume a run whose identity differs."""
     M, B = RUN_SIZES[kind]
+    if kind == "decision" and (n_outer, n_boot) not in ((None, None), (M, B)):
+        raise RuntimeError("the decision run takes the registered M and B; no override")
     n_outer, n_boot = n_outer or M, n_boot or B
     ident = identity(root)
     check_output_dir(out, Path(ident["checkout"]))
@@ -330,17 +346,17 @@ def run(kind: str, out: Path, n_outer: int | None = None, n_boot: int | None = N
     run_file = out / "run.json"
     if run_file.exists():
         prior = json.loads(run_file.read_text())
-        if not _same_identity(prior, meta) or prior["kind"] != kind:
-            raise RuntimeError("resume refused: the run's configuration hash, commit, versions "
-                               "or kind differ from this invocation")
+        diff = _differences(prior, meta, IDENTITY_KEYS + RUN_KEYS)
+        if diff:
+            raise RuntimeError("resume refused: the run differs from this invocation in "
+                               + "; ".join(diff))
     else:
         _write_atomic(run_file, meta)
     scales_file = out / "scales.json"
     if scales_file.exists():
         scales = {int(k): v for k, v in json.loads(scales_file.read_text()).items()}
     else:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            scales = dict(zip(conditions, pool.map(set_counts, conditions)))
+        scales = dict(zip(conditions, _map(set_counts, conditions, workers=workers)))
         _write_atomic(scales_file, {str(k): v for k, v in scales.items()})
     failed = [c for c in conditions if not scales[c]["established"]]
     if failed:
@@ -352,9 +368,19 @@ def run(kind: str, out: Path, n_outer: int | None = None, n_boot: int | None = N
         d.mkdir(exist_ok=True)
         todo += [(cid, kind, s, min(s + chunk, n_outer), scales[cid]["si_area"], n_boot)
                  for s in range(0, n_outer, chunk) if not (d / f"chunk_{s:06d}.json").exists()]
+    for n, (args, rows) in enumerate(zip(todo, _map(_chunk, todo, workers=workers))):
+        path = out / f"c{args[0]:02d}" / f"chunk_{args[2]:06d}.json"
+        _write_atomic(path, rows)
+        if n == 0:
+            print(f"first chunk written: {path}", flush=True)
+
+
+def _map(fn, *iterables, workers=None):
+    """``map`` in this process when ``workers == 1`` (tests, debugging), else in a pool."""
+    if workers == 1:
+        return list(map(fn, *iterables))
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        for args, rows in zip(todo, pool.map(_chunk, todo)):
-            _write_atomic(out / f"c{args[0]:02d}" / f"chunk_{args[2]:06d}.json", rows)
+        return list(pool.map(fn, *iterables))
 
 
 def _load_trials(out: Path, cid: int, n_outer: int) -> list[dict]:
@@ -404,13 +430,15 @@ def condition_summary(cid: int, kind: str, rows: list[dict], n_outer: int) -> di
     """Decision rule 1 and 2 for one condition."""
     cats = {1: [r for r in rows if r["category"] == 1], 2: [r for r in rows if r["category"] == 2],
             3: [r for r in rows if r["category"] == 3]}
-    causes = {}
+    causes, cause_detail = {}, {}
     for r in cats[1] + cats[2]:
-        causes[r["cause"]] = causes.get(r["cause"], 0) + 1
+        kind_ = r["cause"].split(":")[0]
+        causes[kind_] = causes.get(kind_, 0) + 1
+        cause_detail[r["cause"]] = cause_detail.get(r["cause"], 0) + 1
     n_fail = len(cats[1]) + len(cats[2])
     rate = n_fail / n_outer
     s = {"condition": cid, "n_trials": n_outer, "n_category": {str(k): len(v) for k, v in cats.items()},
-         "causes": causes, "rate": rate, "rate_upper_95": binomial_upper_95(n_fail, n_outer),
+         "causes": causes, "cause_detail": cause_detail, "rate": rate, "rate_upper_95": binomial_upper_95(n_fail, n_outer),
          "rate_condition": rate <= RATE_BOUND, "evaluable": None, "R_S": None,
          "sd_bias_2_3": None, "sd_bias_3": None, "median_r": None, "pass": False}
     e3 = np.array([r["estimate"] for r in cats[3]], dtype=np.float64)
@@ -449,15 +477,43 @@ def _sd_bias(e: np.ndarray, truth: list[float]) -> dict | None:
             "n": int(len(e))}
 
 
+PROVENANCE = "synthetic: kappa-scaled expected counts of the registered condition (planning_model)"
+
+
 def admission(cid: int, si_area: float, predict=_predict_r) -> list[dict]:  # noqa: D417
-    """r_pred and the prediction's refusals for every kappa (admission conditions 1 and 2)."""
+    """Per kappa: r_pred, the prediction's refusals, the structural conditions, and the declared input.
+
+    Admission conditions 1 and 2 are summarised as ``eligible``; condition
+    3 as ``structural`` (two or three lines in the denominator, no
+    transmission divided out, a registered background). The declared
+    arrays, the conditions, their provenance and the prediction settings
+    are stored, as §8 "Declared input" says they are in this round.
+    """
     out = []
     for kappa in KAPPA:
         lines, cond = declared(cid, si_area, kappa)
         p = predict(lines, cond, B_PRED)
-        out.append({"kappa": list(kappa), "r_pred": p.r_pred, "declared_refused": p.declared_refused,
-                    "n_refused": p.n_refused,
-                    "eligible": (not p.declared_refused) and p.n_refused == 0 and p.r_pred is not None})
+        structural = (MIN_ELEMENTS <= len(cond.declared_elements) <= MAX_LINES
+                      and cond.transmission_applied == "applied" and cond.background in BACKGROUNDS)
+        out.append({
+            "kappa": list(kappa), "r_pred": p.r_pred, "declared_refused": p.declared_refused,
+            "n_refused": p.n_refused, "structural": bool(structural),
+            "eligible": (not p.declared_refused) and p.n_refused == 0 and p.r_pred is not None,
+            "declared": {
+                "provenance": PROVENANCE, "fixed_before_data": True,
+                "prediction": {"B_pred": B_PRED, "seed_key": list(_PREDICTION_SEED_KEY),
+                               "generator": GENERATOR},
+                "conditions": {"photon_energy": cond.photon_energy, "table": cond.table,
+                               "background": cond.background, "matrix": cond.matrix.compound,
+                               "intensity_semantics": cond.intensity_semantics,
+                               "transmission_applied": cond.transmission_applied,
+                               "declared_elements": list(cond.declared_elements)},
+                "lines": [{"element": ln.element, "orbital": ln.orbital,
+                           "energy_scale": ln.energy_scale, "window": list(ln.window),
+                           "binding_energy": ln.binding_energy, "exposure_s": ln.exposure_s,
+                           "exposure_basis": ln.exposure_basis,
+                           "energy": [float(v) for v in ln.energy],
+                           "intensity": [float(v) for v in ln.intensity]} for ln in lines]}})
     return out
 
 
@@ -529,14 +585,16 @@ def implementation_check(rows: list[dict], summary: dict) -> dict:
 def summarize(out: Path, workers: int | None = None) -> dict:
     """Decision rules 1-6 over a finished run; raises on an incomplete or inconsistent one."""
     meta = json.loads((out / "run.json").read_text())
-    if meta["config_hash"] != config_hash():
-        raise RuntimeError("the run's configuration hash differs from this module's")
+    now = identity()
+    diff = _differences(meta, now, IDENTITY_KEYS)
+    if diff:
+        raise RuntimeError("summary refused: the run and this invocation differ in " + "; ".join(diff))
     scales = {int(k): v for k, v in json.loads((out / "scales.json").read_text()).items()}
     kind, n_outer = meta["kind"], meta["n_outer"]
     conds, record = {}, []
     cids = list(meta["conditions"])
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        admissions = dict(zip(cids, pool.map(admission, cids, [scales[c]["si_area"] for c in cids])))
+    admissions = dict(zip(cids, _map(admission, cids, [scales[c]["si_area"] for c in cids],
+                                     workers=workers)))
     for cid in cids:
         rows = _load_trials(out, cid, n_outer)
         s = condition_summary(cid, kind, rows, n_outer)
@@ -556,8 +614,12 @@ def summarize(out: Path, workers: int | None = None) -> dict:
     decision = decide(conds)
     for cid, s in conds.items():
         cfg, bg, level = condition(cid)
+        r_star = decision[bg]["r_star"]
+        for a in s["admission"]:
+            a["admitted_at_r_star"] = bool(r_star is not None and a["eligible"] and a["structural"]
+                                           and a["r_pred"] <= r_star)
         record.append({"condition": cid, "config": cfg, "background": bg, "level": level, **s})
-    return {"design": DESIGN, "seed": SEED, "run": meta, "summary_identity": identity(),
+    return {"design": DESIGN, "seed": SEED, "run": meta, "summary_identity": now,
             "decision": decision, "conditions": record}
 
 

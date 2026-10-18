@@ -247,3 +247,82 @@ def test_a_small_run_summarises_and_resumes(tmp_path, fake_identity, monkeypatch
     monkeypatch.setitem(v3.REGISTERED, "B_pred", 41)
     with pytest.raises(RuntimeError, match="resume refused"):
         v3.run("pilot", out, n_outer=6, n_boot=5, chunk=4, workers=1, conditions=(CID,))
+
+
+# --- the audit's negative fences ---------------------------------------------
+
+def test_the_seeds_are_the_registered_ones():
+    assert v3.SEED == 20261014 and comp._PREDICTION_SEED_KEY == (20261014, 2)
+    assert v3.REGISTERED["seed"] == 20261014 and v3.REGISTERED["series"]["2"] == "[seed, 2]"
+
+
+def test_predict_r_rejects_complex_arrays_and_reports_not_run_when_refused():
+    lines, cond = v3.declared(CID, 2.5e4)
+    broken = [replace(lines[0], intensity=lines[0].intensity.astype(complex))] + lines[1:]
+    with pytest.raises(ValueError, match="real"):
+        comp._predict_r(broken, cond, n_boot=5)
+    p = comp._predict_r(lines, replace(cond, declared_elements=None), n_boot=5)
+    assert p.declared_refused and p.n_refused is None
+
+
+def test_series_3_and_4_are_distinct_streams():
+    a = v3.generator([v3.SEED, 3, 0, CID, 7]).integers(0, 1 << 30, 8)
+    b = v3.generator([v3.SEED, 4, 0, CID, 7]).integers(0, 1 << 30, 8)
+    assert not np.array_equal(a, b)
+    assert np.array_equal(a, v3.generator([v3.SEED, 3, 0, CID, 7]).integers(0, 1 << 30, 8))
+
+
+def test_a_refused_replicate_is_category_2_withheld(monkeypatch):
+    real = v3._bootstrap_detail
+
+    def one_refused(lines, cond, n_boot, rng, elements):
+        rows, refused, areas = real(lines, cond, n_boot, rng, elements)
+        return rows[:-1], refused + 1, areas[:-1]
+    monkeypatch.setattr(v3, "_bootstrap_detail", one_refused)
+    row = v3.trial(CID, "pilot", 0, 3e4, n_boot=6)
+    assert row["category"] == 2 and row["cause"].startswith("withheld") and row["se"] is None
+    s = v3.condition_summary(CID, "pilot", [row], 1)
+    assert s["causes"] == {"withheld": 1} and s["rate"] == 1.0 and not s["pass"]
+
+
+def test_a_condition_with_no_spread_is_not_evaluable():
+    rows = [{"trial": i, "category": 3, "cause": None, "estimate": [0.3, 0.7], "se": [0.01, 0.01],
+             "r": 0.01} for i in range(5)]
+    s = v3.condition_summary(CID, "pilot", rows, 5)
+    assert s["evaluable"] is False and s["verdict"] == "not evaluable" and not s["pass"]
+
+
+def test_the_implementation_check_fails_when_the_published_set_differs():
+    rows = [v3.trial(CID, "pilot", i, 3e4, n_boot=6) for i in range(4)]
+    s = v3.condition_summary(CID, "pilot", rows, 4)
+    assert v3.implementation_check(rows, s)["ok"]
+    tampered = [dict(r) for r in rows]
+    tampered[0]["se"] = [v * 2 for v in tampered[0]["se"]]
+    assert not v3.implementation_check(tampered, s)["ok"]
+    dropped = rows[:-1] + [{**rows[-1], "category": 2, "cause": "withheld: test", "se": None}]
+    assert not v3.implementation_check(dropped, s)["ok"]
+
+
+def test_the_decision_run_takes_no_override(tmp_path, fake_identity):
+    with pytest.raises(RuntimeError, match="no override"):
+        v3.run("decision", tmp_path / "d", n_outer=6, n_boot=5, workers=1, conditions=(CID,))
+
+
+def test_summary_is_refused_from_another_commit(tmp_path, fake_identity, monkeypatch):
+    monkeypatch.setattr(v3, "B_EXPLORE", 20)
+    monkeypatch.setattr(v3, "B_PRED", 40)
+    monkeypatch.setitem(v3.REGISTERED, "B_explore", 20)
+    monkeypatch.setitem(v3.REGISTERED, "B_pred", 40)
+    out = tmp_path / "pilot"
+    v3.run("pilot", out, n_outer=4, n_boot=5, chunk=4, workers=1, conditions=(CID,))
+    rec = v3.summarize(out, workers=1)
+    (c,) = rec["conditions"]
+    assert all("declared" in a and len(a["declared"]["lines"]) == 2 for a in c["admission"])
+    assert all(a["structural"] for a in c["admission"])
+    run = json.loads((out / "run.json").read_text())
+    run["git_commit"] = "other"
+    (out / "run.json").write_text(json.dumps(run))
+    with pytest.raises(RuntimeError, match="summary refused"):
+        v3.summarize(out, workers=1)
+    with pytest.raises(RuntimeError, match="resume refused"):
+        v3.run("pilot", out, n_outer=4, n_boot=5, chunk=4, workers=1, conditions=(CID,))
