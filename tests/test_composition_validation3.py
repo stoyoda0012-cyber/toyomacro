@@ -328,3 +328,33 @@ def test_summary_is_refused_from_another_commit(tmp_path, fake_identity, monkeyp
         v3.summarize(out, workers=1)
     with pytest.raises(RuntimeError, match="resume refused"):
         v3.run("pilot", out, n_outer=4, n_boot=5, chunk=4, workers=1, conditions=(CID,))
+
+
+def test_chunks_are_written_as_they_complete(tmp_path, fake_identity, monkeypatch):
+    """A slow later chunk must not hold back the first one (the run stays resumable)."""
+    import inspect
+    import time
+    assert inspect.isgeneratorfunction(v3._map)
+    seen = []
+    real_chunk = v3._chunk
+
+    def slow_chunk(args):
+        if args[2] > 0:
+            time.sleep(1.0)
+        return real_chunk(args)
+    monkeypatch.setattr(v3, "_chunk", slow_chunk)
+    monkeypatch.setattr(v3, "set_counts", lambda cid: {"condition": cid, "level": 0.02, "established": True,
+                                                        "si_area": 3e4, "candidate": 1, "r_pred": 0.019,
+                                                        "trace": []})
+    real_write = v3._write_atomic
+
+    def write(path, obj):
+        real_write(path, obj)
+        seen.append((path.name, time.perf_counter()))
+    monkeypatch.setattr(v3, "_write_atomic", write)
+    v3.run("pilot", tmp_path / "p", n_outer=4, n_boot=3, chunk=2, workers=1, conditions=(CID,))
+    names = [n for n, _ in seen if n.startswith("chunk_")]
+    assert names == ["chunk_000000.json", "chunk_000002.json"]
+    t0 = next(t for n, t in seen if n == "chunk_000000.json")
+    t1 = next(t for n, t in seen if n == "chunk_000002.json")
+    assert t1 - t0 >= 0.9  # the first chunk was on disk before the slow one finished

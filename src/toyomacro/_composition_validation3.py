@@ -376,11 +376,18 @@ def run(kind: str, out: Path, n_outer: int | None = None, n_boot: int | None = N
 
 
 def _map(fn, *iterables, workers=None):
-    """``map`` in this process when ``workers == 1`` (tests, debugging), else in a pool."""
+    """Results in order, each yielded as soon as it is ready (so chunks land one by one).
+
+    In this process when ``workers == 1`` (tests, debugging), else in a
+    pool. A generator: collecting every result before returning would
+    write no chunk until the whole run had finished, which is what the
+    resumable layout exists to avoid.
+    """
     if workers == 1:
-        return list(map(fn, *iterables))
+        yield from map(fn, *iterables)
+        return
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(fn, *iterables))
+        yield from pool.map(fn, *iterables)
 
 
 def _load_trials(out: Path, cid: int, n_outer: int) -> list[dict]:
