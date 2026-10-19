@@ -358,3 +358,32 @@ def test_chunks_are_written_as_they_complete(tmp_path, fake_identity, monkeypatc
     t0 = next(t for n, t in seen if n == "chunk_000000.json")
     t1 = next(t for n, t in seen if n == "chunk_000002.json")
     assert t1 - t0 >= 0.9  # the first chunk was on disk before the slow one finished
+
+
+# --- the third record ---------------------------------------------------------
+
+RECORD3 = Path(__file__).parents[1] / "docs" / "design" / "composition-uncertainty-results-3.json"
+
+
+def test_the_third_record_decides_what_section_9_says():
+    """Recompute every stored verdict from its interval; pin the decision and the identities."""
+    rec = json.loads(RECORD3.read_text(encoding="utf-8"))
+    assert rec["design"] == v3.DESIGN and rec["seed"] == v3.SEED
+    for k in v3.IDENTITY_KEYS:
+        assert rec["run"][k] == rec["summary_identity"][k]
+    assert rec["run"]["kind"] == "decision" and (rec["run"]["n_outer"], rec["run"]["n_boot"]) == (2000, 1000)
+    assert {bg: d["r_star"] for bg, d in rec["decision"].items()} == {"linear": 0.02, "shirley": 0.01}
+    conds = rec["conditions"]
+    assert len(conds) == 40 and all(c["implementation_check"]["ok"] for c in conds)
+    for c in conds:
+        assert sum(c["n_category"].values()) == 2000
+        verdicts = [v3._verdict(lo, hi) for lo, hi in c["R_S"]["R_mc_95"]]
+        assert verdicts == c["R_S"]["verdict"]
+        combined = ("pass" if all(v == "pass" for v in verdicts) else
+                    "fail" if "fail" in verdicts else "undecided")
+        assert c["verdict"] == combined
+        assert c["pass"] == (combined == "pass" and c["rate"] <= v3.RATE_BOUND)
+        assert c["rate_upper_95"] == v3.binomial_upper_95(2000 - c["n_category"]["3"], 2000)
+    failing = sorted(c["condition"] for c in conds if not c["pass"])
+    assert failing == [v3.condition_id("P", "shirley", 0.08), v3.condition_id("G", "shirley", 0.08)]
+    assert all(c["count_setting"]["established"] for c in conds)

@@ -606,6 +606,108 @@ bracketing, and extrapolation to more counts than the lowest level.
 
 ## 9. Third validation: results
 
-Not yet written. To be filled from
-`composition-uncertainty-results-3.json` after the decision run, with
-the commit of the runs and of the summary.
+From `composition-uncertainty-results-3.json`: the decision run and its
+summary at commit 063a0c7 (the §8 registration is 51be653; the harness
+of #59 and #60), seed 20261014, M = 2,000 data sets and B = 1,000
+replicates for each of the 40 conditions, 1 h 50 min on 16 workers.
+The run's and the summary's identities (configuration hash, commit,
+Python 3.12.12, numpy 2.3.5, scipy 1.17.0, x86_64, generator) are the
+same, and rule 6 holds in 40 of 40 conditions. A first launch of the
+decision run, from 6cc4e1e, was stopped after 28 minutes: the harness
+then collected every chunk before writing any, so the first chunk
+could not be checked after launch and the run was not resumable; #60
+made the chunks stream, and nothing from that launch is used.
+
+**Count setting.** All 40 conditions established their counts, in 1 to
+8 candidates (mean 3.25; B/Shirley/0.005 needed all 8), with
+r_pred(κ = (1, 1)) at 0.904–0.988 of the level, inside the one-sided
+window. The realised median r over the data sets was 0.894–1.033 of
+the level.
+
+**Rules 1 and 2.** Of 80,000 data sets, 0 were refused by
+`composition()`, 144 returned no standard uncertainty (all withheld
+for refused replicates, in three conditions) and 79,856 returned one.
+Monte Carlo half-widths of R_S are 0.029–0.036 (target 0.05). 38
+conditions pass; the two that do not are both at r = 0.08 with a
+Shirley background:
+
+| condition | ③ | R_S | 95 % MC interval | rate (① + ②)/M, upper 95 % | result |
+|---|---|---|---|---|---|
+| P, Shirley, 0.08 | 1,861 | 1.189 | [1.154, 1.226] | 6.95 %, 7.96 % | fails R_S and the rate |
+| G, Shirley, 0.08 | 1,997 | 1.075 | [1.041, 1.111] | 0.15 %, 0.39 % | undecided; fails the rate |
+| T, Shirley, 0.08 | 1,998 | 1.008 | [0.977, 1.043] | 0.10 %, 0.31 % | passes (rate at the bound) |
+
+The 38 passing conditions have R_S between 0.959 (G/linear/0.01,
+[0.931, 0.989]) and 1.052 (P/linear/0.08, [1.023, 1.083]); every one
+of their intervals lies inside [0.9, 1.1]. Per condition (configuration
+/ background / level: R_S [interval]):
+
+| level | P linear | P Shirley | B linear | B Shirley |
+|---|---|---|---|---|
+| 0.005 | 1.004 [0.975, 1.035] | 1.000 [0.970, 1.032] | 0.993 [0.963, 1.025] | 0.996 [0.966, 1.028] |
+| 0.01 | 1.007 [0.979, 1.039] | 0.970 [0.942, 1.000] | 0.983 [0.953, 1.016] | 1.015 [0.984, 1.050] |
+| 0.02 | 1.014 [0.983, 1.049] | 1.010 [0.978, 1.043] | 0.984 [0.955, 1.016] | 1.030 [1.000, 1.063] |
+| 0.04 | 0.986 [0.954, 1.020] | 1.018 [0.988, 1.053] | 0.992 [0.962, 1.023] | 0.994 [0.965, 1.027] |
+| 0.08 | 1.052 [1.023, 1.083] | **1.189 [1.154, 1.226]** | 1.009 [0.980, 1.040] | 1.030 [1.000, 1.062] |
+
+| level | T linear | T Shirley | G linear | G Shirley |
+|---|---|---|---|---|
+| 0.005 | 1.010 [0.981, 1.042] | 0.995 [0.967, 1.026] | 0.999 [0.969, 1.031] | 0.986 [0.956, 1.018] |
+| 0.01 | 1.000 [0.970, 1.032] | 0.975 [0.946, 1.007] | 0.959 [0.931, 0.989] | 1.004 [0.975, 1.034] |
+| 0.02 | 1.018 [0.987, 1.053] | 1.005 [0.973, 1.039] | 0.982 [0.953, 1.014] | 0.974 [0.946, 1.004] |
+| 0.04 | 0.968 [0.938, 1.001] | 0.984 [0.954, 1.017] | 1.013 [0.982, 1.045] | 0.989 [0.960, 1.020] |
+| 0.08 | 0.998 [0.969, 1.030] | 1.008 [0.977, 1.043] | 1.022 [0.993, 1.055] | *1.075 [1.041, 1.111]* |
+
+Bias of the Si fraction against `composition(μ)` is within ±1.2 × 10⁻³
+in every condition, at most 2.8 standard errors of the mean; the
+standard deviation and bias over ② ∪ ③ and over ③ are in the record.
+
+**Rules 3–5: the scope.** r\* = 0.02 for the linear background and
+r\* = 0.01 for Shirley.
+
+- *Linear.* A_linear(0.02) is the 16 conditions at levels 0.005–0.04 of
+  all four configurations: the level-0.04 conditions enter through
+  κ = (2, 0.5) and (2, 1), whose r_pred is 0.33–0.55 of κ = (1, 1)'s;
+  no level-0.08 condition enters at any candidate. Every admitted
+  condition passes, and the level above each configuration's highest
+  admitted level, 0.08, passes too. r\* = 0.02 stands (so do 0.01 and
+  0.005; the largest is taken).
+- *Shirley.* A_Shirley(0.02) is likewise 16 conditions, but the level
+  above, 0.08, does not pass for P (R_S = 1.189, 139 withheld) or for G
+  (undecided, rate 0.15 %), so 0.02 does not stand. A_Shirley(0.01) is
+  the 12 conditions at levels 0.005–0.02 (the level-0.02 conditions
+  enter through κ = (2, 0.5), and (2, 1) except for P); all pass, and
+  the level above, 0.04, passes in every configuration. r\* = 0.01
+  stands.
+
+Four κ points were ineligible (admission condition 2) because the
+prediction refused 1–8 replicates: P/Shirley/0.08 at κ = (0.5, 1) and
+(0.5, 2), T/Shirley/0.08 at (0.5, 2), G/Shirley/0.08 at (0.5, 1); none
+of them touches the admission sets above.
+
+**What the scope means.** Admission is by r_pred of the declared
+spectrum, and r_pred is sensitive to the declaration in the direction
+§8 "Framing" gave: over the 40 conditions, r_pred at κ = (2, 0.5) is
+0.33–0.41 of its value at κ = (1, 1), at (2, 1) 0.44–0.55, at (2, 2)
+0.68–0.75, and at (0.5, 2) 2.5–3.1. So a data set admitted at r_pred ≤
+r\* whose declaration overstated the peak twofold and understated the
+base twofold has a true r of up to about 3 r\*; the bracketing of rule
+4 is what shows the calibration holds there, up to one level above the
+admitted ones. Within the registered conditions, then: with a linear
+background and r_pred ≤ 0.02, or a Shirley background and r_pred ≤
+0.01, the standard uncertainty returned by the bootstrap matches the
+spread of the estimate to within the ±10 % band, on the data sets that
+return one, for declarations within the nine κ points. The published
+guard admits exactly that; the rest of §8 "Publication" (what the
+code checks, what the user declares, the many-counts side as an
+extrapolation) is implemented in the publication design that follows.
+
+**Not shown here.** Everything in §8 "What this does not cover". In
+particular, the rate of data sets that return no standard uncertainty
+is bounded only as the record states (0 of 2,000 gives an upper bound
+of 0.15 %, not a demonstration of 0.1 %), T/Shirley/0.08 passes the
+rate condition exactly at the bound, and the failing Shirley
+conditions at r = 0.08 are the second round's failure again (P) and a
+new undecided one (G): the mechanism §6 names — resampling about the
+observed counts — is consistent with R_S rising there, but its cause
+was not isolated in this round either.
