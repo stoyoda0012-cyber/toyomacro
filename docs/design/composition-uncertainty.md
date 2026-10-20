@@ -617,8 +617,10 @@ of 40 conditions. The two `checkout` fields, which held the path of the
 worktree, were removed from the committed copy of the record; the
 harness no longer records that path. Before the decision run, the
 registered pilot (M = 200, B = 200) was run three times, at 3ace680,
-467c41d and def5c6b, with identical numbers: cost and Monte Carlo
-error only (half-widths 0.084–0.129), no decision. A first launch of
+467c41d and def5c6b, identical in every number that enters the
+decision (3ace680 still reported an r_pred for the four refused κ
+points that later versions withhold): cost and Monte Carlo error only
+(half-widths 0.084–0.129), no decision. A first launch of
 the decision run, from 6cc4e1e, was stopped after about half an hour
 (#60): the harness then collected every chunk before writing any, so
 the first chunk could not be checked after launch and the run was not
