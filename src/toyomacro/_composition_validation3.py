@@ -290,8 +290,10 @@ def identity(root: Path | None = None) -> dict:
     dirty = _git(root, "status", "--porcelain", "--untracked-files=no")
     if dirty:
         raise RuntimeError(f"the checkout {root} has modified tracked files:\n{dirty}")
+    # The checkout's path is checked here and never recorded: a committed
+    # record must not carry a developer's directory layout (AGENTS.md).
     return {"design": DESIGN, "config_hash": config_hash(), "git_commit": _git(root, "rev-parse", "HEAD"),
-            "checkout": str(root), "python": platform.python_version(),
+            "python": platform.python_version(),
             "numpy": np.__version__, "scipy": scipy.__version__,
             "generator": GENERATOR, "machine": platform.machine()}
 
@@ -339,7 +341,7 @@ def run(kind: str, out: Path, n_outer: int | None = None, n_boot: int | None = N
         raise RuntimeError("the decision run takes the registered M and B; no override")
     n_outer, n_boot = n_outer or M, n_boot or B
     ident = identity(root)
-    check_output_dir(out, Path(ident["checkout"]))
+    check_output_dir(out, Path(root or _git(Path.cwd(), "rev-parse", "--show-toplevel")))
     out.mkdir(parents=True, exist_ok=True)
     meta = {**ident, "kind": kind, "n_outer": n_outer, "n_boot": n_boot,
             "conditions": list(conditions)}

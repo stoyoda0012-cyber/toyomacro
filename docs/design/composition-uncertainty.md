@@ -609,14 +609,21 @@ bracketing, and extrapolation to more counts than the lowest level.
 From `composition-uncertainty-results-3.json`: the decision run and its
 summary at commit 063a0c7 (the §8 registration is 51be653; the harness
 of #59 and #60), seed 20261014, M = 2,000 data sets and B = 1,000
-replicates for each of the 40 conditions, 1 h 50 min on 16 workers.
-The run's and the summary's identities (configuration hash, commit,
-Python 3.12.12, numpy 2.3.5, scipy 1.17.0, x86_64, generator) are the
-same, and rule 6 holds in 40 of 40 conditions. A first launch of the
-decision run, from 6cc4e1e, was stopped after 28 minutes: the harness
-then collected every chunk before writing any, so the first chunk
-could not be checked after launch and the run was not resumable; #60
-made the chunks stream, and nothing from that launch is used.
+replicates for each of the 40 conditions, 1 h 50 min of wall time on
+one 16-core machine. The run's and the summary's identities
+(configuration hash, commit, Python 3.12.12, numpy 2.3.5, scipy 1.17.0,
+an x86_64 interpreter, generator) are the same, and rule 6 holds in 40
+of 40 conditions. The two `checkout` fields, which held the path of the
+worktree, were removed from the committed copy of the record; the
+harness no longer records that path. Before the decision run, the
+registered pilot (M = 200, B = 200) was run three times, at 3ace680,
+467c41d and def5c6b, with identical numbers: cost and Monte Carlo
+error only (half-widths 0.084–0.129), no decision. A first launch of
+the decision run, from 6cc4e1e, was stopped after about half an hour
+(#60): the harness then collected every chunk before writing any, so
+the first chunk could not be checked after launch and the run was not
+resumable; #60 made the chunks stream, and nothing from that launch is
+used.
 
 **Count setting.** All 40 conditions established their counts, in 1 to
 8 candidates (mean 3.25; B/Shirley/0.005 needed all 8), with
@@ -639,8 +646,10 @@ Shirley background:
 
 The 38 passing conditions have R_S between 0.959 (G/linear/0.01,
 [0.931, 0.989]) and 1.052 (P/linear/0.08, [1.023, 1.083]); every one
-of their intervals lies inside [0.9, 1.1]. Per condition (configuration
-/ background / level: R_S [interval]):
+of their intervals lies inside [0.9, 1.1] (over every element; the
+tables give the Si element, and the O and C entries of the T
+configuration are in the record). Per condition (configuration /
+background / level: R_S [interval]):
 
 | level | P linear | P Shirley | B linear | B Shirley |
 |---|---|---|---|---|
@@ -658,9 +667,10 @@ of their intervals lies inside [0.9, 1.1]. Per condition (configuration
 | 0.04 | 0.968 [0.938, 1.001] | 0.984 [0.954, 1.017] | 1.013 [0.982, 1.045] | 0.989 [0.960, 1.020] |
 | 0.08 | 0.998 [0.969, 1.030] | 1.008 [0.977, 1.043] | 1.022 [0.993, 1.055] | *1.075 [1.041, 1.111]* |
 
-Bias of the Si fraction against `composition(μ)` is within ±1.2 × 10⁻³
-in every condition, at most 2.8 standard errors of the mean; the
-standard deviation and bias over ② ∪ ③ and over ③ are in the record.
+Bias of the Si fraction against `composition(μ)`, over ③, is within
+±1.2 × 10⁻³ in every condition, at most 2.8 standard errors of the
+mean; the standard deviation and bias over ② ∪ ③ and over ③ are in the
+record.
 
 **Rules 3–5: the scope.** r\* = 0.02 for the linear background and
 r\* = 0.01 for Shirley.
@@ -689,11 +699,13 @@ of them touches the admission sets above.
 spectrum, and r_pred is sensitive to the declaration in the direction
 §8 "Framing" gave: over the 40 conditions, r_pred at κ = (2, 0.5) is
 0.33–0.41 of its value at κ = (1, 1), at (2, 1) 0.44–0.55, at (2, 2)
-0.68–0.75, and at (0.5, 2) 2.5–3.1. So a data set admitted at r_pred ≤
-r\* whose declaration overstated the peak twofold and understated the
-base twofold has a true r of up to about 3 r\*; the bracketing of rule
-4 is what shows the calibration holds there, up to one level above the
-admitted ones. Within the registered conditions, then: with a linear
+0.68–0.75, and at (0.5, 2) 2.5–3.1 (over the 38 conditions that have
+an r_pred there). So a data set admitted at r_pred ≤ r\* whose
+declaration overstated the peak twofold and understated the base
+twofold has a true r of up to about 3 r\*, between the highest admitted
+level (2 r\*) and the level above it (4 r\*); rule 4's bracketing shows
+a pass at both of those levels and, as §8 says, nothing between them.
+Within the registered conditions, then: with a linear
 background and r_pred ≤ 0.02, or a Shirley background and r_pred ≤
 0.01, the standard uncertainty returned by the bootstrap matches the
 spread of the estimate to within the ±10 % band, on the data sets that

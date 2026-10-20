@@ -386,4 +386,13 @@ def test_the_third_record_decides_what_section_9_says():
         assert c["rate_upper_95"] == v3.binomial_upper_95(2000 - c["n_category"]["3"], 2000)
     failing = sorted(c["condition"] for c in conds if not c["pass"])
     assert failing == [v3.condition_id("P", "shirley", 0.08), v3.condition_id("G", "shirley", 0.08)]
-    assert all(c["count_setting"]["established"] for c in conds)
+    for c in conds:
+        assert c["rate"] == (2000 - c["n_category"]["3"]) / 2000
+        cs = c["count_setting"]
+        assert cs["established"] and 0.9 * c["level"] <= cs["r_pred"] <= c["level"]
+    # rules 3-5 recomputed from the admission rows give the stored decision
+    assert v3.decide({c["condition"]: c for c in conds}) == rec["decision"]
+    # public boundary: the committed record carries no path of the machine it ran on
+    text = RECORD3.read_text(encoding="utf-8")
+    assert "checkout" not in rec["run"] and "checkout" not in rec["summary_identity"]
+    assert not any(s in text for s in ("/Users/", "/home/", "scratchpad", "C:\\"))
