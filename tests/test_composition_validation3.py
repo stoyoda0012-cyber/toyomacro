@@ -383,7 +383,9 @@ def test_the_third_record_decides_what_section_9_says():
                     "fail" if "fail" in verdicts else "undecided")
         assert c["verdict"] == combined
         assert c["pass"] == (combined == "pass" and c["rate"] <= v3.RATE_BOUND)
-        assert c["rate_upper_95"] == v3.binomial_upper_95(2000 - c["n_category"]["3"], 2000)
+        # scipy's beta.ppf differs in the last ulp between platforms: compare to 1e-12
+        assert c["rate_upper_95"] == pytest.approx(
+            v3.binomial_upper_95(2000 - c["n_category"]["3"], 2000), rel=1e-12)
     failing = sorted(c["condition"] for c in conds if not c["pass"])
     assert failing == [v3.condition_id("P", "shirley", 0.08), v3.condition_id("G", "shirley", 0.08)]
     for c in conds:
