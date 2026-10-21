@@ -21,6 +21,7 @@ from toyomacro import _composition_validation3 as v3
 DESIGN = Path(__file__).parents[1] / "docs" / "design"
 RECORD3 = DESIGN / "composition-uncertainty-results-3.json"
 RECORD2 = DESIGN / "composition-uncertainty-results-2.json"
+RECORD1 = DESIGN / "composition-uncertainty-results.json"
 
 #: P/linear/0.02 — an admitted (condition, κ) pair: its κ = (1, 1) r_pred is
 #: at or below the linear r* (§9), so the public path reaches the data side.
@@ -294,10 +295,15 @@ def test_the_registered_values_are_the_harness_conditions():
         assert comp._registered_report(mu, cond)["differs"] == []
 
 
-def test_the_second_records_verdicts_still_follow_from_their_intervals():
-    """Record 2 (empty scope) stays recomputable from its intervals."""
+def test_the_first_two_records_verdicts_still_follow_from_their_intervals():
+    """Records 1 and 2 (empty scope) stay recomputable from their intervals."""
+    rec1 = json.loads(RECORD1.read_text(encoding="utf-8"))
+    for s in rec1["scenarios"]:
+        for el in s["elements"].values():
+            assert el["verdict"] == v3._verdict(*el["R_mc_95"])
     rec2 = json.loads(RECORD2.read_text(encoding="utf-8"))
     for s in rec2["scenarios"]:
+        assert "definition" in s and s["n_attempted"] == 2000
         for block in (s["R_all"], s["R_admitted"] or {}):
             for el in block.values():
                 assert el["verdict"] == v3._verdict(*el["R_mc_95"])
@@ -306,11 +312,12 @@ def test_the_second_records_verdicts_still_follow_from_their_intervals():
 def test_the_first_harness_runs_and_resumes(tmp_path):
     from toyomacro import _composition_validation as val
     out = tmp_path / "S1"
-    val.run("S1", n_outer=4, n_boot=5, out=out, chunk=2, workers=1)
+    val.run("S1", n_outer=6, n_boot=5, out=out, chunk=3, workers=1)
     first = sorted(p.read_text() for p in out.glob("chunk_*.json"))
-    val.run("S1", n_outer=4, n_boot=5, out=out, chunk=2, workers=1)  # nothing to redo
+    val.run("S1", n_outer=6, n_boot=5, out=out, chunk=3, workers=1)  # nothing to redo
     assert sorted(p.read_text() for p in out.glob("chunk_*.json")) == first
-    assert val.summarize(out)["n_outer_attempted"] == 4
+    s = val.summarize(out, n_resample=50)
+    assert s["n_outer_attempted"] == 6 and set(s["elements"]) == {"Si", "O"}
 
 
 def test_composition_alone_says_the_uncertainty_is_not_computed_here(case):
