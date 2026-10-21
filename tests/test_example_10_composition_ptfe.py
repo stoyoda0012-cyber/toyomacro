@@ -35,7 +35,7 @@ def _check(res):
     assert any("integrated_counts" in a for a in b.assumptions)
     assert any("share one normalisation" in a for a in b.assumptions)
     stat = next(n for n in b.not_evaluated if n.startswith("statistical uncertainty"))
-    assert "not evaluated" in stat and "raw counts" in stat and "§7" in stat
+    assert "not computed in this call" in stat and "raw counts" in stat and "§10" in stat
     assert len(res["grid"].changes) == 4 and res["grid"].interaction is not None
     assert res["transmission_equal"].status == "conditional"
     assert res["count_rate"].status == "conditional"

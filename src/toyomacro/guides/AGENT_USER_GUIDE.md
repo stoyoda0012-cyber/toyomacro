@@ -7,7 +7,7 @@
 > changed and why in your analysis notes. Nothing in it widens what the
 > software supports or makes a result scientifically valid.
 >
-> **Written for: toyomacro v0.5.1.** Read the copy that came with the
+> **Written for: toyomacro v0.6.0.** Read the copy that came with the
 > version you have installed (`python -m toyomacro.guides`), not the
 > repository's main branch, which may describe a newer version.
 
@@ -71,12 +71,17 @@ batch refused or flagged, instead of quietly dropping it.
 Report these four things separately, and never fold them into one "±":
 
 1. the **estimate**;
-2. the **statistical uncertainty** — in this version a composition does not
-   carry one. It is *not evaluated* when the intensity is not stated to
-   be raw counts, and *withheld* when it is: the bootstrap is calibrated
-   on synthetic data, but neither of the two rules tried for choosing
-   which data sets to report it for kept that calibration, so its
-   validated scope is empty;
+2. the **statistical uncertainty** — not computed by `composition()`
+   itself. `composition_uncertainty(lines, conditions, declared=...)`
+   computes it, and whether it does is decided from the **expected
+   counts and the analysis conditions you fixed before looking at the
+   data set** (a `DeclaredSpectrum`), never from the data set's own
+   areas or relative noise; it is *not evaluated* when the intensity is
+   not stated to be raw counts, and *withheld* when the composition
+   cannot be estimated, when any of the 1,000 bootstrap replicates is
+   refused, when the declaration's predicted relative area noise is
+   above the validated threshold (0.02 with a linear background, 0.01
+   with Shirley), or when a required assumption is not declared;
 3. the **condition dependence** — how the estimate moves when the table,
    the background or an assumption is changed. It is a difference
    between conditions, not an uncertainty, and it tells you what
@@ -89,14 +94,54 @@ the error bars mean** — on the selected data they no longer match the
 real spread (in toyomacro's test they overstated it by up to 25 %).
 Decide what you will report before you look at how well each fit went.
 
-So, to "what is the error bar?", a v0.5.x answer reads like: "the
-statistical part is not available yet; the result moves by X when the
-cross-section table is changed, by Y with the background, and by Z and W
-with the assumptions about the stored data (what the intensity is,
+What `composition_uncertainty` returns is the standard uncertainty and
+covariance of the composition estimate under independent Poisson counts.
+What was validated, for each registered synthetic condition, is the
+agreement between the root-mean-square reported standard uncertainty
+and the standard deviation of the estimate over the data sets that
+return one. It does not guarantee the accuracy of any one data set's
+uncertainty, the bias of the estimate, the coverage of any interval, or
+the overall accuracy of the composition. The result's `applicability`
+is always `assumed`: the registered calibration transfers to your case
+only under the assumptions you name in the declaration
+(`channel_independence`, `no_prior_correction`, `transfer`), and the
+result lists what in your case differs from the registered values
+(matrix, photon energy, window, channel width, lines, exposure).
+
+In the registered sensitivity analysis, a declaration with twice the
+peak and half the base gives a predicted relative noise of about
+0.33–0.41 of the correct declaration's, so the true relative noise of a
+case admitted at the threshold can reach about 3 times the threshold.
+That is a ratio observed in the registered conditions, not a bound for
+any declaration error: the levels at 2 and 4 times the threshold
+passed, the range between them was not validated. The declaration
+errors tried are nine discrete points on the peak and base amplitudes;
+between the points, wrong shapes, different errors per line and real
+data are separate assumptions. Use at more counts than the lowest
+registered level is an extrapolation too — name it
+(`more_counts_extrapolation`); a predicted noise below 0.005 alone does
+not detect it. The rate of data sets that return no uncertainty is
+known only as a finite-sample bound (0 of 2,000 gives an upper bound
+of 0.15 %), never as "at most 0.1 %".
+
+The noise model is independent Poisson counts per channel. On one
+laboratory detector adjacent channels of the stored intensity
+correlated at +0.16; where that holds the standard uncertainty is too
+small, and `channel_independence` is your assumption, not a fact the
+file states. The sensitivity σ × λ is **not** a complete relative
+sensitivity factor: elastic scattering, the angular distribution,
+polarization and geometry are not in it, and the statistical
+uncertainty does not cover them — they are in `not_evaluated`.
+
+So, to "what is the error bar?", a v0.6.0 answer reads like: "the
+statistical standard uncertainty is X, computed under the declaration
+I fixed beforehand and the named assumptions; the result moves by Y
+when the cross-section table is changed, by Z with the background, and
+by W with the assumptions about the stored data (what the intensity is,
 whether the transmission was applied); these are the ones that matter
-here." `examples/10_composition_ptfe.py` shows this on public data, where
-the two assumptions about the stored data move the answer more than the
-table does.
+here." `examples/10_composition_ptfe.py` shows the condition dependence
+on public data, where the two assumptions about the stored data move
+the answer more than the table does.
 
 ## 6. Keep the record with the result
 
@@ -119,10 +164,10 @@ first tabulated energy.
 
 For the version this guide was written for:
 
-- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/API.md>
-- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/DATA_SOURCES.md>
-- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.5.1/docs/design/composition-uncertainty.md>
-- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.5.1/examples>
+- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/API.md>
+- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/DATA_SOURCES.md>
+- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/design/composition-uncertainty.md>
+- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.6.0/examples>
 
 The repository's `AGENTS.md` and `CONTRIBUTING.md` (branches, audits,
 commit practice) apply when you change the package itself or its public

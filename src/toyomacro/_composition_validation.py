@@ -1,4 +1,4 @@
-"""Synthetic validation of ``_composition_uncertainty`` (private).
+"""Synthetic validation of the composition bootstrap (private): rounds 1 and 2.
 
 Implements the pre-registered check of docs/design/composition-uncertainty.md
 §3. Runs are resumable: each chunk of outer data sets is written to its
