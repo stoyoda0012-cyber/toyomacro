@@ -26,8 +26,8 @@ archived on Zenodo for a citable DOI.
   background's threshold: 0.02 for a linear background, 0.01 for
   Shirley, from the third pre-registered validation (design record
   §8–9: 40 synthetic conditions, M = 2,000 data sets × B = 1,000
-  replicates each; 38 pass, the two failures at r = 0.08 with Shirley
-  set the Shirley threshold). The result keeps `status` (`evaluated`,
+  replicates each; 38 pass, and the two that did not, both at r = 0.08
+  with Shirley, set the Shirley threshold). The result keeps `status` (`evaluated`,
   `withheld` with the reason, `not_evaluated`) apart from
   `applicability`, which is always `assumed` from the public function:
   the registered calibration transfers to a real data set only under

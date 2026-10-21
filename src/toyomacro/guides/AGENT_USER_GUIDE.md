@@ -76,9 +76,9 @@ Report these four things separately, and never fold them into one "±":
    computes it, and whether it does is decided from the **expected
    counts and the analysis conditions you fixed before looking at the
    data set** (a `DeclaredSpectrum`), never from the data set's own
-   areas or relative noise; it is *not evaluated* when the intensity is
-   not stated to be raw counts, and *withheld* when the composition
-   cannot be estimated, when any of the 1,000 bootstrap replicates is
+   areas or relative noise; it is *not evaluated* when the composition
+   cannot be estimated or the intensity is not stated to be raw counts,
+   and *withheld* when any of the 1,000 bootstrap replicates is
    refused, when the declaration's predicted relative area noise is
    above the validated threshold (0.02 with a linear background, 0.01
    with Shirley), or when a required assumption is not declared;
@@ -88,7 +88,8 @@ Report these four things separately, and never fold them into one "±":
    dominates;
 4. what was **not evaluated** — which does not mean zero.
 
-A lesson from that validation that applies to any error bar: **choosing
+A lesson from the validation behind that threshold (three
+pre-registered rounds on synthetic data) that applies to any error bar: **choosing
 which data sets get an error bar by how clean they came out changes what
 the error bars mean** — on the selected data they no longer match the
 real spread (in toyomacro's test they overstated it by up to 25 %).
