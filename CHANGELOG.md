@@ -10,8 +10,8 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
-- **`composition_uncertainty(lines, conditions, declared=...)` and
-  `DeclaredSpectrum` (Experimental).** The statistical standard
+- **`composition_uncertainty(lines, conditions, declared=...)`,
+  `DeclaredSpectrum` and `DeclaredLine` (Experimental).** The statistical standard
   uncertainty of a composition is returned again — admitted not by
   anything the data set shows, but by a declaration fixed before the
   data set was looked at: the expected counts per line (base included),

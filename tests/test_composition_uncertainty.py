@@ -213,8 +213,11 @@ def test_the_shipped_scope_is_the_one_the_third_record_decided():
 
 def test_no_observed_quantity_enters_the_admission(case):
     pub, decl = case["pub"], case["declared"]
-    preds = [comp.composition_uncertainty(d, pub, declared=decl).prediction for d in case["data"]]
+    results = [comp.composition_uncertainty(d, pub, declared=decl) for d in case["data"]]
+    preds = [u.prediction for u in results]
     assert all(p == preds[0] for p in preds)
+    # admitted for every data set: the data-side bootstrap ran each time (no gate after the prediction)
+    assert all(u.data_side is not None for u in results)
     alone = comp._predict_r(decl.as_lines(), pub, n_boot=1000)
     assert preds[0]["r_pred"] == alone.r_pred and preds[0]["n_refused"] == alone.n_refused == 0
 
@@ -252,6 +255,62 @@ def test_registered_only_through_the_private_entry_point(case):
     assert comp._composition_uncertainty_registered(data, pub, decl).applicability == "registered"
     with pytest.raises(TypeError):
         comp.composition_uncertainty(data, pub, declared=decl, data_key=[1])  # no such parameter
+
+
+def test_withheld_when_a_data_side_replicate_is_refused(case):
+    """An observed line with almost no net area refuses replicates; the declaration still admits."""
+    pub, decl, data = case["pub"], case["declared"], case["data"][0]
+    parts, _ = v3.parts(CID, _si_area())
+    _, peak, base = parts[0]  # the Si line at 2 % of its expected peak: a net area that is
+    rng = np.random.default_rng(5)  # positive on the data and not on many replicates
+    weak = replace(data[0], intensity=rng.poisson(base + 0.02 * peak).astype(np.float64))
+    u = comp.composition_uncertainty([weak, data[1]], pub, declared=decl)
+    assert u.status == "withheld" and "replicates were refused" in u.reasons[0]
+    assert u.prediction is not None and u.data_side["n_refused"] > 0
+    assert u.standard_uncertainty is None
+
+
+def test_the_returned_scope_is_a_copy_and_the_statement_a_bool(case):
+    pub, data, decl = case["pub"], case["data"][0], case["declared"]
+    u = comp.composition_uncertainty(data, pub, declared=decl)
+    u.scope["r_pred_threshold"]["linear"] = 1.0
+    u.registered["scope"]["r_pred_threshold"]["linear"] = 1.0
+    assert comp._VALIDATED_SCOPE["r_pred_threshold"]["linear"] == 0.02
+    with pytest.raises(ValueError, match="fixed_before_data"):
+        _declaration(case["mu"], pub, fixed_before_data="yes")
+
+
+def test_the_registered_values_are_the_harness_conditions():
+    reg = comp._REGISTERED_VALUES
+    hvs = {v3.CONFIGS[c][1] for c in v3.CONFIG_NAMES}
+    steps = {v3.CONFIGS[c][2] for c in v3.CONFIG_NAMES}
+    lines = {tuple((el, orb) for el, orb, *_ in v3.CONFIGS[c][0]) for c in v3.CONFIG_NAMES}
+    assert set(reg["photon_energy_eV"]) == hvs and set(reg["channel_step_eV"]) == steps
+    assert set(reg["lines"]) == lines and reg["background"] == v3.BACKGROUNDS
+    assert reg["exposure_s"] == (v3.REGISTERED["exposure_s"],)
+    assert reg["window_half_width_eV"] == (v3.REGISTERED["window_half_eV"],)
+    for cid in (0, 10, 20, 30):  # kappa = (1, 1) of each configuration, linear
+        mu, cond = v3.expected(cid, 1e4)
+        assert comp._registered_report(mu, cond)["differs"] == []
+
+
+def test_the_second_records_verdicts_still_follow_from_their_intervals():
+    """Record 2 (empty scope) stays recomputable from its intervals."""
+    rec2 = json.loads(RECORD2.read_text(encoding="utf-8"))
+    for s in rec2["scenarios"]:
+        for block in (s["R_all"], s["R_admitted"] or {}):
+            for el in block.values():
+                assert el["verdict"] == v3._verdict(*el["R_mc_95"])
+
+
+def test_the_first_harness_runs_and_resumes(tmp_path):
+    from toyomacro import _composition_validation as val
+    out = tmp_path / "S1"
+    val.run("S1", n_outer=4, n_boot=5, out=out, chunk=2, workers=1)
+    first = sorted(p.read_text() for p in out.glob("chunk_*.json"))
+    val.run("S1", n_outer=4, n_boot=5, out=out, chunk=2, workers=1)  # nothing to redo
+    assert sorted(p.read_text() for p in out.glob("chunk_*.json")) == first
+    assert val.summarize(out)["n_outer_attempted"] == 4
 
 
 def test_composition_alone_says_the_uncertainty_is_not_computed_here(case):

@@ -63,6 +63,7 @@ model.
 
 from __future__ import annotations
 
+import copy
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
@@ -694,6 +695,7 @@ class DeclaredLine:
             raise ValueError(f"{self.element} {self.orbital} expected: negative values")
         object.__setattr__(self, "energy", e)
         object.__setattr__(self, "expected", x)
+        object.__setattr__(self, "window", (float(self.window[0]), float(self.window[1])))
 
 
 @dataclass(frozen=True, eq=False)
@@ -744,6 +746,8 @@ class DeclaredSpectrum:
             raise ValueError(f"unknown assumption name(s) {unknown}; known: {list(ASSUMPTIONS)}")
         if len(set(self.assumptions)) != len(self.assumptions):
             raise ValueError("assumptions has duplicates")
+        if self.fixed_before_data is not True and self.fixed_before_data is not False:
+            raise ValueError("fixed_before_data must be True or False: it is your statement")
         object.__setattr__(self, "lines", tuple(self.lines))
         object.__setattr__(self, "assumptions", tuple(self.assumptions))
         object.__setattr__(self, "notes", dict(self.notes))
@@ -812,7 +816,7 @@ class CompositionUncertainty:
     versions: dict
     noise_model: str = _NOISE_MODEL
     resampling: str = _RESAMPLING
-    scope: dict = field(default_factory=lambda: dict(_VALIDATED_SCOPE))
+    scope: dict = field(default_factory=lambda: copy.deepcopy(_VALIDATED_SCOPE))
 
 
 def _check_declaration(lines: Sequence[Line], conditions: Conditions,
@@ -870,7 +874,7 @@ def _registered_report(lines: Sequence[Line], c: Conditions) -> dict:
             "differs": sorted(k for k, ok in matches.items() if not ok),
             "assumed_only": ["peak shapes and widths", "background shape",
                              "relative intensities of the lines"],
-            "scope": dict(_VALIDATED_SCOPE)}
+            "scope": copy.deepcopy(_VALIDATED_SCOPE)}
 
 
 def _uncertainty(lines: Sequence[Line], conditions: Conditions, declared: DeclaredSpectrum,
@@ -955,7 +959,9 @@ def _uncertainty(lines: Sequence[Line], conditions: Conditions, declared: Declar
     if pred.n_refused:
         return out("withheld", [f"{pred.n_refused} of {_B_PRED} prediction replicates refused"],
                    prediction=prediction)
-    if pred.r_pred is None or pred.r_pred > threshold:
+    if pred.r_pred is None:
+        return out("withheld", ["the prediction returned no r_pred"], prediction=prediction)
+    if pred.r_pred > threshold:
         return out("withheld", [f"predicted relative area noise {pred.r_pred:.4g} above the "
                                 f"validated {threshold:g} for the {c.background} background"],
                    prediction=prediction)
