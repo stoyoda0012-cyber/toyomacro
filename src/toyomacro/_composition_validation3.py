@@ -1,4 +1,4 @@
-"""Third validation of ``_composition_uncertainty`` (private): the §8 harness.
+"""Third validation of the composition bootstrap (private): the §8 harness.
 
 Implements docs/design/composition-uncertainty.md §8 clause by clause:
 the declared spectra D_kappa, ``_predict_r``, the count setting with its
@@ -238,7 +238,7 @@ def trial(cid: int, kind: str, i: int, si_area: float, n_boot: int) -> dict:
         return row
     elements = est.denominator
     row["estimate"] = [est.fractions[el] for el in elements]
-    # The checks _composition_uncertainty applies to observed data, in its order.
+    # The checks composition_uncertainty applies to observed data (§10 check 1), in its order.
     if any(np.any(np.asarray(ln.intensity) < 0) for ln in data):
         row.update(category=2, cause="not_evaluated: negative counts")
         return row

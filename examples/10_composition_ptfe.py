@@ -9,9 +9,10 @@ The answer to "what is the error bar?" in this version, on one example:
   changed (differences between conditions, not an uncertainty),
 - the **assumptions** it rests on, listed beside it,
 - and what is **not evaluated**: here the statistical uncertainty, because
-  the file does not state that the intensity is raw counts — and in this
-  version no scope is validated for it in any case
-  (docs/design/composition-uncertainty.md §7).
+  the file does not state that the intensity is raw counts, so the Poisson
+  noise model does not apply. Where it does apply, `composition_uncertainty`
+  computes it from a declaration fixed before the data set is looked at
+  (docs/design/composition-uncertainty.md §10); this example makes none.
 
 Data. The first F 1s / C 1s pair (source blocks 0 and 1) of
 ``Kratos Axis Ultra/PTFE.vms`` in the polymer-degradation dataset of

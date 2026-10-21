@@ -725,3 +725,290 @@ conditions at r = 0.08 are the second round's failure again (P) and a
 new undecided one (G): the mechanism §6 names — resampling about the
 observed counts — is consistent with R_S rising there, but its cause
 was not isolated in this round either.
+
+## 10. Publication design: what the code returns, and under what assumption
+
+*Written after §9, before the public function exists. It does not
+change §8 or §9; it says how their result reaches a user, and keeps two
+things apart that an API can fold together: the conditions under which
+the code returns a standard uncertainty, and the conditions under which
+its calibration was shown.*
+
+**The two statements.** §9 showed, for the registered (condition, κ)
+pairs, that on the data sets that return a standard uncertainty its
+root-mean-square agrees with the spread of the estimate to within
+±10 %, when admission is by r_pred ≤ r\* (0.02 linear, 0.01 Shirley).
+That is a statement about synthetic conditions. A real data set is
+never one of them: its true expected counts are unknown, and its
+lines, shapes, background shape, relative intensities, exposure and
+detector are all outside what was registered. So the public result
+carries two fields, never one:
+
+- `status` — what the code did: `evaluated` (a standard uncertainty is
+  returned), `withheld` (computable in principle, not returned, with
+  the reason) or `not_evaluated` (the noise model does not apply, or
+  the composition itself is refused);
+- `applicability` — on what ground the calibration is applied. The
+  public function always returns `assumed`, with the list of
+  assumptions the result rests on: the package cannot tell whether an
+  observed data set was drawn from the expected counts of a registered
+  condition, and the registered declared spectra are themselves in the
+  record, so nothing in a declaration's content can establish
+  `registered`. `registered` is set only by a private entry point the
+  tests use on data sets they draw from a registered condition.
+
+`conditional` in `CompositionResult` is not reused for this: it says
+that some assumption was made, not which. The uncertainty result names
+them.
+
+**What the code checks (mechanical).** In this order: the declaration
+is validated (an invalid array, an unknown assumption name or a
+mismatch with the observed input is a `ValueError`, whatever else
+holds); `composition(lines, conditions)` runs, and a refusal gives
+`not_evaluated` with its reasons and ends the call; check 1 failing
+gives `not_evaluated` and ends the call; checks 2 and 3, then the
+required assumptions, then the prediction (check 4's prediction side
+and check 5) are evaluated in that order, the first failure giving
+`withheld` with its reason and ending the call, so the prediction
+runs only when checks 2–3 and the assumptions hold and the data-side
+bootstrap runs only when the case is admitted; `prediction` and
+`data_side` are None when not run.
+
+1. The intensity is stated to be raw counts (`intensity_semantics ==
+   "raw_counts"`); every observed intensity is non-negative, finite
+   and integer. (An `assume_intensity` given with stated raw counts is
+   an input inconsistency, refused as a `ValueError` at the
+   declaration step, not ignored.) Integers
+   alone do not make the counts Poisson: the user's declaration (below)
+   carries the channel-independence assumption.
+2. The table is Scofield and the background linear or Shirley; the
+   denominator is `declared_elements` itself (no `normalise_over`), with
+   two or three elements, one line each.
+3. No transmission correction, before storage or in the calculation.
+   In the package's vocabulary `transmission_applied = "applied"` means
+   the stored intensity was already divided by a curve, so it is
+   refused (the counts are no longer counts); `"not_applied"` makes
+   `composition()` divide the curves out, so it is refused too. The
+   admitted state is `transmission_applied = "unknown"` with
+   `assume_transmission = "equal_across_lines"`: nothing is divided,
+   the composition carries that assumption, and the declaration adds
+   that the stored counts carry no prior correction (which the package
+   cannot verify). The validation's synthetic conditions were labelled
+   `"applied"` as a stand-in for "no transmission anywhere"; the
+   computation path is the same, and the registered comparison (below)
+   compares the path, not the label.
+4. B = 1,000 on the data side and B_pred = 1,000 in the prediction,
+   the prediction seeded with [20261014, 2] (series 2); no replicate
+   refused on either side; the standard uncertainty and covariance
+   finite. The data-side bootstrap is seeded with the fixed key
+   [20261014, 4]: the same data and declaration always give the same
+   result, and there is no argument to re-draw. §8's validation keyed
+   the data side per trial; the public key is a convention of this
+   section, not of the registration, and the record says which was
+   used.
+5. r_pred ≤ r\*_bg from `_VALIDATED_SCOPE`. **No quantity computed
+   from the observed data enters the admission** — not its areas, not
+   its own bootstrap's relative noise. The observed data decide only
+   whether an estimate and a standard uncertainty exist.
+6. The declared input matches the observed input: the same elements
+   and orbitals in the same order; per line, an energy grid equal to
+   the observed one element for element (no tolerance: the declaration
+   is made on that grid), the same window, binding energy, exposure
+   and energy scale; and a `Conditions` equal, as a dataclass, to the
+   one the declaration was fixed with — every field, including
+   `assume_intensity`, `assume_transmission`, `normalise_over` and
+   `exclusion_reason`. A mismatch is a `ValueError`: the declaration
+   does not describe this data set.
+
+**What the code checks and records, and the user applies by assumption.**
+The matrix, the photon energy, the window, the channel width, the
+elements and orbitals and the exposure are read from the inputs and
+recorded in the result, against their registered values; the peak
+shapes and widths, the background shape and the relative intensities
+of the lines are implicit in the arrays and are recorded only as the
+user's assumption. None of them is a reason to withhold, and none of
+them is covered by §9 except at the registered values. r_pred does not absorb them: it is the relative
+noise of the net areas, so a different matrix or photon energy changes
+σλ and not r_pred, and a different window or grid changes r_pred
+without any evidence that equal r_pred means equal calibration. The
+calibration is applied to them under the user's declaration that the
+registered result transfers; the result lists each as an assumption.
+Likewise the many-counts side: use at r_pred below the lowest level is
+an extrapolation that the declaration must state (the code does not
+check it, below); r_pred < 0.005 alone
+does not detect it (the registered κ = (1, 1) spectra at level 0.005
+themselves have r_pred 0.0045–0.0049, and admitted pairs go down to
+0.0016), so no numerical lower bound is imposed.
+
+**The declared input.** A new dataclass, `DeclaredSpectrum`, separate
+from `Line` (observed facts) and `Conditions` (analysis choices):
+
+- per line: `element`, `orbital`, the energy grid (`energy`,
+  `energy_scale`), `window`, `binding_energy`, `exposure_s`,
+  `exposure_basis`, and `expected` — the expected counts, base
+  included, non-negative finite reals, not rounded; the arrays are
+  copied on construction so that later changes to the caller's arrays
+  do not reach the declaration;
+- the `Conditions` the declaration was fixed with (stored, and
+  compared with the ones passed at the call);
+- `provenance`: `planning_model` or `other_measurement`, with
+  `provenance_basis`, a free-text statement of where the expectation
+  came from; `this_data` (anything derived from the data set being
+  evaluated: a fit, a smoothing, its areas) is refused with a
+  `ValueError`;
+- `fixed_before_data: True` — the user's declaration that the expected
+  counts **and** the analysis conditions were fixed before the data set
+  was looked at; the package cannot verify it and records it;
+- `assumptions`: a tuple of named statements from a fixed vocabulary,
+  each the user's own: `channel_independence` (the counts are
+  independent Poisson variables), `no_prior_correction` (the stored
+  counts were not divided, smoothed or rescaled before storage),
+  `transfer` (the registered calibration transfers to this case's
+  matrix, photon energy, window, channel width, lines, shapes and
+  exposure), and `more_counts_extrapolation` (use at more counts than
+  the lowest registered level). The first three are required; a
+  missing one gives `withheld` with the reason "applicability not
+  declared: <name>". The fourth is never required by the code — no
+  numerical rule can tell when it applies (above) — it is recorded
+  when given, and the user judges from the (condition, κ) record
+  whether it applies. An unknown name is a `ValueError`. Free text may
+  accompany each.
+
+An invalid array (negative, non-finite, complex, wrong shape, grid
+mismatch) is a `ValueError` at construction or at the call: the input
+is wrong. A valid declaration whose prediction is refused (the
+composition of the declared spectrum is refused, or a prediction
+replicate is) gives `withheld` with the reason: the input is right and
+the method does not apply.
+
+**The function.**
+
+    composition_uncertainty(lines, conditions, *, declared) -> CompositionUncertainty
+
+No `n_boot`, no seed, no retry: B = 1,000 and the keys above are the
+only validated setting. It runs the steps in the order given under
+"What the code checks" and returns:
+
+- `composition`: the `CompositionResult` the uncertainty belongs to;
+- `status`, `reasons`, `applicability`, `assumptions`;
+- `standard_uncertainty` (per element, computed as the harness does:
+  the sample standard deviation over the replicates with ddof = 1) and
+  `covariance` (element order stated, ddof = 1), or None;
+- `prediction`: r_pred, r\* applied, the prediction's refusal flags and
+  refused-replicate count (None when the bootstrap did not run), B_pred
+  and its key;
+- `data_side`: B, refused-replicate count (None when the bootstrap
+  did not run), key;
+- `declared`: a snapshot of the declaration (arrays, grid, provenance,
+  the fixed-before-data statement, the conditions);
+- `registered`: which registered values the case matches and which it
+  does not (table, background, line set, photon energy, matrix, window,
+  channel width), the scope constant used and the record it comes from;
+- `versions`: the package, numpy and scipy versions, and an identifier
+  of the observed data (the lines' `source` fields).
+
+`composition()` alone still returns no uncertainty; both variants of
+its `not_evaluated` note (for stated raw counts, "withheld; the scope
+validated on synthetic data is empty in this version", and otherwise)
+change to "not computed in this call; `composition_uncertainty` with
+a declared spectrum computes it", keeping the clause that the Poisson
+model does not apply when the intensity is not stated raw counts.
+The private `_composition_uncertainty` of v0.5.x, which admitted by the
+observed data's own bootstrap noise when given a scope — the rule §7
+rejected — is removed, not renamed.
+
+**The scope constant.** `_VALIDATED_SCOPE` becomes
+`{"r_pred_threshold": {"linear": 0.02, "shirley": 0.01}, "max_lines":
+3, "min_elements": 2, "record": "composition-uncertainty-results-3.json"}`
+and a test ties it to the record's decision, as the v0.5.x tests tied
+the empty scope to the second record.
+
+**The implementation check in the public path.** The counterpart of
+§8 rule 6, as tests that run in CI:
+
+The tests use an admitted (condition, κ) pair — one whose κ = (1, 1)
+r_pred is at or below its background's r\*, e.g. P/linear/0.02 — so
+that the public path reaches the data-side bootstrap; they relabel the
+harness's conditions to the admitted transmission state (`"unknown"`
+with `assume_transmission = "equal_across_lines"`, the same
+computation path) and supply the three required assumptions, so the
+public function is exercised, not short-circuited at check 3.
+
+- *No observed quantity in the admission.* Over a handful of data sets
+  of that condition drawn with the harness (series 3), the prediction part of
+  the result (r_pred, the refusal flags, the admission) is identical
+  for every data set, and is identical to `_predict_r` called on the
+  declaration alone.
+- *Same bootstrap as the validation.* The private entry point takes
+  the data-side key as a parameter; with §8's per-trial key
+  [20261014, 4, 1, condition, trial] it reproduces, for a handful of
+  trials of that condition, the harness's `trial()`: the same
+  category, the same standard uncertainty bit for bit (both compute
+  the sample standard deviation with ddof = 1 over the same
+  replicates), the same refused-replicate count. The public function
+  has no such parameter; the test is the only place the per-trial
+  keys are used.
+- *The published set.* With the public key, over a handful of data
+  sets of that condition, those that return
+  a standard uncertainty are exactly those whose data-side bootstrap
+  refuses no replicate, and `status` is `withheld` for the others with
+  that reason — the ③ / ② split of §8 under the public key, which can
+  differ from the record's split (another key draws other
+  replicates), so the record's digest is not compared.
+- `applicability` is `registered` only through the private entry
+  point and `assumed` from the public one, for the same inputs. The
+  private entry point also accepts the harness's `"applied"` label on
+  its synthetic conditions (check 3 compares the computation path,
+  which is the same); the public function does not.
+
+**What the guide says** (its section on the error bar; the text is
+rendered in the guide, not here):
+
+1. Whether a statistical uncertainty is computed is decided from the
+   expected counts and the analysis conditions fixed before the data
+   set was looked at; the data set's own areas or relative noise never
+   re-select it. It is still not returned when the composition cannot
+   be estimated, or when any of the 1,000 bootstrap replicates is
+   refused.
+2. What is returned is the standard uncertainty and covariance of the
+   composition estimate under independent Poisson counts. What was
+   validated, per registered condition, is the agreement between the
+   root-mean-square reported standard uncertainty and the standard
+   deviation of the estimate over the data sets that return one. Not
+   guaranteed: the accuracy of any one data set's uncertainty, the
+   bias of the estimate, the coverage of any interval, the overall
+   accuracy of the composition.
+3. In the registered sensitivity analysis a declaration with twice the
+   peak and half the base gives an r_pred of about 0.33–0.41 of the
+   correct declaration's, so the true relative noise of a case
+   admitted at the threshold can reach about 3 r\*. That is a ratio
+   observed in the registered conditions, not a bound for any
+   declaration error; the levels 2 r\* and 4 r\* passed, the range
+   between them was not validated.
+4. κ is nine discrete points on the peak and base amplitudes. Between
+   the points, wrong shapes, different errors per line, and real data
+   are separate assumptions. Use at more counts than the lowest
+   registered level is an extrapolation too, and r_pred below 0.005
+   alone does not detect it.
+
+followed by the guide's existing paragraph on condition dependence
+and two added ones, on detector correlation (+0.16 between adjacent
+channels on one laboratory detector, §2) and on what the sensitivity
+factor leaves out (elastic scattering, angular distribution,
+polarisation, geometry — the `not_evaluated` list of
+`composition()`). The refusal rate is described as §9 does (a
+finite-sample bound), never as "at most 0.1 %".
+
+**Version and record.** A public function and a public dataclass are
+API additions: the next minor version, with a `[Unreleased]` entry, in
+the Experimental tier with the rest of `toyomacro.composition`. Seed
+keys are integer lists of the lengths registered in §8 and here;
+`SeedSequence` pads a short key with zeros, so [20261014, 4] is the
+same state as [20261014, 4, 0], and no key of another length may be
+introduced that could coincide with one in use.
+Saving the snapshot to `/provenance` (HDF5) is not part of this
+design; the result object is serialisable, which is enough for a
+record. §8 "What this does not cover" stands unchanged; the
+independent audit AGENTS.md requires for a public-boundary and
+meaning-of-a-number change runs after the implementation, against
+this section.

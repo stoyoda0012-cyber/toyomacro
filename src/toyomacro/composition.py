@@ -17,9 +17,10 @@ What is returned. A :class:`CompositionResult` keeps four things apart
 and never combines them into one "±":
 
 - the estimate (``fractions``),
-- the statistical uncertainty — withheld in this version: the scope in
-  which it was validated on synthetic data is empty
-  (docs/design/composition-uncertainty.md §7),
+- the statistical uncertainty — not computed by :func:`composition`
+  itself; :func:`composition_uncertainty` computes it from a
+  :class:`DeclaredSpectrum` fixed before the data set was looked at,
+  inside the scope of docs/design/composition-uncertainty.md §8–10,
 - condition dependence — how the estimate moves when a choice is changed
   (:func:`condition_dependence`), a difference between conditions and not
   an uncertainty,
@@ -62,13 +63,15 @@ model.
 
 from __future__ import annotations
 
+import copy
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, field, replace
 from typing import Literal
 
 import numpy as np
 
+import toyomacro
 from toyomacro.background import Linear, Shirley
 from toyomacro.data.cross_section import CrossSection, CrossSectionLookup
 from toyomacro.data.imfp import IMFP, TPP2M_FITTED_RANGE_EV
@@ -289,12 +292,13 @@ def composition(lines: Sequence[Line], conditions: Conditions) -> CompositionRes
     notes: list[str] = []
     extrapolated: list[str] = []
     not_evaluated = [
-        ("statistical uncertainty: withheld; the scope validated on synthetic data is "
-         "empty in this version (docs/design/composition-uncertainty.md §7)")
+        ("statistical uncertainty: not computed in this call; composition_uncertainty with "
+         "a declared spectrum computes it (docs/design/composition-uncertainty.md §10)")
         if c.intensity_semantics == "raw_counts" else
-        ("statistical uncertainty: not evaluated; the intensity is not stated raw counts, "
-         "so the Poisson noise model does not apply (and no scope is validated in this "
-         "version: docs/design/composition-uncertainty.md §7)"),
+        ("statistical uncertainty: not computed in this call, and the intensity is not stated "
+         "raw counts, so the Poisson noise model does not apply; composition_uncertainty "
+         "with a declared spectrum computes it for stated raw counts "
+         "(docs/design/composition-uncertainty.md §10)"),
         "elastic scattering, angular distribution, polarization and geometry: "
         "not in the sensitivity",
     ]
@@ -506,41 +510,6 @@ _NOISE_MODEL = "independent Poisson counts per channel (intensity stated as raw 
 _RESAMPLING = ("each channel drawn from Poisson(observed count) before exposure, "
               "transmission and background; background, areas and composition recomputed")
 
-#: The scope in which the reported standard uncertainty is published:
-#: ``{"r_threshold": {background: r}, "max_lines": n, "record": path}``.
-#: None — nothing is published in this version. The second, pre-registered
-#: validation (design record §6–7) found the standard uncertainty itself
-#: calibrated in 39 of 40 scenarios, but admitting data sets by their
-#: measured relative area noise r miscalibrates the admitted subset
-#: (R about 1.2), so its decision rule gave no scope.
-_VALIDATED_SCOPE: dict | None = None
-
-
-@dataclass(frozen=True)
-class _CompositionUncertainty:
-    """Standard uncertainty of each atomic fraction, or why there is none.
-
-    ``status`` is ``"evaluated"``, ``"withheld"`` (computed or computable,
-    but outside the validated scope or with refused replicates) or
-    ``"not_evaluated"`` (the noise model does not apply). The standard
-    uncertainty is one standard deviation of the estimator under
-    :data:`_NOISE_MODEL`; it is not a confidence interval and does not
-    cover condition dependence.
-    """
-
-    status: Literal["evaluated", "withheld", "not_evaluated"]
-    reasons: tuple[str, ...]
-    elements: tuple[str, ...]
-    standard_uncertainty: dict[str, float] | None
-    covariance: tuple[tuple[float, ...], ...] | None
-    n_boot: int
-    n_refused: int
-    seed: int | None
-    noise_model: str = _NOISE_MODEL
-    resampling: str = _RESAMPLING
-    validated_scope: dict | None = None
-
-
 def _resampled(lines: Sequence[Line], rng: np.random.Generator) -> list[Line]:
     return [replace(ln, intensity=rng.poisson(np.asarray(ln.intensity, dtype=np.float64))
                     .astype(np.float64)) for ln in lines]
@@ -618,7 +587,7 @@ def _predict_r(
     freshly seeded with ``key`` at every call, and r is as in §6 with
     ``ddof = 1`` over the replicates and the declared spectrum's own net
     area (corrected scale) as the divisor. The integer check that
-    :func:`_composition_uncertainty` applies to observed data is not
+    :func:`composition_uncertainty` applies to observed data is not
     applied here.
     """
     for ln in declared:
@@ -647,78 +616,399 @@ def _predict_r(
                        n_boot=n_boot, elements=tuple(elements))
 
 
-def _composition_uncertainty(
-    lines: Sequence[Line],
-    conditions: Conditions,
-    n_boot: int = 1000,
-    seed: int | None = None,
-) -> _CompositionUncertainty:
-    """Bootstrap standard uncertainty of the composition, inside its validated scope.
+# ---------------------------------------------------------------------------
+# The published scope and the public function (design record §10)
+# ---------------------------------------------------------------------------
 
-    Private while :data:`_VALIDATED_SCOPE` is empty: a public function that
-    always withholds would only invite reading its output as an answer.
-    In this version the scope is empty (:data:`_VALIDATED_SCOPE` is None):
-    the result is always ``withheld`` or ``not_evaluated``, with the reason.
-    The calculation and its checks are in place for a later scope.
+#: The scope in which the standard uncertainty is returned, from the third
+#: validation (design record §8–9): admission by the predicted relative area
+#: noise of the declared spectrum, r_pred, at or below the background's
+#: threshold. Tied to the record's decision by a test.
+_VALIDATED_SCOPE: dict = {
+    "r_pred_threshold": {"linear": 0.02, "shirley": 0.01},
+    "max_lines": 3,
+    "min_elements": 2,
+    "record": "docs/design/composition-uncertainty-results-3.json",
+}
+#: The data-side bootstrap's key in the public function (§10): fixed, so the
+#: same data and declaration always give the same result. The validation
+#: keyed the data side per trial ([seed, 4, run kind, condition, trial]).
+_PUBLIC_DATA_KEY: tuple[int, ...] = (20261014, 4)
+_B_DATA = 1000
+_B_PRED = 1000
 
-    Each replicate redraws every channel at the count stage and recomputes
-    background, areas and composition (design record §2). Reported only
-    when the intensity is stated as raw counts, every replicate succeeds,
-    and the case lies in :data:`_VALIDATED_SCOPE`; otherwise ``withheld``
-    or ``not_evaluated`` with the reason.
+#: The user's assumptions, by name (§10, "The declared input"). The first
+#: three are required; the fourth is recorded when given and never required
+#: by the code, since no numerical rule can tell when it applies.
+ASSUMPTIONS = ("channel_independence", "no_prior_correction", "transfer",
+               "more_counts_extrapolation")
+REQUIRED_ASSUMPTIONS = ASSUMPTIONS[:3]
+Provenance = Literal["planning_model", "other_measurement"]
+Applicability = Literal["assumed", "registered"]
+
+#: Values the §8 conditions were registered at, for the ``registered`` report.
+_REGISTERED_VALUES = {
+    "table": ("scofield",), "background": ("linear", "shirley"),
+    "photon_energy_eV": (1486.6, 9251.7), "matrix_compound": ("SiO2",),
+    "lines": ((("Si", "2p"), ("O", "1s")), (("Si", "2p"), ("O", "1s"), ("C", "1s"))),
+    "window_half_width_eV": (10.0,), "channel_step_eV": (0.1, 0.5), "exposure_s": (1.0,),
+}
+
+
+def _real_array(name: str, x, shape=None) -> np.ndarray:
+    raw = np.asarray(x)
+    if np.iscomplexobj(raw) or raw.dtype.kind not in "biuf":
+        raise ValueError(f"{name}: must be real-valued")
+    arr = raw.astype(np.float64)
+    if arr.ndim != 1 or not np.all(np.isfinite(arr)):
+        raise ValueError(f"{name}: must be a 1-D array of finite reals")
+    if shape is not None and arr.shape != shape:
+        raise ValueError(f"{name}: shape {arr.shape} differs from the energy grid {shape}")
+    return arr.copy()
+
+
+@dataclass(frozen=True, eq=False)
+class DeclaredLine:
+    """One line of a declared spectrum: the expected counts on the line's own grid.
+
+    The fields are those of :class:`Line` with ``expected`` in place of
+    ``intensity``: expected counts per channel, base included, as
+    non-negative finite reals (not rounded). Arrays are copied on
+    construction, so later changes to the caller's arrays do not reach
+    the declaration.
     """
+
+    element: str
+    orbital: str
+    energy: np.ndarray
+    expected: np.ndarray
+    window: tuple[float, float]
+    binding_energy: float
+    energy_scale: Literal["kinetic", "binding"] = "kinetic"
+    exposure_s: float | None = None
+    exposure_basis: str = ""
+
+    def __post_init__(self):
+        e = _real_array(f"{self.element} {self.orbital} energy", self.energy)
+        x = _real_array(f"{self.element} {self.orbital} expected", self.expected, e.shape)
+        if np.any(x < 0):
+            raise ValueError(f"{self.element} {self.orbital} expected: negative values")
+        object.__setattr__(self, "energy", e)
+        object.__setattr__(self, "expected", x)
+        object.__setattr__(self, "window", (float(self.window[0]), float(self.window[1])))
+
+
+@dataclass(frozen=True, eq=False)
+class DeclaredSpectrum:
+    """What the user declares before looking at the data set (design record §10).
+
+    Attributes:
+        lines: One :class:`DeclaredLine` per observed line, in the same order.
+        conditions: The :class:`Conditions` the declaration was fixed with;
+            the call's conditions must equal them.
+        provenance: ``"planning_model"`` (a pre-measurement estimate) or
+            ``"other_measurement"`` (another data set sharing nothing with
+            the one evaluated). Anything derived from the data set being
+            evaluated — a fit, a smoothing, its areas — is ``"this_data"``
+            and is refused.
+        provenance_basis: Where the expectation came from, in words.
+        fixed_before_data: The user's statement that the expected counts
+            **and** the analysis conditions were fixed before the data set
+            was looked at. Not verifiable here; recorded.
+        assumptions: Names from :data:`ASSUMPTIONS`. The first three are
+            required for a result; ``more_counts_extrapolation`` is recorded
+            when given.
+        notes: Free text per assumption name.
+    """
+
+    lines: tuple[DeclaredLine, ...]
+    conditions: Conditions
+    provenance: str
+    provenance_basis: str
+    fixed_before_data: bool
+    assumptions: tuple[str, ...] = ()
+    notes: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.provenance == "this_data":
+            raise ValueError("a declaration derived from the data set being evaluated "
+                             "(this_data) is refused: it would select by the data's own "
+                             "fluctuations")
+        if self.provenance not in ("planning_model", "other_measurement"):
+            raise ValueError(f"provenance must be planning_model or other_measurement, "
+                             f"got {self.provenance!r}")
+        if not str(self.provenance_basis).strip():
+            raise ValueError("provenance_basis is required: say where the expectation came from")
+        if not self.lines:
+            raise ValueError("a declaration needs at least one line")
+        unknown = [a for a in self.assumptions if a not in ASSUMPTIONS]
+        if unknown:
+            raise ValueError(f"unknown assumption name(s) {unknown}; known: {list(ASSUMPTIONS)}")
+        if len(set(self.assumptions)) != len(self.assumptions):
+            raise ValueError("assumptions has duplicates")
+        if self.fixed_before_data is not True and self.fixed_before_data is not False:
+            raise ValueError("fixed_before_data must be True or False: it is your statement")
+        object.__setattr__(self, "lines", tuple(self.lines))
+        object.__setattr__(self, "assumptions", tuple(self.assumptions))
+        object.__setattr__(self, "notes", dict(self.notes))
+
+    def as_lines(self) -> list[Line]:
+        """The declaration as :class:`Line` objects, for the prediction."""
+        return [Line(element=d.element, orbital=d.orbital, energy=d.energy.copy(),
+                     intensity=d.expected.copy(), window=tuple(d.window),
+                     binding_energy=d.binding_energy, energy_scale=d.energy_scale,
+                     exposure_s=d.exposure_s, exposure_basis=d.exposure_basis,
+                     source=f"declared ({self.provenance})") for d in self.lines]
+
+    def snapshot(self) -> dict:
+        """A plain-data copy for the record."""
+        return {
+            "lines": [{"element": d.element, "orbital": d.orbital,
+                       "energy": [float(v) for v in d.energy],
+                       "expected": [float(v) for v in d.expected],
+                       "window": [float(d.window[0]), float(d.window[1])],
+                       "binding_energy": d.binding_energy, "energy_scale": d.energy_scale,
+                       "exposure_s": d.exposure_s, "exposure_basis": d.exposure_basis}
+                      for d in self.lines],
+            "conditions": _conditions_snapshot(self.conditions),
+            "provenance": self.provenance, "provenance_basis": self.provenance_basis,
+            "fixed_before_data": self.fixed_before_data,
+            "assumptions": list(self.assumptions), "notes": dict(self.notes),
+        }
+
+
+def _conditions_snapshot(c: Conditions) -> dict:
+    d = asdict(c)
+    d["matrix"] = asdict(c.matrix)
+    return d
+
+
+@dataclass(frozen=True)
+class CompositionUncertainty:
+    """The standard uncertainty of a composition, or why there is none (§10).
+
+    Two fields are kept apart. ``status`` says what the code did:
+    ``"evaluated"`` (a standard uncertainty is returned), ``"withheld"``
+    (computable in principle, not returned, with the reason) or
+    ``"not_evaluated"`` (the noise model does not apply, or the
+    composition itself is refused). ``applicability`` says on what ground
+    the calibration is applied: ``"assumed"`` — always, from the public
+    function — with the named assumptions the result rests on;
+    ``"registered"`` only from the tests, on data sets drawn from a
+    registered condition. The standard uncertainty is one standard
+    deviation of the estimator under :data:`_NOISE_MODEL` (sample
+    standard deviation over the replicates, ddof = 1); it is not a
+    confidence interval and does not cover condition dependence.
+    """
+
+    composition: CompositionResult
+    status: Literal["evaluated", "withheld", "not_evaluated"]
+    reasons: tuple[str, ...]
+    applicability: Applicability
+    assumptions: tuple[str, ...]
+    elements: tuple[str, ...]
+    standard_uncertainty: dict[str, float] | None
+    covariance: tuple[tuple[float, ...], ...] | None
+    prediction: dict | None
+    data_side: dict | None
+    declared: dict
+    registered: dict
+    versions: dict
+    noise_model: str = _NOISE_MODEL
+    resampling: str = _RESAMPLING
+    scope: dict = field(default_factory=lambda: copy.deepcopy(_VALIDATED_SCOPE))
+
+
+def _check_declaration(lines: Sequence[Line], conditions: Conditions,
+                       declared: DeclaredSpectrum) -> None:
+    """§10 check 6 and the input inconsistencies: a mismatch is a ValueError."""
+    if conditions.intensity_semantics == "raw_counts" and conditions.assume_intensity is not None:
+        raise ValueError("assume_intensity given with intensity stated as raw counts: an input "
+                         "inconsistency, not an assumption")
+    if len(lines) != len(declared.lines):
+        raise ValueError(f"the declaration has {len(declared.lines)} lines, the data "
+                         f"{len(lines)}")
+    for ln, d in zip(lines, declared.lines):
+        where = f"{ln.element} {ln.orbital}"
+        if (ln.element, ln.orbital) != (d.element, d.orbital):
+            raise ValueError(f"line order differs: data {where}, declaration "
+                             f"{d.element} {d.orbital}")
+        if not np.array_equal(np.asarray(ln.energy, dtype=np.float64), d.energy):
+            raise ValueError(f"{where}: the declared energy grid differs from the data's")
+        if (tuple(ln.window) != tuple(d.window) or ln.binding_energy != d.binding_energy
+                or ln.energy_scale != d.energy_scale or ln.exposure_s != d.exposure_s
+                or ln.exposure_basis != d.exposure_basis):
+            raise ValueError(f"{where}: window, binding energy, energy scale, exposure or "
+                             "exposure basis differ between the data and the declaration")
+    if conditions != declared.conditions:
+        raise ValueError("the conditions passed differ from the ones the declaration was "
+                         "fixed with")
+
+
+def _registered_report(lines: Sequence[Line], c: Conditions) -> dict:
+    """Which registered values the case matches, and which it does not (§10)."""
+    steps = [float(np.mean(np.diff(np.sort(np.asarray(ln.energy, dtype=np.float64)))))
+             for ln in lines]
+    halves = [float((max(ln.window) - min(ln.window)) / 2) for ln in lines]
+    found = {
+        "table": c.table, "background": c.background, "photon_energy_eV": c.photon_energy,
+        "matrix_compound": c.matrix.compound,
+        "lines": tuple((ln.element, ln.orbital) for ln in lines),
+        "window_half_width_eV": halves, "channel_step_eV": steps,
+        "exposure_s": [ln.exposure_s for ln in lines],
+    }
+    reg = _REGISTERED_VALUES
+    close = lambda v, ref: any(math.isclose(v, r, rel_tol=1e-6) for r in ref)  # noqa: E731
+    matches = {
+        "table": found["table"] in reg["table"],
+        "background": found["background"] in reg["background"],
+        "photon_energy_eV": close(found["photon_energy_eV"], reg["photon_energy_eV"]),
+        "matrix_compound": found["matrix_compound"] in reg["matrix_compound"],
+        "lines": found["lines"] in reg["lines"],
+        "window_half_width_eV": all(close(h, reg["window_half_width_eV"]) for h in halves),
+        "channel_step_eV": all(close(s, reg["channel_step_eV"]) for s in steps),
+        "exposure_s": all(e is not None and close(e, reg["exposure_s"]) for e in found["exposure_s"]),
+    }
+    return {"found": found, "registered": {k: list(v) for k, v in reg.items()},
+            "matches": matches,
+            "differs": sorted(k for k, ok in matches.items() if not ok),
+            "assumed_only": ["peak shapes and widths", "background shape",
+                             "relative intensities of the lines"],
+            "scope": copy.deepcopy(_VALIDATED_SCOPE)}
+
+
+def _uncertainty(lines: Sequence[Line], conditions: Conditions, declared: DeclaredSpectrum,
+                 *, data_key: Sequence[int], registered: bool) -> CompositionUncertainty:
+    """The steps of §10 "What the code checks", in order."""
+    if not isinstance(declared, DeclaredSpectrum):
+        raise TypeError("declared must be a DeclaredSpectrum")
+    _check_declaration(lines, conditions, declared)
     c = conditions
     base = composition(lines, c)
-    elements = base.denominator
+    elements = tuple(base.denominator)
+    versions = {"toyomacro": toyomacro.__version__, "numpy": np.__version__,
+                "scipy": __import__("scipy").__version__,
+                "data": [ln.source for ln in lines]}
+    common = dict(composition=base, applicability="registered" if registered else "assumed",
+                  assumptions=tuple(declared.assumptions), elements=elements,
+                  declared=declared.snapshot(), registered=_registered_report(lines, c),
+                  versions=versions)
 
-    def result(status, reasons, se=None, cov=None, refused=0):
-        return _CompositionUncertainty(
-            status=status, reasons=tuple(reasons), elements=tuple(elements),
-            standard_uncertainty=se, covariance=cov, n_boot=n_boot, n_refused=refused,
-            seed=seed, validated_scope=_VALIDATED_SCOPE)
+    def out(status, reasons, se=None, cov=None, prediction=None, data_side=None):
+        return CompositionUncertainty(status=status, reasons=tuple(reasons),
+                                      standard_uncertainty=se, covariance=cov,
+                                      prediction=prediction, data_side=data_side, **common)
 
     if base.fractions is None:
-        return result("not_evaluated", ["the composition itself is refused"])
+        return out("not_evaluated", ["the composition itself is refused: " + "; ".join(base.reasons)])
+    # check 1: the noise model applies
     if c.intensity_semantics != "raw_counts":
-        return result("not_evaluated", [
-            f"intensity is {c.intensity_semantics!r}, not stated raw counts; the Poisson "
-            "noise model does not apply"])
-    if any(np.any(np.asarray(ln.intensity) < 0) for ln in lines):
-        return result("not_evaluated", ["negative counts"])
-    if n_boot < 2:
-        raise ValueError("n_boot must be at least 2")
-
-    if any(not np.array_equal(np.asarray(ln.intensity), np.round(np.asarray(ln.intensity)))
-           for ln in lines):
-        return result("not_evaluated", ["intensity stated as raw counts is not integer"])
-    rows, refused, areas = _bootstrap_detail(
-        lines, c, n_boot, np.random.default_rng(seed), elements)
-    if refused:
-        return result("withheld", [f"{refused} of {n_boot} replicates were refused; a "
-                                   "standard deviation over the rest would be conditional "
-                                   "on success"], refused=refused)
-    cov = np.atleast_2d(np.cov(rows, rowvar=False, ddof=1))
-    se = {el: float(math.sqrt(cov[i, i])) for i, el in enumerate(elements)}
-    cov_t = tuple(tuple(float(v) for v in row) for row in cov)
-
-    reasons = []
+        return out("not_evaluated", [f"intensity is {c.intensity_semantics!r}, not stated raw "
+                                     "counts; the Poisson noise model does not apply"])
+    for ln in lines:
+        x = np.asarray(ln.intensity, dtype=np.float64)
+        if not np.all(np.isfinite(x)):
+            return out("not_evaluated", [f"{ln.element} {ln.orbital}: non-finite counts"])
+        if np.any(x < 0):
+            return out("not_evaluated", [f"{ln.element} {ln.orbital}: negative counts"])
+        if not np.array_equal(x, np.round(x)):
+            return out("not_evaluated", [f"{ln.element} {ln.orbital}: intensity stated as raw "
+                                         "counts is not integer"])
     scope = _VALIDATED_SCOPE
-    if scope is None:
-        reasons.append("no validated scope in this version (design record "
-                       "docs/design/composition-uncertainty.md §7)")
-    else:
-        threshold = scope["r_threshold"].get(c.background)
-        if threshold is None:
-            reasons.append(f"background {c.background!r} was not validated")
-        else:
-            observed = {x.element: x.area for x in base.lines}
-            r = _relative_area_noise(areas, [observed[el] for el in elements])
-            if r > threshold:
-                reasons.append(f"relative area noise {r:.3g} above the validated {threshold:g}")
-        if len(elements) > scope["max_lines"]:
-            reasons.append(f"{len(elements)} lines; validated up to {scope['max_lines']}")
-        if any(x.transmission_handling.startswith("divided") for x in base.lines):
-            reasons.append("transmission divided out: not validated")
+    # check 2: table, background, denominator
+    reasons = []
+    if c.table != "scofield":
+        reasons.append(f"table {c.table!r}: validated for scofield only")
+    if c.background not in scope["r_pred_threshold"]:
+        reasons.append(f"background {c.background!r} was not validated")
+    if c.normalise_over is not None:
+        reasons.append("normalise_over: validated for the declared elements as denominator only")
+    if not scope["min_elements"] <= len(elements) <= scope["max_lines"]:
+        reasons.append(f"{len(elements)} elements in the denominator; validated for "
+                       f"{scope['min_elements']} to {scope['max_lines']}")
     if reasons:
-        return result("withheld", reasons, se=None, cov=None)
-    return result("evaluated", [], se=se, cov=cov_t)
+        return out("withheld", reasons)
+    # check 3: no transmission correction before storage or in the calculation
+    admitted_t = c.transmission_applied == "unknown" and c.assume_transmission == "equal_across_lines"
+    if registered and c.transmission_applied == "applied" and c.assume_transmission is None:
+        admitted_t = True  # the harness's label on synthetic data: the same computation path
+    if not admitted_t:
+        why = ("the stored intensity was already divided by a transmission curve "
+               "(transmission_applied = 'applied'); it is no longer raw counts"
+               if c.transmission_applied == "applied" else
+               "a transmission curve would be divided out in the calculation; not validated"
+               if c.transmission_applied == "not_applied" or c.assume_transmission == "divide_by_curve"
+               else "transmission state must be 'unknown' with assume_transmission = "
+                    "'equal_across_lines' (nothing divided)")
+        return out("withheld", [why])
+    # the required assumptions
+    missing = [a for a in REQUIRED_ASSUMPTIONS if a not in declared.assumptions]
+    if not declared.fixed_before_data:
+        missing.insert(0, "fixed_before_data")
+    if missing:
+        return out("withheld", [f"applicability not declared: {m}" for m in missing])
+    # check 4 (prediction side) and check 5: the admission, from the declaration alone
+    pred = _predict_r(declared.as_lines(), c, n_boot=_B_PRED)
+    threshold = scope["r_pred_threshold"][c.background]
+    prediction = {"r_pred": pred.r_pred, "r_star": threshold, "declared_refused": pred.declared_refused,
+                  "declared_reasons": list(pred.declared_reasons), "n_refused": pred.n_refused,
+                  "n_boot": _B_PRED, "key": list(_PREDICTION_SEED_KEY)}
+    if pred.declared_refused:
+        return out("withheld", ["the composition of the declared spectrum is refused: "
+                                + "; ".join(pred.declared_reasons)], prediction=prediction)
+    if pred.n_refused:
+        return out("withheld", [f"{pred.n_refused} of {_B_PRED} prediction replicates refused"],
+                   prediction=prediction)
+    if pred.r_pred is None:
+        return out("withheld", ["the prediction returned no r_pred"], prediction=prediction)
+    if pred.r_pred > threshold:
+        return out("withheld", [f"predicted relative area noise {pred.r_pred:.4g} above the "
+                                f"validated {threshold:g} for the {c.background} background"],
+                   prediction=prediction)
+    # check 4 (data side): the bootstrap of the observed data
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([int(k) for k in data_key])))
+    rows, refused, _ = _bootstrap_detail(lines, c, _B_DATA, rng, elements)
+    data_side = {"n_boot": _B_DATA, "n_refused": refused, "key": [int(k) for k in data_key]}
+    if refused:
+        return out("withheld", [f"{refused} of {_B_DATA} replicates were refused; a standard "
+                                "deviation over the rest would be conditional on success"],
+                   prediction=prediction, data_side=data_side)
+    sd = np.std(rows, axis=0, ddof=1)
+    cov = np.atleast_2d(np.cov(rows, rowvar=False, ddof=1))
+    if not (np.all(np.isfinite(sd)) and np.all(np.isfinite(cov))):
+        return out("withheld", ["non-finite standard uncertainty"], prediction=prediction,
+                   data_side=data_side)
+    se = {el: float(v) for el, v in zip(elements, sd)}
+    cov_t = tuple(tuple(float(v) for v in row) for row in cov)
+    return out("evaluated", [], se=se, cov=cov_t, prediction=prediction, data_side=data_side)
+
+
+def composition_uncertainty(lines: Sequence[Line], conditions: Conditions, *,
+                            declared: DeclaredSpectrum) -> CompositionUncertainty:
+    """Standard uncertainty of the composition, admitted by a declaration made beforehand.
+
+    Experimental. Implements docs/design/composition-uncertainty.md §10:
+    the declaration (expected counts and the analysis conditions, fixed
+    before the data set was looked at) decides whether the uncertainty is
+    computed, through the predicted relative area noise of the declared
+    spectrum against the background's validated threshold; nothing
+    computed from the observed data enters that admission. B = 1,000 on
+    both sides, with fixed keys; there is no ``n_boot``, no seed and no
+    retry. ``applicability`` is always ``"assumed"``: the result rests on
+    the named assumptions the declaration carries, and the registered
+    calibration (§9) transfers to this case only under them.
+    """
+    return _uncertainty(lines, conditions, declared, data_key=_PUBLIC_DATA_KEY, registered=False)
+
+
+def _composition_uncertainty_registered(lines: Sequence[Line], conditions: Conditions,
+                                        declared: DeclaredSpectrum, *,
+                                        data_key: Sequence[int] = _PUBLIC_DATA_KEY,
+                                        ) -> CompositionUncertainty:
+    """The tests' entry point: ``applicability = "registered"`` and a data-side key.
+
+    Only for data sets drawn from a registered condition (§8); the key
+    lets a test reproduce the validation's per-trial draws. The public
+    function has neither.
+    """
+    return _uncertainty(lines, conditions, declared, data_key=data_key, registered=True)

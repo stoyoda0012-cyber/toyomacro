@@ -8,6 +8,50 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`composition_uncertainty(lines, conditions, declared=...)`,
+  `DeclaredSpectrum` and `DeclaredLine` (Experimental).** The statistical standard
+  uncertainty of a composition is returned again — admitted not by
+  anything the data set shows, but by a declaration fixed before the
+  data set was looked at: the expected counts per line (base included),
+  the analysis conditions, their provenance (`planning_model` or
+  `other_measurement`; anything derived from the data set itself is
+  refused) and the named assumptions (`channel_independence`,
+  `no_prior_correction`, `transfer`; `more_counts_extrapolation` when it
+  applies). The declaration's predicted relative area noise, computed
+  with the same bootstrap from one fixed seed, must be at or below the
+  background's threshold: 0.02 for a linear background, 0.01 for
+  Shirley, from the third pre-registered validation (design record
+  §8–9: 40 synthetic conditions, M = 2,000 data sets × B = 1,000
+  replicates each; 38 pass, the two failures at r = 0.08 with Shirley
+  set the Shirley threshold). The result keeps `status` (`evaluated`,
+  `withheld` with the reason, `not_evaluated`) apart from
+  `applicability`, which is always `assumed` from the public function:
+  the registered calibration transfers to a real data set only under
+  the named assumptions, and the result lists what in the case differs
+  from the registered values (matrix, photon energy, window, channel
+  width, lines, exposure) and what is assumed only (peak shapes,
+  background shape, relative intensities). B = 1,000 on both sides,
+  fixed keys, no `n_boot`, no seed, no retry. The publication design is
+  §10 of the design record.
+
+### Changed
+
+- `composition()`'s `not_evaluated` note on the statistical uncertainty
+  says it is not computed in that call and names
+  `composition_uncertainty`; the AI-agent user guide's section on
+  reading a result describes the declaration, what was and was not
+  validated, the observed sensitivity to a wrong declaration (a true
+  relative noise of up to about three times the threshold), detector
+  correlation and what the sensitivity factor leaves out.
+
+### Removed
+
+- The private `_composition_uncertainty` of v0.5.x, which admitted a
+  data set by its own bootstrap's relative noise when given a scope —
+  the rule the second validation rejected. Not renamed: replaced.
+
 ## [0.5.1] - 2026-10-15
 
 Archived on Zenodo:

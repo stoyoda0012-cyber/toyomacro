@@ -392,11 +392,12 @@ matrix assumptions.
 composition under an explicit input contract, and reports what it rests on rather than one
 "±": the estimate, how it moves when the table or the background is changed (condition
 dependence, not an uncertainty), the assumptions it needed, and what was not evaluated. The
-statistical part is not available for now (withheld, or not evaluated when the intensity
-is not stated raw counts): its validation on synthetic data left no scope in
-which it could be reported (see
-[docs/design/composition-uncertainty.md](docs/design/composition-uncertainty.md)). It refuses
-rather than fill in a missing exposure, transmission state or denominator.
+statistical standard uncertainty comes from `composition_uncertainty`, which admits a data
+set from a declaration fixed before it was looked at (expected counts, conditions, provenance,
+named assumptions), never from the data's own noise; its calibration was shown on registered
+synthetic conditions and transfers to real data only under those assumptions (see
+[docs/design/composition-uncertainty.md](docs/design/composition-uncertainty.md), §8–10). It
+refuses rather than fill in a missing exposure, transmission state or denominator.
 
 GUI front-ends and a depth-profiling solver built on this engine are
 maintained separately; nothing in this repository depends on them.
@@ -465,7 +466,7 @@ Twelve tests assert a throughput or an elapsed time. They fail on
 hardware slower than the machine their thresholds were set on, which is
 not a defect in the library, so they carry the `perf` marker and
 `-m "not perf"` drops them. Use it when you are working on a laptop and
-want the other 2,620 tests to mean what they say; do not use it to
+want the other 2,625 tests to mean what they say; do not use it to
 decide that a change is safe, because two of the twelve are the only
 guard on the compression codec's decode path.
 
