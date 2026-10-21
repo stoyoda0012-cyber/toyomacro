@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
 ### Added
 
 - **`composition_uncertainty(lines, conditions, declared=...)`,
@@ -51,6 +53,32 @@ archived on Zenodo for a citable DOI.
 - The private `_composition_uncertainty` of v0.5.x, which admitted a
   data set by its own bootstrap's relative noise when given a scope —
   the rule the second validation rejected. Not renamed: replaced.
+
+### Known issues
+
+- **The statistical uncertainty's calibration was shown on registered
+  synthetic conditions only.** On a real data set `composition_uncertainty`
+  returns it under the user's named assumptions (`applicability` is
+  always `assumed`): channel independence (one real detector showed a
+  +0.16 adjacent-channel correlation, under which it is too small), no
+  prior correction of the stored counts, and the transfer of the
+  registered calibration to the case's matrix, photon energy, window,
+  channel width, lines, shapes and exposure. The declaration's errors
+  tried are nine amplitude points; between them, and for a true relative
+  noise between two and four times the threshold, nothing was shown.
+- **At r = 0.08 with a Shirley background** two of the four registered
+  configurations did not pass (R_S 1.19 with 7 % of the data sets
+  withheld; one undecided with a 0.15 % rate), which is why the Shirley
+  threshold is 0.01 and the linear one 0.02. The mechanism named in the
+  design record (resampling about the observed counts) is consistent
+  with it; its cause was not isolated.
+- **Unchanged from v0.5.0:** Yeh–Lindau Cu 3d at 8047.8 eV is still the
+  suspected misprint recorded in v0.3.1; `fit_fermi_edge`'s errors still
+  assume independent channels; on Trzhaskovskaya the `lookup()` range is
+  judged on the axis the table is interpolated on, `BindingEnergy` gives
+  no threshold for a part of each table's lines, and Co 3p1/2 and 3p3/2
+  are stored in reverse order; the VAMAS reader's legacy fixed-line
+  layout is unverified.
 
 ## [0.5.1] - 2026-10-15
 
@@ -2294,7 +2322,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.3.1...v0.4.0

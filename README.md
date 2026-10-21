@@ -181,7 +181,7 @@ Without cloning the repository (needs Git; installs the core package,
 while `examples/` and the benchmarks come with a clone):
 
 ```bash
-pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.5.1"
+pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.6.0"
 ```
 
 From a clone — we recommend [`uv`](https://docs.astral.sh/uv/):
