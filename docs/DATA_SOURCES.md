@@ -131,7 +131,10 @@ no value above 1486.6 eV (`CrossSection.withheld_cells()` lists the cell
 with this evidence). That also moves the PCHIP interpolation between
 1253.6 and 1486.6 eV, whose end slope the cell set, and every value of
 the line under the legacy `polyfit` interpolation, which fits all cells
-at once. The CHANGELOG entry gives the size of both.
+at once. The CHANGELOG entry gives the size of both; against Scofield's
+shape the PCHIP change between 1253.6 and 1486.6 eV is mixed, closer
+above about 1345 eV and slightly further below. Anything that reads
+`cross_section.json` directly, outside `lookup()`, still sees `.32E-3`.
 
 The CSV this file was generated from (`Common/data/CrossSectionTable_Yeh=Lindau.csv`,
 not part of this repository, CR line endings) was corrected in the same

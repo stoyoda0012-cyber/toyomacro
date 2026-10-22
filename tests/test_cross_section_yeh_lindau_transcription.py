@@ -69,6 +69,20 @@ def test_cell_matches_table_i(table, element, orbital, hv):
     )
 
 
+def test_cu_3d_at_8047_8_is_held_as_table_i_prints_it():
+    """Read from the journal page (p. 8) in 2026-10: ``.32E-3``.
+
+    A suspected misprint in the source, so ``lookup()`` withholds it (see
+    ``test_cross_section_withheld_cells.py``); ``to_dict()`` shows it as
+    absent. The bundled file keeps the printed value, read here raw.
+    """
+    from toyomacro.data.paths import load_cross_section_data
+
+    raw = load_cross_section_data()
+    column = raw["photon_energies"].index(8047.8)
+    assert raw["data"]["Cu"]["3d"]["cross_sections"][column] == pytest.approx(3.2e-4, rel=1e-12)
+
+
 def test_corrected_cells_sit_between_their_neighbours(table):
     """The three factor-of-100 corrections restore monotone falloff.
 

@@ -111,8 +111,12 @@ def test_to_dict_shows_the_cell_as_absent_and_marks_the_line():
 @pytest.mark.parametrize("table", AVAILABLE_TABLES)
 def test_every_other_cell_is_loaded_as_stored(table):
     """Only the listed cells differ between the file and what lookups use."""
-    CrossSection._data.pop(table, None)
-    loaded = CrossSection.to_dict(table)
+    saved = CrossSection._data.pop(table, None)
+    try:
+        loaded = CrossSection.to_dict(table)
+    finally:
+        if saved is not None:
+            CrossSection._data[table] = saved
     from toyomacro.data import cross_section as cs
 
     if table == "yeh_lindau":
@@ -150,4 +154,28 @@ def test_a_stale_entry_is_refused(monkeypatch):
         cs._WITHHELD_CELLS, ("yeh_lindau", "Cu", "3d", CU_K_ALPHA), (9.9e-9, "stale")
     )
     with pytest.raises(RuntimeError, match="review the entry"):
+        cs._withhold_cells("yeh_lindau", load_cross_section_data())
+
+
+@pytest.mark.parametrize(("element", "energy", "match"), [
+    ("Cu", 1486.6, "not the printed"),   # value differs from the entry's
+    ("Cu", 9999.0, "not in the table"),  # energy absent from the grid
+    ("Xx", CU_K_ALPHA, "not in the table"),
+])
+def test_a_bad_entry_is_refused_with_a_reason(monkeypatch, element, energy, match):
+    from toyomacro.data import cross_section as cs
+
+    monkeypatch.setattr(cs, "_WITHHELD_CELLS", {
+        ("yeh_lindau", element, "3d", energy): (3.2e-4, "test")})
+    with pytest.raises(RuntimeError, match=match):
+        cs._withhold_cells("yeh_lindau", load_cross_section_data())
+
+
+def test_only_a_last_printed_cell_can_be_withheld(monkeypatch):
+    """An interior cell would be interpolated across; refuse the entry instead."""
+    from toyomacro.data import cross_section as cs
+
+    monkeypatch.setattr(cs, "_WITHHELD_CELLS", {
+        ("yeh_lindau", "Cu", "3d", AL_K_ALPHA): (0.012, "interior")})
+    with pytest.raises(RuntimeError, match="last printed cell"):
         cs._withhold_cells("yeh_lindau", load_cross_section_data())

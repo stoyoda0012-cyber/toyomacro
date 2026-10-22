@@ -357,7 +357,8 @@ it — so pass `table=` explicitly whenever the choice matters, and read
 **What `lookup()` returns, and what it does not.** Inside a line's
 tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
 in log–log space, so a tabulated energy returns the tabulated value;
-above the range it uses a power law through the last cells. **Below a
+above the range it uses a power law through the last cells, unless a
+withheld cell lies above (below). **Below a
 line's first valid cell it returns `None`** (since v0.5.0): that is the
 threshold region, where shape resonances and Cooper minima move the
 cross-section by orders of magnitude and a power law has no support
@@ -393,7 +394,7 @@ is one of its cells, its valid range and the threshold applied.
 |---|---|---|
 | `tabulated` | a valid cell, or between valid cells | yes |
 | `extrapolated_above` | above the line's last valid cell | yes, power law |
-| `outside_range_above` | above a line's *only* valid cell | no |
+| `outside_range_above` | above a line's *only* valid cell, or above its last valid cell when a withheld cell lies above | no |
 | `outside_range_below` | below the line's first valid cell | no, unless `extrapolate_below=True` |
 | `below_threshold` | photon energy below the `BindingEnergy` value | known zero |
 | `unoccupied` | absent component the table's rule says is empty (no bundled table has such a rule confirmed yet) | known zero |

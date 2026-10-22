@@ -34,15 +34,17 @@ archived on Zenodo for a citable DOI.
   0.00032 at 8047.8 eV, about 0.001 at 4 keV and power-law values above.
   Use Scofield there. Below, the default PCHIP interpolation moves
   between 1253.6 and 1486.6 eV only, by up to +1.8 % (the withheld cell
-  set the end slope); the tabulated cells are unchanged. The legacy
+  set the end slope); the tabulated cells are unchanged. Against
+  Scofield's shape over that interval the change is mixed: closer above
+  about 1345 eV, slightly further below, by under 0.6 %. The legacy
   `polyfit` interpolation fits every cell at once, so it moves over the
-  whole line, from −16 % at 1486.6 eV to +14 % near 500 eV; its rms
-  residual against the 15 remaining printed cells falls from 0.055 to
-  0.040 decades. New: `CrossSection.withheld_cells(table)` lists withheld
+  whole line, from −16 % at 1486.6 eV to +14 % near 450 eV; its rms
+  residual against the line's 14 remaining printed cells falls from
+  0.055 to 0.040 decades. New: `CrossSection.withheld_cells(table)` lists withheld
   cells with the printed value and the evidence; `to_dict()` shows the
   cell as `None` and marks the line with `withheld_eV`. Compared over
-  every element, line, j label, energy (all grid cells, midpoints, a
-  dense 5 eV–30 keV grid) and both interpolations of all three tables:
+  every element, line, j label, energy (all grid cells up to 30 keV,
+  midpoints, a dense 5 eV–15 keV grid) and both interpolations of all three tables:
   57 million outputs, of which only Yeh–Lindau Cu 3d differs.
 
 ### Fixed

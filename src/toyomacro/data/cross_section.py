@@ -177,10 +177,18 @@ def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
     that the range logic can refuse to extrapolate across them. Only the
     affected lines are copied; nothing on disk changes.
 
+    Only the last printed cell of a line can be withheld: the range
+    logic refuses to extrapolate across a withheld cell above the line,
+    but would interpolate across an interior one and extrapolate below
+    the first, so an entry for any other cell is refused here rather
+    than handled silently.
+
     Raises:
-        RuntimeError: if the table no longer holds the printed value the
-            entry was made for, so that a changed table cannot leave a
-            stale entry withholding a different number.
+        RuntimeError: if an entry names a line or energy the table does
+            not have, a cell that is not the line's last printed one, or a
+            value other than the printed one the entry was made for — so
+            that a changed table cannot leave a stale entry withholding a
+            different number.
     """
     entries = [(k, v) for k, v in _WITHHELD_CELLS.items() if k[0] == table]
     if not entries:
@@ -188,16 +196,25 @@ def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
     energies = data.get("photon_energies", [])
     elements = dict(data["data"])
     for (_, element, key, energy), (printed, _reason) in entries:
-        line = dict(elements[element][key])
+        where = f"{table} {element} {key} at {energy} eV"
         index = next(
-            i for i, e in enumerate(energies) if math.isclose(e, energy, rel_tol=1e-12)
+            (i for i, e in enumerate(energies) if math.isclose(e, energy, rel_tol=1e-12)),
+            None,
         )
+        if element not in elements or key not in elements[element] or index is None:
+            raise RuntimeError(f"{where} is not in the table; review the _WITHHELD_CELLS entry.")
+        line = dict(elements[element][key])
         cells = list(line["cross_sections"])
         stored = cells[index]
         if stored is None or not math.isclose(stored, printed, rel_tol=1e-9):
             raise RuntimeError(
-                f"{table} {element} {key} at {energy} eV holds {stored}, not the "
-                f"printed {printed} that _WITHHELD_CELLS withholds; review the entry."
+                f"{where} holds {stored}, not the printed {printed} that "
+                f"_WITHHELD_CELLS withholds; review the entry."
+            )
+        if any(v is not None and v > 0 and e > energy for e, v in zip(energies, cells)):
+            raise RuntimeError(
+                f"{where} is not the line's last printed cell; only a last cell can be "
+                f"withheld. Review the _WITHHELD_CELLS entry."
             )
         cells[index] = None
         line["cross_sections"] = cells
@@ -608,7 +625,9 @@ class CrossSection:
         Inside a line's tabulated range the value is a monotone piecewise
         cubic (PCHIP) through the tabulated cells in log-log space, so at a
         tabulated energy it is the tabulated value. Above the range it is a
-        power law through the last cells. **Below a line's first valid cell
+        power law through the last cells, except where the table prints a
+        cell above it that is withheld (see :meth:`withheld_cells`): then
+        there is no value. **Below a line's first valid cell
         it returns None** (since v0.5.0): that is the threshold region,
         where shape resonances and Cooper minima move the cross-section by
         orders of magnitude and a power law has no support — Tl 5d at

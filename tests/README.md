@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,666 automated tests** across **100 files**, in two
+This suite has **2,671 automated tests** across **100 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 62 | 1,581 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 62 | 1,586 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,085 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,234 tests, 84%) — guarantee the library
+- **Contract / regression** (2,239 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,654. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,659. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,581)
+## Library body — `tests/` (1,586)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -132,7 +132,7 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (687)
+### Quantification data (692)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -143,7 +143,7 @@ them would take real coverage with them:
 | 19 | `test_composition_uncertainty.py` | `composition_uncertainty` (design record §10): the declaration's arrays are copied and validated, `this_data` and unknown assumption names refused, a declaration that does not describe the data is a `ValueError`; `not_evaluated` for a refused composition or non-Poisson counts, `withheld` by the structural checks (table, transmission state, missing assumptions) before any bootstrap and by a prediction above the threshold with no data-side bootstrap; `evaluated` is always `assumed` and carries the snapshot; the shipped scope is the third record's decision; the four implementation checks of the public path (no observed quantity in the admission, the registered entry point reproduces the validation bit for bit, the published set is the set with no refused replicate, `registered` only through the private entry point); `composition()` alone says the uncertainty is not computed there; a refused data-side replicate withholds; the returned scope is a copy; the registered values are the harness's; the second record's verdicts recompute; the first harness runs and resumes |
 | 29 | `test_composition_validation3.py` | The §8 harness: condition IDs and the registered constants, κ scaling of the declared spectra, `_predict_r` (deterministic from one fixed seed, non-integer means, refusals), the one-sided count-setting window and its failure after 8 steps, trial categories and seed series, the shared Monte Carlo indices, the binomial bound, rule 4's bracketing, and the execution-identity refusals (dirty checkout, output inside the checkout, missing trial IDs, resume or summary under another hash or commit, no override of the decision run's M and B), plus the negative fences: the registered seeds, complex input, distinct series 3/4, a withheld trial, a not-evaluable condition, a failing implementation check, and chunks written as they complete; the third record's verdicts recomputed from their intervals and its decision pinned |
 | 25 | `test_cross_section_interpolation.py` | `lookup()` returns every tabulated cell at its own energy (PCHIP), `"polyfit"` reproduces v0.3.1 bit for bit, a subshell the table does not carry returns None rather than an estimate across Z, a leave-one-out comparison of the two methods, and nothing non-finite anywhere in the output space |
-| 19 | `test_cross_section_yeh_lindau_transcription.py` | Thirteen cells of the bundled Yeh–Lindau table where two transcriptions disagreed, pinned to what Table I prints; every key an element of Z = 1–103 and a `nl` subshell; the two lines that were present under wrong keys found by `lookup()` rather than extrapolated |
+| 20 | `test_cross_section_yeh_lindau_transcription.py` | Thirteen cells of the bundled Yeh–Lindau table where two transcriptions disagreed, pinned to what Table I prints, and Cu 3d at 8047.8 eV held as printed; every key an element of Z = 1–103 and a `nl` subshell; the two lines that were present under wrong keys found by `lookup()` rather than extrapolated |
 | 26 | `test_element_dedup.py` | Element-name dedup + `ElementInfo` utilities |
 | 53 | `test_elastic_scattering.py` | Albedo-based EAL; required `model` keyword, published slopes, stated validity limits, and the `DescribedLength` / report provenance contract |
 | 41 | `test_sampling_depth.py` | Mean escape depth and information depth; published slopes held apart from the EAL's, the required emission angle and percentage, the straight-line limits, and the source's own tabulated albedos |
@@ -152,7 +152,7 @@ them would take real coverage with them:
 | 22 | `test_compound_provenance.py` | `compounds_provenance.json` stays in step with `compounds.json` field by field, and never leaks into the values |
 | 15 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself; the rebuild parser does not turn the CSV's photon-energy row into an element |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
-| 22 | `test_cross_section_withheld_cells.py` | Cells a table prints but `lookup()` withholds as suspected source misprints: the bundled file keeps Yeh–Lindau Cu 3d at 8047.8 eV as printed (`.32E-3`), the evidence against it (fall from 1486.6 eV and ratio to Scofield against Ni and Zn), no value above 1486.6 eV under both interpolations, every other cell of every table loaded as stored, and a stale entry refused |
+| 26 | `test_cross_section_withheld_cells.py` | Cells a table prints but `lookup()` withholds as suspected source misprints: the bundled file keeps Yeh–Lindau Cu 3d at 8047.8 eV as printed (`.32E-3`), the evidence against it (fall from 1486.6 eV and ratio to Scofield against Ni and Zn), no value above 1486.6 eV under both interpolations, every other cell of every table loaded as stored, and a stale, missing or non-final entry refused |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
