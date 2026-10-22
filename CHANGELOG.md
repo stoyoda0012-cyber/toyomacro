@@ -24,6 +24,35 @@ archived on Zenodo for a citable DOI.
   documented as "not measurable here". The schema version stays 3:
   hosts with a load average are graded as before.
 
+### Fixed
+
+- **Co 3p binding energy: 3p3/2 is 59 eV, not 60.** The bundled table
+  follows the X-ray Data Booklet, which lists Co 3p1/2 = 58.9 and
+  3p3/2 = 59.9 eV — the only pair in the table with the j = 3/2 member
+  bound more deeply. Its source, Fuggle & Mårtensson (1980), prints one
+  unresolved Co 3p level (58.8 and 59.0 eV from two instruments), as it
+  does for Mn and Fe, which the Booklet lists with one value under both
+  columns; Bearden & Burr (1967) also give one level (59.5 eV). Both
+  members are now 59 eV. Old against new over every element and label
+  of the table (4,260,003 outputs of `BindingEnergy` and the
+  cross-section thresholds over 10–200 eV and the usual lines, which
+  bracket the change, and 73,480 of the MCP tools): only Co 3p changes.
+  `BindingEnergy.lookup("Co", "3p")` and `"3p3/2"` give 59 instead of
+  60 and the spin-orbit split 0 instead of 1. Between 59 and 60 eV, Co
+  3p3/2 (Scofield and Trzhaskovskaya) and bare 3p on Yeh–Lindau are no longer a known
+  zero (`below_threshold`) but outside the range — no value by default,
+  an extrapolated one with `extrapolate_below=True`; bare 3p on
+  Scofield and Trzhaskovskaya was already outside the range there, and
+  its extrapolated value now includes 3p3/2. The MCP
+  `calculate_sensitivity` takes the kinetic energy one eV higher for Co
+  3p at every photon energy: the sensitivity moves by +0.06 % at
+  1486.6 eV and by +19.6 % at 80 eV (Yeh–Lindau, SiO₂ matrix), where
+  the IMFP is steep. Against the cited source the value is exact
+  (itself a clean-metal measurement); Bearden & Burr's 59.5 is
+  equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p
+  (59.70, Strydom & Strydom 1989; 60.20, Mandale et al. 1984) lie
+  closer to the old 60.
+
 ## [0.6.0] - 2026-10-21
 
 Archived on Zenodo:

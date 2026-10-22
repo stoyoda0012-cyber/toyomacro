@@ -614,8 +614,10 @@ class CrossSection:
         ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
         73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on
         Trzhaskovskaya, from its energy axis), as v0.4.0 did. Known limits
-        of that source apply too (Co 3p1/2 and 3p3/2 are stored as 59 and
-        60 eV, the reverse of the usual order).
+        of that source apply too; unresolved spin-orbit pairs are stored
+        with one value for both members (Co 3p at 59 eV, as Fuggle &
+        Martensson 1980 print it; the X-ray Data Booklet's 3p3/2 = 59.9,
+        in none of its cited sources, is evidently a misprint of 58.9).
 
         On Trzhaskovskaya the range is judged on the axis it is
         interpolated on, a photoelectron-energy grid read as photon energy:
