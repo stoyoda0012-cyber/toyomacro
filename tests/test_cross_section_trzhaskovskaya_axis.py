@@ -141,3 +141,12 @@ def test_closed_core_subshells_agree_with_scofield_at_the_same_photon_energy():
     for lo, hi in ((0.0, 0.05), (0.05, 0.2), (0.2, 0.5), (0.5, 1.0)):
         band = [abs(r) for r, x in rows if lo <= x < hi]
         assert len(band) > 300 and statistics.median(band) < 0.06, (lo, hi)
+
+
+def test_the_mcp_tool_reports_no_shared_grid_for_this_table():
+    from toyomacro import mcp_server
+
+    out = json.loads(mcp_server.calculate_sensitivity(
+        "Si", "2p", photon_energy=1486.6, table="trzhaskovskaya"))
+    assert out["cross_section_table_range_eV"] is None
+    assert out["cross_section_status"] == "tabulated"

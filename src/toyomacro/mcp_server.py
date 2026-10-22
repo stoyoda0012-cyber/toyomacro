@@ -222,7 +222,7 @@ def calculate_sensitivity(
         "cross_section_unit": units["unit"],
         "cross_section_inferred_unit": units["inferred_unit"],
         "cross_section_unit_status": units["status"],
-        "cross_section_table_range_eV": [cs_lo, cs_hi],
+        "cross_section_table_range_eV": [cs_lo, cs_hi] if grid else None,
         "cross_section_status": found.status,
         "cross_section_extrapolated": found.status != "tabulated",
         "cross_section_components": _components_json(found),

@@ -100,7 +100,11 @@ _J_SUFFIXES = ("1/2", "3/2", "5/2", "7/2")
 #   refuses instead. Flip to True once the source states the rule; the
 #   38-count and the exception elements are pinned by test so the
 #   evidence is still there to act on. NOT licensed by Scofield's Table
-#   A1, which says nothing about this table.
+#   A1, which says nothing about this table. Note also that ADNDT 82
+#   (Z >= 55) prints only subshells bound by less than 2000 eV, so a
+#   deep doublet can be half-listed for that reason alone (Er, Tm, Yb
+#   3p3/2; Os 3d5/2) — and those four printed lines are missing from the
+#   bundled file, a transcription gap rather than an empty component.
 # yeh_lindau — stores bare subshells only; j-resolved requests are refused
 #   rather than split by an assumed branching ratio.
 _ABSENT_COMPONENT_IS_UNOCCUPIED: dict[str, bool] = {
@@ -598,7 +602,9 @@ class CrossSection:
         reader = csv.DictReader(lines)
         fieldnames = reader.fieldnames or []
 
-        # Extract photon energies from CrossSec_PE_XXX columns
+        # The CrossSec_PE_XXX columns are the PHOTOELECTRON energies of the
+        # source; the file keeps them under its legacy key "photon_energies"
+        # and _place_on_photon_axis() moves each line onto E + Eb on load.
         photon_energies: list[float] = []
         pe_cols: list[str] = []
         for col in fieldnames:

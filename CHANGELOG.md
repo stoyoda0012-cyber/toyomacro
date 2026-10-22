@@ -57,13 +57,14 @@ archived on Zenodo for a citable DOI.
   table prints for that subshell, so every Trzhaskovskaya value changes.
   At the usual lab and HAXPES lines every j component rises, because it
   is now read at a lower kinetic energy: median +16 % at 1486.6 eV, +12 %
-  at 2984.3 eV, +5 % at 9251.7 eV, and up to 6.3x for deep levels near
-  threshold (Ho 3d5/2 at 1486.6 eV, Ru 2p3/2 at 2984.3 eV). Of 5.0
-  million compared outputs, 48,950 that were `tabulated` below a line's
-  first kinetic energy now return no value (`outside_range_below`), e.g.
-  Au 4f at 150 eV, and 77,081 that were extrapolated are now inside the
+  at 2984.3 eV, +5 % at 9251.7 eV. Deep levels near threshold rise most,
+  up to 6.8x (Xe 2p3/2 at 4885 eV). Of 5.0 million compared outputs,
+  48,950 that were `tabulated` below a line's first kinetic energy, and
+  434 that were extrapolated, now return no value (`outside_range_below`),
+  e.g. Au 4f at 150 eV; 77,081 that were extrapolated are now inside the
   range. Values fall mainly where a line is extrapolated above its last
-  cell, and in a few outer shells near threshold (actinide 5f most). The direction is right against
+  cell; inside the range 2,161 fall, 4d near threshold most (Mo–Te and
+  the lanthanides; Yb 4d3/2 at 300 eV to 0.76x), then actinide 5f. The direction is right against
   an independent table: on closed core s, p and d subshells at the usual
   lines, Trzhaskovskaya (kb) and Scofield (Mb) now differ by a median
   1.9 % (3,682 points), and by 1.4–3.4 % in every band of Eb/hν; read as
@@ -76,6 +77,7 @@ archived on Zenodo for a citable DOI.
   of one shared `photon_energies`, `get_available_photon_energies(
   'trzhaskovskaya')` raises instead of returning kinetic energies, and
   the MCP tool's `cross_section_table_range_eV` is null for that table.
+  These are changes to Supported behaviour as well as fixes.
 - **The Trzhaskovskaya unit is confirmed as kb**, read from the tables'
   own explanation ("in kb (=10⁻²¹ cm²)", ADNDT 77 p. 106, 82 p. 260, 92
   p. 252); `unit_info()` reported it as inferred. The same text says the

@@ -640,14 +640,13 @@ def test_stored_values_are_not_rescaled():
 
 @pytest.mark.parametrize("table", ["scofield", "trzhaskovskaya", "yeh_lindau"])
 def test_get_rsf_is_the_ratio_of_two_lookups_on_the_same_table(table):
-    """Which is why it is well defined even where the unit is inferred.
+    """Which is why it would be well defined even for an inferred unit.
 
-    Deliberately *not* an agreement check between tables. Two
-    independent theoretical compilations need not agree, and for
-    `trzhaskovskaya` the photoelectron-vs-photon energy axis error
-    survives any ratio between lines of different binding energy — so a
-    cross-table comparison would test neither the unit cancellation nor
-    anything else this file is about.
+    Deliberately *not* an agreement check between tables: two independent
+    theoretical compilations need not agree, so a cross-table comparison
+    would test neither the unit cancellation nor anything else this file
+    is about. (The Trzhaskovskaya-Scofield comparison on closed shells is
+    in test_cross_section_trzhaskovskaya_axis.py.)
     """
     ratio = CrossSection.get_rsf("Si", "2p", "C", "1s", AL_KA_EV, table=table)
     si = CrossSection.lookup("Si", "2p", AL_KA_EV, table=table)

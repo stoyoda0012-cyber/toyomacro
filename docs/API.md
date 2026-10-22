@@ -427,7 +427,7 @@ above change only with a minor version. `get_rsf()` does not carry the state; ca
 `lookup_with_status()` on each line.
 
 `CrossSection.to_dict(table)` returns the table as loaded, in the
-shape the bundled JSON has for all three tables:
+shape the bundled JSON has (Trzhaskovskaya differs, see below):
 `{"photon_energies": [...], "data": {element: {orbital:
 {"binding_energy": eV or None, "cross_sections": [...]}}}}`, with one
 entry per photon energy and `None` where the source table has no entry
