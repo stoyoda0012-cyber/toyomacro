@@ -56,6 +56,11 @@ import numpy as np
 #: now the BEFORE sample's verdict, where in 2 it was the trailing one.
 #: A version-2 record's verdict was computed by a rule that no longer
 #: exists and is not comparable with a version-3 one.
+#:
+#: Not a bump: after v0.6.0 a host without a load average (Windows) grades
+#: ``looks_quiet`` by whole-machine CPU utilisation instead of leaving it
+#: None. Hosts with a load average are graded as before, and every record
+#: names the rule it used in ``quiet_convention``.
 SCHEMA_VERSION = 3
 
 #: Versions worth recording. Deliberately limited to this package and
@@ -101,7 +106,30 @@ def cpu_name() -> str | None:
         except Exception:
             pass
         return platform.processor() or None
+    if system == "Windows":
+        name = _windows_cpu_name()
+        if name:
+            return name
     return platform.processor() or None
+
+
+def _windows_cpu_name() -> str | None:
+    """``ProcessorNameString`` from the registry: the marketing name.
+
+    ``platform.processor()`` on Windows returns the CPUID family/model
+    string (``Intel64 Family 6 Model 181 ...``), which names no product.
+    """
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+        try:
+            value, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+        finally:
+            winreg.CloseKey(key)
+        return " ".join(str(value).split()) or None
+    except Exception:
+        return None
 
 
 def _os_description() -> str:
@@ -175,9 +203,14 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
 
     ``looks_quiet`` applies one stated convention: **every** load average
     -- 1, 5 and 15 minute -- is below a quarter of the logical core
-    count. The convention is asserted, not calibrated: nothing in this
-    repository establishes that a host under it keeps a kernel inside
-    its own reported range. It is a hint for the reader, not a gate.
+    count. Where the platform has no load average (Windows) it applies
+    the nearest one available: whole-machine CPU utilisation over the
+    sampling window below 25 % -- a quarter of the machine, as above,
+    but one short window rather than three averages, so a weaker
+    signal; ``quiet_convention`` says which was used. Either convention
+    is asserted, not calibrated: nothing in this repository establishes
+    that a host under it keeps a kernel inside its own reported range.
+    It is a hint for the reader, not a gate.
     """
     snap: dict = {"sampled_over_s": interval}
     try:
@@ -253,6 +286,13 @@ def load_snapshot(interval: float = 0.2, top_n: int = 5,
         snap["quiet_convention"] = (
             "every load average (1/5/15 min) < 0.25 * logical_cores; "
             "a convention, not a calibrated threshold")
+    elif snap.get("cpu_percent") is not None:
+        snap["looks_quiet"] = snap["cpu_percent"] < 25.0
+        snap["quiet_convention"] = (
+            f"no load average on this platform: whole-machine CPU utilisation "
+            f"over the {interval:g} s sampling window < 25 %; one short window, "
+            "a weaker signal than a load average; a convention, not a "
+            "calibrated threshold")
     else:
         snap["looks_quiet"] = None
         snap["quiet_convention"] = None
@@ -281,7 +321,8 @@ def steal_percent(before: tuple[int, ...] | None,
     On an oversubscribed cloud instance this inflates every wall-clock
     timing while appearing nowhere in the result. It is the confound a
     cloud record most needs and a laptop record cannot have -- ``None``
-    off Linux, where the counter does not exist.
+    off Linux, where the counter does not exist. ``None`` therefore means
+    "not measurable here", never "no steal"; ``0.0`` is a Linux reading.
     """
     if not before or not after or len(before) < 8 or len(after) < 8:
         return None
@@ -296,7 +337,9 @@ def thermal_state() -> dict | None:
     macOS reports this through ``pmset -g therm``. A sustained benchmark
     on a laptop can throttle partway through, which looks exactly like a
     slow machine unless the record says otherwise. ``None`` where the
-    platform offers no equivalent.
+    platform offers no equivalent -- Linux and Windows here (psutil's
+    temperature sensors are not a throttling state, and do not exist on
+    Windows) -- which means "not reported", never "not throttled".
     """
     if platform.system() != "Darwin":
         return None
@@ -358,9 +401,13 @@ def assess_quality(load: dict, steal: float | None,
         before = load.get("load_average_before")
         la = (before or load.get("load_average") or [None])[0]
         which = "before the run" if before else "after the run"
+        cpu = load.get("cpu_percent_before", load.get("cpu_percent"))
         if la is not None:
             reasons.append(f"load average {la:.1f} {which} on "
                            f"{load.get('logical_cores')} cores")
+        elif cpu is not None:
+            reasons.append(f"whole-machine CPU {cpu:.0f}% before the run "
+                           "(no load average on this platform)")
         else:
             reasons.append("host reported busy")
     if load.get("others_busy_after"):
