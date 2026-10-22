@@ -18,10 +18,11 @@ archived on Zenodo for a citable DOI.
   element, read from the scanned report (pp. 166, 319–361). Each core
   line's first cell lies at 1.0070 times the reading, or at a round grid
   energy between the two. The MCP tool reports the field per component.
-  It is never used as a threshold. These are calculated or free-atom
-  energies that can lie above a solid's edge: for Th, Pa and U Scofield's
-  2p1/2 edge sits 89–99 eV above `BindingEnergy`. Treating "below it" as a known zero
-  would drop an open component. Where `BindingEnergy` has no value
+  It is never used as a threshold. These are calculated (Scofield,
+  Yeh–Lindau) or experimental free-atom (Trzhaskovskaya) energies that
+  can lie above a solid's edge: for Th, Pa and U Scofield's 2p1/2 edge
+  sits 89–99 eV above `BindingEnergy`. Treating "below it" as a known
+  zero would drop an open component. Where `BindingEnergy` has no value
   there is still no threshold. No lookup value or status changes;
   compared over every output of the three tables.
 

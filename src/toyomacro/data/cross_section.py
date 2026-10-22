@@ -281,8 +281,9 @@ _SCOFIELD_PRINTED_E_KEV: dict[str, tuple[int, dict[str, float]]] = {
 def _add_scofield_printed_energies(data: dict[str, Any]) -> dict[str, Any]:
     """Return ``data`` with the printed energies above as ``binding_energy``.
 
-    That field is informational on every table (see ComponentLookup's
-    ``printed_binding_energy_eV``); thresholds come from BindingEnergy.
+    That field is never a threshold (see ComponentLookup's
+    ``printed_binding_energy_eV``); thresholds come from BindingEnergy. On
+    Trzhaskovskaya it also places each line's cells at E + Eb.
 
     Raises:
         RuntimeError: if an entry names a line the table lacks, or a line
@@ -400,8 +401,8 @@ class ComponentLookup:
             table itself prints for this line, or None (every Yeh-Lindau
             and Trzhaskovskaya line has one; Scofield only the 71 read from
             UCRL-51326, see ``docs/DATA_SOURCES.md``). Recorded, never used
-            as a threshold: these are calculated or free-atom energies that
-            can lie above a solid sample's edge (for Th, Pa and U, where
+            as a threshold: these are calculated (Scofield, Yeh-Lindau) or
+            experimental free-atom (Trzhaskovskaya) energies that can lie above a solid sample's edge (for Th, Pa and U, where
             ``BindingEnergy`` has values, Scofield's 2p1/2 edge sits 89-99 eV
             above them), so "below it" is not a known zero.
     """
@@ -840,8 +841,9 @@ class CrossSection:
         threshold. ``printed_binding_energy_eV`` gives the energy the
         table itself prints for the line, where it prints one, as a guide
         to where the table places the onset; it is a calculated or
-        free-atom energy and never gates. ``below_threshold``
-        overrides the table where the two disagree: it withholds cells the table prints below the
+        free-atom energy and never gates. Where the table's cells and
+        ``BindingEnergy`` disagree, ``below_threshold`` overrides the
+        table: it withholds cells the table prints below the
         ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
         73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; none on
         Trzhaskovskaya, whose cells start 100 eV above its own binding

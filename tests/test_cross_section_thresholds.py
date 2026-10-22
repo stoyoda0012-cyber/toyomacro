@@ -5,7 +5,7 @@ also carries ``printed_binding_energy_eV``: the energy Yeh & Lindau (1985)
 Table I or Trzhaskovskaya et al. (ADNDT 77, 82) print for every line, and
 for 71 Scofield lines that ``BindingEnergy`` lacks, the subshell energies
 UCRL-51326 prints per element, read from the scanned report. These are
-calculated or free-atom energies and can lie above a solid's edge, so
+calculated or experimental free-atom energies and can lie above a solid's edge, so
 they are reported and never gate a value.
 """
 
