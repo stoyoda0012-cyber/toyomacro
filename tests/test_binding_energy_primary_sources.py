@@ -37,7 +37,7 @@ def test_co_3p_is_unresolved_as_fuggle_and_martensson_print_it():
 def test_no_spin_orbit_pair_is_stored_inverted():
     """Over the whole table, the j = l - 1/2 member is never less bound
     than the j = l + 1/2 member. Equal values are stored for unresolved
-    pairs, and for some pairs of Np-Lr that the source collapses."""
+    pairs, and for some pairs of Np-Lr that the table stores collapsed."""
     elements = json.loads(TABLE.read_text(encoding="utf-8"))["elements"]
     inverted = []
     for el, v in elements.items():

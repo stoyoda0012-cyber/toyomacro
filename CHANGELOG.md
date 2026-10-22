@@ -23,7 +23,7 @@ archived on Zenodo for a citable DOI.
   bracket the change, and 73,480 of the MCP tools): only Co 3p changes.
   `BindingEnergy.lookup("Co", "3p")` and `"3p3/2"` give 59 instead of
   60 and the spin-orbit split 0 instead of 1. Between 59 and 60 eV, Co
-  3p3/2 (all tables) and bare 3p on Yeh–Lindau are no longer a known
+  3p3/2 (Scofield and Trzhaskovskaya) and bare 3p on Yeh–Lindau are no longer a known
   zero (`below_threshold`) but outside the range — no value by default,
   an extrapolated one with `extrapolate_below=True`; bare 3p on
   Scofield and Trzhaskovskaya was already outside the range there, and
