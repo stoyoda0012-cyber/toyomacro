@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,703 automated tests** across **102 files**, in two
+This suite has **2,709 automated tests** across **103 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 64 | 1,612 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 65 | 1,618 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,091 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,271 tests, 84%) — guarantee the library
+- **Contract / regression** (2,277 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,691. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,697. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,612)
+## Library body — `tests/` (1,618)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -132,12 +132,12 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (718)
+### Quantification data (724)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
 | 2 | `test_binding_energy_primary_sources.py` | Bundled binding energies against their primary sources: Co 3p unresolved at 59 eV as Fuggle & Mårtensson 1980 print it (not the X-ray Data Booklet's misprinted 58.9 / 59.9), and no spin-orbit pair stored with the j = l + 1/2 member bound more deeply anywhere in the table |
-| 46 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
+| 47 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
 | 21 | `test_cross_section_status.py` | `lookup_with_status()`: the state of every j component (tabulated, extrapolated above, outside the range below or above, below threshold, unoccupied, not in table) judged on the line's own cells; below the first cell `lookup()` is None and `extrapolate_below=True` restores the v0.4.0 value for one call; one out-of-range component refuses the doublet sum (Zn 2p at 1048 eV on Scofield); `lookup`, the status value and the components agree over each table's grid; the MCP tool refuses below the first cell and judges its flag per line; the last cell is tabulated and just above it extrapolated; `get_rsf` passes `extrapolate_below` to both lines; Trzhaskovskaya's range is judged at each line's own kinetic energy |
 | 40 | `test_composition.py` | Homogeneous-equivalent composition: area / (σ × λ) normalised over the declared elements on synthetic peaks of known area; exposure divides integrated counts only, a transmission curve only when not applied; axis direction and scale do not change it; every missing fact (declared set, exposure basis, matrix source, a positive net area, a window inside the data that contains the line) refuses with a reason and never shrinks the denominator; assumptions, divided curves, a subset denominator and an extrapolated cross-section or IMFP make the result conditional; condition dependence over a 2 × 2 grid with its interaction |
 | 19 | `test_composition_uncertainty.py` | `composition_uncertainty` (design record §10): the declaration's arrays are copied and validated, `this_data` and unknown assumption names refused, a declaration that does not describe the data is a `ValueError`; `not_evaluated` for a refused composition or non-Poisson counts, `withheld` by the structural checks (table, transmission state, missing assumptions) before any bootstrap and by a prediction above the threshold with no data-side bootstrap; `evaluated` is always `assumed` and carries the snapshot; the shipped scope is the third record's decision; the four implementation checks of the public path (no observed quantity in the admission, the registered entry point reproduces the validation bit for bit, the published set is the set with no refused replicate, `registered` only through the private entry point); `composition()` alone says the uncertainty is not computed there; a refused data-side replicate withholds; the returned scope is a copy; the registered values are the harness's; the second record's verdicts recompute; the first harness runs and resumes |
@@ -155,6 +155,7 @@ them would take real coverage with them:
 | 26 | `test_cross_section_withheld_cells.py` | Cells a table prints but `lookup()` withholds as suspected source misprints: the bundled file keeps Yeh–Lindau Cu 3d at 8047.8 eV as printed (`.32E-3`), the evidence against it (fall from 1486.6 eV and ratio to Scofield against Ni and Zn), no value above 1486.6 eV under both interpolations, every other cell of every table loaded as stored, and a stale, missing or non-final entry refused |
 | 12 | `test_cross_section_trzhaskovskaya_axis.py` | Trzhaskovskaya read at E + Eb: printed cells from ADNDT 77, 82 and 92 come back at their photon energy, every line on its own axis, the shipped file unchanged, no shared photon grid offered, no cell below its threshold, and on closed core s, p, d subshells agreement with Scofield (kb against Mb) to a median 2 % in every band of Eb/hν; the MCP tool reports no shared grid for it |
 | 13 | `test_cross_section_thresholds.py` | The binding energy a table prints, reported as `printed_binding_energy_eV` and never used as a threshold: every Yeh–Lindau and Trzhaskovskaya line carries one; below it with no `BindingEnergy` value there is still no known zero (Cu 4s, Np 2p); Scofield's printed subshell energies for Np–Fm and Pm pinned to report pages and checked against where each line's cells start |
+| 5 | `test_cross_section_trzhaskovskaya_transcription.py` | Five Trzhaskovskaya corrections pinned to the printed tables: Eu 5p3/2 at 10 keV (was 10x low), and Er, Tm, Yb 3p3/2 and Os 3d5/2, printed in ADNDT 82 but missing from the bundled file |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |

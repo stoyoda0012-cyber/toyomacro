@@ -88,8 +88,9 @@ _J_SUFFIXES = ("1/2", "3/2", "5/2", "7/2")
 #   missing one would be a genuine data gap, not an empty orbital.
 #   NOTE: Table A1 says nothing about any other table.
 # trzhaskovskaya — set False, conservatively, although the structure
-#   points the other way. Exactly 38 non-s subshells are half-listed;
-#   they are all open valence shells whose upper-j component would be
+#   points the other way. Exactly 42 non-s subshells are half-listed.
+#   Four are deep doublets explained below; the other 38 are all open
+#   valence shells whose upper-j component would be
 #   empty, and elements whose ground-state configuration does put an
 #   electron there (Cr 3d5, Mo 4d5, Eu 4f7, Re 5d5) carry both. That
 #   pattern is consistent with "listed iff occupied" — but it is an
@@ -101,10 +102,11 @@ _J_SUFFIXES = ("1/2", "3/2", "5/2", "7/2")
 #   38-count and the exception elements are pinned by test so the
 #   evidence is still there to act on. NOT licensed by Scofield's Table
 #   A1, which says nothing about this table. Note also that ADNDT 82
-#   (Z >= 55) prints only subshells bound by less than 2000 eV, so a
-#   deep doublet can be half-listed for that reason alone (Er, Tm, Yb
-#   3p3/2; Os 3d5/2) — and those four printed lines are missing from the
-#   bundled file, a transcription gap rather than an empty component.
+#   (Z >= 55) prints only subshells bound by less than 2000 eV (its
+#   abstract, p. 257), so a
+#   deep doublet can be half-listed for that reason alone: Er, Tm and Yb
+#   3p and Os 3d list only the shallower member. Those four printed lines
+#   were missing from the bundled file up to v0.6.0.
 # yeh_lindau — stores bare subshells only; j-resolved requests are refused
 #   rather than split by an assumed branching ratio.
 _ABSENT_COMPONENT_IS_UNOCCUPIED: dict[str, bool] = {
@@ -835,7 +837,7 @@ class CrossSection:
         each component, not the table's own binding energy. Where
         ``BindingEnergy`` has no value no threshold applies
         (``threshold_eV`` is None) — 147 of 754 Yeh-Lindau lines, 286 of
-        1,562 Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly
+        1,562 Scofield and 190 of 1,244 Trzhaskovskaya lines, mostly
         valence levels plus Scofield's deep levels of Np to Fm — and
         ``outside_range_below`` then does not mean the energy is above
         threshold. ``printed_binding_energy_eV`` gives the energy the
