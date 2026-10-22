@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.6.0] - 2026-10-21
 
+Archived on Zenodo:
+[10.5281/zenodo.23553166](https://doi.org/10.5281/zenodo.23553166).
+
 ### Added
 
 - **`composition_uncertainty(lines, conditions, declared=...)`,

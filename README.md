@@ -485,6 +485,8 @@ release is archived on Zenodo:
 
 - **All versions** (resolves to the latest release):
   [10.5281/zenodo.22092076](https://doi.org/10.5281/zenodo.22092076)
+- **v0.6.0**:
+  [10.5281/zenodo.23553166](https://doi.org/10.5281/zenodo.23553166)
 - **v0.5.1**:
   [10.5281/zenodo.23387368](https://doi.org/10.5281/zenodo.23387368)
 - **v0.5.0**:
