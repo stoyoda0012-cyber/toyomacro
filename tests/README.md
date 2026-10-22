@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,690 automated tests** across **101 files**, in two
+This suite has **2,703 automated tests** across **102 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 63 | 1,599 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 64 | 1,612 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,091 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,11 +21,11 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,258 tests, 84%) — guarantee the library
+- **Contract / regression** (2,271 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
-- **Paper reproduction** (432 tests, 17%) — reproduce the accuracy
+- **Paper reproduction** (432 tests, 16%) — reproduce the accuracy
   and throughput claims in the JOSS paper: the GVRT image round-trip,
   the Hilbert/Split parameter encoders, and the Si 2p sub-oxide fit.
   These sweep large parameter grids and are the reason the count looks
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,678. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,691. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,599)
+## Library body — `tests/` (1,612)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -132,7 +132,7 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (705)
+### Quantification data (718)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -154,6 +154,7 @@ them would take real coverage with them:
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
 | 26 | `test_cross_section_withheld_cells.py` | Cells a table prints but `lookup()` withholds as suspected source misprints: the bundled file keeps Yeh–Lindau Cu 3d at 8047.8 eV as printed (`.32E-3`), the evidence against it (fall from 1486.6 eV and ratio to Scofield against Ni and Zn), no value above 1486.6 eV under both interpolations, every other cell of every table loaded as stored, and a stale, missing or non-final entry refused |
 | 12 | `test_cross_section_trzhaskovskaya_axis.py` | Trzhaskovskaya read at E + Eb: printed cells from ADNDT 77, 82 and 92 come back at their photon energy, every line on its own axis, the shipped file unchanged, no shared photon grid offered, no cell below its threshold, and on closed core s, p, d subshells agreement with Scofield (kb against Mb) to a median 2 % in every band of Eb/hν; the MCP tool reports no shared grid for it |
+| 13 | `test_cross_section_thresholds.py` | The binding energy a table prints, reported as `printed_binding_energy_eV` and never used as a threshold: every Yeh–Lindau and Trzhaskovskaya line carries one; below it with no `BindingEnergy` value there is still no known zero (Cu 4s, Np 2p); Scofield's printed subshell energies for Np–Fm and Pm pinned to report pages and checked against where each line's cells start |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |

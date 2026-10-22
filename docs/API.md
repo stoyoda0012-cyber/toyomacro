@@ -407,12 +407,23 @@ rather than a silent under-count (Zn 2p at 1048 eV on Scofield: 2p3/2 is
 tabulated, 2p1/2 is above its threshold but below its first cell). When
 every component is a known zero the status value is `0.0`, while
 `lookup()` keeps returning `None`. The threshold is the `BindingEnergy`
-value of each component, not a table's own binding-energy column; where
+value of each component, not a table's own binding energy; where
 `BindingEnergy` has no value — 147 of 754 Yeh–Lindau lines, 286 of 1,562
 Scofield and 190 of 1,240 Trzhaskovskaya lines, mostly valence levels
 plus Scofield's deep levels of Np–Fm — `threshold_eV` is `None`, no
 threshold was applied, and `outside_range_below` does not mean the
-energy is above threshold. Where the two disagree the threshold wins, as
+energy is above threshold. Each component also carries
+`printed_binding_energy_eV`, the energy the table itself prints for that
+line: every Yeh–Lindau and Trzhaskovskaya line, and for Scofield the 71
+lines `BindingEnergy` lacks among Np–Fm and Pm, read from UCRL-51326. It
+shows where the table places the onset and is never used as a threshold.
+These are calculated or free-atom energies, and they can lie above a
+solid's edge. For Th, Pa and U, where `BindingEnergy` has values,
+Scofield's 2p1/2 edge sits 89–99 eV above them, and its Np 2p1/2 is
+printed at 21,704.9 eV. Yeh–Lindau prints Cu 4s at 6.9 eV, a calculated free-atom
+value referred to the vacuum level, while metallic Cu emits from the
+Fermi level at photon energies above its work function, about 4.7 eV. Treating "below it" as a known zero would
+drop a component that is open. Where the two disagree the threshold wins, as
 in v0.4.0: `below_threshold` withholds cells the table prints below the
 `BindingEnergy` value (47 on Yeh–Lindau, e.g. As 2s at Al Kα; 73 on
 Scofield, e.g. Ar 1s1/2 at 3199.8 eV; none on Trzhaskovskaya, whose
@@ -431,8 +442,9 @@ shape the bundled JSON has (Trzhaskovskaya differs, see below):
 `{"photon_energies": [...], "data": {element: {orbital:
 {"binding_energy": eV or None, "cross_sections": [...]}}}}`, with one
 entry per photon energy and `None` where the source table has no entry
-(usually, not only, below the binding energy; Scofield lines carry no
-binding energy). It is the live process cache, not a copy — read from
+(usually, not only, below the binding energy). Scofield lines carry no
+binding energy except the 71 read from the report's printed subshell
+energies, as above; on every table that field is informational. It is the live process cache, not a copy — read from
 it, or deep-copy before mutating — and `photon_energies` and a line's
 `cross_sections` are only meaningful read as a pair. The grid values are
 the tabulated ones in the unit `unit_info()` reports; `lookup()`
