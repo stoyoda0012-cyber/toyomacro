@@ -102,7 +102,8 @@ _J_SUFFIXES = ("1/2", "3/2", "5/2", "7/2")
 #   38-count and the exception elements are pinned by test so the
 #   evidence is still there to act on. NOT licensed by Scofield's Table
 #   A1, which says nothing about this table. Note also that ADNDT 82
-#   (Z >= 55) prints only subshells bound by less than 2000 eV, so a
+#   (Z >= 55) prints only subshells bound by less than 2000 eV (its
+#   abstract, p. 257), so a
 #   deep doublet can be half-listed for that reason alone: Er, Tm and Yb
 #   3p and Os 3d list only the shallower member. Those four printed lines
 #   were missing from the bundled file up to v0.6.0.

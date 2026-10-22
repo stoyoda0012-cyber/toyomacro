@@ -89,8 +89,8 @@ Conventions that are easy to conflate, and are not the same:
 Which j components the 2001/2002 table lists for an open shell has not
 been read as a rule from the source. Four of its 42 half-listed
 subshells are deep doublets whose deeper member ADNDT 82 does not print,
-because it lists only subshells bound by less than 2000 eV (Er, Tm, Yb
-3p; Os 3d). The other 38 are consistent with "listed iff occupied", but until the inclusion rule is
+because it lists only subshells bound by less than 2000 eV (its
+abstract, p. 257; Er, Tm, Yb 3p; Os 3d). The other 38 are consistent with "listed iff occupied", but until the inclusion rule is
 read a half-listed bare subshell returns `None` rather than summing the
 listed component alone and calling the absent one zero. The listed
 component is still available as a j-resolved request, and the 38-count

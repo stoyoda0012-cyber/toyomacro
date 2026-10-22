@@ -667,7 +667,9 @@ def test_cutoff_half_listed_doublets_lack_the_member_bound_by_2000_ev_or_more():
     """ADNDT 82 prints only subshells bound by less than 2000 eV.
 
     For these four the deeper member is the one missing, and its binding
-    energy is above that limit; the listed one is below it.
+    energy is above that limit; the listed one is below it. The missing
+    member is checked with BindingEnergy (the paper does not print it);
+    the narrowest margin is Er 3p1/2 at 2006 eV.
     """
     from toyomacro.data import BindingEnergy
 

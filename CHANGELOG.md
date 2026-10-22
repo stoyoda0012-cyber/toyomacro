@@ -54,14 +54,18 @@ archived on Zenodo for a citable DOI.
   All 11,160 cells at 100–5000 eV and all 1,240 binding energies agreed,
   and 1,148 of 1,149 cells at 10 keV. The exception: Eu 5p3/2 at 10 keV
   was stored as 0.01133 kb where ADNDT 92 Table 2 (p. 299) prints 0.1133.
-  Above about 4 keV Eu 5p3/2 rises, for example ×3.3 at 8047.8 eV, and
-  its ratio to Scofield goes from 0.30 to 0.99 there. Four lines ADNDT 82
+  Under PCHIP (the default) Eu 5p3/2 falls by up to 2 % at 4.0–5.0 keV
+  and rises above, ×3.3 at 8047.8 eV, where its ratio to Scofield goes
+  from 0.30 to 0.99. Under `polyfit` the whole line moves, by up to −21 %
+  near 1.8 keV and ×4.2 at 8047.8 eV (ratio to Scofield 0.24 to 1.00);
+  every move is toward Scofield. Four lines ADNDT 82
   prints were missing: Er, Tm and Yb 3p3/2 and Os 3d5/2 (pp. 275–283;
   10 keV from ADNDT 92 pp. 300–301). They are the shallower member of a
   deep doublet whose deeper member ADNDT 82 omits, because it prints
   only subshells bound by less than 2000 eV. So 42 subshells are now
-  half-listed, 38 of them open valence shells as before. The new lines
-  agree with Scofield to 2–6 % at 3–9 keV. Compared over every output of
+  half-listed, 38 of them open valence shells as before (the cut-off is
+  stated in ADNDT 82's abstract, p. 257). Under PCHIP the new lines agree
+  with Scofield to 1–6 % at 3–9 keV. Compared over every output of
   the three tables: Yeh–Lindau and Scofield are byte-identical, and on
   Trzhaskovskaya only Eu 5p (and 5p3/2) changes besides the added lines.
 

@@ -484,9 +484,10 @@ Three consequences worth knowing before you trust a number:
 - **A missing component is not guessed at.** Trzhaskovskaya
   half-lists 42 non-s subshells. Four are deep doublets whose deeper
   member ADNDT 82 omits because it prints only subshells bound by less
-  than 2000 eV (Er, Tm, Yb 3p; Os 3d). The other 38 are all open valence
-  shells whose upper-j component would be empty, and the configuration exceptions (Cr 3d⁵,
-  Mo 4d⁵, Eu 4f⁷, Re 5d⁵) carry both. That is consistent with "listed
+  than 2000 eV (abstract, p. 257; Er, Tm, Yb 3p; Os 3d). The other 38
+  are all open valence shells whose upper-j component would be empty,
+  and the configuration exceptions (Cr 3d⁵, Mo 4d⁵, Eu 4f⁷, Re 5d⁵)
+  carry both. That is consistent with "listed
   iff occupied" — but the inclusion rule has **not** been read from
   ADNDT 77/82, so a half-listed bare subshell returns `None` rather than
   treating the absence as a zero. The component that *is* listed remains
