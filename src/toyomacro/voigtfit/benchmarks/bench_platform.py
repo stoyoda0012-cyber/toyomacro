@@ -621,7 +621,9 @@ def settle(timeout_s: float, poll_s: float = 10.0, snapshot=None,
     that "quiet" here means exactly what it means in the verdict.
 
     Returns how long it waited and whether the host reached quiet. On a
-    platform with no load average there is nothing to wait for. Waiting
+    platform with no load average the verdict is the CPU-utilisation
+    convention of ``load_snapshot``; with no verdict at all there is
+    nothing to wait for. Waiting
     stops at ``timeout_s``; the next run then goes ahead, and its own
     verdict says what it found.
     """
@@ -637,8 +639,10 @@ def settle(timeout_s: float, poll_s: float = 10.0, snapshot=None,
         if waited >= timeout_s:
             return {"waited_s": round(waited, 1), "settled": False,
                     "load_average": snap.get("load_average")}
-        la = snap.get("load_average") or [None]
-        print(f"  waiting for the host to settle: load {la[0]:.2f} on "
+        la = snap.get("load_average")
+        what = (f"load {la[0]:.2f}" if la else
+                f"CPU {snap.get('cpu_percent')} %")
+        print(f"  waiting for the host to settle: {what} on "
               f"{snap.get('logical_cores')} cores ({waited:.0f} s)", flush=True)
         sleep(poll_s)
 
@@ -835,7 +839,10 @@ def main(argv: list[str] | None = None) -> None:
         la = (load.get("load_average_before") or load.get("load_average")
               or [None])[0]
         where = "before the run" if load.get("load_average_before") else ""
-        print(f"\nWARNING: load average {la:.1f} {where} on "
+        cpu = load.get("cpu_percent_before", load.get("cpu_percent"))
+        what = (f"load average {la:.1f} {where}" if la is not None else
+                f"whole-machine CPU {cpu}% before the run")
+        print(f"\nWARNING: {what} on "
               f"{load['logical_cores']} cores - this host was busy. "
               "Throughput here is not comparable with a record taken on an "
               "idle machine.", flush=True)

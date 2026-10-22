@@ -180,6 +180,19 @@ owner's statement: the record carries the CPUID string Windows returns
 hashes: throughput compares, `mae_*` does not. No published number
 derives from M4.
 
+Three of the Windows-side gaps this record showed are closed after
+v0.6.0, and the record itself is not regraded: a host without a load
+average is now graded by whole-machine CPU utilisation over the
+sampling window (below 25 %, a quarter of the machine, as the load
+convention; one short window, so a weaker signal, and the record names
+the rule in `quiet_convention`), which also gives the wait between
+`--runs` children something to wait on; the CPU name is read from the
+registry's `ProcessorNameString`, so a new record from this laptop
+carries the marketing name and a different host label from this one,
+and the two will not group together; and a `null` thermal or steal
+field is documented as "not measurable here", never "not throttled" or
+"no steal".
+
 **A Linux-only measurement bug, fixed.** `ru_maxrss` is in kibibytes on
 Linux, and two different mistakes were made about it.
 `memory.get_rss_gb` converted at 1000 bytes per kilobyte rather than
@@ -256,8 +269,9 @@ this kernel is bound by.
 So `contended` at this threshold does not imply a depressed number, and
 this repository has no measurement establishing where the boundary
 actually falls. The convention — every load average below a
-quarter of the core count — is recorded in each record as a convention
-for that reason. Treat a `contended` verdict as a reason to check
+quarter of the core count, or, on a platform without one, whole-machine
+CPU utilisation below 25 % over the sampling window — is recorded in
+each record as a convention for that reason. Treat a `contended` verdict as a reason to check
 `top_processes` and `cpu_percent_others`, not as grounds to discard a
 figure unexamined.
 
