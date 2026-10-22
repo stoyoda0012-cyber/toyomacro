@@ -117,6 +117,9 @@ def test_a_declaration_that_does_not_describe_the_data_is_a_value_error(case):
     with pytest.raises(ValueError, match="assume_intensity"):
         c = replace(pub, assume_intensity="integrated_counts")
         comp.composition_uncertainty(data, c, declared=replace(decl, conditions=c))
+    with pytest.raises(ValueError, match="real-valued"):  # not silently its real part
+        comp.composition_uncertainty([replace(data[0], intensity=data[0].intensity + 10j)] + data[1:],
+                                     pub, declared=decl)
 
 
 # --- statuses, in the order of §10 ----------------------------------------------

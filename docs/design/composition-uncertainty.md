@@ -833,9 +833,9 @@ noise of the net areas, so a different matrix or photon energy changes
 without any evidence that equal r_pred means equal calibration. The
 calibration is applied to them under the user's declaration that the
 registered result transfers; the result lists each as an assumption.
-Likewise the many-counts side: use at r_pred below the lowest level is
-an extrapolation that the declaration must state (the code does not
-check it, below); r_pred < 0.005 alone
+Likewise the many-counts side: use at more counts than the lowest
+registered level is an extrapolation that the declaration must state
+(the code does not check it, below); r_pred < 0.005 alone
 does not detect it (the registered κ = (1, 1) spectra at level 0.005
 themselves have r_pred 0.0045–0.0049, and admitted pairs go down to
 0.0016), so no numerical lower bound is imposed.
@@ -886,7 +886,7 @@ the method does not apply.
     composition_uncertainty(lines, conditions, *, declared) -> CompositionUncertainty
 
 No `n_boot`, no seed, no retry: B = 1,000 and the keys above are the
-only validated setting. It runs the steps in the order given under
+only settings this API exposes. It runs the steps in the order given under
 "What the code checks" and returns:
 
 - `composition`: the `CompositionResult` the uncertainty belongs to;
