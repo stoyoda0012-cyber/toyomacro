@@ -8,6 +8,22 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Changed
+
+- **Benchmark records from a host without a load average (Windows) are
+  graded.** `bench_platform`'s quiet verdict used every load average and
+  left Windows records `unknown`, so `summarize_records` never used them
+  for a headline figure and the wait between `--runs` children returned
+  at once. Such a host is now graded by whole-machine CPU utilisation
+  over the sampling window (below 25 %, a convention like the load one
+  and a weaker signal), named in `quiet_convention`; a busy start cites
+  that figure. The CPU name on Windows is read from the registry's
+  `ProcessorNameString` instead of the CPUID family string, which
+  changes the host label of a new Windows record. Records already
+  committed are not regraded. A `null` thermal or steal field is
+  documented as "not measurable here". The schema version stays 3:
+  hosts with a load average are graded as before.
+
 ## [0.6.0] - 2026-10-21
 
 Archived on Zenodo:

@@ -817,3 +817,66 @@ class TestSettleBetweenRuns:
         c = self._Clock()
         out = bp.settle(600, snapshot=self._snaps(None), sleep=c.sleep, clock=c.now)
         assert out["settled"] is None and out["waited_s"] == 0
+
+
+
+class TestWindowsGaps:
+    """The four Windows-side gaps a native Windows record showed (PR #57)."""
+
+    def test_no_load_average_is_graded_by_whole_machine_cpu(self, monkeypatch):
+        monkeypatch.delattr(record.os, "getloadavg", raising=False)
+        snap = record.load_snapshot(interval=0.05)
+        assert snap["load_average"] is None
+        if snap["cpu_percent"] is None:  # psutil absent: nothing to grade on
+            assert snap["looks_quiet"] is None
+            return
+        assert snap["looks_quiet"] is (snap["cpu_percent"] < 25.0)
+        assert "no load average" in snap["quiet_convention"]
+        assert "0.05 s" in snap["quiet_convention"]
+
+    def test_a_busy_windows_start_cites_cpu_not_a_missing_load(self):
+        q = record.assess_quality({"looks_quiet_before": False, "looks_quiet": False,
+                                   "load_average": None, "cpu_percent_before": 61.0,
+                                   "logical_cores": 14}, None, None)
+        assert q["verdict"] == "contended"
+        assert q["reasons"] == ["whole-machine CPU 61% before the run "
+                                "(no load average on this platform)"]
+        q = record.assess_quality({"looks_quiet_before": True, "looks_quiet": True,
+                                   "load_average": None, "cpu_percent_before": 2.3,
+                                   "logical_cores": 14}, None, None)
+        assert q["verdict"] == "quiet"
+
+    def test_windows_cpu_name_comes_from_the_registry(self, monkeypatch):
+        import sys
+        import types
+        fake = types.SimpleNamespace(
+            HKEY_LOCAL_MACHINE=object(),
+            OpenKey=lambda root, path: ("key", path),
+            QueryValueEx=lambda key, name: ("Intel(R) Core(TM)  Ultra 5 235U ", 1),
+            CloseKey=lambda key: None)
+        monkeypatch.setitem(sys.modules, "winreg", fake)
+        monkeypatch.setattr(record.platform, "system", lambda: "Windows")
+        monkeypatch.setattr(record.platform, "processor",
+                            lambda: "Intel64 Family 6 Model 181 Stepping 0, GenuineIntel")
+        assert record.cpu_name() == "Intel(R) Core(TM) Ultra 5 235U"
+        monkeypatch.setitem(sys.modules, "winreg", None)  # the registry unreadable
+        assert record.cpu_name().startswith("Intel64 Family 6")
+
+    def test_settle_waits_on_the_cpu_verdict_and_prints_it(self, capsys):
+        from toyomacro.voigtfit.benchmarks import bench_platform as bp
+        seq = iter([False, True])
+
+        def snapshot():
+            q = next(seq)
+            return {"looks_quiet": q, "load_average": None, "cpu_percent": 40.0 if not q else 3.0,
+                    "logical_cores": 14}
+        t = {"now": 0.0}
+        out = bp.settle(600, poll_s=10, snapshot=snapshot,
+                        sleep=lambda s: t.__setitem__("now", t["now"] + s),
+                        clock=lambda: t["now"])
+        assert out["settled"] is True and out["waited_s"] == 10
+        assert "CPU 40.0 %" in capsys.readouterr().out
+
+    def test_none_means_not_measurable_for_steal_and_thermal(self):
+        assert "not measurable here" in record.steal_percent.__doc__
+        assert "never \"not throttled\"" in record.thermal_state.__doc__

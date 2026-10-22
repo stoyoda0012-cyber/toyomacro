@@ -151,7 +151,7 @@ def summarize(records: list[dict], solvers: tuple[str, ...]) -> None:
         # summary state the opposite of what it did.
         if not quiet:
             print("   !! no quiet run on this machine - no headline figures. "
-                  f"{len(recs)} contended record(s) listed below.")
+                  f"{len(recs)} record(s) not graded quiet listed below.")
         for solver in solvers:
             rates = [v for v in (solver_rate(r, solver) for r in quiet)
                      if v is not None]
