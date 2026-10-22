@@ -36,8 +36,18 @@ def _restore_interpolation():
 
 
 def _lines(table):
+    """The table and its photon energies: the shared grid, or for a table
+    whose lines each carry their own (Trzhaskovskaya), all of them."""
     d = CrossSection.to_dict(table)
-    return d, d["photon_energies"]
+    if "photon_energies" in d:
+        return d, d["photon_energies"]
+    return d, sorted({e for rec in d["data"].values() for line in rec.values()
+                      for e in line["photon_energies"]})
+
+
+def _cells(d, line):
+    """A line's own photon energies, falling back to the table's grid."""
+    return line.get("photon_energies") or d["photon_energies"]
 
 
 # --- implementation fidelity -------------------------------------------------
@@ -45,14 +55,14 @@ def _lines(table):
 @pytest.mark.parametrize("table", AVAILABLE_TABLES)
 def test_pchip_returns_every_tabulated_cell(table):
     """At a tabulated energy the stored line gives back the stored value."""
-    d, energies = _lines(table)
+    d, _ = _lines(table)
     checked = 0
     for element, rec in d["data"].items():
         for orbital, line in rec.items():
             valid = [v for v in line["cross_sections"] if v is not None and v > 0]
             if len(valid) < 2:
                 continue
-            for e, v in zip(energies, line["cross_sections"]):
+            for e, v in zip(_cells(d, line), line["cross_sections"]):
                 if v is None or v <= 0:
                     continue
                 got = CrossSection._interp_one(line, d, e)
@@ -63,7 +73,11 @@ def test_pchip_returns_every_tabulated_cell(table):
 
 # Values lookup() returned in v0.3.1 on macOS/arm64 (whole-line cubic,
 # order 3 unless stated). "polyfit" must reproduce them to round-off; the
-# least-squares fit's last bits differ between platforms.
+# least-squares fit's last bits differ between platforms. The one
+# Trzhaskovskaya row (Cu 2p3/2 at 1486.6 eV, 52.596778468462944) was removed
+# when that table's grid was placed on the photon axis: v0.3.1 read its
+# photoelectron energies as photon energies, so the value was not meant to
+# survive.
 V031 = [
     ("yeh_lindau", "Si", "2p", 1486.6, 3, 0.01058780110464214),
     ("yeh_lindau", "Ar", "3p", 8047.8, 3, 1.62378556370801e-05),
@@ -72,7 +86,6 @@ V031 = [
     ("yeh_lindau", "O", "1s", 9251.7, 3, 0.00018100209215092514),
     ("scofield", "Si", "2p", 1486.6, 3, 0.0111514214810607),
     ("scofield", "Ir", "3d5/2", 2058.8, 3, 0.31156054742441186),
-    ("trzhaskovskaya", "Cu", "2p3/2", 1486.6, 3, 52.596778468462944),
     ("yeh_lindau", "Si", "2p", 1486.6, 6, 0.011033255233477634),
 ]
 

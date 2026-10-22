@@ -367,11 +367,12 @@ from 40.8 eV at 53 Mb). `extrapolate_below=True` restores the earlier
 value for that call only. A line with a single valid cell (only
 Yeh–Lindau Lr 4p) answers at that cell's energy, and below it only with
 `extrapolate_below=True`; above it never. "Range" means the line's own
-valid cells, not the table's energy grid, on the axis the table is
-interpolated on — for Trzhaskovskaya a photoelectron-energy grid read as
-photon energy, so there a value can be `tabulated` below the source's
-first kinetic energy (Au 4f at 150 eV; 1,170 components over the
-table's grid and photon energies commonly used in XPS). A subshell
+valid cells, not the table's energy grid, in photon energy.
+Trzhaskovskaya is tabulated at photoelectron energies E = 100 eV–10 keV,
+so each of its lines has its own photon-energy cells, E + Eb with the Eb
+the table prints for that subshell: Au 4f7/2 starts at 187 eV, and at
+150 eV it is `outside_range_below`. Up to v0.6.0 that grid was read as
+photon energy. A subshell
 the table does not carry for that element returns `None` — it is not
 estimated from other elements. Yeh–Lindau lists no level bound by more
 than about 1.5 keV (no 1s above Mg, no 2p above Se, no 3d above Er), so
@@ -414,8 +415,8 @@ threshold was applied, and `outside_range_below` does not mean the
 energy is above threshold. Where the two disagree the threshold wins, as
 in v0.4.0: `below_threshold` withholds cells the table prints below the
 `BindingEnergy` value (47 on Yeh–Lindau, e.g. As 2s at Al Kα; 73 on
-Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on Trzhaskovskaya, from its
-energy axis), and the known limits of that source apply: unresolved
+Scofield, e.g. Ar 1s1/2 at 3199.8 eV; none on Trzhaskovskaya, whose
+cells start 100 eV above its own binding energies), and the known limits of that source apply: unresolved
 spin-orbit pairs are stored with one value for both members (Co 3p at
 59 eV, as Fuggle & Mårtensson 1980 print it; the X-ray Data Booklet's
 3p3/2 = 59.9, in none of its cited sources, is evidently a misprint of
@@ -436,6 +437,12 @@ it, or deep-copy before mutating — and `photon_energies` and a line's
 `cross_sections` are only meaningful read as a pair. The grid values are
 the tabulated ones in the unit `unit_info()` reports; `lookup()`
 interpolates through them and returns them at their own energies.
+Trzhaskovskaya differs in one respect: it has no shared photon-energy
+grid. Its printed grid of photoelectron energies is under
+`photoelectron_energies`, and each line carries its own
+`photon_energies` (E + Eb), read as a pair with that line's
+`cross_sections`; `get_available_photon_energies('trzhaskovskaya')`
+raises rather than return kinetic energies under that name.
 
 **A printed cell can be withheld.** `CrossSection.withheld_cells(table)`
 lists the cells a table prints that `lookup()` does not use, because the
@@ -493,28 +500,29 @@ NE 0.33 + 0.67 = 1 electron, C 0.67 + 1.33 = 2, N 1 + 2 = 3,
 O 1.33 + 2.67 = 4). Sum the components as stored; weighting them by
 occupancy again double-corrects.
 
-**The tables are not on a common scale, and one unit is not
-established.** Ask rather than assume:
+**The tables are not on a common scale.** Ask rather than assume:
 
 ```python
 CrossSection.unit_info('scofield')
 # {'table': 'scofield', 'unit': 'Mb', 'inferred_unit': None,
 #  'status': 'confirmed', 'values_rescaled': False}
 CrossSection.unit_info('trzhaskovskaya')
-# {'unit': None, 'inferred_unit': 'kb', 'status': 'inferred', ...}
+# {'unit': 'kb', 'inferred_unit': None, 'status': 'confirmed',
+#  'note': 'Values are for completely filled subshells ...', ...}
 ```
 
-Yeh–Lindau and Scofield are megabarn, each read from its source.
-Trzhaskovskaya values run ~10³ larger; the evidence points to kilobarn
-but the ADNDT 77/82 table heading has not been read, so `unit` stays
-empty, the candidate travels in `inferred_unit`, and no conversion
-factor is offered. Nothing stored is rescaled on an inference. Ratios
-within one table cancel the unknown *unit* factor — and only that. For
-`trzhaskovskaya` a second, independent problem survives any ratio: the
-table is gridded in photoelectron energy but interpolated as photon
-energy, so two lines with different binding energies are read at
-different effective points. Absolute cross-sections, σ×λ sensitivities
-and cross-table comparisons carry both. See
+Yeh–Lindau and Scofield are megabarn and Trzhaskovskaya kilobarn, each
+read from its source's own table heading ("in kb (=10⁻²¹ cm²)", ADNDT
+77, 106; 82, 260; 92, 252). Nothing stored is rescaled. The same
+headings say the Trzhaskovskaya values are **for completely filled
+subshells**: for an open subshell the source divides by 2j+1 and
+multiplies by the actual occupation number. `lookup()` does not apply
+that factor, so a component holding N_j electrons of an open valence
+subshell on that table (H 1s, the alkali s, transition-metal d, most
+p-block p) is overstated by (2j+1)/N_j, and a ratio involving one
+carries it. A future table with an unconfirmed unit
+would report `unit=None` and the candidate in `inferred_unit`, so no
+caller can convert by reading a single field. See
 [`DATA_SOURCES.md`](DATA_SOURCES.md), which also records why the
 2018/2019 tables' unit was checked separately rather than inherited.
 
@@ -523,9 +531,10 @@ and cross-table comparisons carry both. See
 name it is not a complete relative sensitivity factor and not an
 average-matrix RSF: no IMFP or EAL, no elastic scattering, no angular
 distribution, no polarization or geometry, no analyzer transmission, no
-matrix averaging. (Subshell occupancy is *not* a missing factor — it is
-already inside the tabulated σ, which is why the `2p3/2` : `2p1/2` ratio
-comes out near 2:1.) A vendor RSF table is a different quantity; the two
+matrix averaging. (Subshell occupancy is *not* a missing factor for a
+closed subshell — it is already inside the tabulated σ, which is why the
+`2p3/2` : `2p1/2` ratio comes out near 2:1. Trzhaskovskaya open
+subshells are the exception above.) A vendor RSF table is a different quantity; the two
 are not interchangeable. The name is kept for backward compatibility and
 may be revisited after v0.1.0.
 

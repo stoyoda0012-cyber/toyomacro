@@ -32,13 +32,13 @@ been granted where none is stated.
 |---|---|---|---|
 | `scofield.json` | Photoionization cross sections σ(hν), 1–30 keV, Z = 1–100 | Scofield, *Theoretical photoionization cross sections from 1 to 1500 keV*, UCRL-51326, Lawrence Livermore Laboratory (1973). DOI: 10.2172/4545040 | U.S. government-sponsored scientific report; factual numerical data transformed and fully cited. The OSTI record (biblio/4545040) displays no rights, copyright or access-limitation statement, and gives DOE contract W-7405-ENG-48. Bundled cache truncated at 30 keV (covers all lab / HAXPES sources). |
 | `cross_section.json` | σ(hν) at 16 photon energies, 10.2 eV–8.05 keV | Yeh & Lindau, *At. Data Nucl. Data Tables* **32**, 1 (1985). DOI: 10.1016/0092-640X(85)90016-6 | Factual numerical values, transformed into this project's schema and fully cited. No express restrictive notice applies to the values themselves. (The same dataset is redistributed by other open-source projects, e.g. `galore`, JOSS 2018 — noted as context, not as a grant of permission.) |
-| `trzhaskovskaya.json` | Relativistic σ, 10-energy grid 0.1–10 keV, Z = 1–100 | Hand-digitized (in the MATLAB Toyomacro era) from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **77**, 97 (2001), DOI: 10.1006/adnd.2000.0849 (Z = 1–54) and **82**, 257 (2002), DOI: 10.1006/adnd.2002.0886 (Z = 55–100); the 10 keV column comes from a later extension of the same series. **Caveat:** these compilations tabulate against *photoelectron* (kinetic) energy, but the lookup — inherited from the original MATLAB implementation — interpolates the grid as *photon* energy, a systematic energy-axis offset of order BE/hν. Negligible for shallow levels at HAXPES energies; use the 2018/2019 tables below (photon-energy grid, σ included) for deep core levels. | Factual numerical values, hand-transcribed in the MATLAB era and re-expressed in this project's schema, fully cited. No publisher typography or prose is reproduced. |
+| `trzhaskovskaya.json` | Relativistic σ, 10-energy grid 0.1–10 keV, Z = 1–100 | Hand-digitized (in the MATLAB Toyomacro era) from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **77**, 97 (2001), DOI: 10.1006/adnd.2000.0849 (Z = 1–54) and **82**, 257 (2002), DOI: 10.1006/adnd.2002.0886 (Z = 55–100); the 10 keV column comes from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **92**, 245 (2006), DOI: 10.1016/j.adt.2005.12.002, Table 2 (E = 10 keV). All three tabulate against *photoelectron* (kinetic) energy E — nine energies 100–5000 eV, then 10 keV — and print an experimental binding energy Eb per subshell. Since 2026-10 each line is read at photon energy E + Eb with its own Eb (stored per line as `binding_energy`); up to v0.6.0 the grid was read as photon energy, inherited from the MATLAB implementation. σ is in kb **for completely filled subshells**; see the units section. | Factual numerical values, hand-transcribed in the MATLAB era and re-expressed in this project's schema, fully cited. No publisher typography or prose is reproduced. |
 | `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
 | `trzh2019_inner.json` | σ, β, γ, δ (inner shells, hν = 2–18 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (eV; integers except some rows of Np–Lr), per subshell | Standard elemental BE compilation — values follow the LBNL X-ray Data Booklet, except where noted at the end of this row "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values largely appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. **Co 3p departs from the Booklet on purpose** (the table also departs from it elsewhere — N, O and F 1s, absent Ce and Eu 4f, the 7s of Ra–U and the rows of Np–Lr, which the Booklet does not have — for reasons not recorded): it is stored unresolved at 59 eV for both members, as Fuggle & Mårtensson, *J. Electron Spectrosc. Relat. Phenom.* **21**, 275 (1980), doi:10.1016/0368-2048(80)85056-0, Table 2 prints it — 58.8 and 59.0 eV from two instruments, in the column between 3p1/2 and 3p3/2, as for Mn and Fe. The Booklet marks its Co values † ("values taken from Ref. 3", i.e. Fuggle & Mårtensson, Booklet §1.1) and lists 3p1/2 = 58.9, the mean of the two, but 3p3/2 = 59.9, which appears in none of its cited sources: evidently a misprint of 58.9. It was the only spin-orbit pair in the table stored with 3p3/2 deeper than 3p1/2. Bearden & Burr 1967 give one Co M<sub>II,III</sub> level, 59.5 ± 0.3 eV, equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p (59.70, 60.20) lie closer to the old 60. An equal pair records unresolved data, not degenerate levels: free-atom values put Co 3p3/2 about 2 eV less bound than 3p1/2 (e.g. Trzhaskovskaya et al. 2001, 66 and 68 eV). |
 | `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and every entry that overlaps a TPP-series parameter table differs from it. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
 
-## Cross-section units — one table's is not established
+## Cross-section units
 
 The three tables reachable through `CrossSection.lookup` are **not on a
 common scale**, and the evidence for each unit is different. Query it
@@ -48,19 +48,16 @@ rather than assuming: `CrossSection.unit_info(table)`.
 |---|---|---|
 | `yeh_lindau` | Mb | **Confirmed.** Yeh & Lindau tabulate in Mb. |
 | `scofield` | Mb | **Confirmed.** UCRL-51326 Table A2 is headed "PHOTOELECTRIC CROSS SECTIONS(BARNS)"; the bundled cache reproduces those entries after barn → Mb. |
-| `trzhaskovskaya` | *inferred* kb | **Not confirmed.** Values run ~10³ above the megabarn tables. Comparison with Scofield after correcting the energy axis, and the same authors' later tables, both point to kb — but the ADNDT 77 (2001) / 82 (2002) table heading itself has not been read. |
+| `trzhaskovskaya` | kb | **Confirmed.** The explanation of tables in ADNDT 77 (p. 106), 82 (p. 260) and 92 (p. 252) gives σ "in kb (=10⁻²¹ cm²) for completely filled subshells". Until 2026-10 this was recorded as an inference from the size of the values, the heading not having been read. |
 
-`unit_info()` therefore reports `unit=None` and `inferred_unit="kb"` for
-that table, so no caller can convert by reading a single field, and no
-conversion factor is offered. **The stored values are not rescaled** on
-an inference. A ratio within one table cancels the unknown *unit*
-factor, and only that — for `trzhaskovskaya` the photoelectron-vs-photon
-energy axis error recorded above survives any ratio between lines of
-different binding energy. Absolute cross-sections, σ×λ sensitivities,
-and any comparison that mixes tables carry both problems.
+`unit_info()` reports `unit="kb"` for that table, with a note on the
+filled-subshell convention below. **The stored values are not rescaled.**
+No bundled table has an inferred unit now; `unit_info()` keeps
+`unit` and `inferred_unit` separate so that one could be added without a
+caller converting on it.
 
 The 2018/2019 tables are a **separate** question and were checked
-separately — the 2001/2002 inference is not inherited. The UCL
+separately. The UCL
 digitization's own "Explanation of Tables" sheet states that column (B)
 lists the cross section "in kb (=10⁻²¹ cm²) **for completely filled
 subshells**". So for `trzh2018_haxpes.json` and `trzh2019_inner.json`
@@ -68,7 +65,7 @@ the unit is confirmed as kb, and the σ values are full-subshell
 quantities rather than occupancy-weighted ones. Those two files feed
 `AngularCorrection`, not `CrossSection.lookup`.
 
-Two conventions that are easy to conflate, and are not the same:
+Conventions that are easy to conflate, and are not the same:
 
 - **Scofield** incorporates the report's assumed *fractional* subshell
   occupations. UCRL-51326 Table A1 lists them per state: B 2p is
@@ -77,15 +74,26 @@ Two conventions that are easy to conflate, and are not the same:
   occupancy again double-corrects.
 - **Trzhaskovskaya 2018/2019** gives full-subshell values, per the sheet
   quoted above.
+- **Trzhaskovskaya 2001/2002/2006** (the `CrossSection` table) also
+  gives full-subshell values: "To obtain σi for a partially filled atomic
+  subshell i, the value from the Table should be divided by 2ji + 1 and
+  multiplied by the actual occupation number" (ADNDT 77, 106; the same
+  rule in 82, 260 and 92, 252). `lookup()` returns the stored value and
+  does not apply that factor, so a component j holding N_j electrons of
+  an open valence subshell on this table is overstated by (2j+1)/N_j —
+  H 1s and Cu 4s by 2 — and so is any ratio or sensitivity that uses one.
+  Closed subshells are unaffected. Applying the factor needs the
+  occupation numbers the authors assumed, which ADNDT 92 Table 1 prints
+  per element; it has not been done.
 
-Whether the 2001/2002 table follows one convention or the other has not
-been established here, and `CrossSection` does not assume an answer. Its
-38 half-listed subshells are consistent with "listed iff occupied", but
-until the inclusion rule is read from the source a half-listed bare
-subshell returns `None` rather than summing the listed component alone
-and calling the absent one zero. The listed component is still available
-as a j-resolved request, and the 38-count is pinned by test so the
-evidence remains actionable if the rule is later confirmed.
+Which j components the 2001/2002 table lists for an open shell has not
+been read as a rule from the source. Its 38 half-listed subshells are
+consistent with "listed iff occupied", but until the inclusion rule is
+read a half-listed bare subshell returns `None` rather than summing the
+listed component alone and calling the absent one zero. The listed
+component is still available as a j-resolved request, and the 38-count
+is pinned by test so the evidence remains actionable if the rule is
+later confirmed.
 
 ## `cross_section.json` — what has been read against Table I
 

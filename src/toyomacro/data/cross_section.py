@@ -5,10 +5,11 @@ Supports multiple databases:
   - yeh_lindau:       Yeh & Lindau (1985), 16 photon energies
   - scofield:         Scofield (1973), long-format CSV, 28 photon energies
   - trzhaskovskaya:   Trzhaskovskaya/Nefedov/Yarzhemsky ADNDT 77 (2001) &
-                      82 (2002), relativistic, 10 energies. NOTE: the source
-                      tables are gridded in PHOTOELECTRON energy but are
-                      interpolated here as photon energy (MATLAB-era
-                      convention) — see docs/DATA_SOURCES.md
+                      82 (2002), plus 92 (2006) at 10 keV; relativistic,
+                      kb, 10 PHOTOELECTRON energies 100 eV-10 keV. Each
+                      line is read on its own photon axis, E + Eb with the
+                      Eb the table prints for it; values are for
+                      completely filled subshells — see docs/DATA_SOURCES.md
 
 A bare subshell label such as ``'2p'`` means the **whole spin-orbit
 doublet**, σ(2p1/2) + σ(2p3/2) — the quantity a measured peak envelope
@@ -24,9 +25,8 @@ electron, C 0.67 + 1.33 = 2, N 1 + 2 = 3, O 1.33 + 2.67 = 4), so the
 components are summed as stored. Do not weight them by occupancy again.
 
 Units are **not** the same across tables — call ``unit_info()`` rather
-than assuming. Yeh–Lindau and Scofield are megabarn, each read from its
-source; Trzhaskovskaya values run ~10³ larger and their unit is inferred,
-not confirmed, so it is reported separately and nothing is rescaled.
+than assuming. Yeh–Lindau and Scofield are megabarn and Trzhaskovskaya
+kilobarn, each read from its source; nothing is rescaled.
 
 Usage:
     from toyomacro.data import CrossSection
@@ -110,16 +110,13 @@ _ABSENT_COMPONENT_IS_UNOCCUPIED: dict[str, bool] = {
 }
 
 
-_UNIT_NOTE_INFERRED = (
-    "Unit inferred by comparison with Scofield after correcting the "
-    "energy axis, and supported by the same authors' later work; not read "
-    "from the primary table heading of ADNDT 77 (2001) / 82 (2002). "
-    "A ratio within this table cancels the unknown scale factor, and "
-    "only that: this table is gridded in photoelectron energy but "
-    "interpolated as photon energy, so a ratio of two lines with "
-    "different binding energies still carries that axis error. "
-    "Absolute cross-sections, sigma*lambda sensitivities, and any "
-    "comparison that mixes tables may be wrong by ~10^3."
+_TRZ_FILLED_SUBSHELL_NOTE = (
+    "Values are for completely filled subshells, as the tables state "
+    "(ADNDT 77, 106; 82, 260; 92, 252): for an open subshell the source "
+    "divides by 2j+1 and multiplies by the actual occupation number. "
+    "lookup() returns the stored value and does not apply that factor, "
+    "so a component holding N_j electrons of an open subshell is "
+    "overstated by (2j+1)/N_j."
 )
 
 # (confirmed unit, inferred unit, note). Exactly one of the first two is
@@ -128,7 +125,7 @@ _UNIT_NOTE_INFERRED = (
 _TABLE_UNITS: dict[str, tuple[str | None, str | None, str]] = {
     "yeh_lindau": ("Mb", None, ""),
     "scofield": ("Mb", None, ""),
-    "trzhaskovskaya": (None, "kb", _UNIT_NOTE_INFERRED),
+    "trzhaskovskaya": ("kb", None, _TRZ_FILLED_SUBSHELL_NOTE),
 }
 
 
@@ -228,6 +225,40 @@ def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
     return {**data, "data": elements}
 
 
+def _place_on_photon_axis(data: dict[str, Any]) -> dict[str, Any]:
+    """Give each Trzhaskovskaya line its own photon-energy cells.
+
+    ADNDT 77 (2001) and 82 (2002) tabulate sigma at nine photoelectron
+    (kinetic) energies E = 100-5000 eV, and the 10 keV column comes from
+    ADNDT 92 (2006), Table 2, also at photoelectron energy E. The bundled
+    file stores that shared grid under its legacy key ``photon_energies``.
+    A line's photon energies are E + Eb, with Eb the experimental binding
+    energy the table prints for that subshell (stored per line as
+    ``binding_energy``). The shared grid moves to
+    ``photoelectron_energies``; each line gets ``photon_energies``.
+
+    Raises:
+        ValueError: if a line has no binding energy, since its cells
+            could then not be placed on the photon axis at all.
+    """
+    grid = list(data.get("photon_energies", []))
+    elements: dict[str, Any] = {}
+    for element, lines in data["data"].items():
+        placed = {}
+        for key, line in lines.items():
+            eb = line.get("binding_energy")
+            if eb is None:
+                raise ValueError(
+                    f"trzhaskovskaya {element} {key} has no binding energy; "
+                    f"its photoelectron-energy cells cannot be placed on the "
+                    f"photon-energy axis."
+                )
+            placed[key] = {**line, "photon_energies": [e + eb for e in grid]}
+        elements[element] = placed
+    out = {k: v for k, v in data.items() if k not in ("photon_energies", "data")}
+    return {**out, "photoelectron_energies": grid, "data": elements}
+
+
 def _absent_component_is_unoccupied(table: str) -> bool:
     """Whether a missing j component means "empty" rather than "no data"."""
     return _ABSENT_COMPONENT_IS_UNOCCUPIED.get(table, False)
@@ -244,9 +275,9 @@ def _split_orbital(orbital: str) -> tuple[str, str | None]:
 #: Where a cross-section value came from, per j component and summarised
 #: per request. The range is the component's own valid cells (non-None,
 #: > 0), never the table's whole energy grid, and it is judged on the axis
-#: the table is interpolated on. For Trzhaskovskaya that is a photoelectron-
-#: energy grid read as photon energy (see the module docstring), so there
-#: ``tabulated`` does not mean the source tabulates that kinetic energy.
+#: the table is interpolated on: photon energy. Trzhaskovskaya is tabulated
+#: at photoelectron energies, so each of its lines has its own photon-energy
+#: cells, E + Eb (see the module docstring).
 LookupStatus = Literal[
     "tabulated",            # a valid cell, or interpolation between valid cells
     "extrapolated_above",   # above the last valid cell: power law (value given)
@@ -282,9 +313,8 @@ class ComponentLookup:
             valid cells (to 1e-12 relative). With ``"pchip"`` the value is
             then the stored cell to round-off; with ``"polyfit"`` it is not.
         valid_range_eV: First and last valid cell of this line, or None,
-            on the axis the table is interpolated on (photon energy as read;
-            for Trzhaskovskaya a photoelectron-energy grid read as photon
-            energy).
+            in photon energy (for Trzhaskovskaya the line's own cells,
+            E + Eb).
         threshold_eV: The binding energy used as the ionization threshold,
             or None when ``BindingEnergy`` has no value for this level — in
             which case no threshold was applied, and a value below the
@@ -352,13 +382,12 @@ class CrossSection:
         ``values_rescaled`` is always False — nothing stored is altered on
         a guess.
 
-        The three tables are **not** on a common scale. A ratio within
-        one table cancels the unknown *unit* factor — and only that.
-        For `trzhaskovskaya` the separate photoelectron-vs-photon energy
-        axis error survives any ratio between lines of different binding
-        energy (see `docs/DATA_SOURCES.md`). Absolute cross-sections,
-        sigma*lambda sensitivities, and cross-table comparisons carry
-        both problems.
+        The three tables are **not** on a common scale: Mb for
+        `yeh_lindau` and `scofield`, kb for `trzhaskovskaya`, whose note
+        also records that its values are for completely filled subshells
+        (see `docs/DATA_SOURCES.md`). No bundled table has an inferred unit
+        at present; the fields stay separate so that one could be added
+        without a caller converting on it.
         """
         table = table or cls._default_table
         if table not in _TABLE_UNITS:
@@ -435,6 +464,8 @@ class CrossSection:
             data = cls._load_trzhaskovskaya()
         else:
             raise ValueError(f"Unknown table '{table}'")
+        if table == "trzhaskovskaya":
+            data = _place_on_photon_axis(data)
         return _withhold_cells(table, data)
 
     @staticmethod
@@ -670,8 +701,8 @@ class CrossSection:
 
         Returns:
             Cross-section in the unit reported by :meth:`unit_info` for
-            ``table`` — Mb for 'yeh_lindau' and 'scofield', ~10³ larger
-            (inferred kb, unconfirmed) for 'trzhaskovskaya' — or None if
+            ``table`` — Mb for 'yeh_lindau' and 'scofield', kb for
+            'trzhaskovskaya' (completely filled subshells) — or None if
             the table does not carry the subshell for this element, the
             photon energy is below its binding energy, or it is below the
             line's first valid cell. Do not compare across tables without
@@ -719,18 +750,19 @@ class CrossSection:
         threshold. ``below_threshold`` overrides the table where the two
         disagree: it withholds cells the table prints below the
         ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
-        73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on
-        Trzhaskovskaya, from its energy axis), as v0.4.0 did. Known limits
+        73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; none on
+        Trzhaskovskaya, whose cells start 100 eV above its own binding
+        energies), as v0.4.0 did. Known limits
         of that source apply too; unresolved spin-orbit pairs are stored
         with one value for both members (Co 3p at 59 eV, as Fuggle &
         Martensson 1980 print it; the X-ray Data Booklet's 3p3/2 = 59.9,
         in none of its cited sources, is evidently a misprint of 58.9).
 
-        On Trzhaskovskaya the range is judged on the axis it is
-        interpolated on, a photoelectron-energy grid read as photon energy:
-        Au 4f at 150 eV is ``tabulated`` although its kinetic energy (about
-        65 eV) is below the table's first cell (1,170 such components over
-        the table's grid and 19 source energies).
+        Trzhaskovskaya is tabulated at photoelectron energies E, so each
+        line's cells are at E + Eb, with the Eb the table prints for it:
+        Au 4f7/2 starts at 187 eV, and at 150 eV (about 60 eV kinetic
+        energy) it is ``outside_range_below``. Up to v0.6.0 the grid was
+        read as photon energy, and that case was ``tabulated``.
 
         Returns:
             A :class:`CrossSectionLookup`.
@@ -851,7 +883,8 @@ class CrossSection:
     ) -> list[tuple[float, float]]:
         if orbital_data is None:
             return []
-        photon_energies = data.get("photon_energies", [])
+        # A line on its own axis (Trzhaskovskaya) carries its own cells.
+        photon_energies = orbital_data.get("photon_energies") or data.get("photon_energies", [])
         cross_sections = orbital_data.get("cross_sections", [])
         return sorted(
             (e, sigma)
@@ -982,9 +1015,12 @@ class CrossSection:
           bundled)
         - matrix-dependent averaging
 
-        Subshell occupancy is *not* among the missing factors: it is
-        already carried by the tabulated cross-sections, which is why
-        ``2p3/2``/``2p1/2`` comes out near 2:1.
+        Subshell occupancy is *not* among the missing factors for a
+        closed subshell: it is already carried by the tabulated
+        cross-sections, which is why ``2p3/2``/``2p1/2`` comes out near
+        2:1. Trzhaskovskaya values are for completely filled subshells,
+        so for an open valence subshell on that table it *is* missing
+        (see :meth:`unit_info`).
 
         A published RSF table from an instrument vendor is a different
         quantity and the two are not interchangeable. See §5 of
@@ -1015,9 +1051,25 @@ class CrossSection:
 
     @classmethod
     def get_available_photon_energies(cls, table: str | None = None) -> list[float]:
-        """Get list of tabulated photon energies."""
+        """The photon energies ``table`` is tabulated at, shared by all its lines.
+
+        Raises:
+            ValueError: for ``"trzhaskovskaya"``, which has no shared
+                photon-energy grid: it is tabulated at photoelectron
+                energies, so each line's photon energies are its own
+                (E + Eb). Read them from :meth:`to_dict` (a line's
+                ``photon_energies``), or a component's ``valid_range_eV``
+                from :meth:`lookup_with_status`.
+        """
         data = cls._get_data(table)
-        return data.get("photon_energies", [])
+        if "photon_energies" not in data:
+            raise ValueError(
+                f"{table or cls._default_table} has no shared photon-energy grid: it is "
+                f"tabulated at photoelectron energies (to_dict()['photoelectron_energies']), "
+                f"so each line has its own photon energies (to_dict()['data'][element]"
+                f"[subshell]['photon_energies'])."
+            )
+        return data["photon_energies"]
 
     @classmethod
     def get_available_orbitals(cls, element: str, table: str | None = None) -> list[str]:
@@ -1037,7 +1089,10 @@ class CrossSection:
         {"binding_energy": eV or None, "cross_sections": [...]}}}}`` —
         one entry per photon energy, ``None`` where the source table has
         no entry, values in the unit :meth:`unit_info` reports. The same
-        shape for every table. A cell listed by :meth:`withheld_cells` is
+        shape for every table, except that Trzhaskovskaya, tabulated at
+        photoelectron energies, has ``photoelectron_energies`` in place of
+        ``photon_energies`` and each of its lines its own
+        ``photon_energies`` (E + Eb). A cell listed by :meth:`withheld_cells` is
         ``None`` here too, and its line carries ``withheld_eV``; the
         printed value stays in the bundled file. This is the live process
         cache, not a copy: read from it, or deep-copy before mutating.
