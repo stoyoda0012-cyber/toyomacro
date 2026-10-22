@@ -276,13 +276,40 @@ def test_an_extrapolated_imfp_alone_makes_the_result_conditional():
     assert any("IMFP" in x and "Si 2p" in x for x in r.extrapolated_inputs)
 
 
-def test_an_extrapolated_cross_section_alone_makes_the_result_conditional():
-    """Trzhaskovskaya Pd 2p1/2 ends below 5250 eV; its KE (1920 eV) is in range."""
+def test_an_extrapolated_cross_section_alone_makes_the_result_conditional(monkeypatch):
+    """A cross-section status other than tabulated, with nothing else wrong.
+
+    No bundled line is extrapolated above while its kinetic energy is
+    inside TPP-2M's range (Trzhaskovskaya lines run to at least 5 keV
+    kinetic energy), so the status is substituted for an otherwise
+    tabulated Pd 2p1/2.
+    """
+    real = CrossSection.lookup_with_status.__func__
+
+    def extrapolated(cls, element, orbital, hv, table=None, **kw):
+        found = real(cls, element, orbital, hv, table, **kw)
+        return replace(found, status="extrapolated_above")
+
+    monkeypatch.setattr(CrossSection, "lookup_with_status", classmethod(extrapolated))
     pd = _line("Pd", "2p1/2", 3330.0, 1000.0, hv=5250.0)
     r = composition([pd], _conditions(photon_energy=5250.0, table="trzhaskovskaya",
                                       declared_elements=("Pd",)))
     assert r.status == "conditional"
     assert r.extrapolated_inputs == ("Pd 2p1/2: cross-section extrapolated_above",)
+    assert r.fractions == {"Pd": 1.0}
+
+
+def test_trzhaskovskaya_is_read_at_the_kinetic_energy_of_the_line():
+    """Pd 2p1/2 at 5250 eV is 1920 eV kinetic energy, inside the table's 100-5000 eV.
+
+    Read as photon energy, the grid put this line's last cell below
+    5250 eV and called it extrapolated.
+    """
+    pd = _line("Pd", "2p1/2", 3330.0, 1000.0, hv=5250.0)
+    r = composition([pd], _conditions(photon_energy=5250.0, table="trzhaskovskaya",
+                                      declared_elements=("Pd",)))
+    assert r.lines[0].cross_section.status == "tabulated"
+    assert r.extrapolated_inputs == ()
     assert r.fractions == {"Pd": 1.0}
 
 

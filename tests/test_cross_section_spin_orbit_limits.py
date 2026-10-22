@@ -24,7 +24,7 @@ import re
 
 import pytest
 
-from toyomacro.data.cross_section import CrossSection
+from toyomacro.data.cross_section import AVAILABLE_TABLES, CrossSection
 
 AL_KA_EV = 1486.6
 J_RESOLVED_TABLES = ("scofield", "trzhaskovskaya")
@@ -575,12 +575,26 @@ def test_unit_info_separates_confirmed_from_inferred():
         assert info["status"] == "confirmed"
         assert info["values_rescaled"] is False
 
+    # Read from the tables' own headings: "in kb (=10^-21 cm2) for
+    # completely filled subshells" (ADNDT 77, 106; 82, 260; 92, 252).
+    info = CrossSection.unit_info("trzhaskovskaya")
+    assert info["unit"] == "kb"
+    assert info["inferred_unit"] is None
+    assert info["status"] == "confirmed"
+    assert info["values_rescaled"] is False
+    assert "completely filled subshells" in info["note"]
+    assert "2j+1" in info["note"]
+
+
+def test_an_inferred_unit_stays_out_of_unit(monkeypatch):
+    """No bundled table has an inferred unit now; the separation must still hold."""
+    from toyomacro.data import cross_section as cs
+
+    monkeypatch.setitem(cs._TABLE_UNITS, "trzhaskovskaya", (None, "kb", "inferred"))
     info = CrossSection.unit_info("trzhaskovskaya")
     assert info["unit"] is None, "an unconfirmed unit must not fill `unit`"
     assert info["inferred_unit"] == "kb"
     assert info["status"] == "inferred"
-    assert info["values_rescaled"] is False
-    assert info["note"]
 
 
 def test_unit_info_offers_no_conversion_factor():
@@ -589,13 +603,14 @@ def test_unit_info_offers_no_conversion_factor():
     `bool` is a subclass of `int`, so `values_rescaled` has to be
     excluded explicitly rather than by an isinstance check.
     """
-    info = CrossSection.unit_info("trzhaskovskaya")
-    numeric = {
-        k: v for k, v in info.items()
-        if isinstance(v, (int, float)) and not isinstance(v, bool)
-    }
-    assert numeric == {}
-    assert not any("conversion" in k or "factor" in k for k in info)
+    for table in AVAILABLE_TABLES:
+        info = CrossSection.unit_info(table)
+        numeric = {
+            k: v for k, v in info.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)
+        }
+        assert numeric == {}
+        assert not any("conversion" in k or "factor" in k for k in info)
 
 
 def test_no_public_unit_accessor_that_hides_the_status():
@@ -612,10 +627,10 @@ def test_unknown_table_is_rejected():
 
 
 def test_stored_values_are_not_rescaled():
-    """The inference must not have leaked into the data.
+    """Trzhaskovskaya values are stored in kb, as printed.
 
-    Trzhaskovskaya values stay ~10^3 above the megabarn tables; if some
-    future change divides them, `values_rescaled` has to change with it.
+    They stay ~10^3 above the megabarn tables; if some future change
+    divides them, `unit` and `values_rescaled` have to change with it.
     """
     trzh = CrossSection.lookup("Si", "2p", AL_KA_EV, table="trzhaskovskaya")
     scof = CrossSection.lookup("Si", "2p", AL_KA_EV, table="scofield")
@@ -625,14 +640,13 @@ def test_stored_values_are_not_rescaled():
 
 @pytest.mark.parametrize("table", ["scofield", "trzhaskovskaya", "yeh_lindau"])
 def test_get_rsf_is_the_ratio_of_two_lookups_on_the_same_table(table):
-    """Which is why it is well defined even where the unit is inferred.
+    """Which is why it would be well defined even for an inferred unit.
 
-    Deliberately *not* an agreement check between tables. Two
-    independent theoretical compilations need not agree, and for
-    `trzhaskovskaya` the photoelectron-vs-photon energy axis error
-    survives any ratio between lines of different binding energy — so a
-    cross-table comparison would test neither the unit cancellation nor
-    anything else this file is about.
+    Deliberately *not* an agreement check between tables: two independent
+    theoretical compilations need not agree, so a cross-table comparison
+    would test neither the unit cancellation nor anything else this file
+    is about. (The Trzhaskovskaya-Scofield comparison on closed shells is
+    in test_cross_section_trzhaskovskaya_axis.py.)
     """
     ratio = CrossSection.get_rsf("Si", "2p", "C", "1s", AL_KA_EV, table=table)
     si = CrossSection.lookup("Si", "2p", AL_KA_EV, table=table)
