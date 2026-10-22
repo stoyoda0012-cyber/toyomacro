@@ -414,8 +414,11 @@ energy is above threshold. Where the two disagree the threshold wins, as
 in v0.4.0: `below_threshold` withholds cells the table prints below the
 `BindingEnergy` value (47 on Yeh–Lindau, e.g. As 2s at Al Kα; 73 on
 Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on Trzhaskovskaya, from its
-energy axis), and the known limits of that source apply (Co 3p1/2 and
-3p3/2 are stored as 59 and 60 eV, the reverse of the usual order).
+energy axis), and the known limits of that source apply: unresolved
+spin-orbit pairs are stored with one value for both members (Co 3p at
+59 eV, as Fuggle & Mårtensson 1980 print it; the X-ray Data Booklet's
+3p3/2 = 59.9, in none of its cited sources, is evidently a misprint of
+58.9).
 `CrossSectionLookup` and `ComponentLookup` are exported from
 `toyomacro.data` and are Supported, so the status and method vocabularies
 above change only with a minor version. `get_rsf()` does not carry the state; call
