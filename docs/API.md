@@ -358,7 +358,7 @@ it — so pass `table=` explicitly whenever the choice matters, and read
 tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
 in log–log space, so a tabulated energy returns the tabulated value;
 above the range it uses a power law through the last cells, unless a
-withheld cell lies above (below). **Below a
+withheld cell lies above (see *A printed cell can be withheld* below). **Below a
 line's first valid cell it returns `None`** (since v0.5.0): that is the
 threshold region, where shape resonances and Cooper minima move the
 cross-section by orders of magnitude and a power law has no support

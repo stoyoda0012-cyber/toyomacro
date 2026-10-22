@@ -190,7 +190,12 @@ def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
             that a changed table cannot leave a stale entry withholding a
             different number.
     """
-    entries = [(k, v) for k, v in _WITHHELD_CELLS.items() if k[0] == table]
+    # Highest energy first, so that withholding the top two cells of one
+    # line does not depend on the order of the entries.
+    entries = sorted(
+        ((k, v) for k, v in _WITHHELD_CELLS.items() if k[0] == table),
+        key=lambda kv: -kv[0][3],
+    )
     if not entries:
         return data
     energies = data.get("photon_energies", [])

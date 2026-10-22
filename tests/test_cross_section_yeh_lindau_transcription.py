@@ -19,8 +19,11 @@ row had become an element ``Photon``. The first two made ``lookup()``
 miss a tabulated line and extrapolate it from neighbouring elements
 instead. The tests at the end pin the keys and those two lines.
 
-Beyond these thirteen cells and two lines, agreement between the two
-transcriptions is the only check the table has had.
+One more cell was read from the page later: Cu 3d at 8047.8 eV, printed
+``.32E-3`` and held as printed, although ``lookup()`` withholds it as a
+suspected misprint in the source. Beyond these fourteen cells and two
+lines, agreement between the two transcriptions is the only check the
+table has had.
 """
 
 import pytest
