@@ -49,6 +49,47 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **Trzhaskovskaya cross-sections are read at the line's kinetic
+  energy.** ADNDT 77 (2001) and 82 (2002) tabulate σ at nine
+  photoelectron energies E = 100–5000 eV, and the 10 keV column (ADNDT
+  92 (2006), Table 2) is also at E; up to v0.6.0 that grid was read as
+  photon energy. Each line is now read at hν = E + Eb, with the Eb the
+  table prints for that subshell, so every Trzhaskovskaya value changes.
+  At the usual lab and HAXPES lines every j component rises, because it
+  is now read at a lower kinetic energy: median +16 % at 1486.6 eV, +12 %
+  at 2984.3 eV, +5 % at 9251.7 eV. Deep levels near threshold rise most,
+  up to 6.8x (Xe 2p3/2 at 4885 eV). Of 5.0 million compared outputs,
+  48,950 that were `tabulated` below a line's first kinetic energy, and
+  434 that were extrapolated, now return no value (`outside_range_below`),
+  e.g. Au 4f at 150 eV; 77,081 that were extrapolated are now inside the
+  range. Values fall mainly where a line is extrapolated above its last
+  cell; of outputs tabulated before and after, 2,161 fall, 4d near
+  threshold most (Mo–Te and the lanthanides; Yb 4d3/2 at 300 eV to
+  0.76x), then actinide 5f. The direction is right against
+  an independent table: on closed core s, p and d subshells at the usual
+  lines, Trzhaskovskaya (kb) and Scofield (Mb) now differ by a median
+  1.9 % (3,682 points), and by 1.4–3.4 % in every band of Eb/hν; read as
+  photon energy they differed by 31 %, rising from 9 % to 92 % with
+  Eb/hν. Yeh–Lindau and Scofield outputs are unchanged (compared over
+  every element, line, j label and energy of the three tables, both
+  interpolations). The shipped file is unchanged: the per-line axis is
+  built on load. `to_dict('trzhaskovskaya')` now has
+  `photoelectron_energies` and a `photon_energies` list per line instead
+  of one shared `photon_energies`, `get_available_photon_energies(
+  'trzhaskovskaya')` raises instead of returning kinetic energies, and
+  the MCP tool's `cross_section_table_range_eV` is null for that table.
+  These are changes to Supported behaviour as well as fixes.
+- **The Trzhaskovskaya unit is confirmed as kb**, read from the tables'
+  own explanation ("in kb (=10⁻²¹ cm²)", ADNDT 77 p. 106, 82 p. 260, 92
+  p. 252); `unit_info()` reported it as inferred. The same text says the
+  values are for **completely filled subshells**: for an open subshell
+  the source divides by 2j+1 and multiplies by the occupation number.
+  `lookup()` does not apply that factor, so a component holding N_j
+  electrons of an open valence subshell on this table is overstated by
+  (2j+1)/N_j (H 1s and Cu 4s by 2). `unit_info()` now carries this as
+  its note, and the documents no longer say occupancy is never a
+  missing factor.
+
 - **Co 3p binding energy: 3p3/2 is 59 eV, not 60.** The bundled table
   follows the X-ray Data Booklet, which lists Co 3p1/2 = 58.9 and
   3p3/2 = 59.9 eV — the only pair in the table with the j = 3/2 member

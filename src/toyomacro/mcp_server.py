@@ -82,17 +82,17 @@ def calculate_sensitivity(
     apply it twice: if the peak areas were taken from a
     transmission-corrected spectrum, leave this sensitivity as it is.
 
-    The tables are not on a common scale, and one of them has no
-    confirmed unit. `cross_section_unit` and `sensitivity_unit` are
+    The tables are not on a common scale: Yeh & Lindau and Scofield are
+    Mb, Trzhaskovskaya kb. `cross_section_unit` and `sensitivity_unit` are
     populated only where the unit was read from the primary source; for
     an inferred unit they are null and the candidate travels in
     `cross_section_inferred_unit` / `sensitivity_inferred_unit`, with
     `cross_section_unit_status` saying which case you are in. Do not
     convert on an inferred unit. Sensitivities are comparable only
-    between calls that used the same table. A ratio within one table
-    cancels the unknown unit factor and only that — the Trzhaskovskaya
-    table also carries a photoelectron-vs-photon energy axis error that
-    a ratio between lines of different binding energy does not remove.
+    between calls that used the same table. Trzhaskovskaya values are
+    for completely filled subshells (kb, as its tables state): for an
+    open valence subshell they overstate sigma by (2j+1)/N_j, and nothing
+    here applies that factor.
 
     A bare orbital such as '2p' is the summed spin-orbit doublet, which
     is what a measured peak envelope contains; pass '2p3/2' for one
@@ -121,9 +121,9 @@ def calculate_sensitivity(
     method, valid range and threshold of each j component) say where
     the value came from. `cross_section_table_range_eV` is the table's
     whole grid, kept for reference; it is not what the flag is judged
-    on. On 'trzhaskovskaya' the range is judged on that table's own axis,
-    a photoelectron-energy grid read as photon energy, so a value can be
-    'tabulated' below the source's first kinetic energy. Within the
+    on, and it is null for 'trzhaskovskaya', which is tabulated at
+    photoelectron energies: each of its lines starts at 100 eV kinetic
+    energy, its own binding energy plus 100 eV in photon energy. Within the
     range, sigma is a monotone piecewise cubic through the tabulated
     cells in log-log space, so at a tabulated energy it is the tabulated
     value. An orbital the default table does not carry returns an error,
@@ -194,7 +194,12 @@ def calculate_sensitivity(
     # the line's own cells: the table grid (kept below for reference)
     # called Tl 5d at He I "not extrapolated" although Yeh-Lindau prints
     # it only from 40.8 eV.
-    grid = CrossSection.get_available_photon_energies(table=table_name)
+    try:
+        grid = CrossSection.get_available_photon_energies(table=table_name)
+    except ValueError:
+        # Trzhaskovskaya has no shared photon-energy grid: each line's
+        # cells are its photoelectron energies plus its binding energy.
+        grid = []
     cs_lo, cs_hi = (min(grid), max(grid)) if grid else (None, None)
     # Carry the unit through with its status intact. Collapsing an
     # inferred unit into a single confirmed-looking string here would
@@ -217,7 +222,7 @@ def calculate_sensitivity(
         "cross_section_unit": units["unit"],
         "cross_section_inferred_unit": units["inferred_unit"],
         "cross_section_unit_status": units["status"],
-        "cross_section_table_range_eV": [cs_lo, cs_hi],
+        "cross_section_table_range_eV": [cs_lo, cs_hi] if grid else None,
         "cross_section_status": found.status,
         "cross_section_extrapolated": found.status != "tabulated",
         "cross_section_components": _components_json(found),

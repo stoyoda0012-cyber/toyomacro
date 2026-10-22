@@ -127,17 +127,18 @@ def test_above_the_last_cell_is_extrapolated_and_flagged():
     assert r.components[0].method == "power_law_above"
 
 
-def test_trzhaskovskaya_lines_that_stop_early_extrapolate_inside_the_grid():
-    """The range is per line: 91 Trzhaskovskaya lines end below 10 keV."""
+def test_trzhaskovskaya_lines_that_stop_early_extrapolate_inside_their_own_grid():
+    """The range is per line: 91 Trzhaskovskaya lines have no 10 keV cell."""
     d = CrossSection.to_dict("trzhaskovskaya")
-    grid_top = max(d["photon_energies"])
+    grid_top = max(d["photoelectron_energies"])
     early = [
-        (el, o) for el, rec in d["data"].items() for o, line in rec.items()
-        if max(e for e, v in zip(d["photon_energies"], line["cross_sections"]) if v) < grid_top
+        (el, o, line) for el, rec in d["data"].items() for o, line in rec.items()
+        if max(e for e, v in zip(d["photoelectron_energies"], line["cross_sections"]) if v)
+        < grid_top
     ]
     assert len(early) == 91
-    el, o = early[0]
-    r = CrossSection.lookup_with_status(el, o, grid_top, "trzhaskovskaya")
+    el, o, line = early[0]
+    r = CrossSection.lookup_with_status(el, o, line["photon_energies"][-1], "trzhaskovskaya")
     assert r.status == "extrapolated_above"
 
 
@@ -145,8 +146,9 @@ def test_trzhaskovskaya_lines_that_stop_early_extrapolate_inside_the_grid():
 def test_the_last_cell_is_tabulated_and_just_above_is_extrapolated(table):
     d = CrossSection.to_dict(table)
     element, orbital = ("Si", "2p") if table == "yeh_lindau" else ("Si", "2p3/2")
-    line = d["data"][element][orbital]["cross_sections"]
-    hi = max(e for e, v in zip(d["photon_energies"], line) if v)
+    entry = d["data"][element][orbital]
+    cells = entry.get("photon_energies") or d["photon_energies"]
+    hi = max(e for e, v in zip(cells, entry["cross_sections"]) if v)
     at = CrossSection.lookup_with_status(element, orbital, hi, table).components[0]
     assert (at.status, at.at_tabulated_cell) == ("tabulated", True)
     assert at.method != "power_law_above"
@@ -167,18 +169,24 @@ def test_get_rsf_passes_extrapolate_below_to_both_lines():
                                 extrapolate_below=True) > 0
 
 
-def test_trzhaskovskaya_range_is_judged_on_the_axis_it_is_interpolated_on():
-    """Documented limit, pinned so a change to it is deliberate.
+def test_trzhaskovskaya_range_is_judged_at_the_line_s_kinetic_energy():
+    """The table is gridded in photoelectron energy, first cell E = 100 eV.
 
-    The table is gridded in photoelectron energy (first cell 100 eV) but
-    read as photon energy. Au 4f at hv = 150 eV has a kinetic energy of
-    about 65 eV, below the source's first cell, and is still reported
-    ``tabulated`` because the range is judged on the axis as read.
+    A line's photon energies are E + Eb with the Eb the table prints for
+    it: Au 4f7/2 (Eb 87 eV) starts at 187 eV and 4f5/2 (91 eV) at 191 eV.
+    At hv = 150 eV the kinetic energy is about 60 eV, below the first
+    cell, so there is no value. Read as photon energy, as up to v0.6.0,
+    it was ``tabulated``.
     """
+    d = CrossSection.to_dict("trzhaskovskaya")["data"]["Au"]
     r = CrossSection.lookup_with_status("Au", "4f", 150.0, "trzhaskovskaya")
-    assert r.status == "tabulated"
-    assert all(p.valid_range_eV[0] == 100.0 for p in r.components)
-    assert all(150.0 - p.threshold_eV < 100.0 for p in r.components)
+    assert (r.status, r.value) == ("outside_range_below", None)
+    for p in r.components:
+        assert p.valid_range_eV[0] == 100.0 + d[p.orbital]["binding_energy"]
+    assert [p.valid_range_eV[0] for p in r.components] == [191.0, 187.0]
+    at = CrossSection.lookup_with_status("Au", "4f7/2", 187.0, "trzhaskovskaya")
+    assert at.status == "tabulated" and at.components[0].at_tabulated_cell
+    assert at.value == pytest.approx(d["4f7/2"]["cross_sections"][0], rel=1e-12)
 
 
 def test_method_reports_the_interpolation_in_use():
@@ -203,7 +211,9 @@ def test_lookup_and_status_agree_everywhere(table):
       value.
     """
     d = CrossSection.to_dict(table)
-    energies = d["photon_energies"]
+    energies = d.get("photon_energies") or sorted(
+        {e for rec in d["data"].values() for line in rec.values()
+         for e in line["photon_energies"]})
     labels = sorted({o for rec in d["data"].values() for o in rec}
                     | {o[:2] for rec in d["data"].values() for o in rec})
     checked = 0

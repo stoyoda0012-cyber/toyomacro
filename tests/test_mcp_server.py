@@ -60,7 +60,12 @@ class TestReferenceDataTools:
         it.
         """
         from toyomacro.data import CrossSection
+        from toyomacro.data import cross_section as cs
 
+        # No bundled table has an inferred unit now (Trzhaskovskaya's kb was
+        # read from its tables' headings); exercise the path with one.
+        saved = cs._TABLE_UNITS["trzhaskovskaya"]
+        cs._TABLE_UNITS["trzhaskovskaya"] = (None, "kb", "inferred for this test")
         try:
             CrossSection.set_default_table("trzhaskovskaya")
             out = json.loads(mcp_server.calculate_sensitivity(
@@ -68,6 +73,7 @@ class TestReferenceDataTools:
             ))
         finally:
             CrossSection.set_default_table("yeh_lindau")
+            cs._TABLE_UNITS["trzhaskovskaya"] = saved
 
         assert out["cross_section_unit"] is None
         assert out["cross_section_inferred_unit"] == "kb"
