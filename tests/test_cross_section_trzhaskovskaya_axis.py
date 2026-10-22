@@ -69,7 +69,7 @@ def test_the_grid_is_photoelectron_energy_and_every_line_has_its_own_axis():
         for line in rec.values():
             assert line["photon_energies"] == [e + line["binding_energy"] for e in GRID]
             n += 1
-    assert n == 1240
+    assert n == 1244
 
 
 def test_the_bundled_file_is_not_changed():

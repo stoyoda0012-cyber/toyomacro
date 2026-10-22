@@ -91,6 +91,10 @@ A2_ROUNDING_REL = 1e-4
 # so the count is pinned: if it moves, the rule must be re-established
 # before `_ABSENT_COMPONENT_IS_UNOCCUPIED` may stay True.
 TRZH_HALF_LISTED_COUNT = 38
+# Deep doublets ADNDT 82 half-lists for another reason: it prints only
+# subshells bound by less than 2000 eV, so the deeper (lower-j) member is
+# omitted. Not an occupancy statement.
+TRZH_CUTOFF_HALF_LISTED = {("Er", "3p"), ("Tm", "3p"), ("Yb", "3p"), ("Os", "3d")}
 
 
 def _keys(element, table):
@@ -384,7 +388,8 @@ def test_trzhaskovskaya_half_listed_population_is_unchanged():
     the flag may stay True.
     """
     half_listed = {
-        k: v for k, v in _subshells("trzhaskovskaya").items() if len(v) == 1
+        k: v for k, v in _subshells("trzhaskovskaya").items()
+        if len(v) == 1 and k not in TRZH_CUTOFF_HALF_LISTED
     }
     assert len(half_listed) == TRZH_HALF_LISTED_COUNT
 
@@ -444,35 +449,37 @@ def test_an_unlisted_component_is_never_fabricated_by_extrapolation():
 
 
 def test_every_half_listed_subshell_behaves_the_same_way():
-    """All 38, not the one or two that happened to get exemplified.
+    """All 42, not the one or two that happened to get exemplified.
 
     For each: the bare subshell refuses, the component that *is* listed
     returns a positive value, and the absent one is neither returned nor
     fabricated by the extrapolation fallback.
     """
-    upper = {"p": "3/2", "d": "5/2", "f": "7/2"}
+    other = {"p": ("1/2", "3/2"), "d": ("3/2", "5/2"), "f": ("5/2", "7/2")}
     half_listed = {
         k: v for k, v in _subshells("trzhaskovskaya").items() if len(v) == 1
     }
-    assert len(half_listed) == TRZH_HALF_LISTED_COUNT
+    assert len(half_listed) == TRZH_HALF_LISTED_COUNT + len(TRZH_CUTOFF_HALF_LISTED)
 
     for (element, bare), components in half_listed.items():
         listed = components[0]
-        absent = f"{bare}{upper[bare[1]]}"
+        absent = next(f"{bare}{j}" for j in other[bare[1]] if f"{bare}{j}" != listed)
+        # The 2000 eV cut-off lines are bound by more than Al K-alpha.
+        hv = 4000.0 if (element, bare) in TRZH_CUTOFF_HALF_LISTED else AL_KA_EV
 
         assert CrossSection.lookup(
-            element, bare, AL_KA_EV, table="trzhaskovskaya"
+            element, bare, hv, table="trzhaskovskaya"
         ) is None, f"{element} {bare} should refuse while the rule is unconfirmed"
 
         value = CrossSection.lookup(
-            element, listed, AL_KA_EV, table="trzhaskovskaya"
+            element, listed, hv, table="trzhaskovskaya"
         )
         assert value is not None and value > 0, (
             f"{element} {listed} is tabulated and must still resolve"
         )
 
         assert CrossSection.lookup(
-            element, absent, AL_KA_EV, table="trzhaskovskaya"
+            element, absent, hv, table="trzhaskovskaya"
         ) is None, f"{element} {absent} was fabricated"
 
 
@@ -654,3 +661,21 @@ def test_get_rsf_is_the_ratio_of_two_lookups_on_the_same_table(table):
 
     assert ratio is not None and ratio > 0
     assert ratio == pytest.approx(si / c)
+
+
+def test_cutoff_half_listed_doublets_lack_the_member_bound_by_2000_ev_or_more():
+    """ADNDT 82 prints only subshells bound by less than 2000 eV.
+
+    For these four the deeper member is the one missing, and its binding
+    energy is above that limit; the listed one is below it.
+    """
+    from toyomacro.data import BindingEnergy
+
+    subs = _subshells("trzhaskovskaya")
+    for element, bare in sorted(TRZH_CUTOFF_HALF_LISTED):
+        (listed,) = subs[(element, bare)]
+        deeper = f"{bare}{'1/2' if bare[1] == 'p' else '3/2'}"
+        assert listed != deeper
+        assert BindingEnergy.lookup(element, deeper) >= 2000.0
+        line = CrossSection.to_dict("trzhaskovskaya")["data"][element][listed]
+        assert line["binding_energy"] < 2000.0
