@@ -8,6 +8,26 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Co 3p binding energy: 3p3/2 is 59 eV, not 60.** The bundled table
+  follows the X-ray Data Booklet, which lists Co 3p1/2 = 58.9 and
+  3p3/2 = 59.9 eV — the only pair in the table with the j = 3/2 member
+  bound more deeply. Its source, Fuggle & Mårtensson (1980), prints one
+  unresolved Co 3p level (58.8 and 59.0 eV from two instruments), as it
+  does for Mn and Fe, which the Booklet lists with one value under both
+  columns; Bearden & Burr (1967) also give one level (59.5 eV). Both
+  members are now 59 eV. Over every element, label and energy the
+  binding-energy readers accept (4,260,003 outputs compared), only Co
+  3p changes: `BindingEnergy.lookup("Co", "3p")` and `"3p3/2"` give 59
+  instead of 60, its spin-orbit split 0 instead of 1, and between 59 and
+  60 eV the Co 3p3/2 and bare 3p cross-sections are no longer a known
+  zero (`below_threshold`) but outside the tables' range — no value by
+  default, an extrapolated one with `extrapolate_below=True`. Against
+  the cited primary source the value is now exact; individual XPS
+  measurements of Co metal 3p (about 59.7–60.2 eV, unresolved) lie
+  closer to the old 60 than to 59.
+
 ## [0.6.0] - 2026-10-21
 
 Archived on Zenodo:

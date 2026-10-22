@@ -189,16 +189,26 @@ def test_between_the_two_thresholds_only_the_lower_component_contributes():
 
 
 @pytest.mark.parametrize("table", J_RESOLVED_TABLES)
-def test_a_bare_label_is_not_gated_on_the_subshell_binding_energy(table):
-    """Co 3p: bare BE 60 eV, but 3p1/2 opens at 59 eV.
+def test_a_bare_label_is_not_gated_on_the_subshell_binding_energy(table, monkeypatch):
+    """A bare label must not be refused on one subshell's binding energy.
 
-    A subshell-level threshold gate returns None at 59 eV even though
-    3p1/2 is ionizable and the spectrum contains it. The gate has to be
-    per component, which means a bare label must not be refused on the
-    subshell's own binding energy on the way in.
+    The gate is per component: if the subshell a bare label resolves to
+    (j = l + 1/2) were stored with the higher binding energy, a gate on
+    that one value would refuse the bare label at an energy where the
+    other component is already ionizable. No pair in the bundled table is
+    stored that way since Co 3p was corrected (it was the only one, and a
+    misprint of the X-ray Data Booklet); the logic is pinned on Co 3p with
+    an inverted pair supplied for the test.
     """
     from toyomacro.data import BindingEnergy
 
+    real = BindingEnergy.lookup.__func__
+
+    def inverted(cls, element, orbital):
+        if element == "Co" and orbital in ("3p", "3p3/2"):
+            return 60.0
+        return real(cls, element, orbital)
+    monkeypatch.setattr(BindingEnergy, "lookup", classmethod(inverted))
     assert BindingEnergy.lookup("Co", "3p") == 60.0
     assert BindingEnergy.lookup("Co", "3p1/2") == 59.0
 
@@ -213,7 +223,6 @@ def test_a_bare_label_is_not_gated_on_the_subshell_binding_energy(table):
     assert lower is not None and lower > 0
     assert CrossSection.lookup(
         "Co", "3p3/2", 59.0, table=table, extrapolate_below=True) is None
-
     bare = CrossSection.lookup("Co", "3p", 59.0, table=table, extrapolate_below=True)
     assert bare == pytest.approx(lower), (
         "bare 3p was refused at 59 eV although 3p1/2 is open"

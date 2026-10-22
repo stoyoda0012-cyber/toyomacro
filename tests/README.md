@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,637 automated tests** across **98 files**, in two
+This suite has **2,639 automated tests** across **99 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 60 | 1,557 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 61 | 1,559 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,080 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,205 tests, 84%) — guarantee the library
+- **Contract / regression** (2,207 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,625. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,627. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,557)
+## Library body — `tests/` (1,559)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -132,10 +132,11 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (663)
+### Quantification data (665)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
+| 2 | `test_binding_energy_primary_sources.py` | Bundled binding energies against their primary sources: Co 3p unresolved at 59 eV as Fuggle & Mårtensson 1980 print it (not the X-ray Data Booklet's misprinted 58.9 / 59.9), and no spin-orbit pair stored with the j = l + 1/2 member bound more deeply anywhere in the table |
 | 45 | `test_cross_section_spin_orbit_limits.py` | Spin-orbit cross-section lookup and the limits of what it reports |
 | 21 | `test_cross_section_status.py` | `lookup_with_status()`: the state of every j component (tabulated, extrapolated above, outside the range below or above, below threshold, unoccupied, not in table) judged on the line's own cells; below the first cell `lookup()` is None and `extrapolate_below=True` restores the v0.4.0 value for one call; one out-of-range component refuses the doublet sum (Zn 2p at 1048 eV on Scofield); `lookup`, the status value and the components agree over each table's grid; the MCP tool refuses below the first cell and judges its flag per line; the last cell is tabulated and just above it extrapolated; `get_rsf` passes `extrapolate_below` to both lines; the Trzhaskovskaya axis limit is pinned |
 | 39 | `test_composition.py` | Homogeneous-equivalent composition: area / (σ × λ) normalised over the declared elements on synthetic peaks of known area; exposure divides integrated counts only, a transmission curve only when not applied; axis direction and scale do not change it; every missing fact (declared set, exposure basis, matrix source, a positive net area, a window inside the data that contains the line) refuses with a reason and never shrinks the denominator; assumptions, divided curves, a subset denominator and an extrapolated cross-section or IMFP make the result conditional; condition dependence over a 2 × 2 grid with its interaction |
