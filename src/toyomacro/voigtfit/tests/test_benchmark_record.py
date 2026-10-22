@@ -127,9 +127,32 @@ class TestLoadSnapshot:
             assert snap["load_average"] is None
 
     def test_top_processes_carry_names_not_paths(self):
+        """No row may be a filesystem path.
+
+        A name may still contain "/": Linux kernel threads are named like
+        ``kworker/3:2-events``. What must not appear is a path — rooted,
+        home-relative, a Windows drive or any backslash.
+        """
         snap = record.load_snapshot(interval=0.05, top_n=5)
         for row in snap["top_processes"] or []:
-            assert "/" not in row["name"] and "\\" not in row["name"]
+            assert not _looks_like_a_path(row["name"]), row["name"]
+
+    @pytest.mark.parametrize(("name", "is_path"), [
+        ("kworker/3:2-events", False),
+        ("python3.12", False),
+        ("/usr/bin/python3", True),
+        ("~/bin/tool", True),
+        ("C:\\Windows\\explorer.exe", True),
+        ("bin\\tool.exe", True),
+    ])
+    def test_the_path_check_itself(self, name, is_path):
+        assert _looks_like_a_path(name) is is_path
+
+
+def _looks_like_a_path(name: str) -> bool:
+    """A rooted or home-relative path, a Windows drive, or any backslash."""
+    return (name.startswith(("/", "~")) or "\\" in name
+            or (len(name) > 2 and name[1] == ":" and name[2] in "\\/"))
 
 
 class TestSummarize:
