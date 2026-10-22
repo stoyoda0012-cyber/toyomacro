@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 
 from mcp.server.fastmcp import FastMCP
 
@@ -116,6 +117,10 @@ def calculate_sensitivity(
       first valid cell there is no value, and the call returns an error
       naming that state.
 
+    A photon energy at or below the binding energy leaves no positive
+    kinetic energy for lambda, and the call returns an error, also where
+    the table has a cross-section at that energy.
+
     The range is each line's own, not the table's energy grid:
     `cross_section_status` and `cross_section_components` (status,
     method, valid range and threshold of each j component) say where
@@ -183,6 +188,21 @@ def calculate_sensitivity(
                       f"in the '{table_name}' table: {why}"
                       + ("" if table_name == "scofield" or found.status != "not_in_table"
                          else "; for deep levels at HAXPES energies try table='scofield'")),
+            "cross_section_status": found.status,
+            "cross_section_components": _components_json(found),
+        })
+    # The cross-section is evaluated at its threshold (hv == BE), where the
+    # photoelectron leaves with no kinetic energy and TPP-2M has no value.
+    # Refuse here rather than let the IMFP's ValueError escape the tool.
+    # A non-finite ke, which TPP-2M rejects too, is refused the same way
+    # and reported as null: NaN and Infinity are not JSON.
+    if not (math.isfinite(ke) and ke > 0.0):
+        return json.dumps({
+            "error": (f"No IMFP for {element} {orbital} at {photon_energy} eV: "
+                      f"the kinetic energy hv - BE = {ke} eV is not finite and positive "
+                      f"(binding energy {be} eV)"),
+            "binding_energy_eV": be,
+            "kinetic_energy_eV": ke if math.isfinite(ke) else None,
             "cross_section_status": found.status,
             "cross_section_components": _components_json(found),
         })
