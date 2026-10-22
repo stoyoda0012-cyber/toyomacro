@@ -71,7 +71,10 @@ archived on Zenodo for a citable DOI.
   withheld; one undecided with a 0.15 % rate), which is why the Shirley
   threshold is 0.01 and the linear one 0.02. The mechanism named in the
   design record (resampling about the observed counts) is consistent
-  with it; its cause was not isolated.
+  with it; its cause was not isolated. The convergence of the Shirley
+  iteration itself was not evaluated in any round: a replicate counts
+  as refused only when `composition()` refuses it, so zero refusals do
+  not mean the iteration converged (design record §8).
 - **Unchanged from v0.5.0:** Yeh–Lindau Cu 3d at 8047.8 eV is still the
   suspected misprint recorded in v0.3.1; `fit_fermi_edge`'s errors still
   assume independent channels; on Trzhaskovskaya the `lookup()` range is

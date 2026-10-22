@@ -825,6 +825,11 @@ def _check_declaration(lines: Sequence[Line], conditions: Conditions,
     if conditions.intensity_semantics == "raw_counts" and conditions.assume_intensity is not None:
         raise ValueError("assume_intensity given with intensity stated as raw counts: an input "
                          "inconsistency, not an assumption")
+    for ln in lines:
+        raw = np.asarray(ln.intensity)
+        if np.iscomplexobj(raw) or raw.dtype.kind not in "biuf":
+            raise ValueError(f"{ln.element} {ln.orbital}: the observed intensity must be "
+                             "real-valued")
     if len(lines) != len(declared.lines):
         raise ValueError(f"the declaration has {len(declared.lines)} lines, the data "
                          f"{len(lines)}")
