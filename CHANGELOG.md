@@ -63,8 +63,9 @@ archived on Zenodo for a citable DOI.
   434 that were extrapolated, now return no value (`outside_range_below`),
   e.g. Au 4f at 150 eV; 77,081 that were extrapolated are now inside the
   range. Values fall mainly where a line is extrapolated above its last
-  cell; inside the range 2,161 fall, 4d near threshold most (Mo–Te and
-  the lanthanides; Yb 4d3/2 at 300 eV to 0.76x), then actinide 5f. The direction is right against
+  cell; of outputs tabulated before and after, 2,161 fall, 4d near
+  threshold most (Mo–Te and the lanthanides; Yb 4d3/2 at 300 eV to
+  0.76x), then actinide 5f. The direction is right against
   an independent table: on closed core s, p and d subshells at the usual
   lines, Trzhaskovskaya (kb) and Scofield (Mb) now differ by a median
   1.9 % (3,682 points), and by 1.4–3.4 % in every band of Eb/hν; read as

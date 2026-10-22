@@ -144,6 +144,7 @@ def test_closed_core_subshells_agree_with_scofield_at_the_same_photon_energy():
 
 
 def test_the_mcp_tool_reports_no_shared_grid_for_this_table():
+    pytest.importorskip("mcp")
     from toyomacro import mcp_server
 
     out = json.loads(mcp_server.calculate_sensitivity(
