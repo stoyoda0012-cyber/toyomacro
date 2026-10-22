@@ -109,7 +109,9 @@ def calculate_sensitivity(
     - sigma is interpolated between the valid cells of the requested
       line. Above a line's last valid cell the value is a power law
       fitted to its last few cells, flagged as
-      `cross_section_extrapolated`. The default Yeh & Lindau table
+      `cross_section_extrapolated` — unless the table prints a cell
+      above it that is withheld as a suspected source misprint
+      (`CrossSection.withheld_cells()`), in which case there is no value. The default Yeh & Lindau table
       stops at 8047.8 eV, below the 9251.7 eV default. Below a line's
       first valid cell there is no value, and the call returns an error
       naming that state.
@@ -172,7 +174,9 @@ def calculate_sensitivity(
                 "the energy is below the line's first tabulated cell, where "
                 "a power law has no support (threshold region)"),
             "outside_range_above": (
-                "the line has a single tabulated cell and the energy is above it"),
+                "the energy is above the line's only tabulated cell, or above its "
+                "last one where a cell printed above it is withheld as a suspected "
+                "source misprint"),
         }[found.status]
         return json.dumps({
             "error": (f"No cross-section for {element} {orbital} at {photon_energy} eV "

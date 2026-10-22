@@ -23,6 +23,29 @@ archived on Zenodo for a citable DOI.
   committed are not regraded. A `null` thermal or steal field is
   documented as "not measurable here". The schema version stays 3:
   hosts with a load average are graded as before.
+- **Yeh–Lindau Cu 3d at 8047.8 eV is withheld as a suspected source
+  misprint.** Table I (p. 8) prints `.32E-3` Mb. Along the 3d row it
+  falls 38-fold from 1486.6 eV, against about 300-fold for Ni and
+  2,600-fold for Zn, and it is 30x Scofield where Ni is 3.0x and Zn
+  0.31x. The bundled file keeps the printed value; `lookup()` treats the
+  cell as absent and does not extrapolate the line across it. So
+  `lookup('Cu', '3d', hv, table='yeh_lindau')` returns `None` with status
+  `outside_range_above` for every hv above 1486.6 eV, where it returned
+  0.00032 at 8047.8 eV, about 0.001 at 4 keV and power-law values above.
+  Use Scofield there. Below, the default PCHIP interpolation moves
+  between 1253.6 and 1486.6 eV only, by up to +1.8 % (the withheld cell
+  set the end slope); the tabulated cells are unchanged. Against
+  Scofield's shape over that interval the change is mixed: closer above
+  about 1345 eV, slightly further below, by under 0.6 %. The legacy
+  `polyfit` interpolation fits every cell at once, so it moves over the
+  whole line, from −16 % at 1486.6 eV to +14 % near 450 eV; its rms
+  residual against the line's 14 remaining printed cells falls from
+  0.055 to 0.040 decades. New: `CrossSection.withheld_cells(table)` lists withheld
+  cells with the printed value and the evidence; `to_dict()` shows the
+  cell as `None` and marks the line with `withheld_eV`. Compared over
+  every element, line, j label, energy (all grid cells up to 30 keV,
+  midpoints, a dense 5 eV–15 keV grid) and both interpolations of all three tables:
+  57 million outputs, of which only Yeh–Lindau Cu 3d differs.
 
 ### Fixed
 

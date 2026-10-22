@@ -357,7 +357,8 @@ it — so pass `table=` explicitly whenever the choice matters, and read
 **What `lookup()` returns, and what it does not.** Inside a line's
 tabulated range it interpolates with a monotone piecewise cubic (PCHIP)
 in log–log space, so a tabulated energy returns the tabulated value;
-above the range it uses a power law through the last cells. **Below a
+above the range it uses a power law through the last cells, unless a
+withheld cell lies above (see *A printed cell can be withheld* below). **Below a
 line's first valid cell it returns `None`** (since v0.5.0): that is the
 threshold region, where shape resonances and Cooper minima move the
 cross-section by orders of magnitude and a power law has no support
@@ -393,7 +394,7 @@ is one of its cells, its valid range and the threshold applied.
 |---|---|---|
 | `tabulated` | a valid cell, or between valid cells | yes |
 | `extrapolated_above` | above the line's last valid cell | yes, power law |
-| `outside_range_above` | above a line's *only* valid cell | no |
+| `outside_range_above` | above a line's *only* valid cell, or above its last valid cell when a withheld cell lies above | no |
 | `outside_range_below` | below the line's first valid cell | no, unless `extrapolate_below=True` |
 | `below_threshold` | photon energy below the `BindingEnergy` value | known zero |
 | `unoccupied` | absent component the table's rule says is empty (no bundled table has such a rule confirmed yet) | known zero |
@@ -435,6 +436,17 @@ it, or deep-copy before mutating — and `photon_energies` and a line's
 `cross_sections` are only meaningful read as a pair. The grid values are
 the tabulated ones in the unit `unit_info()` reports; `lookup()`
 interpolates through them and returns them at their own energies.
+
+**A printed cell can be withheld.** `CrossSection.withheld_cells(table)`
+lists the cells a table prints that `lookup()` does not use, because the
+printed value is a suspected misprint in the source itself; each entry
+gives the element, subshell, photon energy, printed value and the
+evidence. There is one: Yeh–Lindau Cu 3d at 8047.8 eV (printed
+`.32E-3` Mb, 30x Scofield where its neighbours are 0.3–3x). The bundled
+file keeps the printed value; `to_dict()` shows the cell as `None` and
+marks the line with `withheld_eV`. A line is not extrapolated across a
+withheld cell, so Yeh–Lindau Cu 3d above 1486.6 eV returns no value,
+with status `outside_range_above`. Use another table there.
 
 **A bare orbital is the whole doublet.** `lookup('Si', '2p', hv)` returns
 σ(2p1/2) + σ(2p3/2) — what a measured peak envelope contains. Each

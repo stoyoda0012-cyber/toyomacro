@@ -19,8 +19,11 @@ row had become an element ``Photon``. The first two made ``lookup()``
 miss a tabulated line and extrapolate it from neighbouring elements
 instead. The tests at the end pin the keys and those two lines.
 
-Beyond these thirteen cells and two lines, agreement between the two
-transcriptions is the only check the table has had.
+One more cell was read from the page later: Cu 3d at 8047.8 eV, printed
+``.32E-3`` and held as printed, although ``lookup()`` withholds it as a
+suspected misprint in the source. Beyond these fourteen cells and two
+lines, agreement between the two transcriptions is the only check the
+table has had.
 """
 
 import pytest
@@ -67,6 +70,20 @@ def test_cell_matches_table_i(table, element, orbital, hv):
         f"{element} {orbital} @ {hv} eV: JSON has {got}, Table I (p. {page}) "
         f"prints {expected} ({note})"
     )
+
+
+def test_cu_3d_at_8047_8_is_held_as_table_i_prints_it():
+    """Read from the journal page (p. 8) in 2026-10: ``.32E-3``.
+
+    A suspected misprint in the source, so ``lookup()`` withholds it (see
+    ``test_cross_section_withheld_cells.py``); ``to_dict()`` shows it as
+    absent. The bundled file keeps the printed value, read here raw.
+    """
+    from toyomacro.data.paths import load_cross_section_data
+
+    raw = load_cross_section_data()
+    column = raw["photon_energies"].index(8047.8)
+    assert raw["data"]["Cu"]["3d"]["cross_sections"][column] == pytest.approx(3.2e-4, rel=1e-12)
 
 
 def test_corrected_cells_sit_between_their_neighbours(table):

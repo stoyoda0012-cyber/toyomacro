@@ -123,8 +123,18 @@ one value that is probably a misprint. Cu 3d at 8047.8 eV is printed
 `.32E-3` Mb: along the 3d row it falls only 38-fold from 1486.6 eV,
 against 300-fold for Ni and 2,600-fold for Zn, and it is 68x Zn's
 `.47E-5` and 30x the bundled Scofield value (Zn is 0.31x, Ni 3.0x).
-No erratum has been found, so it stays as printed; it would be changed
-only against a published correction, cited here.
+No erratum has been found, so the file keeps it as printed; it would be
+changed only against a published correction, cited here. Since 2026-10
+`lookup()` withholds it instead of using it: the cell counts as absent,
+and the line is not extrapolated across it, so Yeh–Lindau Cu 3d returns
+no value above 1486.6 eV (`CrossSection.withheld_cells()` lists the cell
+with this evidence). That also moves the PCHIP interpolation between
+1253.6 and 1486.6 eV, whose end slope the cell set, and every value of
+the line under the legacy `polyfit` interpolation, which fits all cells
+at once. The CHANGELOG entry gives the size of both; against Scofield's
+shape the PCHIP change between 1253.6 and 1486.6 eV is mixed, closer
+above about 1345 eV and slightly further below. Anything that reads
+`cross_section.json` directly, outside `lookup()`, still sees `.32E-3`.
 
 The CSV this file was generated from (`Common/data/CrossSectionTable_Yeh=Lindau.csv`,
 not part of this repository, CR line endings) was corrected in the same
