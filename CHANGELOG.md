@@ -17,16 +17,25 @@ archived on Zenodo for a citable DOI.
   unresolved Co 3p level (58.8 and 59.0 eV from two instruments), as it
   does for Mn and Fe, which the Booklet lists with one value under both
   columns; Bearden & Burr (1967) also give one level (59.5 eV). Both
-  members are now 59 eV. Over every element, label and energy the
-  binding-energy readers accept (4,260,003 outputs compared), only Co
-  3p changes: `BindingEnergy.lookup("Co", "3p")` and `"3p3/2"` give 59
-  instead of 60, its spin-orbit split 0 instead of 1, and between 59 and
-  60 eV the Co 3p3/2 and bare 3p cross-sections are no longer a known
-  zero (`below_threshold`) but outside the tables' range — no value by
-  default, an extrapolated one with `extrapolate_below=True`. Against
-  the cited primary source the value is now exact; individual XPS
-  measurements of Co metal 3p (about 59.7–60.2 eV, unresolved) lie
-  closer to the old 60 than to 59.
+  members are now 59 eV. Old against new over every element and label
+  of the table (4,260,003 outputs of `BindingEnergy` and the
+  cross-section thresholds over 10–200 eV and the usual lines, which
+  bracket the change, and 73,480 of the MCP tools): only Co 3p changes.
+  `BindingEnergy.lookup("Co", "3p")` and `"3p3/2"` give 59 instead of
+  60 and the spin-orbit split 0 instead of 1. Between 59 and 60 eV, Co
+  3p3/2 (all tables) and bare 3p on Yeh–Lindau are no longer a known
+  zero (`below_threshold`) but outside the range — no value by default,
+  an extrapolated one with `extrapolate_below=True`; bare 3p on
+  Scofield and Trzhaskovskaya was already outside the range there, and
+  its extrapolated value now includes 3p3/2. The MCP
+  `calculate_sensitivity` takes the kinetic energy one eV higher for Co
+  3p at every photon energy: the sensitivity moves by +0.06 % at
+  1486.6 eV and by +19.6 % at 80 eV (Yeh–Lindau, SiO₂ matrix), where
+  the IMFP is steep. Against the cited source the value is exact
+  (itself a clean-metal measurement); Bearden & Burr's 59.5 is
+  equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p
+  (59.70, Strydom & Strydom 1989; 60.20, Mandale et al. 1984) lie
+  closer to the old 60.
 
 ## [0.6.0] - 2026-10-21
 

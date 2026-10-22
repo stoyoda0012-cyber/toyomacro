@@ -416,8 +416,9 @@ in v0.4.0: `below_threshold` withholds cells the table prints below the
 Scofield, e.g. Ar 1s1/2 at 3199.8 eV; 2,304 on Trzhaskovskaya, from its
 energy axis), and the known limits of that source apply: unresolved
 spin-orbit pairs are stored with one value for both members (Co 3p at
-59 eV, as Fuggle & Mårtensson 1980 print it, where the X-ray Data
-Booklet misprints 58.9 / 59.9).
+59 eV, as Fuggle & Mårtensson 1980 print it; the X-ray Data Booklet's
+3p3/2 = 59.9, in none of its cited sources, is evidently a misprint of
+58.9).
 `CrossSectionLookup` and `ComponentLookup` are exported from
 `toyomacro.data` and are Supported, so the status and method vocabularies
 above change only with a minor version. `get_rsf()` does not carry the state; call
