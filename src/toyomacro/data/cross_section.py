@@ -231,6 +231,80 @@ def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
     return {**data, "data": elements}
 
 
+#: Subshell energies Scofield prints for each element ("STATE NE E(KEV)",
+#: UCRL-51326), read from the scanned report (printed page numbers), for 71
+#: Scofield lines ``BindingEnergy`` has no value for: the L and M levels of
+#: Np-Fm and Pm 3s, which start inside the bundled 1-30 keV grid, and the
+#: Np 5f/6d and Pu 5f valence lines on the same pages. They are the report's
+#: own calculated energies. Lookups record them as a line's
+#: ``printed_binding_energy_eV`` and never use them as a threshold. Each core
+#: line's first tabulated cell lies at 1.0070 times the printed energy (62 of
+#: 65, within 2e-5) or at a round grid energy between the two (Pu 3d3/2,
+#: Bk 3p3/2, Cf 2p3/2) — a check of the reading that resolves about 2e-5
+#: relative, so the last printed digit rests on the reading alone.
+_SCOFIELD_PRINTED_E_KEV: dict[str, tuple[int, dict[str, float]]] = {
+    "Pm": (166, {"3s1/2": 1.6256}),
+    "Np": (319, {
+        "2s1/2": 22.4738, "2p1/2": 21.7049, "2p3/2": 17.6247, "3s1/2": 5.7209, "3p1/2": 5.367,
+        "3p3/2": 4.4212, "3d3/2": 3.8588, "3d5/2": 3.6674, "5f5/2": 0.0101, "5f7/2": 0.0089,
+        "6d3/2": 0.0047, "6d5/2": 0.0041,
+    }),
+    "Pu": (325, {
+        "2s1/2": 23.1603, "2p1/2": 22.3744, "2p3/2": 18.0695, "3s1/2": 5.9118, "3p1/2": 5.5502,
+        "3p3/2": 4.5495, "3d3/2": 3.9774, "3d5/2": 3.7762, "5f5/2": 0.0073, "5f7/2": 0.0062,
+    }),
+    "Am": (331, {
+        "2s1/2": 23.8693, "2p1/2": 23.0659, "2p3/2": 18.5251, "3s1/2": 6.113, "3p1/2": 5.7434,
+        "3p3/2": 4.685, "3d3/2": 4.1032, "3d5/2": 3.8917,
+    }),
+    "Cm": (337, {
+        "2s1/2": 24.602, "2p1/2": 23.7804, "2p3/2": 18.9921, "3s1/2": 6.3253, "3p1/2": 5.9475,
+        "3p3/2": 4.8284, "3d3/2": 4.2367, "3d5/2": 4.0147,
+    }),
+    "Bk": (343, {
+        "2s1/2": 25.3479, "2p1/2": 24.5079, "2p3/2": 19.4596, "3s1/2": 6.537, "3p1/2": 6.151,
+        "3p3/2": 4.968, "3d3/2": 4.3664, "3d5/2": 4.1334,
+    }),
+    "Cf": (349, {
+        "2s1/2": 26.1072, "2p1/2": 25.2482, "2p3/2": 19.9268, "3s1/2": 6.7478, "3p1/2": 6.3533,
+        "3p3/2": 5.1032, "3d3/2": 4.4916, "3d5/2": 4.2472,
+    }),
+    "Es": (355, {
+        "2s1/2": 26.8925, "2p1/2": 26.0139, "2p3/2": 20.4058, "3s1/2": 6.9705, "3p1/2": 6.5673,
+        "3p3/2": 5.2465, "3d3/2": 4.6249, "3d5/2": 4.3686,
+    }),
+    "Fm": (361, {
+        "2s1/2": 27.6986, "2p1/2": 26.7999, "2p3/2": 20.8907, "3s1/2": 7.199, "3p1/2": 6.7871,
+        "3p3/2": 5.3918, "3d3/2": 4.7601, "3d5/2": 4.4916,
+    }),
+}
+
+
+def _add_scofield_printed_energies(data: dict[str, Any]) -> dict[str, Any]:
+    """Return ``data`` with the printed energies above as ``binding_energy``.
+
+    That field is never a threshold (see ComponentLookup's
+    ``printed_binding_energy_eV``); thresholds come from BindingEnergy. On
+    Trzhaskovskaya it also places each line's cells at E + Eb.
+
+    Raises:
+        RuntimeError: if an entry names a line the table lacks, or a line
+            that already carries a binding energy.
+    """
+    elements = dict(data["data"])
+    for element, (_page, energies) in _SCOFIELD_PRINTED_E_KEV.items():
+        lines = dict(elements.get(element, {}))
+        for key, kev in energies.items():
+            if key not in lines or lines[key].get("binding_energy") is not None:
+                raise RuntimeError(
+                    f"scofield {element} {key}: not in the table, or already has a "
+                    f"binding energy; review _SCOFIELD_PRINTED_E_KEV."
+                )
+            lines[key] = {**lines[key], "binding_energy": round(kev * 1000.0, 4)}
+        elements[element] = lines
+    return {**data, "data": elements}
+
+
 def _place_on_photon_axis(data: dict[str, Any]) -> dict[str, Any]:
     """Give each Trzhaskovskaya line its own photon-energy cells.
 
@@ -321,10 +395,18 @@ class ComponentLookup:
         valid_range_eV: First and last valid cell of this line, or None,
             in photon energy (for Trzhaskovskaya the line's own cells,
             E + Eb).
-        threshold_eV: The binding energy used as the ionization threshold,
-            or None when ``BindingEnergy`` has no value for this level — in
-            which case no threshold was applied, and a value below the
-            range is not known to be above threshold.
+        threshold_eV: The :class:`BindingEnergy` value used as the
+            ionization threshold, or None when it has no value for this
+            level — in which case no threshold was applied, and a value
+            below the range is not known to be above threshold.
+        printed_binding_energy_eV: The binding energy the cross-section
+            table itself prints for this line, or None (every Yeh-Lindau
+            and Trzhaskovskaya line has one; Scofield only the 71 read from
+            UCRL-51326, see ``docs/DATA_SOURCES.md``). Recorded, never used
+            as a threshold: these are calculated (Scofield, Yeh-Lindau) or
+            experimental free-atom (Trzhaskovskaya) energies that can lie above a solid sample's edge (for Th, Pa and U, where
+            ``BindingEnergy`` has values, Scofield's 2p1/2 edge sits 89-99 eV
+            above them), so "below it" is not a known zero.
     """
 
     orbital: str
@@ -334,6 +416,7 @@ class ComponentLookup:
     at_tabulated_cell: bool
     valid_range_eV: tuple[float, float] | None
     threshold_eV: float | None
+    printed_binding_energy_eV: float | None = None
 
 
 @dataclass(frozen=True)
@@ -472,6 +555,8 @@ class CrossSection:
             raise ValueError(f"Unknown table '{table}'")
         if table == "trzhaskovskaya":
             data = _place_on_photon_axis(data)
+        elif table == "scofield":
+            data = _add_scofield_printed_energies(data)
         return _withhold_cells(table, data)
 
     @staticmethod
@@ -749,14 +834,18 @@ class CrossSection:
         known zero the value is ``0.0``.
 
         The ionization threshold is the :class:`BindingEnergy` value of
-        each component, not the table's own binding-energy column. Where
+        each component, not the table's own binding energy. Where
         ``BindingEnergy`` has no value no threshold applies
         (``threshold_eV`` is None) — 147 of 754 Yeh-Lindau lines, 286 of
-        1,562 Scofield and 190 of 1,244 Trzhaskovskaya lines, mostly valence
-        levels plus Scofield's deep levels of Np to Fm — and
+        1,562 Scofield and 190 of 1,244 Trzhaskovskaya lines, mostly
+        valence levels plus Scofield's deep levels of Np to Fm — and
         ``outside_range_below`` then does not mean the energy is above
-        threshold. ``below_threshold`` overrides the table where the two
-        disagree: it withholds cells the table prints below the
+        threshold. ``printed_binding_energy_eV`` gives the energy the
+        table itself prints for the line, where it prints one, as a guide
+        to where the table places the onset; it is a calculated or
+        free-atom energy and never gates. Where the table's cells and
+        ``BindingEnergy`` disagree, ``below_threshold`` overrides the
+        table: it withholds cells the table prints below the
         ``BindingEnergy`` value (47 on Yeh-Lindau, e.g. As 2s at Al K-alpha;
         73 on Scofield, e.g. Ar 1s1/2 at 3199.8 eV; none on
         Trzhaskovskaya, whose cells start 100 eV above its own binding
@@ -871,11 +960,13 @@ class CrossSection:
     ) -> ComponentLookup:
         """Evaluate one stored line: threshold first, then its own range."""
         threshold = cls._get_binding_energy(element, key)
+        printed = orbital_data.get("binding_energy")
+        printed = float(printed) if printed is not None else None
         if threshold is not None and photon_energy < threshold:
             return ComponentLookup(
                 orbital=key, status="below_threshold", value=0.0, method=None,
                 at_tabulated_cell=False, valid_range_eV=cls._valid_range(orbital_data, data),
-                threshold_eV=threshold,
+                threshold_eV=threshold, printed_binding_energy_eV=printed,
             )
         status, value, method, at_cell, valid = cls._evaluate_range(
             orbital_data, data, photon_energy, extrapolate_below,
@@ -883,6 +974,7 @@ class CrossSection:
         return ComponentLookup(
             orbital=key, status=status, value=value, method=method,
             at_tabulated_cell=at_cell, valid_range_eV=valid, threshold_eV=threshold,
+            printed_binding_energy_eV=printed,
         )
 
     @staticmethod

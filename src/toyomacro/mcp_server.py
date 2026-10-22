@@ -253,6 +253,7 @@ def _components_json(found) -> list[dict]:
             "method": p.method,
             "valid_range_eV": list(p.valid_range_eV) if p.valid_range_eV else None,
             "threshold_eV": p.threshold_eV,
+            "printed_binding_energy_eV": p.printed_binding_energy_eV,
         }
         for p in found.components
     ]
