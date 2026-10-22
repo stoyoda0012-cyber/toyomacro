@@ -150,6 +150,62 @@ class _Refused:
 _REFUSED = _Refused()
 
 
+#: Cells a table prints but lookups do not use, because the printed value
+#: is a suspected misprint in the source itself. The bundled table keeps
+#: the value exactly as printed: it is a faithful transcription, and the
+#: transcription tests pin it. Only the lookup withholds it. A withheld
+#: cell is treated as absent, and a line is not extrapolated across it:
+#: above the line's last remaining cell, while a withheld cell lies above,
+#: the lookup is ``outside_range_above`` with no value. Each entry cites
+#: the evidence; one is removed only against a published correction.
+_WITHHELD_CELLS: dict[tuple[str, str, str, float], tuple[float, str]] = {
+    ("yeh_lindau", "Cu", "3d", 8047.8): (3.2e-4, (
+        "Yeh & Lindau (1985) Table I, p. 8, prints Cu 3d at 8047.8 eV as "
+        ".32E-3 Mb. Along the 3d row it falls 38-fold from 1486.6 eV, "
+        "against about 300-fold for Ni and 2,600-fold for Zn; it is 30x "
+        "the bundled Scofield value, where Ni is 3.0x and Zn 0.31x. The "
+        "correct digit cannot be read from the table, and no erratum has "
+        "been found."
+    )),
+}
+
+
+def _withhold_cells(table: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Return ``data`` with this table's withheld cells set to ``None``.
+
+    The withheld energies are recorded on the line as ``withheld_eV`` so
+    that the range logic can refuse to extrapolate across them. Only the
+    affected lines are copied; nothing on disk changes.
+
+    Raises:
+        RuntimeError: if the table no longer holds the printed value the
+            entry was made for, so that a changed table cannot leave a
+            stale entry withholding a different number.
+    """
+    entries = [(k, v) for k, v in _WITHHELD_CELLS.items() if k[0] == table]
+    if not entries:
+        return data
+    energies = data.get("photon_energies", [])
+    elements = dict(data["data"])
+    for (_, element, key, energy), (printed, _reason) in entries:
+        line = dict(elements[element][key])
+        index = next(
+            i for i, e in enumerate(energies) if math.isclose(e, energy, rel_tol=1e-12)
+        )
+        cells = list(line["cross_sections"])
+        stored = cells[index]
+        if stored is None or not math.isclose(stored, printed, rel_tol=1e-9):
+            raise RuntimeError(
+                f"{table} {element} {key} at {energy} eV holds {stored}, not the "
+                f"printed {printed} that _WITHHELD_CELLS withholds; review the entry."
+            )
+        cells[index] = None
+        line["cross_sections"] = cells
+        line["withheld_eV"] = sorted({*line.get("withheld_eV", ()), energies[index]})
+        elements[element] = {**elements[element], key: line}
+    return {**data, "data": elements}
+
+
 def _absent_component_is_unoccupied(table: str) -> bool:
     """Whether a missing j component means "empty" rather than "no data"."""
     return _ABSENT_COMPONENT_IS_UNOCCUPIED.get(table, False)
@@ -172,7 +228,8 @@ def _split_orbital(orbital: str) -> tuple[str, str | None]:
 LookupStatus = Literal[
     "tabulated",            # a valid cell, or interpolation between valid cells
     "extrapolated_above",   # above the last valid cell: power law (value given)
-    "outside_range_above",  # above the only valid cell: no basis to extrapolate
+    "outside_range_above",  # above the only valid cell, or above the last valid
+                            # cell with a withheld cell above it: no value
     "outside_range_below",  # below the first valid cell: no value by default
     "below_threshold",      # hv < BindingEnergy value: known zero contribution
     "unoccupied",           # absent component the table rule says is empty
@@ -297,6 +354,31 @@ class CrossSection:
         return info
 
     @classmethod
+    def withheld_cells(cls, table: str | None = None) -> list[dict[str, Any]]:
+        """Cells ``table`` prints that ``lookup()`` does not use, and why.
+
+        A cell is withheld when the printed value is a suspected misprint
+        in the source itself. The bundled table keeps the printed value;
+        lookups treat the cell as absent and do not extrapolate across it,
+        so above the line's last remaining cell they return no value with
+        status ``outside_range_above``.
+
+        Returns one dict per cell with ``element``, ``subshell``,
+        ``photon_energy_eV``, ``printed_value`` (in the table's unit, see
+        :meth:`unit_info`) and ``reason``; an empty list when the table
+        has none.
+        """
+        table = table or cls._default_table
+        if table not in AVAILABLE_TABLES:
+            raise ValueError(f"Unknown table '{table}'. Choose from {AVAILABLE_TABLES}")
+        return [
+            {"element": element, "subshell": key, "photon_energy_eV": energy,
+             "printed_value": printed, "reason": reason}
+            for (name, element, key, energy), (printed, reason) in _WITHHELD_CELLS.items()
+            if name == table
+        ]
+
+    @classmethod
     def set_default_table(cls, table: str) -> None:
         """Set the default cross-section table.
 
@@ -322,15 +404,16 @@ class CrossSection:
 
     @classmethod
     def _load_table(cls, table: str) -> dict[str, Any]:
-        """Load a specific cross-section table."""
+        """Load a specific cross-section table, withheld cells removed."""
         if table == "yeh_lindau":
-            return load_cross_section_data()
+            data = load_cross_section_data()
         elif table == "scofield":
-            return cls._load_scofield()
+            data = cls._load_scofield()
         elif table == "trzhaskovskaya":
-            return cls._load_trzhaskovskaya()
+            data = cls._load_trzhaskovskaya()
         else:
             raise ValueError(f"Unknown table '{table}'")
+        return _withhold_cells(table, data)
 
     @staticmethod
     def _load_with_cache(cache_name: str, csv_name: str, parser) -> dict[str, Any]:
@@ -791,6 +874,13 @@ class CrossSection:
                 return "outside_range_below", None, None, False, (lo, hi)
             value = cls._interpolate_log_log(points, photon_energy)
             return "outside_range_below", value, "power_law_below", False, (lo, hi)
+        if photon_energy > hi and not at_cell and any(
+            e > hi for e in (orbital_data or {}).get("withheld_eV", ())
+        ):
+            # The table has a cell up there; it is withheld, not missing.
+            # Extrapolating across it would replace a printed value with a
+            # guess, so refuse instead (see _WITHHELD_CELLS).
+            return "outside_range_above", None, None, False, (lo, hi)
         value = cls._interpolate_log_log(points, photon_energy)
         if photon_energy > hi and not at_cell:
             return "extrapolated_above", value, "power_law_above", False, (lo, hi)
@@ -921,8 +1011,10 @@ class CrossSection:
         {"binding_energy": eV or None, "cross_sections": [...]}}}}`` —
         one entry per photon energy, ``None`` where the source table has
         no entry, values in the unit :meth:`unit_info` reports. The same
-        shape for every table. This is the live process cache, not a
-        copy: read from it, or deep-copy before mutating.
+        shape for every table. A cell listed by :meth:`withheld_cells` is
+        ``None`` here too, and its line carries ``withheld_eV``; the
+        printed value stays in the bundled file. This is the live process
+        cache, not a copy: read from it, or deep-copy before mutating.
         """
         return cls._get_data(table)
 

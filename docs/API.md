@@ -433,6 +433,17 @@ it, or deep-copy before mutating — and `photon_energies` and a line's
 the tabulated ones in the unit `unit_info()` reports; `lookup()`
 interpolates through them and returns them at their own energies.
 
+**A printed cell can be withheld.** `CrossSection.withheld_cells(table)`
+lists the cells a table prints that `lookup()` does not use, because the
+printed value is a suspected misprint in the source itself; each entry
+gives the element, subshell, photon energy, printed value and the
+evidence. There is one: Yeh–Lindau Cu 3d at 8047.8 eV (printed
+`.32E-3` Mb, 30x Scofield where its neighbours are 0.3–3x). The bundled
+file keeps the printed value; `to_dict()` shows the cell as `None` and
+marks the line with `withheld_eV`. A line is not extrapolated across a
+withheld cell, so Yeh–Lindau Cu 3d above 1486.6 eV returns no value,
+with status `outside_range_above`. Use another table there.
+
 **A bare orbital is the whole doublet.** `lookup('Si', '2p', hv)` returns
 σ(2p1/2) + σ(2p3/2) — what a measured peak envelope contains. Each
 component is evaluated at the requested energy and then added; summing

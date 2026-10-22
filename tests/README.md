@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,642 automated tests** across **98 files**, in two
+This suite has **2,664 automated tests** across **99 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 60 | 1,557 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 61 | 1,579 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,085 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,210 tests, 84%) — guarantee the library
+- **Contract / regression** (2,232 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,630. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,652. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,7 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,557)
+## Library body — `tests/` (1,579)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -132,7 +132,7 @@ them would take real coverage with them:
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (663)
+### Quantification data (685)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -151,6 +151,7 @@ them would take real coverage with them:
 | 22 | `test_compound_provenance.py` | `compounds_provenance.json` stays in step with `compounds.json` field by field, and never leaks into the values |
 | 15 | `test_bundled_table_loading.py` | The `_cache/` tables are shipped data, not a rebuildable cache: a missing file raises rather than regenerating itself; the rebuild parser does not turn the CSV's photon-energy row into an element |
 | 13 | `test_transmission_adapter.py` | Analyzer-transmission loader (synthetic fixtures only; no vendor data bundled) |
+| 22 | `test_cross_section_withheld_cells.py` | Cells a table prints but `lookup()` withholds as suspected source misprints: the bundled file keeps Yeh–Lindau Cu 3d at 8047.8 eV as printed (`.32E-3`), the evidence against it (fall from 1486.6 eV and ratio to Scofield against Ni and Zn), no value above 1486.6 eV under both interpolations, every other cell of every table loaded as stored, and a stale entry refused |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
