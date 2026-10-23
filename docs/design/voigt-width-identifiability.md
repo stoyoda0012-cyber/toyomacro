@@ -685,13 +685,15 @@ follows the path count for that rule: in the outward pass, the nearest
 obtained neighbour. The stated point stays a start, but its iterates
 decide no stop. Moved onto a distant constraint plane it can sit at any
 amplitude, so an iterate from it says nothing about whether the path
-reached zero. The development configuration was one peak with
-σ/γ = 1/4 on ±0.8γ and an estimated linear background. There the rule as
-first written turned t = −2.8 into a stop: an iterate from the stated
-point sat at A = −1.8×10⁵, while one step back the path was at
-A = 3.5×10⁵ with γ held at 0. Under the amendment both routes still fail
-there, where I_z is singular to rounding, and the point is
-"not obtained".
+reached zero. A successful solution from the stated point is still a
+candidate for the solution the summaries use, and its events still make
+a stop. The development configuration was one peak with σ/γ = 1/4 on
+±0.8γ and an estimated linear background. There the rule as first
+written turned t = −2.8 into a stop: an iterate from the stated point sat
+at A = −1.8×10⁵, while the path's own iterates there sat at
+A = 3.3–3.5×10⁵ with γ held at 0 (the last obtained point, −2.6, at
+3.3×10⁵). Under the amendment both routes still fail there, where I_z is
+singular to rounding, and the point is "not obtained".
 
 - *bound active* — for each side and each bound, the first grid point
   (not refined) whose solution has that bound active. Reported with the

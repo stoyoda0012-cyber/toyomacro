@@ -2231,7 +2231,7 @@ class TestModeProfile:
         moved[:3] -= row * problem.theta(t, z)[0][0] / (row @ row)
         return moved
 
-    def _patched(self, monkeypatch, rewrite):
+    def _patched(self, monkeypatch, rewrite, grid=(-0.5, -0.25, 0.0, 0.25, 0.5, 0.75)):
         """mode_profile on the interior configuration and a short grid, with
         each _Profile.solve result passed through ``rewrite(problem, t,
         call, result, iterates)``."""
@@ -2245,7 +2245,7 @@ class TestModeProfile:
 
         monkeypatch.setattr(idf._Profile, "solve", solve)
         e, peak, bg = DEV_INTERIOR
-        return mode_profile(e, peak, bg(e), t=(-0.5, -0.25, 0.0, 0.25, 0.5, 0.75))
+        return mode_profile(e, peak, bg(e), t=grid)
 
     def test_a_side_stops_where_the_solution_reaches_zero_amplitude(self, monkeypatch):
         """A successful solution at a zero amplitude is a stop: it and every
@@ -2283,15 +2283,20 @@ class TestModeProfile:
         assert by_t[0.5].flagged and by_t[0.75].delta_a is None  # beyond: not solved
 
     def test_a_failed_inward_iterate_does_not_move_the_stop(self, monkeypatch):
+        """0.25 fails in both passes; in the inward one a path-start iterate
+        sits at a zero amplitude. Only the outward pass finds a stop."""
         def rewrite(problem, t, call, result, iterates, starts):
-            if t == 0.25 and call == 2:  # the inward pass
+            if t == 0.25:
                 failed = {r: (None, result[r][1]) for r in ("A", "B")}
-                return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+                if call == 2:
+                    return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+                return failed, iterates
             return result, iterates
 
         prof = self._patched(monkeypatch, rewrite)
         assert prof.plus.stop is None
-        assert all(p.outcome == "ok" for p in prof.points)
+        assert next(p for p in prof.points if p.t == 0.25).outcome == "not_obtained"
+        assert all(p.outcome == "ok" for p in prof.points if p.t != 0.25)
 
     def test_an_iterate_from_the_stated_point_makes_no_stop(self, monkeypatch):
         """§9.4 as amended before the registered run: the stated point, moved
@@ -2348,3 +2353,66 @@ class TestModeProfile:
         self._patched(monkeypatch, rewrite)
         assert seen[0.25] == [2, 2] and seen[-0.25] == [2, 2]  # outward 2, inward own + outer
         assert seen[0.75] == [2, 1] and seen[-0.5] == [2, 1]   # the ends have no outer neighbour
+
+    def test_a_route_that_succeeds_records_its_own_result(self, monkeypatch):
+        """Its deviance and KKT residual, even where a failed candidate of the
+        same route has a lower deviance."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                return {"A": ((dev, z, res), (dev - 0.5, z, 5e-3)), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        point = next(p for p in prof.points if p.t == 0.25)
+        assert point.success_a and point.kkt_a < 1e-6
+        assert point.delta_a == pytest.approx(point.delta_b, abs=1e-6)
+
+    def test_an_infeasible_point_is_not_active(self):
+        """1e-3 of the scale below a bound fails the KKT test; 5e-7 below
+        counts as on it; an iterate far below both bounds is no corner."""
+        e, peak, bg = DEV_TIGHT
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        t = 1.5
+        on = problem.scoring(t, problem.z_of(t, problem.peak0, problem.b0), ("variance",))
+        assert problem.kkt(t, on)[0]
+        row, i = problem.g_row("variance")
+        for below, passes in ((1e-3, False), (5e-7, True)):
+            z = on - row * (below * problem.scales[i]) / (row @ row)
+            assert problem.g(t, z, "variance") == pytest.approx(-below * problem.scales[i])
+            assert problem.kkt(t, z)[0] is passes
+        rows = np.array([problem.g_row(b)[0] for b in ("variance", "gamma")])
+        target = np.array([-0.2 * problem.scales[2] - problem.g(t, on, "variance"),
+                           -0.2 * problem.scales[3] - problem.g(t, on, "gamma")])
+        far = on + np.linalg.lstsq(rows, target, rcond=None)[0]
+        assert problem.active(t, far) == () and problem.event(t, far) is None
+
+    @pytest.mark.parametrize("excess, flagged", [(2e-6, True), (5e-7, False)])
+    def test_the_agreement_tolerance(self, monkeypatch, excess, flagged):
+        """1e-6 absolute below Delta = 1, relative above it."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t in (0.25, 1.5) and result["A"][0] is not None and result["B"][0] is not None:
+                dev, z, res = result["B"][0]
+                shifted = (dev + excess * max(1.0, dev), z, res)
+                return {"A": (shifted, shifted), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite, grid=(0.0, 0.25, 1.5))
+        for t in (0.25, 1.5):
+            point = next(p for p in prof.points if p.t == t)
+            assert point.success_a and point.success_b and point.flagged is flagged
+        assert next(p for p in prof.points if p.t == 1.5).delta > 1.0
+
+    def test_delta_before_a_stop_that_was_not_obtained(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25:
+                return {r: (None, result[r][1]) for r in ("A", "B")}, iterates
+            found = result["A"][0] or result["B"][0]
+            if t == 0.5 and found is not None:
+                dev, z, res = found
+                zero = self._amplitude_zero(problem, t, z)
+                return {"A": ((dev, zero, res), (dev, zero, res)), "B": (None, None)}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop["t"] == 0.5 and prof.plus.stop["delta_before"] == "not obtained"

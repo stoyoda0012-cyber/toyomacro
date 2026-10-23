@@ -40,6 +40,13 @@ CONFIGURATIONS = {
 OUTCOMES = ("ok", "not_obtained", "amplitude_at_zero", "corner")
 
 
+def _blas():
+    try:
+        return np.show_config(mode="dicts")["Build Dependencies"]["blas"]["name"]
+    except Exception:  # the layout of show_config is not a stable API
+        return "unknown"
+
+
 def _fmt(value):
     if value is None:
         return "-"
@@ -60,7 +67,8 @@ def test_registered_profile_is_recorded(name, record_property):
 
     mode = profile.mode
     lines = [
-        f"Python {platform.python_version()}, NumPy {np.__version__}, SciPy {scipy.__version__}",
+        f"Python {platform.python_version()}, NumPy {np.__version__}, SciPy {scipy.__version__}, "
+        f"{platform.system()} {platform.machine()}, BLAS {_blas()}",
         f"{name}: mode 1 relative SD {mode.relative_sd:.6g}, weights "
         + ", ".join(f"{k} {v:+.4f}" for k, v in mode.weights.items()),
     ]
