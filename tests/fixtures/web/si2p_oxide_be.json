@@ -1,0 +1,268 @@
+{
+  "schema": "toyomacro-web-fixture",
+  "schema_version": 1,
+  "case": "si2p_oxide_be",
+  "description": "Si 2p five-state oxide template (10 Voigt components, spin-orbit doublets, width interpolation) on the contract-test spectrum, on the BE axis stored high-to-low.",
+  "model": {
+    "name": "si2p_oxide_template",
+    "call": "AutoFitter(AutoFitConfig()).fit_with_template(Spectrum(energy=x, intensity=y, energy_type=energy_type, element='Si2p'), 'Si2p_oxide', reference_center=reference_center)",
+    "template": "Si2p_oxide",
+    "energy_type": "BE",
+    "reference_center": 99.3,
+    "window": [97.3, 104.3],
+    "background": {
+      "type": "shirley",
+      "auto_range": true,
+      "mode": "subtract_then_fit"
+    },
+    "objective": "unweighted least squares on the background-subtracted signal, all points",
+    "solver": {
+      "method": "trf",
+      "other_settings": "SciPy defaults"
+    },
+    "so_split_eV": 0.6,
+    "partner_area_ratio": 0.5,
+    "parameter_meaning": {
+      "<state>.area": "analytic integrated area of the state's j+ (2p3/2) Voigt",
+      "<state>.center": "centre of the j+ line on the input axis",
+      "width.sigma_ref, width.gamma_ref": "Si0 widths in toyomacro's convention: sigma = fwhm_g / 2.3548 (not the exact 2*sqrt(2 ln 2)), gamma = fwhm_l / 2",
+      "width.sigma_max, width.gamma_max": "the same for Si4+; others interpolate linearly"
+    }
+  },
+  "input": {
+    "energy_type": "BE",
+    "x_unit": "eV",
+    "y_unit": "arbitrary (synthetic, counts-like)",
+    "points": 201,
+    "order": "descending",
+    "x": [104.3, 104.265, 104.23, 104.195, 104.16, 104.125, 104.09, 104.055, 104.02, 103.985, 103.95, 103.915, 103.88, 103.845, 103.81, 103.775, 103.74, 103.705, 103.67, 103.635, 103.6, 103.565, 103.53, 103.495, 103.46, 103.425, 103.39, 103.355, 103.32, 103.285, 103.25, 103.215, 103.18, 103.145, 103.11, 103.075, 103.04, 103.005, 102.97, 102.935, 102.9, 102.865, 102.83, 102.795, 102.76, 102.725, 102.69, 102.655, 102.62, 102.585, 102.55, 102.515, 102.48, 102.445, 102.41, 102.375, 102.34, 102.305, 102.27, 102.235, 102.2, 102.165, 102.13, 102.095, 102.06, 102.025, 101.99, 101.955, 101.92, 101.885, 101.85, 101.815, 101.78, 101.745, 101.71, 101.675, 101.64, 101.605, 101.57, 101.535, 101.5, 101.465, 101.43, 101.395, 101.36, 101.325, 101.29, 101.255, 101.22, 101.185, 101.15, 101.115, 101.08, 101.045, 101.01, 100.975, 100.94, 100.905, 100.87, 100.835, 100.8, 100.765, 100.73, 100.695, 100.66, 100.625, 100.59, 100.555, 100.52, 100.485, 100.45, 100.415, 100.38, 100.345, 100.31, 100.275, 100.24, 100.205, 100.17, 100.135, 100.1, 100.065, 100.03, 99.995, 99.96, 99.925, 99.89, 99.855, 99.82, 99.785, 99.75, 99.715, 99.68, 99.645, 99.61, 99.575, 99.54, 99.505, 99.47, 99.435, 99.4, 99.365, 99.33, 99.295, 99.26, 99.225, 99.19, 99.155, 99.12, 99.085, 99.05, 99.015, 98.98, 98.945, 98.91, 98.875, 98.84, 98.805, 98.77, 98.735, 98.7, 98.665, 98.63, 98.595, 98.56, 98.525, 98.49, 98.455, 98.42, 98.385, 98.35, 98.315, 98.28, 98.245, 98.21, 98.175, 98.14, 98.105, 98.07, 98.035, 98.0, 97.965, 97.93, 97.895, 97.86, 97.825, 97.79, 97.755, 97.72, 97.685, 97.65, 97.615, 97.58, 97.545, 97.51, 97.475, 97.44, 97.405, 97.37, 97.335, 97.3],
+    "y": [6063.915001, 6044.541698, 6349.807515, 6506.876751, 6368.220272, 6596.533828, 6916.206128, 7061.840685, 7295.121455, 7427.825605, 7829.859554, 8060.195872, 8240.261466, 8607.224428, 8810.401807, 8953.784967, 9358.112157, 9510.868377, 9982.690103, 10179.154386, 10454.919577, 10693.38358, 11169.576672, 11314.54365, 11565.774226, 11847.058428, 12203.296154, 12447.506747, 12705.060211, 12950.252027, 13353.687499, 13318.389311, 13512.445073, 13669.865002, 13981.041007, 14178.831284, 14177.044836, 14200.831386, 14270.861514, 14457.404252, 14475.249448, 14432.862061, 14258.749506, 14265.118211, 14141.38752, 14012.641492, 13914.86557, 13666.190378, 13510.795917, 13235.977048, 13036.328252, 12845.508191, 12413.369303, 12310.466411, 12090.027483, 11883.274868, 11748.748936, 11776.568284, 11414.738573, 11496.462996, 11153.196107, 11231.679996, 11244.165079, 11264.490403, 11265.661814, 11268.134531, 11148.427964, 11126.529849, 11238.118677, 11098.688854, 10938.551163, 10881.995781, 10812.989931, 10845.637641, 10684.931969, 10601.993121, 10344.734543, 10255.611633, 10158.292955, 9930.316452, 9887.414595, 9675.630563, 9628.747369, 9575.508432, 9469.000239, 9637.946939, 9566.932279, 9660.740651, 9770.235918, 9841.788416, 9945.581868, 9952.23033, 9997.883459, 10099.496308, 9989.536162, 10043.181161, 10060.700831, 10072.297951, 10165.882937, 9967.563996, 9937.002513, 10014.558249, 9762.410557, 9800.272365, 9588.209688, 9653.013122, 9615.704658, 9764.433909, 10022.515683, 9957.370771, 10413.36302, 10677.764841, 10920.385827, 11204.006865, 11774.680797, 12197.090679, 12838.723866, 13486.581541, 14432.552003, 15157.153651, 16087.525045, 17268.060004, 18307.702585, 19336.937341, 19980.218034, 20325.402248, 20479.364287, 19910.788933, 19372.98465, 18567.681448, 17799.524761, 16986.580591, 16728.615837, 16564.369486, 16831.640943, 17783.195066, 19322.86119, 21205.75586, 23432.570452, 25713.642273, 27490.172036, 28965.232, 29840.405486, 30300.50222, 29598.569409, 28291.520225, 26324.007452, 24032.476085, 21651.268139, 19101.859755, 16813.479401, 14768.656561, 13087.125042, 11921.442983, 10976.942244, 10417.435468, 9705.066029, 9386.968707, 8941.4923, 8651.721673, 8506.691555, 8402.433534, 8587.644484, 8213.240909, 8315.465344, 8089.642689, 8230.932314, 8141.751261, 8059.304991, 8047.756134, 7967.524903, 8062.421074, 7960.226855, 7873.739596, 7861.38523, 8001.321854, 8138.611654, 7994.885879, 7966.572961, 8007.782611, 8111.645263, 8005.796976, 7946.449811, 8102.639613, 8040.063891, 8156.584625, 8027.738259, 7893.90712, 7886.964888, 8196.747105, 8212.304584, 8030.647242, 8019.289602, 8213.083429, 7965.862632, 7996.998539, 8160.964113, 8067.569362, 8117.138063, 8112.133375, 8173.255952]
+  },
+  "generation": {
+    "kind": "synthetic",
+    "function": "tests/test_fitting_templates.py::_make_synthetic_si2p_ke",
+    "contract_test": "tests/test_fitting_templates.py::TestTemplateFitting::test_si2p_oxide_ke",
+    "arguments": {
+      "photon_energy": 1486.7,
+      "noise_level": 100.0
+    },
+    "noise": {
+      "distribution": "normal",
+      "sigma": 100.0,
+      "seed": 42,
+      "clipped_at": 0.0
+    },
+    "axis": "BE = photon_energy - KE in the generated order (descending BE)",
+    "stored_input_rounding": {
+      "x_decimals": 9,
+      "y_decimals": 6
+    }
+  },
+  "truth": {
+    "states": [
+      {
+        "name": "Si0",
+        "center": 99.3,
+        "area_main": 12000.0,
+        "area_partner": 6000.0,
+        "fwhm_g": 0.35,
+        "fwhm_l": 0.15
+      },
+      {
+        "name": "Si1+",
+        "center": 100.25,
+        "area_main": 2000.0,
+        "area_partner": 1000.0,
+        "fwhm_g": 0.45,
+        "fwhm_l": 0.2
+      },
+      {
+        "name": "Si2+",
+        "center": 101.1,
+        "area_main": 1500.0,
+        "area_partner": 750.0,
+        "fwhm_g": 0.55,
+        "fwhm_l": 0.25
+      },
+      {
+        "name": "Si3+",
+        "center": 101.9,
+        "area_main": 3000.0,
+        "area_partner": 1500.0,
+        "fwhm_g": 0.65,
+        "fwhm_l": 0.3
+      },
+      {
+        "name": "Si4+",
+        "center": 102.9,
+        "area_main": 8000.0,
+        "area_partner": 4000.0,
+        "fwhm_g": 0.8,
+        "fwhm_l": 0.35
+      }
+    ],
+    "so_split_eV": 0.6,
+    "partner_area_ratio": 0.5,
+    "background": {
+      "type": "linear",
+      "at_low_energy": 8000.0,
+      "at_high_energy": 5000.0
+    },
+    "model_matches_generator": false,
+    "misspecification": ["the spectrum has a linear background; the template subtracts a Shirley background", "intermediate states' widths are not on the template's linear width interpolation"]
+  },
+  "expected": {
+    "definition": "least-squares optimum of toyomacro's own residual on the stored input (the call above, with least_squares ftol=xtol=gtol=1e-14)",
+    "parameters": [
+      {
+        "name": "Si0.area",
+        "unit": "intensity*eV",
+        "value": 11104.64,
+        "tolerance": 0.82,
+        "statistical_sd": 32.0,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si0.center",
+        "unit": "eV",
+        "value": 99.30281,
+        "tolerance": 1.2e-05,
+        "statistical_sd": 0.00044,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si1+.area",
+        "unit": "intensity*eV",
+        "value": 1887.64,
+        "tolerance": 0.54,
+        "statistical_sd": 21.0,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si1+.center",
+        "unit": "eV",
+        "value": 100.2362,
+        "tolerance": 0.00012,
+        "statistical_sd": 0.0043,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si2+.area",
+        "unit": "intensity*eV",
+        "value": 1221.89,
+        "tolerance": 0.77,
+        "statistical_sd": 30.0,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si2+.center",
+        "unit": "eV",
+        "value": 101.11703,
+        "tolerance": 0.00029,
+        "statistical_sd": 0.011,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si3+.area",
+        "unit": "intensity*eV",
+        "value": 2433.25,
+        "tolerance": 0.81,
+        "statistical_sd": 32.0,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si3+.center",
+        "unit": "eV",
+        "value": 101.90253,
+        "tolerance": 0.00024,
+        "statistical_sd": 0.0092,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si4+.area",
+        "unit": "intensity*eV",
+        "value": 5878.22,
+        "tolerance": 0.85,
+        "statistical_sd": 33.0,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "Si4+.center",
+        "unit": "eV",
+        "value": 102.877228,
+        "tolerance": 8.4e-05,
+        "statistical_sd": 0.0033,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "width.sigma_ref",
+        "unit": "eV",
+        "value": 0.167578,
+        "tolerance": 3.1e-05,
+        "statistical_sd": 0.0012,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "width.gamma_ref",
+        "unit": "eV",
+        "value": 0.038958,
+        "tolerance": 5e-05,
+        "statistical_sd": 0.002,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "width.sigma_max",
+        "unit": "eV",
+        "value": 0.364957,
+        "tolerance": 7.2e-05,
+        "statistical_sd": 0.0028,
+        "at_bound": null,
+        "bound": null
+      },
+      {
+        "name": "width.gamma_max",
+        "unit": "eV",
+        "value": 0.02,
+        "tolerance": 1e-07,
+        "statistical_sd": null,
+        "at_bound": "lower",
+        "bound": 0.02
+      }
+    ],
+    "cost": 3241196.0,
+    "cost_definition": "0.5*sum(residual^2) of the background-subtracted fit",
+    "background": [6406.59, 6406.59, 6406.59, 6406.59, 6406.59, 6406.59, 6406.59, 6407.45, 6408.57, 6410.08, 6411.82, 6414.23, 6417.04, 6420.14, 6423.87, 6427.94, 6432.24, 6437.23, 6442.47, 6448.5, 6454.86, 6461.68, 6468.89, 6476.9, 6485.15, 6493.81, 6502.93, 6512.65, 6522.76, 6533.3, 6544.23, 6555.84, 6567.36, 6579.2, 6591.29, 6603.88, 6616.79, 6629.68, 6642.58, 6655.58, 6668.88, 6682.18, 6695.39, 6708.28, 6721.16, 6733.81, 6746.21, 6758.43, 6770.2, 6781.69, 6792.69, 6803.33, 6813.63, 6823.17, 6832.53, 6841.49, 6850.08, 6858.43, 6866.81, 6874.56, 6882.44, 6889.72, 6897.12, 6904.53, 6911.96, 6919.38, 6926.79, 6933.98, 6941.13, 6948.45, 6955.53, 6962.31, 6968.99, 6975.55, 6982.14, 6988.45, 6994.61, 7000.32, 7005.87, 7011.24, 7016.22, 7021.11, 7025.63, 7030.07, 7034.41, 7038.56, 7042.99, 7047.29, 7051.74, 7056.38, 7061.12, 7066.04, 7070.96, 7075.95, 7081.1, 7086.06, 7091.1, 7096.16, 7101.23, 7106.45, 7111.33, 7116.15, 7121.09, 7125.59, 7130.15, 7134.34, 7138.63, 7142.85, 7147.32, 7152.22, 7157.0, 7162.55, 7168.54, 7174.93, 7181.8, 7189.63, 7198.16, 7207.78, 7218.48, 7230.77, 7244.28, 7259.35, 7276.41, 7295.21, 7315.74, 7337.32, 7359.46, 7381.82, 7403.17, 7423.57, 7442.56, 7460.21, 7476.45, 7492.22, 7507.68, 7523.57, 7541.06, 7561.14, 7584.39, 7611.4, 7642.25, 7676.08, 7712.37, 7750.08, 7788.51, 7825.68, 7860.56, 7892.03, 7919.54, 7942.94, 7961.96, 7977.05, 7988.62, 7997.31, 8004.0, 8009.07, 8013.17, 8016.05, 8018.39, 8019.96, 8021.04, 8021.87, 8022.52, 8023.48, 8023.8, 8024.3, 8024.41, 8024.76, 8024.96, 8025.02, 8025.06, 8024.96, 8025.03, 8024.92, 8024.66, 8024.38, 8024.34, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54],
+    "background_endpoint_indices": [6, 176],
+    "background_endpoint_rule": "indices into the input as stored",
+    "background_endpoint_energies": [104.09, 98.14]
+  },
+  "tolerance": {
+    "rule": "free parameter: 10*sqrt(2*ftol*F*C_ii), ftol=1e-8 (SciPy default), F=0.5*sum(residual^2) at the optimum, C=(J^T J)^-1 over the free parameters; parameter at a bound: within 1e-7*max(1,|bound|) of it; cost: relative 100*ftol",
+    "ftol": 1e-08,
+    "safety_factor": 10.0,
+    "cost_relative": 1e-06,
+    "bound_relative": 1e-07,
+    "background_absolute": 0.1,
+    "background_rule": "1e-3 * generating noise sigma; the background is not a solver output"
+  },
+  "provenance": {
+    "generator": "tests/web_fixtures.py",
+    "source_commit": "94d1aab004141bfe8f3f9fb68fe128e7d87f5cbb",
+    "source_files": ["toyomacro/background/", "toyomacro/lineshape/", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py"],
+    "source_paths": ["toyomacro/background/__init__.py", "toyomacro/background/base.py", "toyomacro/background/linear.py", "toyomacro/background/shirley.py", "toyomacro/background/tougaard.py", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py", "toyomacro/lineshape/__init__.py", "toyomacro/lineshape/base.py", "toyomacro/lineshape/doniach_sunjic.py", "toyomacro/lineshape/factory.py", "toyomacro/lineshape/fermi_dirac.py", "toyomacro/lineshape/gaussian.py", "toyomacro/lineshape/lorentzian.py", "toyomacro/lineshape/pseudovoigt.py", "toyomacro/lineshape/voigt.py"],
+    "source_sha256": "8406ed30d2763d3f32e22559f20e2c90c0d15a80873c82e7f90abbaa11023e7a",
+    "source_sha256_definition": "sha256 of the lines '<sha256 hex>  <path relative to src/>' of the source files, sorted by path, each ending in a newline"
+  }
+}

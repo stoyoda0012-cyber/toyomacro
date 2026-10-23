@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,709 automated tests** across **103 files**, in two
+This suite has **2,724 automated tests** across **104 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 65 | 1,618 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 66 | 1,633 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,091 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,277 tests, 84%) — guarantee the library
+- **Contract / regression** (2,292 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,697. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,712. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,7 +70,35 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,618)
+## Fixtures for ports
+
+`tests/fixtures/web/` holds language-neutral JSON fixtures for code that
+re-runs two toyomacro models elsewhere (a browser build, for example):
+one Voigt on a jointly fitted linear background (toyomacro has no fitter
+for it: only the lineshape `Voigt.evaluate` is toyomacro's), and the
+`Si2p_oxide` template. Each case carries a synthetic input spectrum, the model
+settings, the generating parameters, the least-squares optimum with a
+tolerance per quantity, and the toyomacro source it came from
+(`source_commit`, `source_sha256`). The definitions — what the optimum
+is, why a tolerance is ten times the band the solver's termination test
+cannot resolve, why storage precision follows the tolerance — are in
+the docstring of `tests/web_fixtures.py`.
+
+```bash
+python -m tests.web_fixtures           # are the committed files current?
+python -m tests.web_fixtures --write   # regenerate (needs full history, committed source)
+```
+
+The `Si2p_oxide` cases use the contract test's generator,
+`_make_synthetic_si2p_ke` from `test_fitting_templates.py`; the
+single-Voigt generator follows its style. After a change to the
+numerical source, commit it first and then regenerate, so that
+`source_commit` names the code that produced the numbers;
+`test_web_fixtures.py` fails until that is done. A shallow clone (CI)
+cannot check `source_commit` and skips that one test; the source digest
+and the bytes are checked everywhere.
+
+## Library body — `tests/` (1,633)
 
 ### Claim guards — noise model, versions, backends, comparisons (147)
 | Tests | File | Guards |
@@ -106,6 +134,11 @@ them would take real coverage with them:
 | 20 | `test_template_bridge.py` | `FittingTemplate` → `ComponentConfig` conversion |
 | 17 | `test_fast_voigt_solvers.py` | `FastVoigtFitter` routing (incl. `use_mlx` on the multipeak path) + template binding-energy integration |
 | 12 | `test_fit_dirty_map.py` | Interactive fit-result accumulator |
+
+### Fixtures for ports (15)
+| Tests | File | Guards |
+|--:|---|---|
+| 15 | `test_web_fixtures.py` | `tests/fixtures/web/` equals a fresh generation byte for byte, and its `source_commit` matches the history where one is available; the reference fits at default settings (`fit_with_template` for `Si2p_oxide`; the module's own model, with toyomacro's `Voigt.evaluate`, for the single Voigt) reproduce each expected value within its stated tolerance; where model and generator match, the optimum is consistent with the generating parameters |
 
 ### GVRT / synthetic — paper reproduction (191)
 | Tests | File | Guards |
