@@ -1,0 +1,36 @@
+{
+  "schema": "toyomacro-web-fixture-index",
+  "schema_version": 1,
+  "source_commit": "94d1aab004141bfe8f3f9fb68fe128e7d87f5cbb",
+  "source_sha256": "8406ed30d2763d3f32e22559f20e2c90c0d15a80873c82e7f90abbaa11023e7a",
+  "cases": [
+    {
+      "case": "single_voigt_be",
+      "file": "single_voigt_be.json",
+      "model": "single_voigt_linear_background",
+      "energy_type": "BE",
+      "sha256": "99583ddc0eae22df153620143051f92d7c22d4a2c5537bb5a1e5d43e73d7e925"
+    },
+    {
+      "case": "single_voigt_ke",
+      "file": "single_voigt_ke.json",
+      "model": "single_voigt_linear_background",
+      "energy_type": "KE",
+      "sha256": "2548bdfcd615c0db209fe9befc19b13f083a2565f73d5aaa5b12fc688d6c25f1"
+    },
+    {
+      "case": "si2p_oxide_ke",
+      "file": "si2p_oxide_ke.json",
+      "model": "si2p_oxide_template",
+      "energy_type": "KE",
+      "sha256": "6253c0ec230503dab81a48a9e73c2b22126e04a13d4896b76135d4aab7ba8ef1"
+    },
+    {
+      "case": "si2p_oxide_be",
+      "file": "si2p_oxide_be.json",
+      "model": "si2p_oxide_template",
+      "energy_type": "BE",
+      "sha256": "d6a0fc20c82e6e24fb2c3f118d5f00313f1ce037ade3881ac9d7f333aa51abae"
+    }
+  ]
+}
