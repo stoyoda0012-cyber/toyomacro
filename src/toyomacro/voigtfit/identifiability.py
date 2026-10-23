@@ -157,6 +157,7 @@ from .crlb import _NULL_PROJECTION_TOL
 __all__ = [
     "INTENSITY_SEMANTICS",
     "PARAMETERIZATIONS",
+    "PROFILE_GRID",
     "VoigtDerivatives",
     "VoigtPeak",
     "Background",
@@ -168,7 +169,10 @@ __all__ = [
     "IdentifiabilityReport",
     "EstimateReport",
     "Mode",
+    "ModeProfile",
     "ModeReport",
+    "ProfilePoint",
+    "ProfileSide",
     "ScanGrid",
     "voigt_derivatives",
     "voigt_fwhm",
@@ -181,6 +185,7 @@ __all__ = [
     "identifiability_at_estimate",
     "identifiability_from_exact_k",
     "identifiability_modes",
+    "mode_profile",
     "scan_identifiability",
 ]
 
@@ -1611,6 +1616,717 @@ def identifiability_from_exact_k(
     return EstimateReport(
         withheld=None, model=model, intensity=intensity, parameters=tuple(parameters),
         near_boundary=near, modes=modes, assessment=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# The profile along a mode (P3)
+# ---------------------------------------------------------------------------
+
+# Registered in design record §9.4; not to be retuned after the registered
+# profiles have been seen.
+_PROFILE_TOL = 1e-6          # KKT residual, bound proximity, amplitude at zero, agreement
+_PROFILE_BISECT = 1e-6       # crossing bracket in t
+_PROFILE_MAX_ITER = 60       # route A
+_PROFILE_SLSQP = {"ftol": 1e-12, "maxiter": 1000}
+PROFILE_GRID: tuple[float, ...] = tuple(k / 10.0 for k in range(-30, 31))
+
+
+@dataclass(frozen=True)
+class ProfilePoint:
+    """One grid point of ``mode_profile``.
+
+    Attributes:
+        t: Displacement along the mode, in units of its SD bound
+        outcome: 'ok', 'not_obtained', or the stop's event
+            ('amplitude_at_zero', 'corner') at and beyond a stop
+        delta: The lower successful deviance of the two routes; None
+            unless ``outcome`` is 'ok'
+        route: 'A' or 'B', the route ``delta`` came from
+        delta_a, delta_b: Each route's deviance (None if it found no
+            point, or the point was not solved)
+        success_a, success_b: Whether each route succeeded
+        kkt_a, kkt_b: Each route's recorded KKT residual
+        flagged: The routes disagree by more than 1e-6 (relative above 1),
+            or either failed
+        active: Bounds active at the summary solution ('variance', 'gamma')
+        background_negative: The re-estimated background curve is
+            negative in some channel
+        parameters: The summary solution, name -> value
+    """
+
+    t: float
+    outcome: str
+    delta: float | None
+    route: str | None
+    delta_a: float | None
+    delta_b: float | None
+    success_a: bool
+    success_b: bool
+    kkt_a: float | None
+    kkt_b: float | None
+    flagged: bool
+    active: tuple[str, ...]
+    background_negative: bool
+    parameters: dict[str, float] | None
+
+
+@dataclass(frozen=True)
+class ProfileSide:
+    """What one side (t > 0 or t < 0) of ``mode_profile`` comes to.
+
+    Attributes:
+        crossing: |t| where the profile first reaches 1, a float; else
+            'beyond the grid', the stop's event, or 'not obtained'
+        delta_1, delta_2: The profile at |t| = 1 and 2: a float, the
+            stop's event, or 'not obtained'
+        activations: Bound -> (t, delta) at the first grid point with that
+            bound active
+        stop: None, or {'event', 't', 'delta_before',
+            'background_only_deviance'}
+        background_negative: Grid points with a negative background curve
+    """
+
+    crossing: float | str
+    delta_1: float | str
+    delta_2: float | str
+    activations: dict[str, tuple[float, float | None]]
+    stop: dict[str, Any] | None
+    background_negative: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class ModeProfile:
+    """Result of ``mode_profile``.
+
+    Attributes:
+        mode: The ``Mode`` profiled
+        points: One ``ProfilePoint`` per grid value
+        plus, minus: The two sides
+        exposure, variance_floor: As given
+        caveat: What the numbers are
+    """
+
+    mode: Mode
+    points: tuple[ProfilePoint, ...]
+    plus: ProfileSide
+    minus: ProfileSide
+    exposure: float
+    variance_floor: float
+    caveat: str = (
+        "the minimum Poisson deviance along a mode on expected counts (no noise), "
+        "against the Fisher prediction t**2; a property of the model, not the "
+        "coverage of any interval; no boundary correction"
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-Python summary for ``json.dumps`` (the mode without its signature)."""
+        mode = vars(self.mode).copy()
+        del mode["signature"]
+        return {
+            "mode": mode,
+            "points": [vars(p).copy() for p in self.points],
+            "plus": vars(self.plus).copy(),
+            "minus": vars(self.minus).copy(),
+            "exposure": self.exposure,
+            "variance_floor": self.variance_floor,
+            "caveat": self.caveat,
+        }
+
+
+class _Profile:
+    """The constrained problem at one mode: coordinates, deviance, the KKT
+    test and the two routes of design record §9.4."""
+
+    _BOUNDS = ("variance", "gamma")
+
+    def __init__(self, energy, peak, background, exposure, variance_floor, mode_index):
+        report = identifiability_modes(energy, [peak], background, exposure=exposure, k=4,
+                                       variance_floor=variance_floor)
+        if not 0 <= mode_index < len(report.modes):
+            raise ValueError(
+                f"mode must index one of the {len(report.modes)} non-null modes; a null "
+                "mode has no finite SD in which to measure t"
+            )
+        self.mode = report.modes[mode_index]
+        if self.mode.status == "not_resolved":
+            raise ValueError("the mode has no resolved bound to measure t in")
+        names = ("amp_0", "center_0", "var_0", "gamma_0")
+        vec = lambda m: np.array([m.weights[n] for n in names])  # noqa: E731
+        others = [vec(m) for m in report.modes if m is not self.mode] + [
+            vec(m) for m in report.null_modes]
+        self.w = vec(self.mode)
+        self.others = np.array(others).T                      # (4, 3)
+        self.scales = np.array([report.scales[n] for n in names])
+        self.sd_w = self.mode.relative_sd
+        self.energy = np.asarray(energy, dtype=np.float64)
+        self.exposure = float(exposure)
+        self.floor = float(variance_floor)
+        self.peak0 = np.array([peak.amplitude, peak.center, peak.variance, peak.gamma])
+        if background is None:
+            self.basis = np.zeros((0, self.energy.size))
+            self.b0 = np.zeros(0)
+            self.known = np.zeros(self.energy.size)
+            self.bg_names: tuple[str, ...] = ()
+        else:
+            est = np.array(background.estimated, dtype=bool)
+            self.basis = background.basis[est]
+            self.b0 = background.coefficients[est]
+            self.known = background.coefficients[~est] @ background.basis[~est]
+            self.bg_names = tuple(n for n, e in zip(background.names, est) if e)
+        self.y = report.fisher.expected_counts
+        self.n_z = 3 + self.b0.size
+        # theta_peak = peak0 + S (t sd w + others z_p) ; b = z_b
+        self.dpeak_dz = self.scales[:, None] * self.others   # (4, 3)
+        self.bound_index = {"variance": 2, "gamma": 3}
+        self.bound_value = {"variance": self.floor, "gamma": 0.0}
+        self.amp_floor = _PROFILE_TOL * abs(peak.amplitude)
+        self.names = names + self.bg_names
+        # rounding below a bound, after a projection onto it, counts as on it
+        self.slack = {b: 1e-12 * self.scales[i] for b, i in self.bound_index.items()}
+
+    # -- coordinates ------------------------------------------------------
+    def theta(self, t, z):
+        peak = self.peak0 + self.scales * (t * self.sd_w * self.w) + self.dpeak_dz @ z[:3]
+        return peak, z[3:]
+
+    def z_of(self, t, peak, b):
+        """The coordinates of (peak, b) once moved onto the constraint plane."""
+        x = (np.asarray(peak) - self.peak0) / self.scales - t * self.sd_w * self.w
+        return np.concatenate([self.others.T @ x, np.asarray(b, dtype=np.float64)])
+
+    def g_row(self, bound):
+        """g(z) = a . z + c for one width bound, as (a, c) at t = 0 offsets."""
+        i = self.bound_index[bound]
+        a = np.zeros(self.n_z)
+        a[:3] = self.dpeak_dz[i]
+        return a, i
+
+    def g(self, t, z, bound):
+        peak, _ = self.theta(t, z)
+        i = self.bound_index[bound]
+        return peak[i] - self.bound_value[bound]
+
+    # -- model --------------------------------------------------------------
+    def evaluate(self, t, z, *, derivatives=True):
+        """(mean, J_z, deviance) or None outside the domain."""
+        peak, b = self.theta(t, z)
+        amp, center, var, gamma = self.on_bounds(peak)
+        if var < 0.0 or gamma < 0.0 or (var == 0.0 and gamma == 0.0):
+            return None
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            d = voigt_derivatives(self.energy, center, var, gamma)  # extremes give non-finite
+        mean = self.exposure * (amp * d.value + b @ self.basis + self.known)
+        if not np.all(np.isfinite(mean)) or not np.all(mean > 0.0):
+            return None
+        dev = _deviance(self.y, mean)
+        if not derivatives:
+            return mean, None, dev
+        j_peak = self.exposure * np.stack(
+            [d.value, amp * d.d_center, amp * d.d_variance, amp * d.d_gamma], axis=1)
+        jac = np.hstack([j_peak @ self.dpeak_dz, self.exposure * self.basis.T])
+        return mean, jac, dev
+
+    def on_bounds(self, peak):
+        """Peak values with rounding just below a width bound put on it."""
+        peak = np.array(peak, dtype=np.float64)
+        for bound, i in self.bound_index.items():
+            low = self.bound_value[bound]
+            if low - self.slack[bound] <= peak[i] < low:
+                peak[i] = low
+        return peak
+
+    def feasible(self, t, z, bound):
+        return self.g(t, z, bound) >= -self.slack[bound]
+
+    def start(self, t, z, held=()):
+        """z on the held bounds, and on any other width bound it violates;
+        None if that is the corner or outside the domain."""
+        z = self.project(t, z, tuple(held))
+        violated = tuple(b for b in self._BOUNDS if b not in held and not self.feasible(t, z, b))
+        if violated:
+            z = self.project(t, z, tuple(held) + violated)
+        if self.evaluate(t, z, derivatives=False) is None:
+            return None
+        return z
+
+    def deviance(self, t, z):
+        out = self.evaluate(t, z, derivatives=False)
+        return np.inf if out is None else out[2]
+
+    # -- the KKT test ---------------------------------------------------------
+    def active(self, t, z):
+        out = []
+        for bound in self._BOUNDS:
+            i = self.bound_index[bound]
+            if self.g(t, z, bound) < _PROFILE_TOL * self.scales[i]:
+                out.append(bound)
+        return tuple(out)
+
+    def project(self, t, z, bounds):
+        """Least-squares move of z onto g = 0 for the given bounds."""
+        if not bounds:
+            return z
+        rows = np.array([self.g_row(b)[0] for b in bounds])
+        resid = np.array([self.g(t, z, b) for b in bounds])
+        return z - np.linalg.lstsq(rows, resid, rcond=None)[0]
+
+    def kkt(self, t, z):
+        """(passed, residual, active, projected z, deviance, solution)."""
+        act = self.active(t, z)
+        zp = self.project(t, z, act)
+        out = self.evaluate(t, zp)
+        if out is None:
+            return False, np.inf, act, zp, np.inf
+        mean, jac, dev = out
+        info = (jac / mean[:, None]).T @ jac
+        half_grad = jac.T @ (1.0 - self.y / mean)
+        rows = np.array([self.g_row(b)[0] for b in act]).reshape(len(act), self.n_z)
+        if act:
+            nu = np.linalg.lstsq(rows.T, half_grad, rcond=None)[0]
+        else:
+            nu = np.zeros(0)
+        resid = half_grad - rows.T @ nu
+        diag = np.diag(info)
+        try:
+            info_inv = np.linalg.inv(info)
+            singular = not (np.all(diag > 0.0) and np.all(np.isfinite(info_inv)))
+        except np.linalg.LinAlgError:
+            singular = True
+        if singular:
+            return False, np.inf, act, zp, dev
+        res = float(np.max(np.abs(resid) / np.sqrt(diag)))
+        normalised = [float(n * math.sqrt(max(r @ info_inv @ r, 0.0))) for n, r in zip(nu, rows)]
+        inactive_ok = all(self.feasible(t, zp, b) for b in self._BOUNDS if b not in act)
+        passed = inactive_ok and res < _PROFILE_TOL and all(v > -_PROFILE_TOL for v in normalised)
+        return passed, res, act, zp, dev
+
+    # -- route A: active sets, Fisher scoring ---------------------------------
+    def admissible_sets(self):
+        sets = [(), ("variance",), ("gamma",)]
+        if self.floor > 0.0:
+            sets.append(("variance", "gamma"))
+        return sets
+
+    def scoring(self, t, z0, held):
+        """Fisher scoring with the bounds in ``held`` as equalities; None if
+        the start cannot be put on them inside the domain."""
+        z = self.start(t, z0, held)
+        if z is None:
+            return None
+        free = [b for b in self._BOUNDS if b not in held]
+        if held:
+            rows = np.array([self.g_row(b)[0] for b in held])
+            null = np.linalg.svd(rows)[2][len(held):].T
+        else:
+            null = np.eye(self.n_z)
+        out = self.evaluate(t, z)
+        if out is None:
+            return None
+        damping = 1e-3
+        for _ in range(_PROFILE_MAX_ITER):
+            mean, jac, dev = out
+            if self.kkt(t, z)[0]:
+                break
+            info = null.T @ ((jac / mean[:, None]).T @ jac) @ null
+            grad = null.T @ (jac.T @ (1.0 - self.y / mean))
+            accepted = False
+            while damping < 1e12:
+                lhs = info + damping * np.diag(np.diag(info))
+                try:
+                    step = -np.linalg.solve(lhs, grad)
+                except np.linalg.LinAlgError:
+                    damping *= 10.0
+                    continue
+                trial = z + null @ step
+                if all(self.feasible(t, trial, b) for b in free):
+                    trial_out = self.evaluate(t, trial)
+                    if trial_out is not None and trial_out[2] <= dev:
+                        z, out = trial, trial_out
+                        damping = max(damping / 10.0, 1e-12)
+                        accepted = True
+                        break
+                damping *= 10.0
+            if not accepted:
+                break
+        return z
+
+    # -- route B: SLSQP -------------------------------------------------------
+    def slsqp(self, t, z0):
+        """SLSQP from z0, in coordinates preconditioned by the Fisher diagonal
+        at the start; returns (z, scipy success) or None."""
+        from scipy.optimize import minimize
+
+        z0 = self.start(t, z0)
+        if z0 is None:
+            return None
+        mean0, jac0, _ = self.evaluate(t, z0)
+        precond = 1.0 / np.sqrt(np.maximum(np.diag((jac0 / mean0[:, None]).T @ jac0), 1e-300))
+        floor_mean = 1e-12 * float(self.y.max())
+
+        def unpack(u):
+            return u * precond
+
+        def fun(u):
+            out = self.evaluate(t, unpack(u))
+            if out is None:
+                return 1e30, np.zeros_like(u)
+            mean, jac, dev = out
+            return dev, precond * (2.0 * jac.T @ (1.0 - self.y / mean))
+
+        constraints = []
+        for bound in self._BOUNDS:
+            a, i = self.g_row(bound)
+            constraints.append({
+                "type": "ineq",
+                "fun": lambda u, b=bound: np.array([self.g(t, unpack(u), b)]),
+                "jac": lambda u, a=a: (a * precond)[np.newaxis, :],
+            })
+
+        def mean_con(u):
+            peak, b = self.theta(t, unpack(u))
+            amp, center, var, gamma = peak
+            if var < 0.0 or gamma < 0.0 or (var == 0.0 and gamma == 0.0):
+                return -np.ones(self.energy.size)
+            with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+                d = voigt_derivatives(self.energy, center, var, gamma)
+            out = self.exposure * (amp * d.value + b @ self.basis + self.known) - floor_mean
+            return np.where(np.isfinite(out), out, -1.0)
+
+        def mean_jac(u):
+            out = self.evaluate(t, unpack(u))
+            if out is None:
+                return np.zeros((self.energy.size, u.size))
+            return out[1] * precond
+
+        constraints.append({"type": "ineq", "fun": mean_con, "jac": mean_jac})
+        res = minimize(fun, z0 / precond, jac=True, method="SLSQP", constraints=constraints,
+                       options=dict(_PROFILE_SLSQP))
+        return unpack(res.x), bool(res.success)
+
+    # -- one point -------------------------------------------------------------
+    def solve(self, t, starts):
+        """Both routes from every start. Returns per route the best successful
+        (deviance, z) or None, the recorded KKT residual, and every final
+        iterate (for the stop rule when neither succeeds)."""
+        result = {}
+        iterates = []
+        for route in ("A", "B"):
+            best = None
+            best_any = None
+            for z0 in starts:
+                runs = []
+                if route == "A":
+                    for held in self.admissible_sets():
+                        z = self.scoring(t, z0, held)
+                        if z is not None:
+                            runs.append((z, True))
+                else:
+                    out = self.slsqp(t, z0)
+                    if out is not None:
+                        runs.append(out)
+                for z, ok in runs:
+                    iterates.append(z)
+                    passed, res, _, zp, dev = self.kkt(t, z)
+                    if best_any is None or dev < best_any[0]:
+                        best_any = (dev, zp, res)
+                    if ok and passed and (best is None or dev < best[0]):
+                        best = (dev, zp, res)
+            result[route] = (best, best_any)
+        return result, iterates
+
+    def event(self, t, z):
+        """'amplitude_at_zero', 'corner' or None for a solution."""
+        peak, _ = self.theta(t, z)
+        if peak[0] <= self.amp_floor:
+            return "amplitude_at_zero"
+        if self.floor == 0.0 and set(self.active(t, z)) == set(self._BOUNDS):
+            return "corner"
+        return None
+
+    def background_only_deviance(self):
+        """D minimised over the estimated background coefficients with A = 0."""
+        b = self.b0.copy()
+        basis = self.exposure * self.basis
+        known = self.exposure * self.known
+
+        def dev_of(b):
+            mean = b @ basis + known
+            if not np.all(mean > 0.0):
+                return np.inf, mean
+            return _deviance(self.y, mean), mean
+
+        dev, mean = dev_of(b)
+        if b.size == 0:
+            return dev
+        for _ in range(200):
+            grad = basis @ (1.0 - self.y / mean)
+            info = (basis / mean) @ basis.T
+            step = -np.linalg.solve(info, grad)
+            scale = 1.0
+            while scale > 1e-12:
+                trial = b + scale * step
+                trial_dev, trial_mean = dev_of(trial)
+                if trial_dev <= dev:
+                    break
+                scale *= 0.5
+            if scale <= 1e-12 or dev - trial_dev < 1e-12 * max(1.0, dev):
+                if trial_dev <= dev:
+                    b, dev, mean = trial, trial_dev, trial_mean
+                break
+            b, dev, mean = trial, trial_dev, trial_mean
+        return dev
+
+
+def _deviance(y: np.ndarray, mean: np.ndarray) -> float:
+    """2 sum(mu - y + y ln(y/mu)), as 2 sum y (x - log1p(x)) with x = mu/y - 1,
+    which does not cancel near the minimum and so stays at or above 0."""
+    x = mean / y - 1.0
+    return 2.0 * float(np.sum(y * (x - np.log1p(x))))
+
+
+def _better(a, b):
+    """The lower-deviance of two (deviance, z, residual) results, either None."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if a[0] <= b[0] else b
+
+
+def mode_profile(
+    energy: np.ndarray,
+    peak: VoigtPeak,
+    background: Background | None = None,
+    *,
+    mode: int = 0,
+    t: tuple[float, ...] | list[float] | np.ndarray = PROFILE_GRID,
+    exposure: float = 1.0,
+    variance_floor: float = 0.0,
+) -> ModeProfile:
+    """The Poisson deviance along one mode, against the Fisher prediction.
+
+    Design record §9.4, registered before this code. The data are the
+    expected counts y = mu(theta_0) at the stated parameters: no noise and
+    no seed (the "Asimov" data set of Cowan et al. 2011). Along the mode
+    ``w`` of ``identifiability_modes`` with bound ``sqrt(lambda)``, the
+    constraint ``w^T S^-1 (theta_peak - theta_0) = t sqrt(lambda)`` is
+    imposed and the deviance minimised over everything else -- the other
+    peak directions and the background -- with the Gaussian variance held
+    at or above ``variance_floor`` and gamma at or above 0. At theta_0 the
+    Hessian of the deviance is exactly twice the Fisher matrix, so the
+    Fisher prediction is Delta(t) = t**2 and any departure is curvature or
+    a boundary. It is a property of the model, not the coverage of any
+    interval, and no boundary correction is applied.
+
+    Two routes solve every grid point: A enumerates the admissible sets of
+    active width bounds and solves each by Fisher scoring; B is SLSQP.
+    Both are judged by the same KKT test; the summaries use the lower
+    successful deviance, and a disagreement beyond 1e-6 is flagged, never
+    resolved. Where the amplitude reaches zero, or both widths reach zero,
+    the side stops and every later point is reported as that event.
+
+    Args:
+        energy: Energy axis (eV)
+        peak: One ``VoigtPeak`` (a list of one is accepted)
+        background: None, or a ``Background``; its estimated terms are
+            profiled out with the peak directions
+        mode: Index into the non-null modes of ``identifiability_modes``
+            (0 the softest)
+        t: Strictly increasing grid in units of the mode's SD bound,
+            containing 0
+        exposure: As in ``identifiability_modes``
+        variance_floor: Lower bound of the Gaussian variance
+
+    Returns:
+        ModeProfile
+
+    Raises:
+        ValueError: for more than one peak, a null or unresolved mode, or
+            a grid that is not strictly increasing or lacks 0
+    """
+    if isinstance(peak, (list, tuple)):
+        if len(peak) != 1:
+            raise ValueError("mode_profile is for a single peak only")
+        peak = peak[0]
+    grid = np.asarray(t, dtype=np.float64)
+    if grid.ndim != 1 or np.any(np.diff(grid) <= 0.0) or not np.any(grid == 0.0):
+        raise ValueError("t must be strictly increasing and contain 0")
+    problem = _Profile(energy, peak, background, exposure, variance_floor, mode)
+    zero = int(np.flatnonzero(grid == 0.0)[0])
+    stated = {float(x): problem.z_of(float(x), problem.peak0, problem.b0) for x in grid}
+
+    best: dict[float, dict[str, Any]] = {}      # t -> route -> (dev, z, res) best successful
+    best_any: dict[float, dict[str, Any]] = {}  # t -> route -> lowest-deviance candidate
+    events: dict[float, str] = {}               # stop events
+
+    def run(x, starts):
+        res, iterates = problem.solve(x, starts)
+        for route in ("A", "B"):
+            best.setdefault(x, {})[route] = _better(best.get(x, {}).get(route), res[route][0])
+            best_any.setdefault(x, {})[route] = _better(
+                best_any.get(x, {}).get(route), res[route][1])
+        return iterates
+
+    def summary(x):
+        """(deviance, z, route) of the lower successful route, or None."""
+        options = [(v[0], v[1], r) for r, v in best.get(x, {}).items() if v is not None]
+        return min(options, key=lambda o: o[0]) if options else None
+
+    def classify(x, iterates):
+        """'ok', 'not_obtained' or the event that makes x a stop."""
+        s = summary(x)
+        if s is not None:
+            return problem.event(x, s[1]) or "ok"
+        found = [problem.event(x, z) for z in iterates]
+        for name in ("amplitude_at_zero", "corner"):
+            if name in found:
+                return name
+        return "not_obtained"
+
+    run(0.0, [stated[0.0]])
+    sides = {"plus": [float(x) for x in grid[zero + 1:]],
+             "minus": [float(x) for x in grid[:zero][::-1]]}
+    stops: dict[str, int | None] = {}
+    outcome: dict[float, str] = {0.0: classify(0.0, [])}
+    for side, xs in sides.items():
+        stop = None
+        last = stated[0.0] if summary(0.0) is None else summary(0.0)[1]
+        for i, x in enumerate(xs):
+            iterates = run(x, [last, stated[x]])
+            outcome[x] = classify(x, iterates)
+            if outcome[x] in ("amplitude_at_zero", "corner"):
+                stop = i
+                events[x] = outcome[x]
+                break
+            if outcome[x] == "ok":
+                last = summary(x)[1]
+        # inward from the point before the stop (or the end)
+        end = len(xs) if stop is None else stop
+        for i in range(end - 1, -1, -1):
+            x = xs[i]
+            starts = []
+            if summary(x) is not None:
+                starts.append(summary(x)[1])
+            if i + 1 < end and summary(xs[i + 1]) is not None:
+                starts.append(summary(xs[i + 1])[1])
+            if not starts:
+                continue
+            run(x, starts)
+            s = summary(x)
+            if s is not None:
+                ev = problem.event(x, s[1])
+                if ev is not None:
+                    stop, end = i, i
+                    events[x] = ev
+                    outcome[x] = ev
+                else:
+                    outcome[x] = "ok"
+        stops[side] = stop
+        if stop is not None:
+            for x in xs[stop + 1:]:
+                outcome[x] = events[xs[stop]]
+
+    def point(x):
+        out = outcome.get(x, "not_obtained")
+        routes = best.get(x, {})
+        anyr = best_any.get(x, {})
+        da = routes.get("A")[0] if routes.get("A") else None
+        db = routes.get("B")[0] if routes.get("B") else None
+        solved = x in best
+        s = summary(x) if out == "ok" else None
+        if s is not None:
+            peak_values, b = problem.theta(x, s[1])
+            peak_values = problem.on_bounds(peak_values)
+            active = problem.active(x, s[1])
+            for bound in active:  # projected onto it: report it there, not at rounding
+                peak_values[problem.bound_index[bound]] = problem.bound_value[bound]
+            curve = b @ problem.basis + problem.known
+            params = dict(zip(problem.names, [float(v) for v in np.concatenate([peak_values, b])]))
+            negative = bool(np.any(curve < 0.0))
+        else:
+            params, active, negative = None, (), False
+        flagged = solved and out not in ("amplitude_at_zero", "corner") and (
+            da is None or db is None
+            or abs(da - db) > _PROFILE_TOL * max(1.0, min(da, db)))
+        return ProfilePoint(
+            t=x, outcome=out, delta=None if s is None else float(s[0]),
+            route=None if s is None else s[2], delta_a=None if da is None else float(da),
+            delta_b=None if db is None else float(db), success_a=da is not None,
+            success_b=db is not None,
+            kkt_a=None if not anyr.get("A") else float(anyr["A"][2]),
+            kkt_b=None if not anyr.get("B") else float(anyr["B"][2]),
+            flagged=bool(flagged), active=active, background_negative=negative,
+            parameters=params,
+        )
+
+    points = {float(x): point(float(x)) for x in grid}
+
+    def side_summary(side):
+        xs = sides[side]
+        stop = stops[side]
+        before = xs if stop is None else xs[:stop]
+        stop_event = None if stop is None else events[xs[stop]]
+
+        def at(target):
+            for x in xs:
+                if abs(abs(x) - target) < 1e-12:
+                    p = points[x]
+                    if p.outcome == "ok":
+                        return float(p.delta)
+                    return p.outcome.replace("_", " ")
+            return "not on the grid"
+
+        crossing: float | str
+        chain = [0.0] + before
+        crossing = "beyond the grid" if stop is None else stop_event.replace("_", " ")
+        for lo_x, hi_x in zip(chain, chain[1:]):
+            lo_p, hi_p = points[lo_x], points[hi_x]
+            if lo_p.outcome != "ok" or hi_p.outcome != "ok":
+                crossing = "not obtained"
+                break
+            if lo_p.delta < 1.0 <= hi_p.delta:
+                lo, hi = (lo_x, summary(lo_x)[1]), (hi_x, summary(hi_x)[1])
+                crossing = None
+                while abs(hi[0] - lo[0]) > _PROFILE_BISECT:
+                    mid = 0.5 * (lo[0] + hi[0])
+                    res, _ = problem.solve(mid, [lo[1], hi[1]])
+                    options = [v for v in (res["A"][0], res["B"][0]) if v is not None]
+                    if not options:
+                        crossing = "not obtained"
+                        break
+                    dev, z, _ = min(options, key=lambda o: o[0])
+                    if dev < 1.0:
+                        lo = (mid, z)
+                    else:
+                        hi = (mid, z)
+                if crossing is None:
+                    crossing = float(abs(0.5 * (lo[0] + hi[0])))
+                break
+        activations = {}
+        for x in before:
+            p = points[x]
+            for bound in p.active:
+                activations.setdefault(bound, (x, p.delta))
+        stop_info = None
+        if stop is not None:
+            prev = xs[stop - 1] if stop > 0 else 0.0
+            prev_p = points[prev]
+            stop_info = {
+                "event": stop_event, "t": xs[stop],
+                "delta_before": prev_p.delta if prev_p.outcome == "ok" else None,
+                "background_only_deviance": float(problem.background_only_deviance()),
+            }
+        return ProfileSide(
+            crossing=crossing, delta_1=at(1.0), delta_2=at(2.0), activations=activations,
+            stop=stop_info,
+            background_negative=tuple(x for x in xs if points[x].background_negative),
+        )
+
+    return ModeProfile(
+        mode=problem.mode, points=tuple(points[float(x)] for x in grid),
+        plus=side_summary("plus"), minus=side_summary("minus"),
+        exposure=float(exposure), variance_floor=float(variance_floor),
     )
 
 

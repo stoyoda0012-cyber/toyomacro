@@ -42,6 +42,25 @@ archived on Zenodo for a citable DOI.
     In one single-peak configuration, the replica spread along the three
     softest modes is 0.985–1.002 of the bound.
 
+- **`mode_profile` (experimental): the Poisson deviance along a mode,
+  against the Fisher prediction.**
+  - For a single peak, it takes the expected counts at the stated
+    parameters and moves along the softest mode, or another one, in
+    steps of its SD bound. At each step it minimises the deviance over
+    everything else, with the Gaussian variance and γ held at or above
+    their bounds.
+  - It reports the profile on a grid, its values at ±1 and ±2 and the
+    crossings of 1. Fisher's quadratic predicts t² and 1.
+  - It also reports where a width bound becomes active, and where a side
+    stops because the amplitude, or both widths, reached zero.
+  - Two routes solve every point: active sets with Fisher scoring, and
+    SLSQP. Both are held to one KKT test. A disagreement is flagged,
+    never resolved.
+  - It is a property of the model, not the coverage of any interval,
+    and no boundary correction is applied.
+  - Design record §9.4 registered the definitions before the code. §9.8
+    records the three registered configurations.
+
 - **`identifiability_at_estimate` and `identifiability_from_exact_k`
   (experimental): the labels and the modes at a fit's result.**
   - The result is a plug-in at a noisy estimate, not a confidence

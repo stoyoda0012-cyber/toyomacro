@@ -37,6 +37,7 @@ from toyomacro.voigtfit.identifiability import (
     identifiability_from_exact_k,
     identifiability_modes,
     linear_background,
+    mode_profile,
     poisson_fisher,
     scan_identifiability,
     shirley_background,
@@ -2063,3 +2064,124 @@ class TestEstimate:
             identifiability_from_exact_k(
                 dataclasses.replace(doublet, candidates=(doublet.candidates[0], broken)),
                 2, EK_ENERGY, intensity="raw_counts")
+
+
+# ===================================================================
+# The profile along a mode
+# ===================================================================
+
+# Development configurations only. The registered ones of design record
+# §9.6 run in tests/test_identifiability_profile_record.py.
+DEV_INTERIOR = (np.arange(-2.0, 2.0 + 1e-9, 0.025), VoigtPeak(5.0e4, 0.0, 0.25, 0.35),
+                lambda e: linear_background(e, 500.0, -20.0))
+DEV_TIGHT = (np.arange(-0.5, 0.5 + 1e-9, 0.025), VoigtPeak(3.0e4, 0.0, 0.08, 0.35),
+             lambda e: constant_background(e, 400.0))
+DEV_STOP = (np.arange(-0.32, 0.32 + 1e-9, 0.02), VoigtPeak(1.5e4, 0.0, 0.1, 0.4),
+            lambda e: linear_background(e, 250.0, 5.0))
+
+
+@pytest.fixture(scope="module")
+def profiles():
+    return {name: mode_profile(e, peak, bg(e)) for name, (e, peak, bg) in
+            (("interior", DEV_INTERIOR), ("tight", DEV_TIGHT), ("stop", DEV_STOP))}
+
+
+class TestModeProfile:
+    """``mode_profile`` (design record §9.4) on development configurations."""
+
+    def test_every_grid_point_has_an_entry(self, profiles):
+        for prof in profiles.values():
+            assert [p.t for p in prof.points] == list(idf.PROFILE_GRID)
+            assert all(p.outcome in ("ok", "not_obtained", "amplitude_at_zero", "corner")
+                       for p in prof.points)
+            json.dumps(prof.to_dict())
+
+    def test_starts_at_zero_and_never_goes_below(self, profiles):
+        for prof in profiles.values():
+            zero = next(p for p in prof.points if p.t == 0.0)
+            assert zero.outcome == "ok" and zero.delta == 0.0
+            assert all(p.delta >= 0.0 for p in prof.points if p.outcome == "ok")
+
+    def test_follows_the_fisher_prediction_in_the_interior(self, profiles):
+        """Well determined: Delta(t) = t**2 to within a percent out to 3 SD,
+        the crossings at |t| = 1 to a percent, and the routes agree."""
+        prof = profiles["interior"]
+        assert all(p.outcome == "ok" and not p.flagged for p in prof.points)
+        for p in prof.points:
+            if p.t:
+                assert p.delta == pytest.approx(p.t**2, rel=0.02)
+        small = next(p for p in prof.points if p.t == 0.1)
+        assert small.delta == pytest.approx(0.01, rel=1e-2)
+        for side in (prof.plus, prof.minus):
+            assert side.crossing == pytest.approx(1.0, abs=0.01)
+            assert side.delta_1 == pytest.approx(1.0, rel=0.01)
+            assert side.stop is None and not side.activations
+
+    def test_a_bound_activates_and_the_profile_continues(self, profiles):
+        prof = profiles["tight"]
+        t_on, delta_on = prof.plus.activations["variance"]
+        beyond = [p for p in prof.points if p.t >= t_on]
+        assert all(p.outcome == "ok" and "variance" in p.active for p in beyond)
+        assert all(p.parameters["var_0"] == 0.0 for p in beyond)
+        assert delta_on == next(p.delta for p in prof.points if p.t == t_on)
+        assert prof.plus.stop is None
+        assert not any(p.flagged for p in prof.points)
+        assert prof.plus.background_negative  # recorded per point
+        assert all(next(p for p in prof.points if p.t == x).background_negative
+                   for x in prof.plus.background_negative)
+
+    def test_a_side_stops_where_the_amplitude_reaches_zero(self, profiles):
+        prof = profiles["stop"]
+        stop = prof.minus.stop
+        assert stop["event"] == "amplitude_at_zero"
+        later = [p for p in prof.points if p.t <= stop["t"]]
+        assert all(p.outcome == "amplitude_at_zero" and p.delta is None for p in later)
+        before = next(p for p in prof.points if p.t == round(stop["t"] + 0.1, 10))
+        assert stop["delta_before"] == before.delta
+        assert np.isfinite(stop["background_only_deviance"])
+        assert stop["background_only_deviance"] > stop["delta_before"]
+        assert prof.minus.delta_1 == prof.minus.delta_2 == "amplitude at zero"
+        assert isinstance(prof.minus.crossing, float)  # found before the stop
+
+    def test_the_kkt_test(self):
+        """Passes at the stated point and at an interior optimum; fails off
+        it, and fails a bound held with a multiplier of the wrong sign."""
+        e, peak, bg = DEV_STOP
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        stated = problem.z_of(0.0, problem.peak0, problem.b0)
+        assert problem.kkt(0.0, stated)[0]
+        moved = stated.copy()
+        moved[0] += 1e-3
+        assert not problem.kkt(0.0, moved)[0]
+        start = problem.z_of(-0.1, problem.peak0, problem.b0)
+        interior = problem.scoring(-0.1, start, ())
+        assert problem.kkt(-0.1, interior)[0]
+        held = problem.scoring(-0.1, start, ("variance",))
+        passed, residual, active, _, _ = problem.kkt(-0.1, held)
+        assert active == ("variance",) and residual < 1e-6 and not passed
+
+    def test_route_a_has_a_fourth_set_with_a_positive_floor(self):
+        e, peak, bg = DEV_INTERIOR
+        assert len(idf._Profile(e, peak, bg(e), 1.0, 0.0, 0).admissible_sets()) == 3
+        assert len(idf._Profile(e, peak, bg(e), 1.0, 0.01, 0).admissible_sets()) == 4
+
+    def test_a_failing_route_flags_every_point(self, monkeypatch):
+        """With route B made to fail, route A carries the summaries and every
+        solved point is flagged; nothing is resolved silently."""
+        monkeypatch.setattr(idf._Profile, "slsqp", lambda self, t, z0: None)
+        e, peak, bg = DEV_INTERIOR
+        prof = mode_profile(e, peak, bg(e), t=(-0.5, 0.0, 0.5))
+        assert all(p.flagged and p.route == "A" and not p.success_b for p in prof.points)
+
+    def test_refusals(self):
+        e, peak, bg = DEV_INTERIOR
+        with pytest.raises(ValueError, match="single peak"):
+            mode_profile(e, [peak, peak], bg(e))
+        with pytest.raises(ValueError, match="contain 0"):
+            mode_profile(e, peak, bg(e), t=(0.1, 0.2))
+        with pytest.raises(ValueError, match="strictly increasing"):
+            mode_profile(e, peak, bg(e), t=(0.0, 0.2, 0.1))
+        with pytest.raises(ValueError, match="non-null modes"):
+            mode_profile(e, peak, bg(e), mode=4)
+        with pytest.raises(TypeError):
+            mode_profile(e, peak, bg(e), variance_floor_sd=0.01)
