@@ -912,6 +912,64 @@ route's modes agree with dc05fb2's to 4×10⁻¹⁵ relative in the bounds and
 those weights, so the recorded result stands. The test was not run
 again for the record. CI runs it on every job as a regression test.
 
+**P3 — recorded.** Run once, at commit 67141a4 with a clean tree, on
+Python 3.12.11, NumPy 2.3.5 and SciPy 1.17.0 (macOS arm64, Accelerate
+BLAS), after the implementation's independent audit and its re-audit
+found no Blocker or Major. In all three configurations every one of the
+61 grid points was obtained. No point was flagged: both routes succeeded
+everywhere and agreed within the registered 10⁻⁶ (relative above Δ = 1).
+There was no stop.
+
+| configuration | √λ of mode 1 | t > 0: t₊, Δ(1), Δ(2) | t < 0: \|t₋\|, Δ(−1), Δ(−2) | first active bound |
+|---|---|---|---|---|
+| soft | 1.805 | 0.277, 41.95, 85.56 | 0.482, 1.03×10⁴, 1.21×10⁴ | v at t = 0.3 (Δ = 1.68); γ at t = −0.5 (Δ = 35.9) |
+| soft ×100 | 0.179 | 0.944, 1.130, 5.181 | 1.060, 0.896, 3.242 | v at t = 2.2 (Δ = 7.33) |
+| hard | 0.00708 | 1.0017, 0.9967, 3.974 | 0.9984, 1.0033, 4.027 | none |
+
+Mode 1 is the same combination in both soft rows: amplitude +0.860,
+variance −0.352, γ +0.369, center 0. In the hard row it is variance
++0.918, γ −0.315, amplitude −0.242.
+
+The re-estimated background curve is negative in some channel at every
+t > 0 point of both soft rows, and at t ≤ −0.9 in the soft row. It is
+never negative in the hard row.
+
+Read with these qualifications, not as a judgement:
+
+- Δ at each point is the lowest deviance found from the registered
+  starts. It is not certified as the global minimum, and agreement of
+  the two routes is not evidence that it is: both start from the same
+  points. In the narrow window the soft rows can have several branches
+  (γ held at 0 or not, a falling or rising amplitude). Which one the
+  outward chain follows is part of the result.
+- Where a bound is active the profile is the constrained minimum. No
+  boundary correction is applied (§8).
+- The hard row's Δ(±1) agrees with the single-route values computed
+  before registration (§9.6, Disclosure).
+
+Numerical details left to the code by §9.4, as fixed for this run:
+
+- The deviance is computed as 2 Σ y (x − log1p x) with x = μ/y − 1.
+- Projection onto active bounds is the minimum-norm move in z.
+- Rounding below a bound by up to 10⁻¹² of the reference scale counts as
+  on it.
+- Starts are put on any width bound they violate before solving.
+- The stated-point start is the orthogonal projection of θ₀ onto the
+  constraint plane.
+- I_z is singular by the n·ε rule on its unit-diagonal form. A
+  non-finite I_z also fails.
+- Route A uses Levenberg damping on the Fisher matrix: it starts at
+  10⁻³, is ×10 on a rejected step and ÷10 on an accepted one, is bounded
+  in [10⁻¹², 10¹²], and accepts a step only if D does not increase.
+- Route B runs SLSQP in coordinates scaled by the Fisher diagonal at
+  its start. Its constraints are the two width bounds and μ ≥ 10⁻¹² ·
+  max y per channel, evaluated on the bound-snapped widths. Outside the
+  domain it returns D = 10³⁰.
+- The background-only deviance is minimised by Newton steps with step
+  halving.
+- Where a solution shows both events, amplitude at zero is the one
+  reported.
+
 ## References
 
 - J. J. Olivero and R. L. Longbothum, *J. Quant. Spectrosc. Radiat.

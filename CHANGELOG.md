@@ -61,6 +61,13 @@ archived on Zenodo for a citable DOI.
     and no boundary correction is applied.
   - Design record §9.4 registered the definitions before the code. §9.8
     records the three registered configurations.
+    - In the well-determined one, Δ(±1) is within 0.4 % of 1 and the
+      crossings are within 0.2 % of 1.
+    - At the registered counts the narrow window meets a width bound
+      within 0.3–0.5 SD on either side, and Δ(±1) is 42 and 1.0×10⁴.
+    - At 100 times the counts, Δ(±1) is 0.90 and 1.13.
+    - Everywhere, Δ is the lowest deviance found from the registered
+      starts, not a certified global minimum.
 
 - **`identifiability_at_estimate` and `identifiability_from_exact_k`
   (experimental): the labels and the modes at a fit's result.**
