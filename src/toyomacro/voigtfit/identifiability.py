@@ -19,9 +19,11 @@ Three things live here that the older Fisher modules do not have:
 
 On top of those, ``assess_identifiability`` sorts each parameter into
 rank deficient, weakly identified or identified, and separately says
-whether the Gaussian variance sits near its boundary. What those labels
-do and do not mean is in its docstring; none of them is a statement
-about a fit.
+whether the Gaussian variance, or gamma, sits near its boundary;
+``identifiability_modes`` reports which combinations of peak parameters
+are determined worst and what each looks like in the spectrum. What
+those do and do not mean is in their docstrings; none of them is a
+statement about a fit.
 
 Why the variance. A Voigt profile is a Lorentzian convolved with a
 Gaussian, so it obeys the heat equation in ``v``::
@@ -109,10 +111,10 @@ Not exported from ``toyomacro.voigtfit.__init__``; not wired to any CLI.
 
 The parts that do not depend on the lineshape -- ``Background`` and its
 constant and linear builders, the Fisher product, the rank decision,
-``effective_information`` and ``IdentifiabilityThresholds`` -- are
-defined in the private module ``toyomacro._identifiability`` and
-re-exported here unchanged; this module is where they are documented
-and supported.
+``effective_information``, ``IdentifiabilityThresholds``, ``Mode`` and
+the mode decomposition itself -- are defined in the private module
+``toyomacro._identifiability`` and re-exported here unchanged; this
+module is where they are documented and supported.
 
 References:
     J. J. Olivero and R. L. Longbothum, J. Quant. Spectrosc. Radiat.
@@ -138,10 +140,12 @@ from .._identifiability import (
     Background,
     EffectiveInformation,
     IdentifiabilityThresholds,
+    Mode,
     constant_background,
     covariance_bound,
     effective_information,
     linear_background,
+    mode_decomposition,
     poisson_fisher_matrix,
 )
 from .._identifiability import null_directions as _null_directions  # noqa: F401  (tests)
@@ -159,6 +163,8 @@ __all__ = [
     "ParameterAssessment",
     "WidthAssessment",
     "IdentifiabilityReport",
+    "Mode",
+    "ModeReport",
     "ScanGrid",
     "voigt_derivatives",
     "voigt_fwhm",
@@ -168,6 +174,7 @@ __all__ = [
     "poisson_fisher",
     "effective_information",
     "assess_identifiability",
+    "identifiability_modes",
     "scan_identifiability",
 ]
 
@@ -798,8 +805,8 @@ class WidthAssessment:
             precision of the Gaussian component *relative to itself*.
             Grows without limit as the component vanishes however good
             ``worst_relative_sd`` looks; ``inf`` on the boundary.
-        near_boundary: ``variance_excess < boundary_sd * sd_variance``.
-            Independent of ``status``.
+        near_boundary: The Gaussian variance's flag: ``variance_excess <
+            boundary_sd * sd_variance``. Independent of ``status``.
         worst_relative_sd: Square root of the largest eigenvalue of the
             2x2 covariance bound after dividing variance by
             FWHM**2/(8 ln2) and gamma by FWHM: the relative bound along
@@ -810,6 +817,14 @@ class WidthAssessment:
         status: 'rank_deficient' if either width is; else
             'weakly_identified' if ``worst_relative_sd`` exceeds the
             threshold; else 'identified'
+        gamma_relative_sd: ``sd(gamma) / gamma``, the precision of the
+            Lorentzian width relative to itself; ``inf`` at gamma = 0.
+            gamma is judged against the FWHM elsewhere, a scale that
+            stays finite as the Lorentzian component vanishes.
+        near_boundary_gamma: gamma's flag, ``gamma < boundary_sd *
+            sd(gamma)``; gamma = 0 is a boundary just as the variance
+            floor is. True when gamma is rank deficient. Independent of
+            ``status``.
     """
 
     peak: int
@@ -822,6 +837,8 @@ class WidthAssessment:
     worst_direction: tuple[float, float]
     status: str
     variance_floor_sd: float = 0.0
+    gamma_relative_sd: float = math.nan
+    near_boundary_gamma: bool = False
 
 
 @dataclass(frozen=True)
@@ -901,10 +918,11 @@ def assess_identifiability(
       ``thresholds.weak_relative_sd`` times the reference scale.
     - 'identified': neither.
 
-    and one independent flag per peak, 'near_boundary', for a Gaussian
+    and two independent flags per peak: 'near_boundary', for a Gaussian
     variance within ``thresholds.boundary_sd`` bounds of its lower limit
     ``variance_floor`` (0, or a calibrated instrument variance when the
-    quantity of interest is the broadening in excess of it).
+    quantity of interest is the broadening in excess of it), and
+    'near_boundary_gamma', for gamma within as many bounds of 0.
 
     What the labels do not mean:
 
@@ -919,7 +937,7 @@ def assess_identifiability(
       have gamma 'identified' while sd(gamma)/gamma is of order one (0.58
       at sigma/gamma = 100 for the default ``ScanGrid`` peak on +-5 FWHM
       with an estimated flat background, where sd(gamma)/FWHM is 2e-3).
-      No flag is raised for that boundary; compare ``sd`` with ``value``.
+      Read ``gamma_relative_sd`` and ``near_boundary_gamma`` for it.
     - 'weakly_identified' is **not** structural non-identifiability. It
       says the information in *this* window, at *this* exposure and with
       *this* background is small against a chosen scale; more counts or
@@ -1025,12 +1043,15 @@ def assess_identifiability(
             worst = math.sqrt(max(eigenvalues[-1], 0.0))
             direction = (float(eigenvectors[0, -1]), float(eigenvectors[1, -1]))
             status = "weakly_identified" if worst > thresholds.weak_relative_sd else "identified"
+        sd_g = np.inf if unbounded[ig] else math.sqrt(max(covariance[ig, ig], 0.0))
         widths.append(WidthAssessment(
             peak=k, fwhm=fwhm[k], variance_excess=excess, sd_variance=float(sd_v),
             variance_relative_sd=float(sd_v / excess) if excess > 0.0 else np.inf,
             near_boundary=bool(excess < thresholds.boundary_sd * sd_v),
             worst_relative_sd=float(worst), worst_direction=direction, status=status,
             variance_floor_sd=float(variance_floor_sd),
+            gamma_relative_sd=float(sd_g / p.gamma) if p.gamma > 0.0 else np.inf,
+            near_boundary_gamma=bool(p.gamma < thresholds.boundary_sd * sd_g),
         ))
 
     return IdentifiabilityReport(
@@ -1038,6 +1059,173 @@ def assess_identifiability(
         condition_number=condition, thresholds=thresholds,
         variance_floor=float(variance_floor), variance_floor_sd=float(variance_floor_sd),
         fisher=fisher,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Modes
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ModeReport:
+    """Result of ``identifiability_modes``.
+
+    Attributes:
+        modes: Up to ``k`` non-null modes of the peak parameters, softest
+            first (``Mode``)
+        null_modes: A basis of the directions with an infinite bound, in
+            the same scaled coordinates. Only their span means anything.
+        null_space_dim: As ``IdentifiabilityReport.null_space_dim``
+        nuisance_null_dim: Null directions with no component on the peak
+            parameters (by the tolerance behind the labels); the other
+            ``null_space_dim - nuisance_null_dim`` are the null modes
+        scales: Peak parameter name -> its reference scale
+        thresholds: The thresholds used
+        exposure: As given
+        variance_floor: As given; it moves a boundary, not the matrix
+        fisher: The underlying 'var_gamma' ``PoissonFisherResult``
+    """
+
+    modes: tuple[Mode, ...]
+    null_modes: tuple[Mode, ...]
+    null_space_dim: int
+    nuisance_null_dim: int
+    scales: dict[str, float]
+    thresholds: IdentifiabilityThresholds
+    exposure: float
+    variance_floor: float
+    fisher: PoissonFisherResult = field(repr=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-Python summary for ``json.dumps``: no arrays and no matrix.
+
+        The signatures are left out (they are arrays over the energy
+        axis); read them from ``modes``. Infinite bounds are written as
+        ``Infinity`` and the bound of a 'not_resolved' mode as ``NaN``,
+        which strict JSON parsers reject.
+        """
+        def entry(mode: Mode) -> dict[str, Any]:
+            out = vars(mode).copy()
+            del out["signature"]
+            return out
+
+        return {
+            "null_space_dim": self.null_space_dim,
+            "nuisance_null_dim": self.nuisance_null_dim,
+            "weak_relative_sd": self.thresholds.weak_relative_sd,
+            "exposure": self.exposure,
+            "variance_floor": self.variance_floor,
+            "scales": dict(self.scales),
+            "modes": [entry(m) for m in self.modes],
+            "null_modes": [entry(m) for m in self.null_modes],
+        }
+
+
+def identifiability_modes(
+    energy: np.ndarray,
+    peaks: list[VoigtPeak],
+    background: Background | None = None,
+    *,
+    exposure: float = 1.0,
+    k: int = 3,
+    variance_floor: float = 0.0,
+    thresholds: IdentifiabilityThresholds | None = None,
+) -> ModeReport:
+    """Which combinations of peak parameters the spectrum determines worst.
+
+    ``assess_identifiability`` bounds each parameter on its own. This
+    returns the least determined *directions*: the peak block of the
+    inverse Fisher matrix in 'var_gamma' coordinates -- amplitude,
+    center, variance and gamma of every peak, with every estimated
+    background term profiled out, so the cost of estimating the
+    background is included -- divided by the reference scales of
+    ``assess_identifiability`` (|A|, FWHM, FWHM**2/(8 ln2), FWHM) and
+    diagonalised. Each ``Mode`` gives the relative bound along its
+    direction, the direction as named weights, how the background
+    follows when the peaks move one SD along it, what that move does to
+    the expected spectrum, and how much of each parameter's bound lies
+    along it.
+
+    What depends on a convention and what does not:
+
+    - The directions and their order depend on the reference scales;
+      other scales would list other directions. The background is not in
+      the directions because no scale for it survived checking: one tied
+      to the peak height moved the modes when the same background was
+      written on another basis.
+    - The null space does not depend on them, and neither does the size
+      of a signature: a one-SD move along any mode changes the expected
+      spectrum by one unit of counting noise, ``whitened_norm = 1`` in
+      exact arithmetic. The convention decides which directions are
+      listed, not how visible they are. A departure of ``whitened_norm``
+      from 1 measures that mode's numerical error: it appears at the stiff
+      end of a near-singular design, in every mode of a design singular
+      to within rounding, or when the background is itself nearly
+      singular. Where rounding leaves no positive bound the mode is
+      'not_resolved'.
+    - The softest mode is never better determined than any single peak
+      parameter with a finite bound, nor than a width block's
+      ``worst_relative_sd`` without a floor uncertainty. The converse does
+      not hold: a mode can be 'weakly_identified' while no parameter is,
+      because the threshold then applies to a combination of fractions of
+      different scales.
+    - Null directions are reported apart, in ``null_modes``: as many as
+      the rank of the null space's peak-parameter rows, by the tolerance
+      that marks a single parameter 'rank_deficient', so there is a null
+      mode exactly when some peak parameter carries that label. The soft modes are taken on their
+      complement, so they are combinations the data determine: with two
+      coincident peaks, A0 + A1 lies in their span while every single
+      peak parameter is 'rank_deficient'.
+
+    This is a diagnostic, not a set of weights: nothing here is meant to
+    be fed to a downstream fit as a covariance, and nothing here is a
+    confidence interval. Like the labels it is computed from a model at
+    stated parameters, under the conditions of ``crlb``'s module
+    docstring, and near a boundary the Fisher numbers are not the spread
+    of a constrained estimator (Self & Liang 1987). ``variance_floor_sd``
+    is not taken: the floor's own uncertainty is not information carried
+    by the spectrum, and adding it would break ``whitened_norm = 1``.
+
+    Args:
+        energy: Energy axis (eV)
+        peaks: One or more peaks
+        background: None, or a ``Background``
+        exposure: Multiplier on the whole mean; relative bounds scale as
+            ``1/sqrt(exposure)`` and the directions do not move
+        k: Number of non-null modes to report, at most
+        variance_floor: Lower limit of every peak's Gaussian variance,
+            as in ``assess_identifiability``. It moves a boundary, not
+            the matrix, so it changes no mode.
+        thresholds: Defaults to ``IdentifiabilityThresholds()``; only
+            ``weak_relative_sd`` is used
+
+    Returns:
+        ModeReport
+    """
+    thresholds = thresholds or IdentifiabilityThresholds()
+    if variance_floor < 0.0 or any(p.variance < variance_floor for p in peaks):
+        raise ValueError(
+            f"need 0 <= variance_floor <= sigma**2 for every peak, got {variance_floor}"
+        )
+    fisher = poisson_fisher(energy, peaks, background, exposure=exposure)
+    target = [i for i, role in enumerate(fisher.param_roles) if role != "background"]
+    scales = []
+    for p in peaks:
+        fwhm = voigt_fwhm(p.variance, p.gamma)
+        scales += [abs(p.amplitude), fwhm, fwhm * fwhm / _EIGHT_LN2, fwhm]
+    decomposition = mode_decomposition(
+        fisher.fisher, fisher.jacobian, fisher.expected_counts, fisher.param_names,
+        target, scales, k=k, weak_relative_sd=thresholds.weak_relative_sd,
+        projection_tol=_NULL_PROJECTION_TOL,
+    )
+    return ModeReport(
+        modes=decomposition.modes, null_modes=decomposition.null_modes,
+        null_space_dim=decomposition.null_space_dim,
+        nuisance_null_dim=decomposition.nuisance_null_dim,
+        scales=dict(zip(decomposition.target_names, decomposition.scales)),
+        thresholds=thresholds, exposure=float(exposure),
+        variance_floor=float(variance_floor), fisher=fisher,
     )
 
 
@@ -1158,8 +1346,9 @@ def scan_identifiability(grid: ScanGrid) -> dict[str, np.ndarray]:
           scales FWHM**2/(8 ln2) and FWHM; ``*_conditional`` the same
           from the width sub-block with everything else known
         - ``worst_relative_sd``, ``variance_relative_sd``,
-          ``near_boundary``, ``status`` (0 identified, 1 weakly
-          identified, 2 rank deficient): as in ``WidthAssessment``
+          ``near_boundary``, ``near_boundary_gamma``, ``status`` (0
+          identified, 1 weakly identified, 2 rank deficient): as in
+          ``WidthAssessment``
         - ``sd_sigma``: bound on sigma in 'sigma_gamma' coordinates over
           FWHM/sqrt(8 ln2); ``inf`` at sigma = 0
         - ``info_variance``, ``info_sigma``: effective information on the
@@ -1182,6 +1371,7 @@ def scan_identifiability(grid: ScanGrid) -> dict[str, np.ndarray]:
     )
     out = {key: np.full(shape, np.nan) for key in keys}
     out["near_boundary"] = np.zeros(shape, dtype=bool)
+    out["near_boundary_gamma"] = np.zeros(shape, dtype=bool)
     out["status"] = np.full(shape, -1, dtype=np.int8)
 
     fwhm = grid.fwhm
@@ -1218,6 +1408,7 @@ def scan_identifiability(grid: ScanGrid) -> dict[str, np.ndarray]:
             out["worst_relative_sd"][cell] = width.worst_relative_sd
             out["variance_relative_sd"][cell] = width.variance_relative_sd
             out["near_boundary"][cell] = width.near_boundary
+            out["near_boundary_gamma"][cell] = width.near_boundary_gamma
             out["status"][cell] = _STATUS_CODE[width.status]
             out["info_variance"][cell] = (var_.reference_scale / var_.sd) ** 2
 

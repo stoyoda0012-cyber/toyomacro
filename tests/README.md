@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,709 automated tests** across **103 files**, in two
+This suite has **2,744 automated tests** across **103 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 65 | 1,618 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,091 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 65 | 1,619 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,125 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,277 tests, 84%) — guarantee the library
+- **Contract / regression** (2,312 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,697. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,732. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -70,9 +70,9 @@ them would take real coverage with them:
   `fit_time < 10.0`, and also stores the fit that two later tests read.
   Deselecting it would silently skip them.
 
-## Library body — `tests/` (1,618)
+## Library body — `tests/` (1,619)
 
-### Claim guards — noise model, versions, backends, comparisons (147)
+### Claim guards — noise model, versions, backends, comparisons (148)
 | Tests | File | Guards |
 |--:|---|---|
 | 19 | `test_noise_semantics.py` | `level` ↔ peak-SNR ↔ Poisson-mean conversions, empirically pinned to the sampler |
@@ -83,7 +83,7 @@ them would take real coverage with them:
 | 5 | `test_readme_inventory.py` | Every count on this page — total, per location, per section, per file, contract / reproduction split, and the `not perf` count here and in the top-level README — against a fresh `pytest --collect-only` |
 | 4 | `test_version.py` | pyproject ↔ `toyomacro.__version__` ↔ voigtfit ↔ CLI consistency, and README's install pin |
 | 2 | `test_varpro_oracle.py` | `VarProFitter` against a SciPy least-squares oracle |
-| 6 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged |
+| 7 | `test_identifiability_mc.py` | Monte Carlo check of `voigtfit.identifiability`: 10⁴ simulated spectra fitted by exact constrained Poisson maximum likelihood (helper `_poisson_mle.py`, not shipped) against the inverse Fisher matrix in the interior; the estimator's distribution near the variance boundary is recorded, not judged; the spread along each of the three softest modes of `identifiability_modes` against its bound, as registered in the design record (§9.6) |
 | 14 | `test_fermi_edge_bootstrap.py` | Fermi-edge resampling: the Monte Carlo spread against the bound at an interior point, the boundary and the non-separable region recorded rather than judged, the constrained fit against a different optimiser, a replica held at a bound against the Karush-Kuhn-Tucker condition, the draws against the Poisson law, the deviance against its own value, a per-replica start through the chunked path, whether a nested bootstrap interval covers the truth, whether zero channels split the parametric and nonparametric draws, `fit_fermi_edge`'s own spread against its sandwich covariance, and one singular replica not aborting a batch |
 | 4 | `test_bootstrap_profile.py` | Profile-likelihood intervals in the private bootstrap: equal to the likelihood-ratio interval for a Poisson mean, and the Self & Liang threshold (2.71, not 3.84) decides whether a lower bound is in the set |
 | 11 | `test_bootstrap_sweeps.py` | Sweep resampling and the detector-gain estimate in the private bootstrap, on synthetic sweeps: the gain recovered within 2.5% through source drift and jitter and a drifting edge, a tolerance that fails without either the per-sweep scaling or the sweep differences, read noise landing in the offset and none without it, the sweep bootstrap equal to the Poisson one for independent sweeps and wider by the predicted factor under source variation |
@@ -165,7 +165,7 @@ them would take real coverage with them:
 |--:|---|---|
 | 15 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through, and the startup preload of what they import |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,091)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,125)
 
 ### Solvers & fitting core (296)
 | Tests | File | Guards |
@@ -196,10 +196,10 @@ them would take real coverage with them:
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (371)
+### Statistics & information theory (405)
 | Tests | File | Guards |
 |--:|---|---|
-| 113 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate; the lineshape-independent core it shares does not import the engine |
+| 147 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate, the γ = 0 flag; the modes of the peak parameters — the eigen-relation, one unit of counting noise per mode, no mode better than any parameter, invariance under the energy unit, the background basis and the exposure, the null-space count on constructed cases and against the labels, an oblique null direction, the stiff end of a near-singular design, the shares, the sign rule; the lineshape-independent core it shares does not import the engine |
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
 | 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |

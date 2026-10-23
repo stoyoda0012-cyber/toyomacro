@@ -33,6 +33,7 @@ from toyomacro.voigtfit.identifiability import (
     assess_identifiability,
     constant_background,
     effective_information,
+    identifiability_modes,
     linear_background,
     poisson_fisher,
     scan_identifiability,
@@ -853,7 +854,8 @@ class TestEffectiveInformation:
                                 check=True).stdout.strip()
         assert loaded == "['toyomacro', 'toyomacro._identifiability']"
         for name in ("Background", "EffectiveInformation", "IdentifiabilityThresholds",
-                     "constant_background", "linear_background", "effective_information"):
+                     "constant_background", "linear_background", "effective_information",
+                     "Mode", "mode_decomposition"):
             assert getattr(idf, name) is getattr(sys.modules["toyomacro._identifiability"], name)
 
     def test_no_nuisance_means_no_loss(self):
@@ -1052,9 +1054,11 @@ class TestAssessment:
             if a.relative_sd is not None:
                 assert b.relative_sd == pytest.approx(a.relative_sd, rel=1e-8)
         for a, b in zip(ev.widths, mev.widths):
-            assert (a.status, a.near_boundary) == (b.status, b.near_boundary)
+            assert (a.status, a.near_boundary, a.near_boundary_gamma) == (
+                b.status, b.near_boundary, b.near_boundary_gamma)
             assert b.worst_relative_sd == pytest.approx(a.worst_relative_sd, rel=1e-8)
             assert b.variance_relative_sd == pytest.approx(a.variance_relative_sd, rel=1e-8)
+            assert b.gamma_relative_sd == pytest.approx(a.gamma_relative_sd, rel=1e-8)
 
     def test_coincident_peaks_are_rank_deficient(self):
         energy = np.arange(-3.0, 3.0 + 1e-9, 0.01)
@@ -1063,6 +1067,7 @@ class TestAssessment:
         assert report.null_space_dim == 4 and report.condition_number == np.inf
         assert all(a.status == "rank_deficient" and a.sd == np.inf for a in report.parameters)
         assert all(w.status == "rank_deficient" and w.near_boundary for w in report.widths)
+        assert all(w.near_boundary_gamma and w.gamma_relative_sd == np.inf for w in report.widths)
 
     def test_redundant_background_does_not_condemn_the_peak(self):
         """The null direction bg_a - bg_b touches no peak axis."""
@@ -1121,7 +1126,8 @@ class TestScan:
 
     def test_shapes_and_round_trip_through_npz(self, scan, tmp_path):
         shape = (3, 2, 4, 3, 2)
-        for key in ("sd_variance", "sd_sigma", "status", "near_boundary", "condition_number"):
+        for key in ("sd_variance", "sd_sigma", "status", "near_boundary", "near_boundary_gamma",
+                    "condition_number"):
             assert scan[key].shape == shape
         assert np.isnan(scan["separations"][0]) and scan["separations"][1] == 0.5
         path = tmp_path / "scan.npz"
@@ -1141,7 +1147,21 @@ class TestScan:
         cell = (self._b(scan, "estimated"), 0, 3, 1, 1)
         assert scan["sd_gamma"][cell] == pytest.approx(report.parameters[3].relative_sd, rel=1e-12)
         assert scan["worst_relative_sd"][cell] == report.widths[0].worst_relative_sd
+        assert scan["near_boundary_gamma"][cell] == report.widths[0].near_boundary_gamma
         assert scan["n_energy"][cell] == 101
+
+    def test_gamma_flag_reaches_the_cells(self, scan):
+        """A flagged cell, rebuilt directly: single peak, sigma/gamma = 1,
+        known background, +-0.3 FWHM, level 1."""
+        cell = (self._b(scan, "known"), 0, 3, 0, 0)
+        sigma, gamma = idf._widths_at_fwhm(1.0, 1.0)
+        energy = np.linspace(-0.3, 0.3, 31)
+        peak = VoigtPeak(1.0e4, 0.0, sigma, gamma)
+        known = constant_background(energy, _flat(energy, peak).coefficients[0], estimated=False)
+        width = assess_identifiability(energy, [peak], known).widths[0]
+        assert width.near_boundary_gamma
+        assert scan["near_boundary_gamma"][cell]
+        assert scan["near_boundary_gamma"].any() and not scan["near_boundary_gamma"].all()
 
     def test_coordinate_degeneracy_and_information_loss_come_apart(self, scan):
         """Towards sigma = 0 only the sigma bound moves; towards a narrow
@@ -1322,3 +1342,391 @@ class TestVarianceFloorUncertainty:
     def test_a_negative_floor_sd_raises(self):
         with pytest.raises(ValueError, match="variance_floor_sd"):
             self._report(variance_floor_sd=-1e-6)
+
+
+# ===================================================================
+# The gamma = 0 boundary
+# ===================================================================
+
+
+class TestGammaBoundary:
+    """gamma = 0 is a boundary as the variance floor is, and gets the same
+    two numbers: a precision relative to itself and a flag."""
+
+    def test_a_nearly_gaussian_peak_is_flagged(self):
+        """The example of the docstring: sigma/gamma = 100, default scan
+        peak, +-5 FWHM, estimated flat background. gamma is 'identified'
+        against the FWHM, yet known only to about 58 % of itself."""
+        sigma, gamma = idf._widths_at_fwhm(100.0, 1.0)
+        energy = np.linspace(-5.0, 5.0, 501)
+        peak = VoigtPeak(1.0e4, 0.0, sigma, gamma)
+        report = assess_identifiability(energy, [peak], _flat(energy, peak))
+        assert report.parameters[3].status == "identified"
+        width = report.widths[0]
+        assert width.gamma_relative_sd == pytest.approx(0.58, abs=0.01)
+        assert width.gamma_relative_sd == pytest.approx(report.parameters[3].sd / gamma)
+        assert width.near_boundary_gamma and not width.near_boundary
+
+    def test_a_lorentzian_peak_is_not(self):
+        report = TestAssessment()._report(10.0)
+        assert not report.widths[0].near_boundary_gamma
+        assert report.widths[0].gamma_relative_sd < 0.05
+
+    def test_gamma_at_zero(self):
+        energy = np.linspace(-1.0, 1.0, 201)
+        peak = VoigtPeak(1.0e4, 0.0, 0.2, 0.0)
+        width = assess_identifiability(energy, [peak], _flat(energy, peak)).widths[0]
+        assert width.gamma_relative_sd == np.inf and width.near_boundary_gamma
+
+    def test_follows_the_boundary_threshold(self):
+        energy = np.linspace(-5.0, 5.0, 501)
+        sigma, gamma = idf._widths_at_fwhm(100.0, 1.0)
+        peak = VoigtPeak(1.0e4, 0.0, sigma, gamma)
+        width = assess_identifiability(energy, [peak], _flat(energy, peak)).widths[0]
+        ratio = 1.0 / width.gamma_relative_sd  # gamma in units of its own sd
+        below = IdentifiabilityThresholds(boundary_sd=0.9 * ratio)
+        above = IdentifiabilityThresholds(boundary_sd=1.1 * ratio)
+        assert not assess_identifiability(energy, [peak], _flat(energy, peak),
+                                          thresholds=below).widths[0].near_boundary_gamma
+        assert assess_identifiability(energy, [peak], _flat(energy, peak),
+                                      thresholds=above).widths[0].near_boundary_gamma
+
+
+# ===================================================================
+# Modes
+# ===================================================================
+
+
+MODE_ENERGY = np.arange(-3.0, 3.0 + 1e-9, 0.02)
+MODE_PEAK = VoigtPeak(2.0e4, 0.0, 0.3, 0.3)
+
+
+def _mode_cases():
+    """(name, energy, peaks, background, exposure): one peak, a pair, a
+    Shirley step, a narrow window, a higher exposure."""
+    e = MODE_ENERGY
+    pair = [VoigtPeak(2.0e4, -0.4, 0.2, 0.3), VoigtPeak(1.0e4, 0.5, 0.3, 0.2)]
+    narrow = np.arange(-0.3, 0.3 + 1e-9, 0.02)
+    soft = VoigtPeak(2.0e4, 0.0, 0.1, 0.3)
+    return [
+        ("single", e, [MODE_PEAK], linear_background(e, 300.0, 10.0), 1.0),
+        ("pair", e, pair, linear_background(e, 300.0, 10.0), 1.0),
+        ("shirley", e, [MODE_PEAK],
+         constant_background(e, 300.0) + shirley_background(e, [MODE_PEAK], 200.0), 1.0),
+        ("narrow", narrow, [soft], linear_background(narrow, 300.0, 10.0), 1.0),
+        ("exposure", e, pair, linear_background(e, 300.0, 10.0), 7.3),
+    ]
+
+
+def _scaled_effective(report):
+    """I_s = S I_eff S from scratch, for checking the eigen-relation."""
+    f = report.fisher
+    target = [i for i, r in enumerate(f.param_roles) if r != "background"]
+    scales = np.array([report.scales[f.param_names[i]] for i in target])
+    effective = effective_information(f.fisher, target).effective
+    return effective * np.outer(scales, scales), [f.param_names[i] for i in target]
+
+
+class TestModes:
+    """``identifiability_modes``: the identities and invariances of §9.1 of
+    the design record. The Monte Carlo is in tests/test_identifiability_mc.py."""
+
+    @pytest.mark.parametrize("case", _mode_cases(), ids=lambda c: c[0])
+    def test_every_mode_is_one_unit_of_counting_noise(self, case):
+        _, energy, peaks, background, exposure = case
+        report = identifiability_modes(energy, peaks, background, exposure=exposure, k=20)
+        assert report.modes and not report.null_modes
+        for mode in report.modes:
+            assert mode.whitened_norm == pytest.approx(1.0, abs=1e-9)
+            mu = report.fisher.expected_counts
+            assert np.sqrt(np.sum(mode.signature**2 / mu)) == pytest.approx(mode.whitened_norm)
+
+    @pytest.mark.parametrize("case", _mode_cases(), ids=lambda c: c[0])
+    def test_eigen_relation(self, case):
+        """I_s w = w / lambda, lambda = relative_sd**2, and the modes are
+        orthonormal; every non-null mode is listed with k large enough."""
+        _, energy, peaks, background, exposure = case
+        report = identifiability_modes(energy, peaks, background, exposure=exposure, k=20)
+        scaled, names = _scaled_effective(report)
+        vectors = np.array([[m.weights[n] for n in names] for m in report.modes]).T
+        assert vectors.shape == scaled.shape
+        assert np.allclose(vectors.T @ vectors, np.eye(len(names)), atol=1e-10)
+        for mode, w in zip(report.modes, vectors.T):
+            assert np.allclose(scaled @ w, w / mode.relative_sd**2,
+                               rtol=1e-7, atol=1e-7 * np.abs(scaled).max())
+        sds = [m.relative_sd for m in report.modes]
+        assert sds == sorted(sds, reverse=True)
+        ratios = [m.eigenvalue_ratio for m in report.modes]
+        assert ratios[-1] is None
+        assert all(r == pytest.approx((a / b) ** 2) for r, a, b in zip(ratios, sds, sds[1:]))
+
+    @pytest.mark.parametrize("case", _mode_cases(), ids=lambda c: c[0])
+    def test_softest_is_no_better_than_any_parameter(self, case):
+        """The largest eigenvalue bounds every diagonal element and every
+        principal sub-block (no floor uncertainty in the comparison)."""
+        _, energy, peaks, background, exposure = case
+        softest = identifiability_modes(energy, peaks, background, exposure=exposure).modes[0]
+        report = assess_identifiability(energy, peaks, background, exposure=exposure)
+        bounded = [a.relative_sd for a in report.parameters
+                   if a.relative_sd is not None and np.isfinite(a.relative_sd)]
+        assert softest.relative_sd >= max(bounded) * (1.0 - 1e-9)
+        assert softest.relative_sd >= max(w.worst_relative_sd for w in report.widths) * (1.0 - 1e-9)
+
+    def test_a_mode_can_be_weak_when_no_parameter_is(self):
+        """The converse does not hold; the docstring says so. Not every
+        configuration shows it -- here the single-peak case does not."""
+        energy, peaks, background = MODE_ENERGY, [MODE_PEAK], linear_background(
+            MODE_ENERGY, 300.0, 10.0)
+        softest = identifiability_modes(energy, peaks, background).modes[0]
+        largest = max(a.relative_sd for a in assess_identifiability(
+            energy, peaks, background).parameters if a.relative_sd is not None)
+        between = IdentifiabilityThresholds(weak_relative_sd=0.5 * (softest.relative_sd + largest))
+        assert identifiability_modes(energy, peaks, background,
+                                     thresholds=between).modes[0].status == "weakly_identified"
+        assert all(a.status != "weakly_identified" for a in assess_identifiability(
+            energy, peaks, background, thresholds=between).parameters)
+
+    def test_does_not_depend_on_the_energy_unit(self):
+        c = 1000.0
+        e = MODE_ENERGY
+        pair = [VoigtPeak(2.0e4, -0.4, 0.2, 0.3), VoigtPeak(1.0e4, 0.5, 0.3, 0.2)]
+        ev = identifiability_modes(e, pair, linear_background(e, 300.0, 10.0), k=8)
+        mev = identifiability_modes(
+            c * e, [VoigtPeak(c * p.amplitude, c * p.center, c * p.sigma, c * p.gamma)
+                    for p in pair],
+            linear_background(c * e, 300.0, 10.0 / c), k=8)
+        for a, b in zip(ev.modes, mev.modes):
+            assert b.relative_sd == pytest.approx(a.relative_sd, rel=1e-8)
+            for name in a.weights:
+                assert b.weights[name] == pytest.approx(a.weights[name], abs=1e-8)
+            assert b.background_shift["bg_level"] == pytest.approx(
+                a.background_shift["bg_level"], rel=1e-6, abs=1e-9)
+            assert b.background_shift["bg_slope"] == pytest.approx(
+                a.background_shift["bg_slope"] / c, rel=1e-6, abs=1e-12)
+
+    def test_does_not_depend_on_how_the_background_is_written(self):
+        """[1, E - E_mid] and [1, E + 100] span the same background. The
+        modes, and the background curve that follows each, are the same."""
+        e = MODE_ENERGY
+        mid = linear_background(e, 300.0, 10.0)
+        shifted = Background(
+            basis=np.vstack([np.ones(e.size), e + 100.0]),
+            coefficients=np.array([300.0 - 10.0 * 100.0, 10.0]),
+            names=("bg_a", "bg_b"), estimated=(True, True),
+        )
+        assert np.allclose(mid.counts(), shifted.counts())
+        a = identifiability_modes(e, [MODE_PEAK], mid, k=4)
+        b = identifiability_modes(e, [MODE_PEAK], shifted, k=4)
+        for x, y in zip(a.modes, b.modes):
+            assert y.relative_sd == pytest.approx(x.relative_sd, rel=1e-8)
+            assert all(y.weights[n] == pytest.approx(x.weights[n], abs=1e-8) for n in x.weights)
+            curve_x = mid.basis.T @ np.array(list(x.background_shift.values()))
+            curve_y = shifted.basis.T @ np.array(list(y.background_shift.values()))
+            assert np.allclose(curve_x, curve_y, rtol=1e-6, atol=1e-6 * np.abs(curve_x).max())
+
+    def test_scales_with_exposure_and_the_directions_do_not_move(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        one = identifiability_modes(e, [MODE_PEAK], bg, k=4)
+        more = identifiability_modes(e, [MODE_PEAK], bg, k=4, exposure=7.3)
+        for a, b in zip(one.modes, more.modes):
+            assert b.relative_sd * math.sqrt(7.3) == pytest.approx(a.relative_sd, rel=1e-10)
+            assert all(b.weights[n] == pytest.approx(a.weights[n], abs=1e-10) for n in a.weights)
+
+    def test_null_space_counts_on_constructed_cases(self):
+        """Coincident peaks: 4 null modes. A background term duplicated: a
+        null direction, but wholly in the background, so no null mode. A
+        background term with the peak's own shape: 1 null mode."""
+        e = MODE_ENERGY
+        twin = VoigtPeak(2.0e4, 0.0, 0.1, 0.3)
+        coincident = identifiability_modes(e, [twin, twin], linear_background(e, 300.0, 10.0))
+        assert (coincident.null_space_dim, coincident.nuisance_null_dim) == (4, 0)
+        assert len(coincident.null_modes) == 4
+
+        twice = constant_background(e, 150.0) + Background(
+            basis=np.ones((1, e.size)), coefficients=np.array([150.0]),
+            names=("bg_level_2",), estimated=(True,))
+        duplicated = identifiability_modes(e, [MODE_PEAK], twice)
+        assert (duplicated.null_space_dim, duplicated.nuisance_null_dim) == (1, 1)
+        assert not duplicated.null_modes
+
+        shape = voigt_derivatives(e, 0.0, MODE_PEAK.variance, MODE_PEAK.gamma).value
+        peak_shaped = constant_background(e, 300.0) + Background(
+            basis=shape[np.newaxis, :], coefficients=np.array([0.0]),
+            names=("bg_peak_shape",), estimated=(True,))
+        aliased = identifiability_modes(e, [MODE_PEAK], peak_shaped)
+        assert (aliased.null_space_dim, aliased.nuisance_null_dim) == (1, 0)
+        assert len(aliased.null_modes) == 1
+        assert aliased.null_modes[0].weights["amp_0"] > 0.99
+
+        cases = (
+            (coincident, [twin, twin], linear_background(e, 300.0, 10.0)),
+            (duplicated, [MODE_PEAK], twice),
+            (aliased, [MODE_PEAK], peak_shaped),
+        )
+        for report, peaks, background in cases:
+            assert report.null_space_dim == assess_identifiability(
+                e, peaks, background).null_space_dim
+            for mode in report.null_modes:
+                assert mode.relative_sd == np.inf and mode.status == "rank_deficient"
+                assert mode.whitened_norm < 1e-6
+                assert all(v is None for v in mode.shares.values())
+
+    def test_coincident_peaks_leave_the_sum_determined(self):
+        """Every single peak parameter is rank deficient, yet A0 + A1 lies
+        in the span of the soft modes."""
+        e = MODE_ENERGY
+        twin = VoigtPeak(2.0e4, 0.0, 0.1, 0.3)
+        report = identifiability_modes(e, [twin, twin], linear_background(e, 300.0, 10.0), k=8)
+        assert len(report.modes) == 4
+        names = list(report.modes[0].weights)
+        span = np.array([[m.weights[n] for n in names] for m in report.modes]).T
+        total = np.zeros(len(names))
+        total[names.index("amp_0")] = 1.0 / report.scales["amp_0"]
+        total[names.index("amp_1")] = 1.0 / report.scales["amp_1"]
+        total /= np.linalg.norm(total)
+        assert np.linalg.norm(span.T @ total) == pytest.approx(1.0, abs=1e-8)
+        assert all(np.isfinite(m.relative_sd) for m in report.modes)
+        # every peak parameter's own bound is infinite, so it has no share
+        assert all(report.modes[0].shares[n] is None for n in names)
+
+    def test_shares(self):
+        """Over all modes the shares of a peak parameter add to 1; those of a
+        background coefficient to 1 - (I_bb^-1)_bb / Var(b)."""
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        report = identifiability_modes(e, [MODE_PEAK], bg, k=20)
+        f = report.fisher
+        for name in ("amp_0", "center_0", "var_0", "gamma_0"):
+            assert sum(m.shares[name] for m in report.modes) == pytest.approx(1.0, abs=1e-9)
+        b = [i for i, r in enumerate(f.param_roles) if r == "background"]
+        known_peaks = np.linalg.inv(f.fisher[np.ix_(b, b)])
+        full = np.linalg.inv(f.fisher)
+        for j, i in enumerate(b):
+            expected = 1.0 - known_peaks[j, j] / full[i, i]
+            got = sum(m.shares[f.param_names[i]] for m in report.modes)
+            assert got == pytest.approx(expected, abs=1e-9)
+        assert all(0.0 <= v <= 1.0 + 1e-12 for m in report.modes for v in m.shares.values())
+
+    def test_sign_convention(self):
+        from toyomacro._identifiability import _oriented
+
+        report = identifiability_modes(MODE_ENERGY, [MODE_PEAK],
+                                       linear_background(MODE_ENERGY, 300.0, 10.0), k=4)
+        for mode in report.modes:
+            values = list(mode.weights.values())
+            assert max(values, key=abs) > 0.0
+        assert _oriented(np.array([0.6, -0.8])).tolist() == [-0.6, 0.8]
+        assert _oriented(np.array([-0.6, 0.8])).tolist() == [-0.6, 0.8]
+        tie = np.array([-0.5, 0.5 * (1.0 + 1e-9), 0.1])
+        assert _oriented(tie)[0] > 0.0  # within the tie tolerance the first decides
+        gap = np.array([-0.5, 0.5 * (1.0 + 1e-4), 0.1])
+        assert _oriented(gap)[1] > 0.0  # outside it the largest decides
+
+    def test_k_and_the_status(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        assert len(identifiability_modes(e, [MODE_PEAK], bg).modes) == 3
+        assert len(identifiability_modes(e, [MODE_PEAK], bg, k=1).modes) == 1
+        assert len(identifiability_modes(e, [MODE_PEAK], bg, k=50).modes) == 4
+        assert len(identifiability_modes(e, [MODE_PEAK], bg, k=np.int64(2)).modes) == 2
+        for bad in (0, -1, 2.0):
+            with pytest.raises(ValueError, match="k must be"):
+                identifiability_modes(e, [MODE_PEAK], bg, k=bad)
+        modes = identifiability_modes(e, [MODE_PEAK], bg, k=4).modes
+        cut = IdentifiabilityThresholds(
+            weak_relative_sd=0.5 * (modes[1].relative_sd + modes[2].relative_sd))
+        status = [m.status for m in identifiability_modes(e, [MODE_PEAK], bg, k=4,
+                                                          thresholds=cut).modes]
+        assert status == ["weakly_identified", "weakly_identified", "identified", "identified"]
+
+    def test_variance_floor_moves_no_mode(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        plain = identifiability_modes(e, [MODE_PEAK], bg)
+        floored = identifiability_modes(e, [MODE_PEAK], bg, variance_floor=0.05)
+        assert floored.variance_floor == 0.05
+        for a, b in zip(plain.modes, floored.modes):
+            assert (a.relative_sd, a.weights) == (b.relative_sd, b.weights)
+        with pytest.raises(ValueError, match="variance_floor"):
+            identifiability_modes(e, [MODE_PEAK], bg, variance_floor=0.2)
+
+    def test_report_serialises_without_arrays(self):
+        report = identifiability_modes(MODE_ENERGY, [MODE_PEAK],
+                                       linear_background(MODE_ENERGY, 300.0, 10.0))
+        data = report.to_dict()
+        text = json.dumps(data)
+        assert "signature" not in text and "whitened_norm" in text
+        assert len(data["modes"]) == 3 and data["null_modes"] == []
+        assert set(data["scales"]) == {"amp_0", "center_0", "var_0", "gamma_0"}
+
+    def test_null_count_follows_the_labels(self):
+        """Two background terms that are nearly, but not numerically,
+        dependent: [1, 1 + delta E]. Counting null modes as the difference
+        of two n*eps decisions on different matrices put a null mode here
+        for some delta while every peak parameter was labelled; the rank of
+        the null space's peak rows, with the labels' tolerance, does not."""
+        e = MODE_ENERGY
+        flat = identifiability_modes(e, [MODE_PEAK], constant_background(e, 300.0), k=4)
+        linear = identifiability_modes(e, [MODE_PEAK], linear_background(e, 300.0, 0.0), k=4)
+        for delta in np.logspace(-10.0, -6.0, 81):
+            bg = Background(basis=np.vstack([np.ones(e.size), np.ones(e.size) + delta * e]),
+                            coefficients=np.array([150.0, 150.0]), names=("bg_a", "bg_b"),
+                            estimated=(True, True))
+            report = identifiability_modes(e, [MODE_PEAK], bg, k=4)
+            labels = assess_identifiability(e, [MODE_PEAK], bg).parameters
+            deficient = any(a.status == "rank_deficient" for a in labels if a.role != "background")
+            assert bool(report.null_modes) == deficient, delta
+            assert report.null_space_dim - report.nuisance_null_dim == len(report.null_modes)
+            # The two terms span [1, E], numerically [1] as delta shrinks. The
+            # three widest modes do not see the slope (a centred peak), the
+            # fourth (the center) lies between the flat and the linear value.
+            # Re-estimating a nearly singular background costs digits in the
+            # signatures, which whitened_norm shows.
+            for mode, reference in zip(report.modes[:3], flat.modes):
+                assert mode.relative_sd == pytest.approx(reference.relative_sd, rel=1e-6)
+            assert (flat.modes[3].relative_sd * (1 - 1e-3) <= report.modes[3].relative_sd
+                    <= linear.modes[3].relative_sd * (1 + 1e-3))
+            assert all(m.whitened_norm == pytest.approx(1.0, abs=0.05) for m in report.modes)
+
+    def test_an_oblique_null_direction(self):
+        """A background term built from a mix of the center, variance and
+        gamma columns: the null direction is not along any axis, so the
+        mapping into scaled coordinates is what is being tested."""
+        e = MODE_ENERGY
+        peak = VoigtPeak(2.0e4, 0.1, 0.3, 0.3)
+        jac = poisson_fisher(e, [peak], constant_background(e, 300.0)).jacobian
+        fwhm = voigt_fwhm(peak.variance, peak.gamma)
+        shape = 3.0 * jac[:, 1] / fwhm + jac[:, 3] / fwhm + 0.5 * jac[:, 2] / (
+            fwhm**2 / (8.0 * math.log(2.0)))
+        bg = constant_background(e, 300.0) + Background(
+            basis=shape[np.newaxis, :], coefficients=np.array([0.0]),
+            names=("bg_oblique",), estimated=(True,))
+        report = identifiability_modes(e, [peak], bg, k=10)
+        assert len(report.null_modes) == 1 and len(report.modes) == 3
+        scaled, names = _scaled_effective(report)
+        q = np.array([report.null_modes[0].weights[n] for n in names])
+        assert np.linalg.norm(scaled @ q) < 1e-8 * np.abs(scaled).max()
+        assert report.null_modes[0].whitened_norm < 1e-6
+        vectors = np.array([[m.weights[n] for n in names] for m in report.modes]).T
+        assert np.allclose(vectors.T @ q, 0.0, atol=1e-8)
+        for mode, w in zip(report.modes, vectors.T):
+            assert np.allclose(scaled @ w, w / mode.relative_sd**2,
+                               rtol=1e-7, atol=1e-7 * np.abs(scaled).max())
+            assert mode.whitened_norm == pytest.approx(1.0, abs=1e-9)
+
+    def test_the_stiff_end_of_a_near_singular_design(self):
+        """Two close peaks, every mode requested. The covariance side keeps
+        the soft end; at the stiff end digits can go, and a bound rounding
+        leaves non-positive is reported as 'not_resolved', never as 0."""
+        e = MODE_ENERGY
+        peaks = [VoigtPeak(2.0e4, -0.028, 0.3, 0.3), VoigtPeak(2.0e3, 0.028, 0.3, 0.3)]
+        report = identifiability_modes(e, peaks, constant_background(e, 300.0), k=8)
+        assert report.modes[0].whitened_norm == pytest.approx(1.0, abs=1e-2)
+        for mode in report.modes:
+            if mode.status == "not_resolved":
+                assert math.isnan(mode.relative_sd) and mode.eigenvalue_ratio is None
+                assert all(v is None for v in mode.shares.values())
+            else:
+                assert np.isfinite(mode.relative_sd) and mode.relative_sd > 0.0
+                assert mode.eigenvalue_ratio is None or mode.eigenvalue_ratio >= 1.0 - 1e-9

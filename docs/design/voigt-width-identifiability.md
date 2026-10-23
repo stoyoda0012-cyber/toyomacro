@@ -187,7 +187,8 @@ raise a flag.
   scale.
 - `identified` — neither.
 - `near_boundary` — an independent flag: the variance lies within k
-  bounds of its lower limit.
+  bounds of its lower limit. `near_boundary_gamma` is the same for γ
+  at 0 (§9.2, v0.7.0).
 
 **Reference scales**: |A| for an amplitude; the total FWHM for the center
 and for γ; FWHM²/(8 ln 2) for v. Not the parameter's own value, which is
@@ -220,8 +221,9 @@ unless rank deficient.
 detection of a small Gaussian component, and the same holds at the other
 end: γ = 0 is a boundary too, γ is judged against the FWHM, and a nearly
 Gaussian peak can have γ `identified` with sd(γ)/γ of order one (0.58 at
-σ/γ = 100 for the default scan peak on ±5 FWHM). No flag is raised for
-that boundary. `weakly_identified` is not
+σ/γ = 100 for the default scan peak on ±5 FWHM). Since v0.7.0
+`gamma_relative_sd` and `near_boundary_gamma` report it (§9.2); before,
+no flag was raised for that boundary. `weakly_identified` is not
 structural non-identifiability — the tests show more exposure lifting
 it. Near the boundary the reported bounds are still the Fisher numbers;
 they are not corrected. Nothing here is a statement about a fit.
@@ -300,9 +302,8 @@ Open questions:
   belongs in this module is undecided.
 - The Shirley step ignores its own dependence on the peak parameters
   (§3). How much that understates the loss has not been measured.
-- γ = 0 is a boundary as well and gets no flag and no relative-precision
-  field of its own (§5). Symmetric treatment would be cheap; whether it
-  is wanted is undecided.
+- γ = 0 is a boundary as well. *Closed in v0.7.0 (§9.2)*: it gets the
+  same flag and relative-precision field as the variance.
 - The Doniach–Šunjić asymmetry is not covered. It adds a parameter that
   competes with γ for the same tail.
 - The Olivero–Longbothum width is used as the reference scale. It is the
@@ -401,6 +402,15 @@ Jacobian both at the stated exposure). Every mode is one unit of
 counting noise in the data; the convention decides which directions are
 listed, not how visible they are.
 
+*Amendment, 2026-10-23, same audit.* "Exactly 1" holds in exact
+arithmetic. The covariance side keeps the soft end, which is what is
+reported by default, except in a design singular to within rounding. At
+the stiff end of a near-singular design, in such a design, and where the
+background is itself nearly singular, a mode loses digits, and the
+departure of its whitened norm from 1 measures how many. A mode for
+which rounding leaves no positive bound is reported with status
+`not_resolved` and a NaN bound, never as 0.
+
 With `variance_floor_sd = 0` in `assess_identifiability`, the relative
 SD of the softest mode is never smaller than any bounded peak
 parameter's `relative_sd` or than `worst_relative_sd`: the largest
@@ -428,6 +438,26 @@ A₀ + A₁ lies in their span while every individual peak parameter is
 `rank_deficient`. `crlb._NULL_PROJECTION_TOL` is not used: it decides
 whether one parameter's axis touches the null space, it was calibrated
 on crlb's background-free design, and the modes do not need it.
+
+*Amendment, 2026-10-23, from the implementation's independent audit,
+before any registered run (neither configuration of §9.6 has a null
+space).* The count above does not keep the labels and the modes in
+agreement. The two n·ε decisions are made on matrices of different size
+and largest eigenvalue, so a dependency lying wholly within the
+background can be null for the full matrix and not for its block. Two
+background terms [1, 1 + δE] then gave a null mode for 8 of 81 values
+of δ between 10⁻¹⁰ and 10⁻⁶ — the ordinary softest direction, plainly
+visible in the data — while every peak parameter was labelled
+`identified`. The number of null modes
+is instead the rank of the full null space's peak-parameter rows,
+counting singular values whose square exceeds `_NULL_PROJECTION_TOL`: the
+tolerance that labels a single parameter `rank_deficient` — and 0 when
+no peak parameter's bound is infinite, since the largest singular value
+can exceed the tolerance where no single row does (it is at least the
+largest row norm and at most √n times it). There is then a null mode
+exactly when some peak parameter carries that label.
+`nuisance_null_dim` is the rest of the null space. So the tolerance is
+used after all, to keep the modes on the labels' decision.
 
 **Computing route.** Invert on the unit-diagonal matrix as
 `covariance_bound` does, apply the reference scales, then project out

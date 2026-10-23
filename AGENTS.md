@@ -36,7 +36,7 @@ These are the subpackages that exist here:
 | `src/toyomacro/mcp_server.py` | MCP server over the public layer |
 | `src/toyomacro/composition.py` | experimental: homogeneous-equivalent composition with its assumptions and refusals |
 | `src/toyomacro/guides/` | guides shipped with the package (the AI-agent user guide) |
-| `src/toyomacro/_identifiability.py` | private: the lineshape-independent parts of the identifiability diagnostics (Poisson Fisher product, rank rule, effective information, thresholds, linear backgrounds); imports nothing from the package |
+| `src/toyomacro/_identifiability.py` | private: the lineshape-independent parts of the identifiability diagnostics (Poisson Fisher product, rank rule, effective information, thresholds, linear backgrounds, modes of a parameter block); imports nothing from the package |
 | `tests/` and `src/toyomacro/voigtfit/tests/` | both are collected by pytest |
 | `docs/`, `examples/`, `paper/` | documentation, runnable examples, JOSS paper |
 
