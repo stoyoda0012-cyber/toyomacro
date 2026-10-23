@@ -459,10 +459,28 @@ exactly when some peak parameter carries that label.
 `nuisance_null_dim` is the rest of the null space. So the tolerance is
 used after all, to keep the modes on the labels' decision.
 
+*Amendment, 2026-10-23, from the first CI run of the implementation.*
+The null modes are no longer the smallest eigenvectors of I_eff rescaled
+to unit diagonal. Where a peak parameter's effective information is zero
+(a background term with the peak's own shape), that rescaling divides by
+a diagonal at rounding level. On one platform's BLAS the null mode then
+came out as another direction: an amplitude weight of −0.19 instead of
++1. The null modes now span the target part of the full matrix's null
+space, as computed for the count above.
+
 **Computing route.** Invert on the unit-diagonal matrix as
 `covariance_bound` does, apply the reference scales, then project out
 the null space. Diagonalising the scaled matrix directly loses accuracy
 where its condition exceeds 1/ε and the unit-diagonal one's does not.
+
+*Amendment, 2026-10-23, same CI run.* "The unit-diagonal matrix" is the
+full Fisher matrix, not I_eff. The soft modes come from the target
+block of `covariance_bound`'s pseudo-inverse, scaled and restricted to
+the complement of the null displacements. On that complement every
+generalised inverse agrees, so this equals the inverse of I_eff there in
+exact arithmetic. Everything then rests on the single decomposition
+behind the labels. In the P1 configuration the modes agree with the
+first route to 4×10⁻¹⁵ relative.
 
 **`variance_floor_sd` is not an input.** The floor's own uncertainty is
 not information carried by the spectrum. Added to the bound it would
@@ -846,6 +864,13 @@ All three ratios lie within 4 % of 1. Recorded, not judged:
 As §9.6 says, this confirms the bound along the reported directions in
 one single-peak configuration. It says nothing about the scale
 convention.
+
+*Amendment, 2026-10-23.* After this run, the computing route of §9.1 was
+changed (the second amendment there). In this configuration the new
+route's modes agree with dc05fb2's to 4×10⁻¹⁵ relative in the bounds and
+2×10⁻¹⁵ in the weights. The projections the check takes are linear in
+those weights, so the recorded result stands. The test was not run
+again for the record. CI runs it on every job as a regression test.
 
 ## References
 

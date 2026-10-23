@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,744 automated tests** across **103 files**, in two
+This suite has **2,745 automated tests** across **103 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 65 | 1,619 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,125 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,126 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,312 tests, 84%) — guarantee the library
+- **Contract / regression** (2,313 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,732. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,733. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -165,7 +165,7 @@ them would take real coverage with them:
 |--:|---|---|
 | 15 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through, and the startup preload of what they import |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,125)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,126)
 
 ### Solvers & fitting core (296)
 | Tests | File | Guards |
@@ -196,10 +196,10 @@ them would take real coverage with them:
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (405)
+### Statistics & information theory (406)
 | Tests | File | Guards |
 |--:|---|---|
-| 147 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate, the γ = 0 flag; the modes of the peak parameters — the eigen-relation, one unit of counting noise per mode, no mode better than any parameter, invariance under the energy unit, the background basis and the exposure, the null-space count on constructed cases and against the labels, an oblique null direction, the stiff end of a near-singular design, the shares, the sign rule; the lineshape-independent core it shares does not import the engine |
+| 148 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate, the γ = 0 flag; the modes of the peak parameters — the eigen-relation, one unit of counting noise per mode, no mode better than any parameter, invariance under the energy unit, the background basis and the exposure, the null-space count on constructed cases and against the labels, an oblique null direction, the stiff end of a near-singular design, the shares, the sign rule; the lineshape-independent core it shares does not import the engine |
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
 | 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |

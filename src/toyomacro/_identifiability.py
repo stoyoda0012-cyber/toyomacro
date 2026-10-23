@@ -415,19 +415,19 @@ def mode_decomposition(
     convention; the null space as a subspace, and the whitened norm of
     every signature, do not.
 
-    The null space of the full matrix comes from the ``n * eps`` rule on
-    its unit-diagonal form. The number of null modes is the rank of that
-    null space's target rows, counting singular values whose square
-    exceeds ``projection_tol`` -- the tolerance that marks a single
-    parameter's bound infinite in ``covariance_bound`` -- and is 0 when no
-    target parameter's bound is infinite. So there is a null mode exactly
-    when some target parameter is 'rank_deficient'. The rest of the null
-    space lies wholly outside the target block (``nuisance_null_dim``). The null
-    modes are the eigenvectors of the unit-diagonal effective information
-    with the smallest eigenvalues; the soft modes are taken on their
-    complement in the scaled coordinates, so they are combinations the
-    data determine. ``projection_tol`` also decides which ``shares`` are
-    None.
+    Everything comes from one decomposition of the full matrix rescaled
+    to unit diagonal, the one ``covariance_bound`` makes for the
+    per-parameter labels. Its null space follows the ``n * eps`` rule.
+    The null modes span the target part of that null space: its rank is
+    counted with ``projection_tol`` -- the tolerance that marks a single
+    parameter's bound infinite -- and is 0 when no target parameter's
+    bound is infinite, so there is a null mode exactly when some target
+    parameter is 'rank_deficient'. The rest of the null space lies wholly
+    outside the target block (``nuisance_null_dim``). The soft modes are
+    the target block of the pseudo-inverse, in scaled coordinates, on the
+    complement of the null displacements: combinations the data
+    determine, on which every generalised inverse agrees.
+    ``projection_tol`` also decides which ``shares`` are None.
 
     ``whitened_norm`` is 1 in exact arithmetic. The covariance side is
     accurate at the soft end, which is what is reported by default; at
@@ -435,10 +435,7 @@ def mode_decomposition(
     can every mode of a design singular to within rounding or of a nearly
     singular background. A departure of ``whitened_norm`` from 1 measures
     by how much. Where rounding leaves no positive bound at all, the mode
-    is reported as 'not_resolved' with ``relative_sd`` nan. An eigenvalue
-    the null-space count keeps but that sits at rounding level is floored
-    at ``n * eps`` of the largest, so it gets a large finite bound, never
-    a negative one.
+    is reported as 'not_resolved' with ``relative_sd`` nan.
 
     Args:
         fisher: Fisher matrix, (n, n)
@@ -476,31 +473,30 @@ def mode_decomposition(
         raise ValueError(f"k must be a positive integer, got {k!r}")
     nuisance = np.array([i for i in range(n) if i not in set(target.tolist())], dtype=int)
 
-    unit, _ = _unit_diagonal(fisher)
+    # Everything below comes from one decomposition of the full
+    # unit-diagonal matrix: the decision behind the per-parameter labels.
+    unit, d_full = _unit_diagonal(fisher)
     full_eigenvalues, full_vectors = np.linalg.eigh(unit)
     null = null_directions(full_eigenvalues)
     null_space_dim = int(null.sum())
-    # The rank of the null space's target rows, with the same projection
-    # tolerance that marks a parameter's bound infinite.
-    target_rows = full_vectors[np.ix_(target, np.flatnonzero(null))]
-    n_null = int(np.sum(np.linalg.svd(target_rows, compute_uv=False) ** 2 > projection_tol)
-                 if target_rows.size else 0)
     covariance, unbounded, _, _ = covariance_bound(fisher, projection_tol)
-    if not unbounded[target].any():
-        n_null = 0  # the rank can exceed the tolerance where no single row does
-    info = effective_information(fisher, target.tolist())
 
-    # Inverse on the unit-diagonal effective information, its n_null
-    # smallest directions dropped, then into scaled coordinates.
-    unit_eff, d_eff = _unit_diagonal(info.effective)
-    eigenvalues, eigenvectors = np.linalg.eigh(unit_eff)
-    kept = eigenvalues[n_null:]
-    if kept.size:  # directions the rule kept can still sit at rounding level
-        kept = np.maximum(kept, kept[-1] * kept.size * np.finfo(np.float64).eps)
-    inverse = (eigenvectors[:, n_null:] / kept) @ eigenvectors[:, n_null:].T
-    scaled_cov = inverse / np.outer(d_eff * scales, d_eff * scales)
+    # Null modes: the target part of the null space, its rank counted with
+    # the tolerance that marks a single bound infinite -- and none where no
+    # target bound is infinite, since the rank can exceed the tolerance
+    # where no single row does.
+    target_rows = full_vectors[np.ix_(target, np.flatnonzero(null))]
+    null_raw = np.zeros((target.size, 0))
+    if target_rows.size and unbounded[target].any():
+        left, singular, _ = np.linalg.svd(target_rows, full_matrices=False)
+        null_raw = left[:, singular**2 > projection_tol] / d_full[target][:, np.newaxis]
+    n_null = null_raw.shape[1]
 
-    null_scaled = eigenvectors[:, :n_null] / (d_eff * scales)[:, np.newaxis]
+    # Soft modes: the target block of that pseudo-inverse in scaled
+    # coordinates, on the complement of the null displacements -- the
+    # combinations the data determine, where any generalised inverse agrees.
+    scaled_cov = covariance[np.ix_(target, target)] / np.outer(scales, scales)
+    null_scaled = null_raw / scales[:, np.newaxis]
     basis, _ = np.linalg.qr(
         np.hstack([null_scaled, np.eye(target.size)]) if n_null else np.eye(target.size)
     )
