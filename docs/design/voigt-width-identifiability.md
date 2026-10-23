@@ -679,6 +679,20 @@ route succeeds at a point, the point is the stop — not "not obtained" —
 if any final iterate of either route, from any start or active set,
 shows one of them.
 
+*Amendment, 2026-10-23, before any registered run, from a development
+configuration; ruled by the owner.* Only iterates from a start that
+follows the path count for that rule: in the outward pass, the nearest
+obtained neighbour. The stated point stays a start, but its iterates
+decide no stop. Moved onto a distant constraint plane it can sit at any
+amplitude, so an iterate from it says nothing about whether the path
+reached zero. The development configuration was one peak with
+σ/γ = 1/4 on ±0.8γ and an estimated linear background. There the rule as
+first written turned t = −2.8 into a stop: an iterate from the stated
+point sat at A = −1.8×10⁵, while one step back the path was at
+A = 3.5×10⁵ with γ held at 0. Under the amendment both routes still fail
+there, where I_z is singular to rounding, and the point is
+"not obtained".
+
 - *bound active* — for each side and each bound, the first grid point
   (not refined) whose solution has that bound active. Reported with the
   bound and Δ there. The profile continues past it; it is the

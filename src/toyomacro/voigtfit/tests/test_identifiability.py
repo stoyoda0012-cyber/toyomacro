@@ -2130,18 +2130,20 @@ class TestModeProfile:
         assert all(next(p for p in prof.points if p.t == x).background_negative
                    for x in prof.plus.background_negative)
 
-    def test_a_side_stops_where_the_amplitude_reaches_zero(self, profiles):
+    def test_no_stop_from_a_stated_point_iterate(self, profiles):
+        """The amplitude-dominated configuration: far out on the minus side
+        both routes fail where I_z is singular to rounding, and the points
+        are 'not obtained' and flagged -- not a stop, as they were before the
+        amendment of §9.4, when an iterate from the stated point (at a
+        negative amplitude by construction) made one."""
         prof = profiles["stop"]
-        stop = prof.minus.stop
-        assert stop["event"] == "amplitude_at_zero"
-        later = [p for p in prof.points if p.t <= stop["t"]]
-        assert all(p.outcome == "amplitude_at_zero" and p.delta is None for p in later)
-        before = next(p for p in prof.points if p.t == round(stop["t"] + 0.1, 10))
-        assert stop["delta_before"] == before.delta
-        assert np.isfinite(stop["background_only_deviance"])
-        assert stop["background_only_deviance"] > stop["delta_before"]
-        assert prof.minus.delta_1 == prof.minus.delta_2 == "amplitude at zero"
-        assert isinstance(prof.minus.crossing, float)  # found before the stop
+        assert prof.minus.stop is None and prof.plus.stop is None
+        missing = [p for p in prof.points if p.outcome == "not_obtained"]
+        assert missing and all(p.flagged and not p.success_a and not p.success_b
+                               for p in missing)
+        assert isinstance(prof.minus.crossing, float)
+        assert isinstance(prof.minus.delta_1, float) and isinstance(prof.minus.delta_2, float)
+        assert prof.minus.activations["gamma"][0] < 0.0
 
     def test_the_kkt_test(self):
         """Passes at the stated point and at an interior optimum; fails off
@@ -2185,3 +2187,164 @@ class TestModeProfile:
             mode_profile(e, peak, bg(e), mode=4)
         with pytest.raises(TypeError):
             mode_profile(e, peak, bg(e), variance_floor_sd=0.01)
+
+    # -- the registered rules, pinned one at a time ---------------------------
+
+    def test_registered_constants(self):
+        assert idf._PROFILE_TOL == 1e-6 and idf._PROFILE_BISECT == 1e-6
+        assert idf._PROFILE_MAX_ITER == 60
+        assert idf._PROFILE_SLSQP == {"ftol": 1e-12, "maxiter": 1000}
+        assert idf.PROFILE_GRID == tuple(k / 10.0 for k in range(-30, 31))
+
+    def test_the_kkt_threshold_is_1e_minus_6(self):
+        """Interior, no bound near: the test passes exactly when the
+        normalised residual is below 1e-6, across both sides of it."""
+        e, peak, bg = DEV_INTERIOR
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        stated = problem.z_of(0.0, problem.peak0, problem.b0)
+        residuals = []
+        for eps in np.logspace(-12, -3, 37):
+            z = stated.copy()
+            z[0] += eps
+            passed, res, active, _, _ = problem.kkt(0.0, z)
+            assert active == () and passed == (res < 1e-6)
+            residuals.append(res)
+        assert min(residuals) < 1e-6 < max(residuals) and any(1e-6 < r < 1e-3 for r in residuals)
+
+    def test_amplitude_at_zero_is_judged_at_1e_minus_6(self):
+        e, peak, bg = DEV_INTERIOR
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        z = problem.z_of(0.0, problem.peak0, problem.b0)
+        row = problem.dpeak_dz[0]
+        for fraction, expected in ((2e-6, None), (0.5e-6, "amplitude_at_zero"),
+                                   (-0.1, "amplitude_at_zero")):
+            target = fraction * peak.amplitude - problem.peak0[0]
+            moved = z.copy()
+            moved[:3] += row * target / (row @ row)
+            assert problem.theta(0.0, moved)[0][0] == pytest.approx(fraction * peak.amplitude)
+            assert problem.event(0.0, moved) == expected
+
+    @staticmethod
+    def _amplitude_zero(problem, t, z):
+        row = problem.dpeak_dz[0]
+        moved = z.copy()
+        moved[:3] -= row * problem.theta(t, z)[0][0] / (row @ row)
+        return moved
+
+    def _patched(self, monkeypatch, rewrite):
+        """mode_profile on the interior configuration and a short grid, with
+        each _Profile.solve result passed through ``rewrite(problem, t,
+        call, result, iterates)``."""
+        real = idf._Profile.solve
+        calls: dict[float, int] = {}
+
+        def solve(problem, t, starts):
+            calls[t] = calls.get(t, 0) + 1
+            result, iterates = real(problem, t, starts)
+            return rewrite(problem, t, calls[t], result, iterates, starts)
+
+        monkeypatch.setattr(idf._Profile, "solve", solve)
+        e, peak, bg = DEV_INTERIOR
+        return mode_profile(e, peak, bg(e), t=(-0.5, -0.25, 0.0, 0.25, 0.5, 0.75))
+
+    def test_a_side_stops_where_the_solution_reaches_zero_amplitude(self, monkeypatch):
+        """A successful solution at a zero amplitude is a stop: it and every
+        later point are the event, Delta before it and the background-only
+        deviance are reported, and the stop is flagged if a route failed."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                zero = self._amplitude_zero(problem, t, z)
+                return {"A": ((dev, zero, res), (dev, zero, res)),
+                        "B": (None, result["B"][1])}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        by_t = {p.t: p for p in prof.points}
+        stop = prof.plus.stop
+        assert stop["event"] == "amplitude_at_zero" and stop["t"] == 0.5
+        assert by_t[0.5].outcome == by_t[0.75].outcome == "amplitude_at_zero"
+        assert by_t[0.5].flagged and by_t[0.75].delta_a is None
+        assert stop["delta_before"] == by_t[0.25].delta
+        assert np.isfinite(stop["background_only_deviance"])
+        assert stop["background_only_deviance"] > by_t[0.25].delta
+
+    def test_a_stop_from_iterates_when_neither_route_succeeds(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5:
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        by_t = {p.t: p for p in prof.points}
+        assert prof.plus.stop["event"] == "amplitude_at_zero" and prof.plus.stop["t"] == 0.5
+        assert by_t[0.5].outcome == by_t[0.75].outcome == "amplitude_at_zero"
+        assert by_t[0.5].flagged and by_t[0.75].delta_a is None  # beyond: not solved
+
+    def test_a_failed_inward_iterate_does_not_move_the_stop(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25 and call == 2:  # the inward pass
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop is None
+        assert all(p.outcome == "ok" for p in prof.points)
+
+    def test_an_iterate_from_the_stated_point_makes_no_stop(self, monkeypatch):
+        """§9.4 as amended before the registered run: the stated point, moved
+        onto a distant constraint plane, can sit at any amplitude, so its
+        iterates do not decide a stop; with neither route succeeding the point
+        is 'not obtained'."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5:
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                return failed, [(1, self._amplitude_zero(problem, t, iterates[0][1]))]
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop is None
+        assert next(p for p in prof.points if p.t == 0.5).outcome == "not_obtained"
+
+    def test_the_lower_route_is_used_and_a_disagreement_flagged(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                worse = (dev + 0.1, z, res)
+                return {"A": (worse, worse), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        point = next(p for p in prof.points if p.t == 0.25)
+        assert point.route == "B" and point.delta == point.delta_b
+        assert point.delta_a == pytest.approx(point.delta_b + 0.1) and point.flagged
+
+    def test_a_corner_stops_the_side(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == -0.5 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                corner = problem.project(t, z, ("variance", "gamma"))
+                return {"A": ((dev, corner, res), (dev, corner, res)), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.minus.stop["event"] == "corner" and prof.minus.stop["t"] == -0.5
+        assert prof.minus.delta_1 == "not on the grid"
+
+    def test_the_starts_are_the_registered_ones(self, monkeypatch):
+        """Outward: the nearest obtained neighbour and the stated point.
+        Inward: the point's own solution and its obtained outer neighbour."""
+        seen: dict[float, list[int]] = {}
+
+        def rewrite(problem, t, call, result, iterates, starts):
+            stated = problem.z_of(t, problem.peak0, problem.b0)
+            seen.setdefault(t, []).append(len(starts))
+            if call == 1 and t != 0.0:
+                assert any(np.allclose(z, stated) for z in starts)
+            return result, iterates
+
+        self._patched(monkeypatch, rewrite)
+        assert seen[0.25] == [2, 2] and seen[-0.25] == [2, 2]  # outward 2, inward own + outer
+        assert seen[0.75] == [2, 1] and seen[-0.5] == [2, 1]   # the ends have no outer neighbour

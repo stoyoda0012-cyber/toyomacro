@@ -7,7 +7,8 @@ design record registered before the code existed. Recorded, not judged:
 no prior claim of agreement or disagreement with the Fisher prediction.
 The only assertions are that the computation ran -- every grid point
 produced an entry -- and that each entry is one of the defined outcomes.
-The record is printed and attached to the test report; run with ``-rP``.
+The record is printed, shown with ``-rP``; the full profile also goes to
+``record_property`` (in a junit report).
 
 Every setting below is the registration's: the peak at center 0, a 0.02
 eV step, an estimated ``linear_background(E, 300, 10)``, exposure 1,
@@ -16,8 +17,11 @@ eV step, an estimated ``linear_background(E, 300, 10)``, exposure 1,
 computed from a model; none of it is a measurement.
 """
 
+import platform
+
 import numpy as np
 import pytest
+import scipy
 
 from toyomacro.voigtfit.identifiability import (
     PROFILE_GRID,
@@ -48,13 +52,15 @@ def _fmt(value):
 def test_registered_profile_is_recorded(name, record_property):
     energy, peak = CONFIGURATIONS[name]
     assert energy.size == (31 if name.startswith("soft") else 301)
-    profile = mode_profile(energy, peak, linear_background(energy, 300.0, 10.0))
+    profile = mode_profile(energy, peak, linear_background(energy, 300.0, 10.0), mode=0,
+                           t=PROFILE_GRID, exposure=1.0, variance_floor=0.0)
 
     assert [p.t for p in profile.points] == list(PROFILE_GRID)
     assert all(p.outcome in OUTCOMES for p in profile.points)
 
     mode = profile.mode
     lines = [
+        f"Python {platform.python_version()}, NumPy {np.__version__}, SciPy {scipy.__version__}",
         f"{name}: mode 1 relative SD {mode.relative_sd:.6g}, weights "
         + ", ".join(f"{k} {v:+.4f}" for k, v in mode.weights.items()),
     ]

@@ -1,12 +1,12 @@
 # Test inventory
 
-This suite has **2,785 automated tests** across **105 files**, in two
+This suite has **2,795 automated tests** across **105 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
 | `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 67 | 1,637 |
-| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,148 |
+| `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,158 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,353 tests, 84%) — guarantee the library
+- **Contract / regression** (2,363 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,773. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,783. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -199,7 +199,7 @@ and the bytes are checked everywhere.
 |--:|---|---|
 | 15 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through, and the startup preload of what they import |
 
-## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,148)
+## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,158)
 
 ### Solvers & fitting core (296)
 | Tests | File | Guards |
@@ -230,10 +230,10 @@ and the bytes are checked everywhere.
 | 14 | `test_gvrt_noise.py` | Noise-robustness visualization |
 | 13 | `test_gvrt_tracking.py` | Parameter-tracking visualization |
 
-### Statistics & information theory (428)
+### Statistics & information theory (438)
 | Tests | File | Guards |
 |--:|---|---|
-| 170 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate, the γ = 0 flag; the modes of the peak parameters — the eigen-relation, one unit of counting noise per mode, no mode better than any parameter, invariance under the energy unit, the background basis and the exposure, the null-space count on constructed cases and against the labels, an oblique null direction, the stiff end of a near-singular design, the shares, the sign rule; the profile along a mode on development configurations — the Fisher prediction in the interior, a bound activating, a side stopping at a zero amplitude, the KKT test, a failing route flagged, the refusals; at a fitted estimate — the intensity declaration and what is withheld, the `exact_k` sub-model's Jacobian against finite differences of the tied model, tying never losing information, the labels and boundary flags of the sub-model, the fit's own sigma bound, malformed reports, the axis order; the lineshape-independent core it shares does not import the engine |
+| 180 | `test_identifiability.py` | Width identifiability: Voigt derivatives in the Gaussian variance down to σ = 0 (two routes and a quadrature reference, the asymptotic limit on the term count), Poisson Fisher matrix with a background, effective vs conditional information, the labels and their unit invariance, the condition scan, a floor that is itself an estimate, the γ = 0 flag; the modes of the peak parameters — the eigen-relation, one unit of counting noise per mode, no mode better than any parameter, invariance under the energy unit, the background basis and the exposure, the null-space count on constructed cases and against the labels, an oblique null direction, the stiff end of a near-singular design, the shares, the sign rule; the profile along a mode on development configurations — the Fisher prediction in the interior, a bound activating, a side stopping at a zero amplitude, no stop from a stated-point iterate, the KKT test and its threshold, the registered constants and starts, a failing route and a disagreement flagged, the refusals; at a fitted estimate — the intensity declaration and what is withheld, the `exact_k` sub-model's Jacobian against finite differences of the tied model, tying never losing information, the labels and boundary flags of the sub-model, the fit's own sigma bound, malformed reports, the axis order; the lineshape-independent core it shares does not import the engine |
 | 37 | `test_fisher_transform.py` | Fisher coordinate transform / anisotropy / decorrelation |
 | 36 | `test_fisher_information.py` | Fisher information basic / scaling / 3-D vs 4-D |
 | 54 | `test_crlb.py` | Cramér-Rao lower bound consistency / symmetry / overlap |

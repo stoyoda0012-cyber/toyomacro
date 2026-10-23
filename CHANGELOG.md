@@ -52,7 +52,8 @@ archived on Zenodo for a citable DOI.
   - It reports the profile on a grid, its values at ±1 and ±2 and the
     crossings of 1. Fisher's quadratic predicts t² and 1.
   - It also reports where a width bound becomes active, and where a side
-    stops because the amplitude, or both widths, reached zero.
+    stops because the amplitude reached zero or below, or both widths
+    reached zero.
   - Two routes solve every point: active sets with Fisher scoring, and
     SLSQP. Both are held to one KKT test. A disagreement is flagged,
     never resolved.

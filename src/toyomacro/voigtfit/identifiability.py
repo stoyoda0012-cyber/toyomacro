@@ -150,7 +150,7 @@ from .._identifiability import (
     mode_decomposition,
     poisson_fisher_matrix,
 )
-from .._identifiability import null_directions as _null_directions  # noqa: F401  (tests)
+from .._identifiability import null_directions as _null_directions
 from ..lineshape.pseudovoigt import PseudoVoigt
 from .crlb import _NULL_PROJECTION_TOL
 
@@ -1643,12 +1643,17 @@ class ProfilePoint:
         delta: The lower successful deviance of the two routes; None
             unless ``outcome`` is 'ok'
         route: 'A' or 'B', the route ``delta`` came from
-        delta_a, delta_b: Each route's deviance (None if it found no
-            point, or the point was not solved)
+        delta_a, delta_b: Each route's deviance: its best successful
+            result, or for a route that failed the deviance of its
+            lowest-deviance candidate; None if it found no candidate or
+            the point was not solved (beyond a stop found outward). A
+            point between a stop found in the inward pass and the
+            outward one keeps what was solved there.
         success_a, success_b: Whether each route succeeded
-        kkt_a, kkt_b: Each route's recorded KKT residual
-        flagged: The routes disagree by more than 1e-6 (relative above 1),
-            or either failed
+        kkt_a, kkt_b: Each route's recorded KKT residual, belonging to the
+            result whose deviance is recorded
+        flagged: A solved point where the routes disagree by more than
+            1e-6 (relative above 1), or either failed -- a stop included
         active: Bounds active at the summary solution ('variance', 'gamma')
         background_negative: The re-estimated background curve is
             negative in some channel
@@ -1679,11 +1684,14 @@ class ProfileSide:
         crossing: |t| where the profile first reaches 1, a float; else
             'beyond the grid', the stop's event, or 'not obtained'
         delta_1, delta_2: The profile at |t| = 1 and 2: a float, the
-            stop's event, or 'not obtained'
+            stop's event, 'not obtained', or 'not on the grid'
         activations: Bound -> (t, delta) at the first grid point with that
             bound active
-        stop: None, or {'event', 't', 'delta_before',
-            'background_only_deviance'}
+        stop: None, or {'event', 't', 'delta_before' (a float, or 'not
+            obtained'), 'background_only_deviance'}. 'amplitude_at_zero'
+            means the amplitude reached 1e-6 of its stated value or went
+            below it, a sign change included; where a solution shows both
+            events, amplitude at zero is the one reported.
         background_negative: Grid points with a negative background curve
     """
 
@@ -1856,10 +1864,12 @@ class _Profile:
 
     # -- the KKT test ---------------------------------------------------------
     def active(self, t, z):
+        """Bounds the solution lies within 1e-6 of, in units of the reference
+        scale, on either side: a larger violation is not active but infeasible."""
         out = []
         for bound in self._BOUNDS:
             i = self.bound_index[bound]
-            if self.g(t, z, bound) < _PROFILE_TOL * self.scales[i]:
+            if abs(self.g(t, z, bound)) < _PROFILE_TOL * self.scales[i]:
                 out.append(bound)
         return tuple(out)
 
@@ -1888,14 +1898,19 @@ class _Profile:
             nu = np.zeros(0)
         resid = half_grad - rows.T @ nu
         diag = np.diag(info)
+        if not (np.all(np.isfinite(info)) and np.all(np.isfinite(resid)) and np.all(diag > 0.0)):
+            return False, np.inf, act, zp, dev
+        res = float(np.max(np.abs(resid) / np.sqrt(diag)))
+        # singular: the n*eps rule on the unit-diagonal I_z, as for the labels
+        root = np.sqrt(diag)
+        unit = info / root[:, None] / root[None, :]
         try:
+            singular = _null_directions(np.linalg.eigvalsh(0.5 * (unit + unit.T))).any()
             info_inv = np.linalg.inv(info)
-            singular = not (np.all(diag > 0.0) and np.all(np.isfinite(info_inv)))
         except np.linalg.LinAlgError:
             singular = True
         if singular:
-            return False, np.inf, act, zp, dev
-        res = float(np.max(np.abs(resid) / np.sqrt(diag)))
+            return False, res, act, zp, dev
         normalised = [float(n * math.sqrt(max(r @ info_inv @ r, 0.0))) for n, r in zip(nu, rows)]
         inactive_ok = all(self.feasible(t, zp, b) for b in self._BOUNDS if b not in act)
         passed = inactive_ok and res < _PROFILE_TOL and all(v > -_PROFILE_TOL for v in normalised)
@@ -1985,7 +2000,7 @@ class _Profile:
 
         def mean_con(u):
             peak, b = self.theta(t, unpack(u))
-            amp, center, var, gamma = peak
+            amp, center, var, gamma = self.on_bounds(peak)
             if var < 0.0 or gamma < 0.0 or (var == 0.0 and gamma == 0.0):
                 return -np.ones(self.energy.size)
             with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
@@ -2007,14 +2022,15 @@ class _Profile:
     # -- one point -------------------------------------------------------------
     def solve(self, t, starts):
         """Both routes from every start. Returns per route the best successful
-        (deviance, z) or None, the recorded KKT residual, and every final
-        iterate (for the stop rule when neither succeeds)."""
+        (deviance, z, residual) or None and the lowest-deviance candidate, and
+        every final iterate as (start index, z), for the stop rule when
+        neither route succeeds."""
         result = {}
         iterates = []
         for route in ("A", "B"):
             best = None
             best_any = None
-            for z0 in starts:
+            for index, z0 in enumerate(starts):
                 runs = []
                 if route == "A":
                     for held in self.admissible_sets():
@@ -2026,7 +2042,7 @@ class _Profile:
                     if out is not None:
                         runs.append(out)
                 for z, ok in runs:
-                    iterates.append(z)
+                    iterates.append((index, z))
                     passed, res, _, zp, dev = self.kkt(t, z)
                     if best_any is None or dev < best_any[0]:
                         best_any = (dev, zp, res)
@@ -2150,8 +2166,9 @@ def mode_profile(
             raise ValueError("mode_profile is for a single peak only")
         peak = peak[0]
     grid = np.asarray(t, dtype=np.float64)
-    if grid.ndim != 1 or np.any(np.diff(grid) <= 0.0) or not np.any(grid == 0.0):
-        raise ValueError("t must be strictly increasing and contain 0")
+    if (grid.ndim != 1 or not np.all(np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0)
+            or not np.any(grid == 0.0)):
+        raise ValueError("t must be finite, strictly increasing and contain 0")
     problem = _Profile(energy, peak, background, exposure, variance_floor, mode)
     zero = int(np.flatnonzero(grid == 0.0)[0])
     stated = {float(x): problem.z_of(float(x), problem.peak0, problem.b0) for x in grid}
@@ -2173,12 +2190,15 @@ def mode_profile(
         options = [(v[0], v[1], r) for r, v in best.get(x, {}).items() if v is not None]
         return min(options, key=lambda o: o[0]) if options else None
 
-    def classify(x, iterates):
-        """'ok', 'not_obtained' or the event that makes x a stop."""
+    def classify(x, iterates, path_starts):
+        """'ok', 'not_obtained' or the event that makes x a stop. When
+        neither route succeeds, only iterates from the starts that follow the
+        path count (§9.4, amendment of 2026-10-23): the stated point, moved
+        onto a distant constraint plane, can sit at any amplitude."""
         s = summary(x)
         if s is not None:
             return problem.event(x, s[1]) or "ok"
-        found = [problem.event(x, z) for z in iterates]
+        found = [problem.event(x, z) for index, z in iterates if index in path_starts]
         for name in ("amplitude_at_zero", "corner"):
             if name in found:
                 return name
@@ -2188,13 +2208,13 @@ def mode_profile(
     sides = {"plus": [float(x) for x in grid[zero + 1:]],
              "minus": [float(x) for x in grid[:zero][::-1]]}
     stops: dict[str, int | None] = {}
-    outcome: dict[float, str] = {0.0: classify(0.0, [])}
+    outcome: dict[float, str] = {0.0: classify(0.0, [], ())}
     for side, xs in sides.items():
         stop = None
         last = stated[0.0] if summary(0.0) is None else summary(0.0)[1]
         for i, x in enumerate(xs):
-            iterates = run(x, [last, stated[x]])
-            outcome[x] = classify(x, iterates)
+            iterates = run(x, [last, stated[x]])  # the neighbour follows the path
+            outcome[x] = classify(x, iterates, (0,))
             if outcome[x] in ("amplitude_at_zero", "corner"):
                 stop = i
                 events[x] = outcome[x]
@@ -2231,9 +2251,19 @@ def mode_profile(
         out = outcome.get(x, "not_obtained")
         routes = best.get(x, {})
         anyr = best_any.get(x, {})
-        da = routes.get("A")[0] if routes.get("A") else None
-        db = routes.get("B")[0] if routes.get("B") else None
         solved = x in best
+
+        def record(route):
+            """(success, deviance, residual): the best successful result, or
+            for a route that failed its lowest-deviance candidate."""
+            if routes.get(route) is not None:
+                return True, routes[route][0], routes[route][2]
+            if anyr.get(route) is not None:
+                return False, anyr[route][0], anyr[route][2]
+            return False, None, None
+
+        ok_a, da, ka = record("A")
+        ok_b, db, kb = record("B")
         s = summary(x) if out == "ok" else None
         if s is not None:
             peak_values, b = problem.theta(x, s[1])
@@ -2246,16 +2276,13 @@ def mode_profile(
             negative = bool(np.any(curve < 0.0))
         else:
             params, active, negative = None, (), False
-        flagged = solved and out not in ("amplitude_at_zero", "corner") and (
-            da is None or db is None
-            or abs(da - db) > _PROFILE_TOL * max(1.0, min(da, db)))
+        flagged = solved and (
+            not ok_a or not ok_b or abs(da - db) > _PROFILE_TOL * max(1.0, min(da, db)))
         return ProfilePoint(
             t=x, outcome=out, delta=None if s is None else float(s[0]),
             route=None if s is None else s[2], delta_a=None if da is None else float(da),
-            delta_b=None if db is None else float(db), success_a=da is not None,
-            success_b=db is not None,
-            kkt_a=None if not anyr.get("A") else float(anyr["A"][2]),
-            kkt_b=None if not anyr.get("B") else float(anyr["B"][2]),
+            delta_b=None if db is None else float(db), success_a=ok_a, success_b=ok_b,
+            kkt_a=None if ka is None else float(ka), kkt_b=None if kb is None else float(kb),
             flagged=bool(flagged), active=active, background_negative=negative,
             parameters=params,
         )
@@ -2314,7 +2341,7 @@ def mode_profile(
             prev_p = points[prev]
             stop_info = {
                 "event": stop_event, "t": xs[stop],
-                "delta_before": prev_p.delta if prev_p.outcome == "ok" else None,
+                "delta_before": prev_p.delta if prev_p.outcome == "ok" else "not obtained",
                 "background_only_deviance": float(problem.background_only_deviance()),
             }
         return ProfileSide(
