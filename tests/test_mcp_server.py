@@ -219,6 +219,68 @@ def test_sensitivity_table_argument_reaches_deep_levels():
     assert "Unknown table" in bad["error"]
 
 
+@pytest.mark.parametrize(("element", "orbital", "table"), [
+    ("P", "1s", "scofield"),
+    ("Cu", "2s", "scofield"),
+    ("As", "3s", "yeh_lindau"),
+    ("O", "2s", "yeh_lindau"),
+])
+def test_sensitivity_refuses_photon_energy_equal_to_binding_energy(element, orbital, table):
+    """At hv == BE the table has a cross-section (the threshold gate is
+    hv < BE), but ke = 0 and TPP-2M has no value. The tool returned no
+    JSON there: IMFP.tpp2m's ValueError escaped it."""
+    from toyomacro.data import BindingEnergy, CrossSection
+
+    be = BindingEnergy.lookup(element, orbital)
+    # The case is only a test of the guard if sigma alone would pass.
+    assert CrossSection.lookup_with_status(element, orbital, be, table).value > 0
+
+    out = json.loads(mcp_server.calculate_sensitivity(
+        element, orbital, photon_energy=be, table=table))
+    assert "kinetic energy" in out["error"]
+    assert out["kinetic_energy_eV"] == 0.0
+    assert out["cross_section_status"] in ("tabulated", "outside_range_below")
+    assert "sensitivity" not in out
+
+
+def test_trzhaskovskaya_at_its_threshold_is_a_json_error():
+    """Read at hv = E + Eb, Trzhaskovskaya has no value at E = 0, so
+    hv == BE never reaches the kinetic-energy check there; it must still
+    come back as the tool's error object."""
+    from toyomacro.data import BindingEnergy
+
+    be = BindingEnergy.lookup("Si", "2p1/2")
+    out = json.loads(mcp_server.calculate_sensitivity(
+        "Si", "2p1/2", photon_energy=be, table="trzhaskovskaya"))
+    assert "error" in out and "sensitivity" not in out
+
+
+def test_sensitivity_refuses_photon_energy_below_binding_energy(monkeypatch):
+    """hv < BE is refused as a JSON error, never a ValueError: by the
+    cross-section's threshold gate where it applies, and by the tool's own
+    ke check where it does not. Yeh-Lindau prints As 2s at Al K-alpha,
+    below its 1527 eV binding energy; with the gate switched off (as on a
+    line with no threshold) the table answers and only the ke check is left.
+    """
+    from toyomacro.data import CrossSection
+
+    gated = json.loads(mcp_server.calculate_sensitivity(
+        "As", "2s", photon_energy=1486.6, table="yeh_lindau"))
+    assert gated["cross_section_status"] == "below_threshold"
+    assert "sensitivity" not in gated
+
+    monkeypatch.setattr(CrossSection, "_get_binding_energy",
+                        classmethod(lambda cls, element, orbital: None))
+    assert CrossSection.lookup_with_status(
+        "As", "2s", 1486.6, "yeh_lindau").value > 0
+    ungated = json.loads(mcp_server.calculate_sensitivity(
+        "As", "2s", photon_energy=1486.6, table="yeh_lindau"))
+    assert "kinetic energy" in ungated["error"]
+    assert ungated["kinetic_energy_eV"] == pytest.approx(-40.4)
+    assert ungated["cross_section_status"] == "tabulated"
+    assert "sensitivity" not in ungated
+
+
 
 def _lazy_tool_imports() -> set[str]:
     """Modules imported inside function bodies of mcp_server.py."""
