@@ -10,6 +10,38 @@ archived on Zenodo for a citable DOI.
 
 ### Added
 
+- **`identifiability_modes` (experimental): which combinations of peak
+  parameters a spectrum determines worst.** `assess_identifiability`
+  bounds each parameter on its own. This returns the least determined
+  *directions* of the peak parameters, softest first: the peak block of
+  the inverse Poisson Fisher matrix, with every estimated background
+  term profiled out, divided by the same reference scales as the labels
+  (|A|, FWHM, FWHM²/(8 ln 2), FWHM).
+  - **What each mode reports.**
+    - The relative bound along the direction, with a label.
+    - The direction as named weights.
+    - How the background follows when the peaks move one SD along it.
+    - The change in the expected spectrum that move makes. Its
+      whitened norm is 1 in exact arithmetic: a one-SD move is one unit
+      of counting noise. A departure from 1 measures the mode's numerical
+      error, and a mode rounding leaves without a positive bound is
+      `not_resolved`.
+    - The share of each parameter's bound that lies along it.
+  - **Null directions are kept apart** from weak ones. There is a null
+    mode exactly when some peak parameter is labelled `rank_deficient`.
+  - **The directions depend on the reference scales, which are a
+    convention.** The null space and the size of the signatures do not.
+  - These are **bounds computed from a model, not confidence intervals
+    and not statements about a fit**. The modes are a diagnostic, not a
+    set of weights for a downstream fit.
+  - The lineshape-independent core is in `toyomacro._identifiability`.
+  - Example `11_identifiability_modes.py` draws the signatures.
+  - The design and the checks were registered before the code: design
+    record §9. The Monte Carlo check of the bound along the modes is in
+    `tests/test_identifiability_mc.py`, and its result is in §9.8.
+    In one single-peak configuration, the replica spread along the three
+    softest modes is 0.985–1.002 of the bound.
+
 - **`ComponentLookup.printed_binding_energy_eV`.** Each component of
   `lookup_with_status()` now carries the binding energy the table itself
   prints for the line: every Yeh–Lindau and Trzhaskovskaya line, and 71
@@ -27,6 +59,18 @@ archived on Zenodo for a citable DOI.
   compared over every output of the three tables.
 
 ### Changed
+
+- **`WidthAssessment` gains `gamma_relative_sd` and
+  `near_boundary_gamma`, and `scan_identifiability` gains a
+  `near_boundary_gamma` array.** γ = 0 is a boundary just as the
+  variance floor is. γ is judged against the FWHM, so a nearly Gaussian
+  peak could read `identified` while sd(γ)/γ was 0.58, with no flag. The
+  two new numbers are sd(γ)/γ and γ < `boundary_sd`·sd(γ), the same pair
+  the Gaussian side already had. `near_boundary` keeps its meaning
+  (the variance).
+  - No existing value changes. The dataclass's fields, repr and
+    `to_dict` keys do, an additive exception recorded in the design
+    record (§9.2).
 
 - **Benchmark records from a host without a load average (Windows) are
   graded.** `bench_platform`'s quiet verdict used every load average and

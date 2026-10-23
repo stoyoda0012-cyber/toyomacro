@@ -18,6 +18,11 @@ Two regimes, treated differently on purpose:
   attached to the test report, and nothing about the disagreement is
   asserted. Run with ``-rP`` to read it.
 
+A third part checks ``identifiability_modes`` (design record §9.6,
+registered before the code): the spread of the estimates projected on
+each of the three softest modes, against that mode's bound. Pass/fail,
+with the seed and the criterion fixed there.
+
 Everything here is a simulation from the model; none of it is a
 measurement. Seeds are fixed.
 """
@@ -26,10 +31,13 @@ import numpy as np
 import pytest
 
 from tests._poisson_mle import I_VAR, deviance, fit_in_chunks, fit_reference, model
+from toyomacro._bootstrap import draw_poisson
 from toyomacro.voigtfit.identifiability import (
     VoigtPeak,
     assess_identifiability,
     constant_background,
+    identifiability_modes,
+    linear_background,
     poisson_fisher,
 )
 
@@ -167,3 +175,87 @@ class TestBoundary:
         assert fit.converged.all()
         assert np.all(fit.params[:, I_VAR] >= floor)
         assert np.all((fit.params[:, I_VAR] == floor) == fit.at_floor)
+
+
+# Design record §9.6: the registered check of the modes. Every setting
+# below is the registration's; none of them may be changed to rescue a
+# result (a fail or a not-evaluable run is entered in §9.8 instead).
+MODE_SEED = 20261023
+MODE_SLOPE = 10.0
+MODE_REPLICAS = 10_000
+MODE_TOLERANCE = 0.04
+
+
+def _mode_run(seed_key, report, background):
+    rng = np.random.default_rng(np.random.SeedSequence([MODE_SEED, seed_key]))
+    counts = draw_poisson(report.fisher.expected_counts, MODE_REPLICAS, rng)
+    fit = fit_in_chunks(counts, ENERGY, report.fisher.param_values, background.basis,
+                        max_iter=60, score_tol=1e-6)
+    scales = np.array(list(report.scales.values()))
+    scaled = (fit.params[:, :4] - report.fisher.param_values[:4]) / scales
+    vectors = np.array([list(m.weights.values()) for m in report.modes]).T
+    bounds = np.array([m.relative_sd for m in report.modes])
+    projected = scaled @ vectors
+    return fit, scaled, projected.std(axis=0, ddof=1) / bounds, projected.mean(axis=0) / bounds
+
+
+class TestModes:
+    def test_projected_spread_is_the_mode_bound(self, record_property):
+        """sigma/gamma = 1 on an estimated linear background, 10^4 replicas
+        with seed key [20261023, 1]: for each of the three softest modes,
+        the replica sd of w^T S^-1 (theta_hat - theta_0) over sqrt(lambda)
+        within 4 % of 1. Not evaluable if a replica fails to converge or
+        ends at the floor, or if the configuration is not interior along
+        every mode by boundary_sd.
+
+        This confirms the bound along the reported directions; it says
+        nothing about the scale convention, which is a choice. Recorded,
+        not judged: the angle between mode 1 and the replicas' first
+        principal axis, the bias along each mode, and seed keys 2 and 3.
+        """
+        peak = VoigtPeak(AREA, 0.0, GAMMA, GAMMA)
+        background = linear_background(ENERGY, LEVEL, MODE_SLOPE)
+        report = identifiability_modes(ENERGY, [peak], background)
+        assert len(report.modes) == 3 and not report.null_modes
+        assert list(report.scales) == ["amp_0", "center_0", "var_0", "gamma_0"]
+        assert all(list(m.weights) == list(report.scales) for m in report.modes)
+
+        # interior along every mode, before any replica is drawn
+        reach = report.thresholds.boundary_sd
+        truth = report.fisher.param_values[:4]
+        scales = np.array(list(report.scales.values()))
+        for mode in report.modes:
+            w = np.array(list(mode.weights.values()))
+            for sign in (1.0, -1.0):
+                moved = truth + sign * reach * mode.relative_sd * scales * w
+                assert moved[0] > 0.0 and moved[2] > 0.0 and moved[3] > 0.0, (
+                    f"P1 not evaluable: mode {mode.index} leaves the interior")
+
+        fit, scaled, ratios, bias = _mode_run(1, report, background)
+        covariance = np.cov(scaled.T)
+        axis = np.linalg.eigh(covariance)[1][:, -1]
+        first = np.array(list(report.modes[0].weights.values()))
+        angle = float(np.degrees(np.arccos(min(abs(axis @ first), 1.0))))
+        lines = [
+            f"seed key 1: converged {int(fit.converged.sum())}/{MODE_REPLICAS}, "
+            f"at floor {int(fit.at_floor.sum())}",
+            "mode  relative_sd  sd_rep/sqrt(lambda)  mean/sqrt(lambda)",
+        ]
+        for mode, ratio, b in zip(report.modes, ratios, bias):
+            lines.append(f"{mode.index + 1:4d}  {mode.relative_sd:11.6g}  {ratio:19.4f}  {b:17.4f}")
+        lines.append(f"angle(mode 1, first principal axis) = {angle:.3f} deg, "
+                     f"lambda1/lambda2 = {report.modes[0].eigenvalue_ratio:.2f}")
+        record_property("mode_ratios_seed1", tuple(float(r) for r in ratios))
+        record_property("mode_bias_seed1", tuple(float(b) for b in bias))
+        record_property("mode_angle_deg", angle)
+        for key in (2, 3):
+            other, _, other_ratios, _ = _mode_run(key, report, background)
+            record_property(f"mode_ratios_seed{key}", tuple(float(r) for r in other_ratios))
+            lines.append(
+                f"seed key {key}: ratios " + ", ".join(f"{r:.4f}" for r in other_ratios)
+                + f"; converged {int(other.converged.sum())}, at floor {int(other.at_floor.sum())}"
+            )
+        print("\n".join(lines))
+
+        assert fit.converged.all() and not fit.at_floor.any(), "P1 not evaluable"
+        assert np.all(np.abs(ratios - 1.0) < MODE_TOLERANCE)

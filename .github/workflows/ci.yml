@@ -74,6 +74,7 @@ jobs:
           uv run python examples/08_map_viewer_frontend.py --smoke
           uv run python examples/09_fermi_edge_identifiability.py
           uv run python examples/10_composition_ptfe.py
+          uv run python examples/11_identifiability_modes.py
           # A small benchmark: its report is checked under the same encoding.
           uv run python -m toyomacro.voigtfit.cli benchmark --n-spectra 2000 --n-energy 100
 
