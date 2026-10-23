@@ -313,6 +313,485 @@ Open questions:
   size, not a bound. Irrelevant for a scale; stated because the package
   said "within 0.02 %" before.
 
+## 9. Modes, the estimate, and the shape of the profile (v0.7.0)
+
+*The definitions of §9.4, the checks of §9.6, and §9.1's notation,
+null-space split and sign rule as far as those use them, are the
+registration: written
+before the code and before the registered runs (§9.6 lists what was
+computed earlier), and not changed after. For them, where this section
+and the code disagree, the code is wrong.
+The rest of §9 records the design as ruled; where implementation or an
+audit changes it, a dated amendment goes below the paragraph it
+changes, never a rewrite. Results go to §9.8 only.*
+
+§1–§8 report how well each parameter is determined: a label and a bound
+per parameter, and for the two widths of one peak the least determined
+direction of that pair. This section adds three things, all
+Experimental like the rest of the module. P1, *modes*: which
+combinations of peak parameters the spectrum determines worst, and what
+each looks like in the spectrum. P2, *the estimate*: the same
+diagnostics at a fitted estimate — through the `exact_k` adapter, for
+the sub-model that fit used.
+P3, *the profile*: for a single peak, whether the Fisher ellipse
+describes the likelihood along the worst direction, or whether
+curvature and boundaries take over first.
+
+Like everything above, these are statements computed from a model at
+stated parameters. The modes are a **diagnostic, not a set of
+weights**: nothing here is meant to be fed to a downstream fit as a
+covariance (§8's exclusion of exporting a covariance stands), and
+nothing here is a confidence interval.
+
+### 9.1 Modes (P1)
+
+`identifiability_modes(energy, peaks, background=None, *, exposure=1.0,
+k=3, ...)`.
+
+**Notation.** θ_p are the peak parameters (amplitude, center, variance
+and γ of every peak) in `var_gamma` coordinates and θ₀ their stated
+values. I_eff is the effective information on θ_p with every estimated
+background term profiled out — §4's Schur complement with the whole
+background as the nuisance — so it already contains the cost of
+estimating the background. S is the diagonal of the §5 reference
+scales of θ_p (|A|, FWHM, FWHM²/(8 ln 2), FWHM) and I_s = S I_eff S. A
+mode is a unit vector w with I_s w = w/λ; √λ is its relative
+standard-deviation bound. The k with the largest λ are reported,
+softest first. Mode i in this text is index i − 1 in the API.
+
+**Why the background is not in the eigenvectors.** It was the first
+design, and it needed a reference scale for every background
+coefficient. The candidate (the peak sum's maximum count per channel,
+divided by the basis function's maximum) failed two checks made before
+this registration. The modes changed when the same linear background
+was written on [1, E] instead of [1, E − E_mid], i.e. with the energy
+origin, which §5 chose the FWHM to avoid; and a tenth of the peak height
+was a different amount of background in different windows. Profiling
+the background out needs no scale for it, and the modes do not change
+under any rewriting of the background basis that keeps its span.
+
+**What each mode reports**: its relative SD and a status, `identified`
+or `weakly_identified` against the same `weak_relative_sd` as the
+per-parameter labels; the weights on the peak parameters, by name, in
+scaled coordinates; how the background follows — the change of each
+background coefficient, in its own units, when the peak parameters move
+one SD along the mode and the background is re-estimated; the
+signature, the change of the expected counts per channel for that move,
+background included, and its whitened norm; and the ratio of its λ to
+the next one's, since where two are close only the plane they span is
+determined, not the vectors. For every parameter, background
+coefficients included, it also reports the share of that parameter's
+variance bound lying along the mode, i.e. corr² between the parameter
+and the mode coordinate, which does not depend on how the mode's own
+weights are scaled. The share is `None` for a rank-deficient parameter
+(its variance is unbounded while its covariance with an estimable mode
+is not, so the limit is 0, and a finite number there would be an
+artefact). Over all modes the shares of a peak parameter add to 1; those
+of a background coefficient b add to 1 − (I_bb⁻¹)_bb/Var(b), with I_bb
+the background block of the Fisher matrix; the rest is its own
+uncertainty with the peaks known.
+
+**What depends on the convention, and what does not.** The eigenvectors
+and their order depend on the reference scales: another scaling of the
+peak parameters lists other directions. The null space, as a subspace,
+does not. Nor does the size of any signature: the whitened signature of
+a one-SD move along any reported mode, background re-estimated, has
+squared norm exactly 1 (Σ δμ²/μ = λ·wᵀ I_s w = 1, with μ and the
+Jacobian both at the stated exposure). Every mode is one unit of
+counting noise in the data; the convention decides which directions are
+listed, not how visible they are.
+
+With `variance_floor_sd = 0` in `assess_identifiability`, the relative
+SD of the softest mode is never smaller than any bounded peak
+parameter's `relative_sd` or than `worst_relative_sd`: the largest
+eigenvalue bounds every diagonal element and every principal sub-block.
+The converse does not hold. A mode can be `weakly_identified` while no
+single parameter is, because 0.1 is then applied to a norm over
+fractions of different scales. That is what a joint direction is for,
+and the docstring says so.
+
+**Null space and weak directions are kept apart**, because they mean
+different things (§5). The number of null directions of the peak block
+is `null_space_dim − nuisance_null_dim`, both taken from the existing
+decisions (the n·ε rule on the full unit-diagonal matrix, and on its
+background block), so that the labels and the modes always agree. Those
+directions are spanned by that many eigenvectors of I_eff rescaled to
+unit diagonal, those with the smallest eigenvalues. Counting by the n·ε
+rule on that matrix itself agrees in exact arithmetic but can differ by
+one near the threshold; it is not used. Null modes go in their own field, with an
+infinite bound, status `rank_deficient` and their whitened signature
+norm as a numerical check; only the subspace they span means anything,
+the vectors chosen inside it are arbitrary. The soft modes are taken on
+the complement of the null space in the scaled coordinates, which makes
+them combinations the data do determine: with two coincident peaks,
+A₀ + A₁ lies in their span while every individual peak parameter is
+`rank_deficient`. `crlb._NULL_PROJECTION_TOL` is not used: it decides
+whether one parameter's axis touches the null space, it was calibrated
+on crlb's background-free design, and the modes do not need it.
+
+**Computing route.** Invert on the unit-diagonal matrix as
+`covariance_bound` does, apply the reference scales, then project out
+the null space. Diagonalising the scaled matrix directly loses accuracy
+where its condition exceeds 1/ε and the unit-diagonal one's does not.
+
+**`variance_floor_sd` is not an input.** The floor's own uncertainty is
+not information carried by the spectrum. Added to the bound it would
+break the identity above — a mode would be drawn as invisible when the
+data show it — and, the floor being shared by every peak, it would enter
+as a rank-one term, not on the diagonal. It stays in `WidthAssessment`;
+neither `identifiability_modes` nor `mode_profile` takes it. The floor's
+location, `variance_floor`, is accepted: it moves a boundary, not the
+matrix.
+
+**Sign.** Each vector is oriented so that its largest-magnitude
+component is positive; components within 10⁻⁶ of the largest, relative,
+are a tie, broken by the first in parameter order. No rule is continuous
+over a scan; a scan that tracks a mode aligns each vector with its
+predecessor and says so.
+
+**Lineshape independence.** The decomposition, the null-space split, the
+background re-estimation, the shares and the signatures take a
+Jacobian, parameter names, the peak/nuisance partition and the scales,
+and live in `toyomacro._identifiability`, which imports nothing from the
+package. The Voigt entry supplies the Voigt Jacobian and the §5 scales;
+another lineshape needs its own Jacobian and scales and nothing more.
+
+`to_dict` holds no matrix. k is not capped: k = n recovers the bound, and
+`IdentifiabilityReport.fisher` is public anyway, so a cap would protect
+nothing. What keeps the modes from being used as weights is the wording
+of the docstring and of this record.
+
+### 9.2 The γ = 0 boundary
+
+The open item of §8 is closed in favour of symmetric treatment.
+`WidthAssessment` gains `gamma_relative_sd`, sd(γ)/γ (infinite at
+γ = 0), and `near_boundary_gamma`, γ < `boundary_sd`·sd(γ) (always true
+when γ is rank deficient, as for the variance); `scan_identifiability`
+gains the same flag as an array. The existing `near_boundary` keeps its
+meaning, the Gaussian variance, now said in its docstring. The names
+follow `near_boundary_v` and `near_boundary_tau` of the Fermi-edge
+module, which already flags its two boundaries separately.
+
+Reason: γ judged against the FWHM can read `identified` while sd(γ)/γ is
+of order one (the §5 example, 0.58). That is the defect `near_boundary`
+and `variance_relative_sd` exist to show on the Gaussian side, and the
+fix costs two numbers that are already computed.
+
+This adds fields to a public dataclass. No existing value changes, but
+its repr, equality and `to_dict` keys do, and §8 lists "changing any
+existing public API" as out of scope. It is recorded here as a
+deliberate, additive exception and in the CHANGELOG under Changed;
+`variance_floor_sd` was added to the same dataclass additively, in
+v0.3.0.
+The sentences of §5 and §8 that say no flag is raised are updated when
+the flag ships.
+
+### 9.3 The estimate (P2)
+
+`identifiability_at_estimate(energy, peaks, background, *, intensity)`
+evaluates §9.1 and the per-parameter labels at a fitted estimate. It is
+a plug-in at a noisy estimate, not a confidence interval, and the
+docstring says both. The fitters in this package that produce such
+estimates are least squares, not Poisson maximum likelihood. If the
+fit's estimator is unbiased and the model — including the fit's ties
+and independent Poisson channels — is correct, its variance is at least
+the bound at the true parameters; this report is a plug-in estimate of
+that bound.
+
+**The intensity is declared, never guessed.** The bound needs
+`amplitude × V(E)` to be counts per channel as recorded (§3), and no fit
+result in the package records what its intensities are. `intensity` is
+a required keyword with no default, in the package's existing
+vocabulary (`IntensitySemantics` of the readers). Only `"raw_counts"`
+proceeds; `"count_rate"`, `"corrected_intensity"`, `"arbitrary"` and
+`"unknown"` return a *withheld* report — the reason, and no numbers; a
+string outside that vocabulary raises `ValueError`. With
+raw counts the exposure is 1, so `exposure` is not taken: it would count
+the acquisition twice.
+
+The generic entry evaluates every peak parameter free. For a fit that
+tied or fixed parameters it answers another question, and its
+docstring says so.
+
+**One adapter, for `exact_k`.** It takes an `ExactKReport`, a K, the
+energy axis and `intensity` (the report stores neither the axis nor the
+intensity convention), and not a bare candidate, because only the report
+records whether the background was a plug-in. It rebuilds the
+polynomial background on `build_bg_design`'s own basis, cast to
+float64, and withholds
+when the background was a plug-in Shirley or Tougaard (only a summary is
+stored), when an amplitude is not positive (`exact_k` allows negative
+ones by design), when the fitted mean is not positive in every channel,
+or when the candidate carries `sigma_at_bound` or a
+`center_*_at_energy_bound` flag (the estimate is not a stationary point).
+
+**The model the fit used.** `exact_k` shares one σ across the peaks,
+fixes γ and can fix a doublet's splitting and branching ratio. All of
+these are affine constraints in `var_gamma` coordinates, so the adapter
+evaluates the sub-model, with Jacobian J·L, not the model with every
+parameter free. The free model answers another question: it can name
+var₀ − var₁ as the softest direction of a fit that has one shared
+variance. In the core, a shared variance is scaled by FWHM²/(8 ln 2) of
+the narrowest peak that shares it, the smallest candidate scale and so
+the largest relative bound. (In `exact_k` every component has the same σ
+and the same fixed γ, so the choice does not arise there.)
+Per-parameter labels for a sub-model come from its own matrix;
+`assess_identifiability` assumes four parameters per peak and is not
+used for it.
+
+**Not received in v0.7.0**, with the reason: `MultiPeakResult` (a
+float32 batch, and without the Newton step its amplitude, center and σ
+are not one stationary point); `core.FittingResult` (its area/height
+columns mean different things for different producers, and the
+background survives only as a curve); `FastFitResult` and
+`pipeline.FitResult` (no background).
+
+P2 has no stochastic check of its own; it is covered by deterministic
+tests.
+
+### 9.4 The profile (P3) — registered
+
+`mode_profile(energy, peak, background=None, *, mode=0, t=...,
+exposure=1.0, variance_floor=0.0)`, for a single peak only (it raises
+otherwise). It has no `variance_floor_sd` argument (§9.1).
+
+**Data and Δ.** The data are the expected counts y = μ(θ₀) at the
+stated parameters — no noise, no seed; the "Asimov" data set of Cowan
+et al. (2011, §3.2). Δ(t) is the minimum of the Poisson deviance
+D = 2 Σ [μ − y + y ln(y/μ)] subject to the profile constraint below, so
+Δ(0) = 0. At θ₀ the Hessian of D is exactly 2× the Fisher matrix, so the
+profile departs from the Fisher prediction by curvature and boundaries
+alone. This is a property of the model like everything else here, not a
+coverage statement about any interval.
+
+**Coordinate.** With w the chosen non-null mode of §9.1 and λ_w its
+eigenvalue, the constraint is wᵀ S⁻¹ (θ_p − θ₀,p) = t·√λ_w, and D is
+minimised over everything else: the coordinates along the other
+eigenvectors of I_s, null ones included, and the background
+coefficients. Both routes below work in these rotated, scaled
+coordinates. The Fisher prediction is Δ(t) = t². A null mode is
+refused: it has no finite SD in which to measure t.
+
+**Constraints.** v ≥ `variance_floor` and γ ≥ 0 are held as bounds, as
+the §6 estimator holds v (and as it would hold γ, instead of rejecting
+γ = 0). Background coefficients are not constrained in sign, as the
+estimator does not constrain them. μ > 0 is the domain of D, which is
+infinite outside it. No boundary correction is applied (§8's chi-bar
+item stays open).
+
+**Active bounds and the KKT test**, the same for both routes. Let z be
+the free coordinates of the coordinate paragraph above, so that each
+width bound is an affine inequality g_k(z) ≥ 0 in z. A bound is active
+when the solution lies within 10⁻⁶ of it in units of that parameter's
+reference scale; the solution is projected onto its active bounds, and
+D, Δ and the KKT test are evaluated there. With I_z the Fisher matrix in
+z at that point, take the multipliers ν_k of
+½∇_z D = Σ_active ν_k ∇_z g_k by ordinary least squares in z (the
+minimum-norm solution if the active gradients are dependent) and the
+residual r = ½∇_z D − Σ ν_k ∇_z g_k. The test passes when every inactive
+g_k(z) ≥ 0, every coordinate has |r_i|/√(I_z)_ii < 10⁻⁶ (the rule of
+`_bootstrap.fit_poisson_mle`, with the multipliers taken out), and every
+multiplier, normalised as ν_k·(∇g_kᵀ I_z⁻¹ ∇g_k)^½, is above −10⁻⁶; a point
+where I_z is singular fails it. The recorded KKT residual is
+max_i |r_i|/√(I_z)_ii; for a route that fails, that of its
+lowest-deviance candidate.
+
+**Events.** Events are read from the solution the summaries use
+(below). The stop is found in the outward pass; if the inward pass
+finds, in the solution the summaries use, *amplitude at zero* or
+*corner* at an earlier grid point, that point becomes the stop. A failed
+inward iterate never moves the stop. Other
+events are read after the inward pass. *Amplitude at zero* and *corner*
+are limits at which no route can be expected to succeed: when neither
+route succeeds at a point, the point is the stop — not "not obtained" —
+if any final iterate of either route, from any start or active set,
+shows one of them.
+
+- *bound active* — for each side and each bound, the first grid point
+  (not refined) whose solution has that bound active. Reported with the
+  bound and Δ there. The profile continues past it; it is the
+  constrained minimum.
+- *background negative* — a solution whose re-estimated background
+  curve is negative in some channel. Recorded per point.
+- *amplitude at zero* — a solution with A ≤ 10⁻⁶|A₀|. At A = 0 the
+  center and the widths leave the mean, and when w has a component on
+  the center any t is then met at the background-only deviance.
+- *corner* — with `variance_floor` 0, a solution with both width bounds
+  active at once. The Voigt does not exist there. With a positive floor,
+  v at the floor and γ = 0 is a valid Voigt (route A's fourth active
+  set) and the side continues.
+
+**Stops.** A side's stop is the first grid point from t = 0 that has
+*amplitude at zero* or *corner*. The side is not solved past it, and the
+inward pass on that side starts at the point before the stop. The stop
+and every later point are reported as the event, not as a number, and
+so are Δ(±1) and Δ(±2) at or beyond it. A stop reports its t, Δ at the
+point before it, and the background-only deviance (D minimised over the
+background coefficients with A = 0).
+
+**Two routes.** Route A enumerates the admissible sets of active bounds
+on {v, γ} — three when `variance_floor` is 0 (both at zero is the
+corner), four otherwise — solves each by Fisher scoring, and keeps the
+lowest-deviance point that passes the KKT test, with `max_iter=60`; it
+succeeds when one does. Route B is SLSQP (`ftol=1e-12`,
+`maxiter=1000`); it succeeds when SciPy reports success and the KKT
+test passes. Grid points are solved outward from t = 0 on each side,
+starting from the nearest obtained neighbour on the t = 0 side and from
+the stated point, then once inward from the ends, each point starting
+from its own outward solution and, where its outer neighbour was
+obtained and is not the stop, from that neighbour's solution;
+each route keeps its lowest-deviance successful result. Bisection points
+are solved from their bracketing solutions. Every grid point solved
+records both routes' Δ, success and KKT residual. A point is flagged
+when |Δ_A − Δ_B| > 10⁻⁶·max(1, min(Δ_A, Δ_B)) or when either route
+fails. The summaries use the lower successful Δ of the two and name the
+route it came from. Infeasibility is not tested: a point where neither
+route succeeds, and which is not a stop, is "not obtained", and so is
+every summary that needs it. Numerical details not fixed here — damping
+in the scoring, SLSQP's internals beyond the settings above — are the
+code's: fixed before the registered run and recorded with its results.
+Nothing is retuned after the registered profiles have been seen, and a
+disagreement between the routes is reported, never resolved.
+
+**Summaries.** Δ on the grid; Δ(±1) and Δ(±2); and the crossings. t₊ is
+found in the first grid interval with t_j ≥ 0, both ends before the
+stop, and Δ(t_j) < 1 ≤ Δ(t_{j+1}), refined by bisection to a bracket of
+10⁻⁶ in t, whose midpoint is reported. If
+Δ < 1 at every grid point before the stop, t₊ is reported as the stop's
+event, and with no stop, as "beyond the grid". t₋ likewise for t ≤ 0.
+t± needs every grid point from 0 to the far end of its bracket and every
+bisection point; when it is the stop's event or "beyond the grid", every
+grid point before the stop, or on that side. If any of those is "not
+obtained", so is t±. The ratio to the
+Fisher crossing is |t±| itself. 1.00 is the one-parameter 68.3 %
+convention, used as a yardstick only; there is no 2-D profile, so 2.30
+is not used.
+
+### 9.5 Vocabulary
+
+Words used for these ideas elsewhere, mapped with their limits:
+
+| here | there | limit |
+|---|---|---|
+| `rank_deficient`, null mode | gauge direction | only for a redundancy of description: a background term with the peak's own shape (a null mode), or two background terms with the same shape (`rank_deficient` background coefficients, not a mode). Coincident peaks are distinct components the data cannot separate, a degeneracy of the measurement, not a gauge. §4's "gauge" — the unit-diagonal rescaling — is the same idea applied to units |
+| `weakly_identified` mode | sloppy direction | related, not equivalent. Sloppy models (Gutenkunst et al. 2007) have eigenvalues spread over many decades; here a threshold is applied to one direction |
+| a known background, `fixed_instrument`, `exact_k`'s fixed γ | datum | a value chosen, not learnt from the spectrum |
+
+### 9.6 Checks — registered
+
+Both checks take seconds and run as tests, as §6 does; the long-run
+harness of the composition validation (resumable chunks, run identity
+files) is for runs that take hours and is not used. What carries over is
+that seeds, settings and criteria are fixed here before the code exists,
+and that each test asserts that the computation ran. Each result is
+entered in §9.8 when its check lands, with the commit and the Python,
+NumPy and SciPy versions it ran on (NumPy does not promise identical
+Poisson streams across versions).
+
+**P1, pass/fail.** One peak at center 0, γ = 0.3 eV, σ/γ = 1, area
+2×10⁴ counts·eV, on `linear_background(E, 300, 10)` with both terms
+estimated; E = −3…3 eV in 0.02 eV steps (301 channels); exposure 1;
+`variance_floor` 0. This is §6's configuration with a linear instead of
+a flat background. The data are
+`_bootstrap.draw_poisson(expected_counts, 10_000, rng)` with
+`rng = default_rng(SeedSequence([20261023, 1]))`, fitted by
+`tests/_poisson_mle.fit_in_chunks` (the §6 estimator: exact constrained
+Poisson maximum likelihood) with the linear basis, started at the truth,
+`max_iter=60`, `score_tol=1e-6`.
+
+Before the replicas, the test asserts that the configuration is interior
+along each of the k = 3 modes, which are computed from the model at the
+truth, not from the replicas: θ₀,p ± 3√λᵢ·S wᵢ has A > 0, v > 0 and γ > 0
+for i = 1, 2, 3 (3 = `boundary_sd`).
+
+*Criterion.* For each mode i = 1, 2, 3, the sample standard deviation
+(ddof = 1) over the replicas of wᵢᵀ S⁻¹ (θ̂_p − θ₀,p), divided by √λᵢ, lies
+within 4 % of 1. All three must pass. The tolerance and its reasons are
+§6's: the sampling error of an SD from 10⁴ replicas is 0.71 %, so 4 % is
+5.7 standard errors, ample for three comparisons, and a Fisher matrix
+wrong by 10 % moves the ratio by about 5 %.
+
+*Not evaluable.* If any replica of seed key 1 does not converge or ends
+at the floor, or the interior check fails, P1 is not evaluable and does
+not pass. The estimator settings and the seed are not changed to rescue
+it. A fail or a not-evaluable result is entered in §9.8, and
+`identifiability_modes` does not ship until its cause is found. After a
+cause is found and fixed, P1 is run once more with seed key 1, and both
+results are entered.
+
+*Recorded, not judged:* the angle, folded to 0°–90°, between mode 1 and
+the first principal axis of the scaled replicas S⁻¹(θ̂_p − θ₀,p) (the
+leading eigenvector of their sample covariance), with λ₁/λ₂; the mean of
+each projection in units of √λᵢ, signed by §9.1's sign rule; and the same ratios, with their
+convergence counts, for seed keys [20261023, 2] and [20261023, 3], which
+decide nothing.
+
+*What this checks and what it does not.* The variance of a fixed linear
+combination of the estimates agrees with the bound along any direction
+fixed in advance, whatever the scaling, so a pass confirms the bound
+along the reported directions and says nothing about the scale
+convention, which is a choice, not a fact. The decomposition itself is
+covered by deterministic tests: the eigen-relations; the whitened-norm
+identity; the softest mode against every bounded `relative_sd`, and
+`worst_relative_sd` at `variance_floor_sd = 0` (to rounding); invariance
+under the energy unit and under rewriting the background basis; the
+null-space count on constructed cases (coincident peaks 4, a duplicated
+background term 0, a background term with the peak's own shape 1);
+relative SDs scaling as 1/√exposure.
+
+**P3, recorded only.** No prior claim of agreement or disagreement. Along
+mode 1 (`mode=0`), on the grid t = k/10, k = −30…30, with the
+definitions of §9.4. Every configuration has the peak at center 0, a
+0.02 eV step, an estimated `linear_background(E, 300, 10)`, exposure 1
+and `variance_floor` 0:
+
+| name | σ/γ | window | area (counts·eV) |
+|---|---|---|---|
+| soft | 1/3 (γ = 0.3 eV) | ±γ: −0.3…0.3 eV, ends included, 31 channels | 2×10⁴ |
+| soft ×100 | 1/3 (γ = 0.3 eV) | ±γ: −0.3…0.3 eV, ends included, 31 channels | 2×10⁶ |
+| hard | 1 (γ = 0.3 eV) | −3…3 eV, ends included, 301 channels (the P1 configuration) | 2×10⁴ |
+
+Recorded per configuration: the summaries of §9.4, the events and
+stops with what each stop reports, and the per-point agreement of the
+two routes.
+
+**Disclosure.** Some of these quantities were computed before this
+registration, while the design was being checked. The existing §6
+per-parameter check was run once on this window with
+`linear_background(E, 300, 10)` and §6's own seed, to see whether the
+estimator copes with a slope. Single-route profiles along mode 1 were
+computed in the hard and soft configurations, and the soft ×100 row was
+added because the soft profile met a bound before Δ = 1 on both sides.
+None of those numbers is a result; the registered checks use a new seed
+and the definitions above.
+
+### 9.7 Not in this version, and what stays open
+
+The Doniach–Šunjić asymmetry α (P4) is not in this version. The core of
+§9.1 is lineshape-independent, so what it lacks is the DS ⊗ Gauss
+lineshape and its Jacobian — a lineshape change first. Two things have
+to be decided before it: the amplitude convention, since the area
+diverges for α > 0 (height, or area truncated to the window), and the
+window width as a scan axis, since the information on α sits in the
+high-binding-energy tail that the window cuts. The expectation, not a
+result, is that the first mode mixes α, γ and the Shirley height and
+stays finite, a monotone step and a one-sided power-law tail differing
+in shape. Fixing α at a literature value is a datum.
+
+Families of models (P5) — multistart, enumerating the distinct
+solutions (peak count, component layout) and weighting each by a
+Laplace evidence log L − ½ log det(F/2π) — belong with `model_selection`
+and `exact_k` (docs/RANK_MODEL_SELECTION.md), not here.
+
+Still open: §8's chi-bar item, and the Shirley step's own dependence on
+the peaks.
+
+### 9.8 Results
+
+Each part gets an independent audit in a context that did not write it.
+Results of §9.6 are entered here as each check lands; nothing above
+changes because of them.
+
 ## References
 
 - J. J. Olivero and R. L. Longbothum, *J. Quant. Spectrosc. Radiat.
@@ -323,3 +802,8 @@ Open questions:
   **10**, 210 (2022), doi:10.3390/math10020210
 - S. G. Self and K.-Y. Liang, *J. Am. Stat. Assoc.* **82**, 605–610
   (1987), doi:10.1080/01621459.1987.10478472
+- G. Cowan, K. Cranmer, E. Gross and O. Vitells, *Eur. Phys. J. C*
+  **71**, 1554 (2011), doi:10.1140/epjc/s10052-011-1554-0
+- R. N. Gutenkunst, J. J. Waterfall, F. P. Casey, K. S. Brown, C. R.
+  Myers and J. P. Sethna, *PLoS Comput. Biol.* **3**, e189 (2007),
+  doi:10.1371/journal.pcbi.0030189
