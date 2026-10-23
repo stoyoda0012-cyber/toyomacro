@@ -1908,6 +1908,8 @@ class TestEstimate:
             else:
                 assert row.relative_sd == pytest.approx(row.sd / row.reference_scale)
         assert set(report.near_boundary) == {"var_shared", "var_shared_fit_bounds"}
+        two = identifiability_from_exact_k(ek_doublet, 2, EK_ENERGY, intensity="raw_counts", k=2)
+        assert len(two.modes.modes) == 2
         json.dumps(report.to_dict())
 
     def test_the_axis_order_does_not_matter(self, ek_singlet):
@@ -1997,14 +1999,24 @@ class TestEstimate:
         assert (by_name["amp_1"].peak, by_name["center_1"].peak) == (1, 1)
 
     def test_flag_at_the_fits_own_sigma_bound(self, ek_singlet):
-        """exact_k constrains sigma to sigma_bounds (0.02 eV at the low end):
-        a variance a few bounds from 0.02**2 is flagged there, though far
-        from 0 in its own units."""
-        near = self._variant(ek_singlet, sigma=0.0205, amplitudes=(1.0e3, 1.0e3))
+        """exact_k constrains sigma to sigma_bounds. At sigma = 0.0205 eV
+        the variance is 8 bounds above 0 but 0.4 above 0.02**2: flagged at
+        the fit's bound, not at 0. The upper end counts the same way, and
+        the margin is boundary_sd bounds (here 2.5 inside, 5 outside)."""
+        import dataclasses
+
+        near = self._variant(ek_singlet, sigma=0.0205)
         report = identifiability_from_exact_k(near, 2, EK_ENERGY, intensity="raw_counts")
-        assert report.near_boundary["var_shared_fit_bounds"]
-        far = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
-        assert not far.near_boundary["var_shared_fit_bounds"]
+        assert report.near_boundary == {"var_shared": False, "var_shared_fit_bounds": True}
+        wide = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
+        assert wide.near_boundary == {"var_shared": False, "var_shared_fit_bounds": False}
+        row = {a.name: a for a in wide.parameters}["var_shared"]
+        for distance, flagged in ((2.5, True), (5.0, False)):
+            upper = math.sqrt(row.value + distance * row.sd)
+            moved = dataclasses.replace(
+                ek_singlet, config={**ek_singlet.config, "sigma_bounds": [0.02, upper]})
+            report = identifiability_from_exact_k(moved, 2, EK_ENERGY, intensity="raw_counts")
+            assert report.near_boundary["var_shared_fit_bounds"] is flagged
 
     def test_generic_flags_are_per_width(self):
         """A nearly Gaussian peak: gamma is flagged, the variance is not."""

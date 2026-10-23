@@ -1441,7 +1441,9 @@ def identifiability_from_exact_k(
         report: An ``exact_k.ExactKReport``
         k_structured: Which candidate K
         energy: The energy axis the fit ran on, in either order (the
-            report does not store it)
+            report does not store it). Its length is checked and it must
+            contain the fitted centers; another axis of the same length
+            that still contains them cannot be told apart.
         intensity: One of ``INTENSITY_SEMANTICS``; required
         k: Number of modes
         thresholds: Defaults to ``IdentifiabilityThresholds()``
