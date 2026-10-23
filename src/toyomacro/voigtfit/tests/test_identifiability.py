@@ -37,6 +37,7 @@ from toyomacro.voigtfit.identifiability import (
     identifiability_from_exact_k,
     identifiability_modes,
     linear_background,
+    mode_profile,
     poisson_fisher,
     scan_identifiability,
     shirley_background,
@@ -2063,3 +2064,357 @@ class TestEstimate:
             identifiability_from_exact_k(
                 dataclasses.replace(doublet, candidates=(doublet.candidates[0], broken)),
                 2, EK_ENERGY, intensity="raw_counts")
+
+
+# ===================================================================
+# The profile along a mode
+# ===================================================================
+
+# Development configurations only. The registered ones of design record
+# §9.6 run in tests/test_identifiability_profile_record.py.
+DEV_INTERIOR = (np.arange(-2.0, 2.0 + 1e-9, 0.025), VoigtPeak(5.0e4, 0.0, 0.25, 0.35),
+                lambda e: linear_background(e, 500.0, -20.0))
+DEV_TIGHT = (np.arange(-0.5, 0.5 + 1e-9, 0.025), VoigtPeak(3.0e4, 0.0, 0.08, 0.35),
+             lambda e: constant_background(e, 400.0))
+DEV_STOP = (np.arange(-0.32, 0.32 + 1e-9, 0.02), VoigtPeak(1.5e4, 0.0, 0.1, 0.4),
+            lambda e: linear_background(e, 250.0, 5.0))
+
+
+@pytest.fixture(scope="module")
+def profiles():
+    return {name: mode_profile(e, peak, bg(e)) for name, (e, peak, bg) in
+            (("interior", DEV_INTERIOR), ("tight", DEV_TIGHT), ("stop", DEV_STOP))}
+
+
+class TestModeProfile:
+    """``mode_profile`` (design record §9.4) on development configurations."""
+
+    def test_every_grid_point_has_an_entry(self, profiles):
+        for prof in profiles.values():
+            assert [p.t for p in prof.points] == list(idf.PROFILE_GRID)
+            assert all(p.outcome in ("ok", "not_obtained", "amplitude_at_zero", "corner")
+                       for p in prof.points)
+            json.dumps(prof.to_dict())
+
+    def test_starts_at_zero_and_never_goes_below(self, profiles):
+        for prof in profiles.values():
+            zero = next(p for p in prof.points if p.t == 0.0)
+            assert zero.outcome == "ok" and zero.delta == 0.0
+            assert all(p.delta >= 0.0 for p in prof.points if p.outcome == "ok")
+
+    def test_follows_the_fisher_prediction_in_the_interior(self, profiles):
+        """Well determined: Delta(t) = t**2 to within a percent out to 3 SD,
+        the crossings at |t| = 1 to a percent, and the routes agree."""
+        prof = profiles["interior"]
+        assert all(p.outcome == "ok" and not p.flagged for p in prof.points)
+        for p in prof.points:
+            if p.t:
+                assert p.delta == pytest.approx(p.t**2, rel=0.02)
+        small = next(p for p in prof.points if p.t == 0.1)
+        assert small.delta == pytest.approx(0.01, rel=1e-2)
+        for side in (prof.plus, prof.minus):
+            assert side.crossing == pytest.approx(1.0, abs=0.01)
+            assert side.delta_1 == pytest.approx(1.0, rel=0.01)
+            assert side.stop is None and not side.activations
+
+    def test_a_bound_activates_and_the_profile_continues(self, profiles):
+        prof = profiles["tight"]
+        t_on, delta_on = prof.plus.activations["variance"]
+        beyond = [p for p in prof.points if p.t >= t_on]
+        assert all(p.outcome == "ok" and "variance" in p.active for p in beyond)
+        assert all(p.parameters["var_0"] == 0.0 for p in beyond)
+        assert delta_on == next(p.delta for p in prof.points if p.t == t_on)
+        assert prof.plus.stop is None
+        assert not any(p.flagged for p in prof.points)
+        assert prof.plus.background_negative  # recorded per point
+        assert all(next(p for p in prof.points if p.t == x).background_negative
+                   for x in prof.plus.background_negative)
+
+    def test_no_stop_from_a_stated_point_iterate(self, profiles):
+        """The amplitude-dominated configuration has more than one branch on
+        the minus side, and which one the chain follows depends on the
+        platform (macOS holds gamma at 0, Windows reaches a zero amplitude).
+        Whatever the branch: a stop comes from a successful solution, never
+        from an iterate when both routes failed -- before the amendment of
+        §9.4 one from the stated point, at a negative amplitude by
+        construction, made such a stop -- and every point not obtained is
+        flagged."""
+        prof = profiles["stop"]
+        by_t = {p.t: p for p in prof.points}
+        for side in (prof.plus, prof.minus):
+            if side.stop is not None:
+                at = by_t[side.stop["t"]]
+                assert at.success_a or at.success_b
+        assert all(p.flagged for p in prof.points if p.outcome == "not_obtained")
+
+    def test_the_kkt_test(self):
+        """Passes at the stated point and at an interior optimum; fails off
+        it, and fails a bound held with a multiplier of the wrong sign."""
+        e, peak, bg = DEV_STOP
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        stated = problem.z_of(0.0, problem.peak0, problem.b0)
+        assert problem.kkt(0.0, stated)[0]
+        moved = stated.copy()
+        moved[0] += 1e-3
+        assert not problem.kkt(0.0, moved)[0]
+        start = problem.z_of(-0.1, problem.peak0, problem.b0)
+        interior = problem.scoring(-0.1, start, ())
+        assert problem.kkt(-0.1, interior)[0]
+        held = problem.scoring(-0.1, start, ("variance",))
+        passed, residual, active, _, _ = problem.kkt(-0.1, held)
+        assert active == ("variance",) and residual < 1e-6 and not passed
+
+    def test_route_a_has_a_fourth_set_with_a_positive_floor(self):
+        e, peak, bg = DEV_INTERIOR
+        assert len(idf._Profile(e, peak, bg(e), 1.0, 0.0, 0).admissible_sets()) == 3
+        assert len(idf._Profile(e, peak, bg(e), 1.0, 0.01, 0).admissible_sets()) == 4
+
+    def test_a_failing_route_flags_every_point(self, monkeypatch):
+        """With route B made to fail, route A carries the summaries and every
+        solved point is flagged; nothing is resolved silently."""
+        monkeypatch.setattr(idf._Profile, "slsqp", lambda self, t, z0: None)
+        e, peak, bg = DEV_INTERIOR
+        prof = mode_profile(e, peak, bg(e), t=(-0.5, 0.0, 0.5))
+        assert all(p.flagged and p.route == "A" and not p.success_b for p in prof.points)
+
+    def test_refusals(self):
+        e, peak, bg = DEV_INTERIOR
+        with pytest.raises(ValueError, match="single peak"):
+            mode_profile(e, [peak, peak], bg(e))
+        with pytest.raises(ValueError, match="contain 0"):
+            mode_profile(e, peak, bg(e), t=(0.1, 0.2))
+        with pytest.raises(ValueError, match="strictly increasing"):
+            mode_profile(e, peak, bg(e), t=(0.0, 0.2, 0.1))
+        with pytest.raises(ValueError, match="non-null modes"):
+            mode_profile(e, peak, bg(e), mode=4)
+        with pytest.raises(TypeError):
+            mode_profile(e, peak, bg(e), variance_floor_sd=0.01)
+
+    # -- the registered rules, pinned one at a time ---------------------------
+
+    def test_registered_constants(self):
+        assert idf._PROFILE_TOL == 1e-6 and idf._PROFILE_BISECT == 1e-6
+        assert idf._PROFILE_MAX_ITER == 60
+        assert idf._PROFILE_SLSQP == {"ftol": 1e-12, "maxiter": 1000}
+        assert idf.PROFILE_GRID == tuple(k / 10.0 for k in range(-30, 31))
+
+    def test_the_kkt_threshold_is_1e_minus_6(self):
+        """Interior, no bound near: the test passes exactly when the
+        normalised residual is below 1e-6, across both sides of it."""
+        e, peak, bg = DEV_INTERIOR
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        stated = problem.z_of(0.0, problem.peak0, problem.b0)
+        residuals = []
+        for eps in np.logspace(-12, -3, 37):
+            z = stated.copy()
+            z[0] += eps
+            passed, res, active, _, _ = problem.kkt(0.0, z)
+            assert active == () and passed == (res < 1e-6)
+            residuals.append(res)
+        assert min(residuals) < 1e-6 < max(residuals) and any(1e-6 < r < 1e-3 for r in residuals)
+
+    def test_amplitude_at_zero_is_judged_at_1e_minus_6(self):
+        e, peak, bg = DEV_INTERIOR
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        z = problem.z_of(0.0, problem.peak0, problem.b0)
+        row = problem.dpeak_dz[0]
+        for fraction, expected in ((2e-6, None), (0.5e-6, "amplitude_at_zero"),
+                                   (-0.1, "amplitude_at_zero")):
+            target = fraction * peak.amplitude - problem.peak0[0]
+            moved = z.copy()
+            moved[:3] += row * target / (row @ row)
+            assert problem.theta(0.0, moved)[0][0] == pytest.approx(fraction * peak.amplitude)
+            assert problem.event(0.0, moved) == expected
+
+    @staticmethod
+    def _amplitude_zero(problem, t, z):
+        row = problem.dpeak_dz[0]
+        moved = z.copy()
+        moved[:3] -= row * problem.theta(t, z)[0][0] / (row @ row)
+        return moved
+
+    def _patched(self, monkeypatch, rewrite, grid=(-0.5, -0.25, 0.0, 0.25, 0.5, 0.75)):
+        """mode_profile on the interior configuration and a short grid, with
+        each _Profile.solve result passed through ``rewrite(problem, t,
+        call, result, iterates)``."""
+        real = idf._Profile.solve
+        calls: dict[float, int] = {}
+
+        def solve(problem, t, starts):
+            calls[t] = calls.get(t, 0) + 1
+            result, iterates = real(problem, t, starts)
+            return rewrite(problem, t, calls[t], result, iterates, starts)
+
+        monkeypatch.setattr(idf._Profile, "solve", solve)
+        e, peak, bg = DEV_INTERIOR
+        return mode_profile(e, peak, bg(e), t=grid)
+
+    def test_a_side_stops_where_the_solution_reaches_zero_amplitude(self, monkeypatch):
+        """A successful solution at a zero amplitude is a stop: it and every
+        later point are the event, Delta before it and the background-only
+        deviance are reported, and the stop is flagged if a route failed."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                zero = self._amplitude_zero(problem, t, z)
+                return {"A": ((dev, zero, res), (dev, zero, res)),
+                        "B": (None, result["B"][1])}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        by_t = {p.t: p for p in prof.points}
+        stop = prof.plus.stop
+        assert stop["event"] == "amplitude_at_zero" and stop["t"] == 0.5
+        assert by_t[0.5].outcome == by_t[0.75].outcome == "amplitude_at_zero"
+        assert by_t[0.5].flagged and by_t[0.75].delta_a is None
+        assert stop["delta_before"] == by_t[0.25].delta
+        assert np.isfinite(stop["background_only_deviance"])
+        assert stop["background_only_deviance"] > by_t[0.25].delta
+
+    def test_a_stop_from_iterates_when_neither_route_succeeds(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5:
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        by_t = {p.t: p for p in prof.points}
+        assert prof.plus.stop["event"] == "amplitude_at_zero" and prof.plus.stop["t"] == 0.5
+        assert by_t[0.5].outcome == by_t[0.75].outcome == "amplitude_at_zero"
+        assert by_t[0.5].flagged and by_t[0.75].delta_a is None  # beyond: not solved
+
+    def test_a_failed_inward_iterate_does_not_move_the_stop(self, monkeypatch):
+        """0.25 fails in both passes; in the inward one a path-start iterate
+        sits at a zero amplitude. Only the outward pass finds a stop."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25:
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                if call == 2:
+                    return failed, [(0, self._amplitude_zero(problem, t, iterates[0][1]))]
+                return failed, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop is None
+        assert next(p for p in prof.points if p.t == 0.25).outcome == "not_obtained"
+        assert all(p.outcome == "ok" for p in prof.points if p.t != 0.25)
+
+    def test_an_iterate_from_the_stated_point_makes_no_stop(self, monkeypatch):
+        """§9.4 as amended before the registered run: the stated point, moved
+        onto a distant constraint plane, can sit at any amplitude, so its
+        iterates do not decide a stop; with neither route succeeding the point
+        is 'not obtained'."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.5:
+                failed = {r: (None, result[r][1]) for r in ("A", "B")}
+                return failed, [(1, self._amplitude_zero(problem, t, iterates[0][1]))]
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop is None
+        assert next(p for p in prof.points if p.t == 0.5).outcome == "not_obtained"
+
+    def test_the_lower_route_is_used_and_a_disagreement_flagged(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                worse = (dev + 0.1, z, res)
+                return {"A": (worse, worse), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        point = next(p for p in prof.points if p.t == 0.25)
+        assert point.route == "B" and point.delta == point.delta_b
+        assert point.delta_a == pytest.approx(point.delta_b + 0.1) and point.flagged
+
+    def test_a_corner_stops_the_side(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == -0.5 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                corner = problem.project(t, z, ("variance", "gamma"))
+                return {"A": ((dev, corner, res), (dev, corner, res)), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.minus.stop["event"] == "corner" and prof.minus.stop["t"] == -0.5
+        assert prof.minus.delta_1 == "not on the grid"
+
+    def test_the_starts_are_the_registered_ones(self, monkeypatch):
+        """Outward: the nearest obtained neighbour and the stated point.
+        Inward: the point's own solution and its obtained outer neighbour."""
+        seen: dict[float, list[int]] = {}
+
+        def rewrite(problem, t, call, result, iterates, starts):
+            stated = problem.z_of(t, problem.peak0, problem.b0)
+            seen.setdefault(t, []).append(len(starts))
+            if call == 1 and t != 0.0:
+                assert any(np.allclose(z, stated) for z in starts)
+            return result, iterates
+
+        self._patched(monkeypatch, rewrite)
+        assert seen[0.25] == [2, 2] and seen[-0.25] == [2, 2]  # outward 2, inward own + outer
+        assert seen[0.75] == [2, 1] and seen[-0.5] == [2, 1]   # the ends have no outer neighbour
+
+    def test_a_route_that_succeeds_records_its_own_result(self, monkeypatch):
+        """Its deviance and KKT residual, even where a failed candidate of the
+        same route has a lower deviance."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25 and result["A"][0] is not None:
+                dev, z, res = result["A"][0]
+                return {"A": ((dev, z, res), (dev - 0.5, z, 5e-3)), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        point = next(p for p in prof.points if p.t == 0.25)
+        assert point.success_a and point.kkt_a < 1e-6
+        assert point.delta_a == pytest.approx(point.delta_b, abs=1e-6)
+
+    def test_an_infeasible_point_is_not_active(self):
+        """1e-3 of the scale below a bound fails the KKT test; 5e-7 below
+        counts as on it; an iterate far below both bounds is no corner."""
+        e, peak, bg = DEV_TIGHT
+        problem = idf._Profile(e, peak, bg(e), 1.0, 0.0, 0)
+        t = 1.5
+        on = problem.scoring(t, problem.z_of(t, problem.peak0, problem.b0), ("variance",))
+        assert problem.kkt(t, on)[0]
+        row, i = problem.g_row("variance")
+        for below, passes in ((1e-3, False), (5e-7, True)):
+            z = on - row * (below * problem.scales[i]) / (row @ row)
+            assert problem.g(t, z, "variance") == pytest.approx(-below * problem.scales[i])
+            assert problem.kkt(t, z)[0] is passes
+        rows = np.array([problem.g_row(b)[0] for b in ("variance", "gamma")])
+        target = np.array([-0.2 * problem.scales[2] - problem.g(t, on, "variance"),
+                           -0.2 * problem.scales[3] - problem.g(t, on, "gamma")])
+        far = on + np.linalg.lstsq(rows, target, rcond=None)[0]
+        assert problem.active(t, far) == () and problem.event(t, far) is None
+
+    @pytest.mark.parametrize("excess, flagged", [(2e-6, True), (5e-7, False)])
+    def test_the_agreement_tolerance(self, monkeypatch, excess, flagged):
+        """1e-6 absolute below Delta = 1, relative above it."""
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t in (0.25, 1.5) and result["A"][0] is not None and result["B"][0] is not None:
+                dev, z, res = result["B"][0]
+                shifted = (dev + excess * max(1.0, dev), z, res)
+                return {"A": (shifted, shifted), "B": result["B"]}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite, grid=(0.0, 0.25, 1.5))
+        for t in (0.25, 1.5):
+            point = next(p for p in prof.points if p.t == t)
+            assert point.success_a and point.success_b and point.flagged is flagged
+        assert next(p for p in prof.points if p.t == 1.5).delta > 1.0
+
+    def test_delta_before_a_stop_that_was_not_obtained(self, monkeypatch):
+        def rewrite(problem, t, call, result, iterates, starts):
+            if t == 0.25:
+                return {r: (None, result[r][1]) for r in ("A", "B")}, iterates
+            found = result["A"][0] or result["B"][0]
+            if t == 0.5 and found is not None:
+                dev, z, res = found
+                zero = self._amplitude_zero(problem, t, z)
+                return {"A": ((dev, zero, res), (dev, zero, res)), "B": (None, None)}, iterates
+            return result, iterates
+
+        prof = self._patched(monkeypatch, rewrite)
+        assert prof.plus.stop["t"] == 0.5 and prof.plus.stop["delta_before"] == "not obtained"
