@@ -25,7 +25,7 @@
     "parameter_meaning": {
       "<state>.area": "analytic integrated area of the state's j+ (2p3/2) Voigt",
       "<state>.center": "centre of the j+ line on the input axis",
-      "width.sigma_ref, width.gamma_ref": "Gaussian sigma and Lorentzian HWHM of Si0",
+      "width.sigma_ref, width.gamma_ref": "Si0 widths in toyomacro's convention: sigma = fwhm_g / 2.3548 (not the exact 2*sqrt(2 ln 2)), gamma = fwhm_l / 2",
       "width.sigma_max, width.gamma_max": "the same for Si4+; others interpolate linearly"
     }
   },
@@ -52,7 +52,7 @@
       "seed": 42,
       "clipped_at": 0.0
     },
-    "axis": "as generated (KE)",
+    "axis": "as generated (KE, ascending)",
     "stored_input_rounding": {
       "x_decimals": 9,
       "y_decimals": 6
@@ -245,6 +245,7 @@
     "cost_definition": "0.5*sum(residual^2) of the background-subtracted fit",
     "background": [6406.59, 6406.59, 6406.59, 6406.59, 6406.59, 6406.59, 6407.45, 6408.57, 6410.08, 6411.82, 6414.23, 6417.04, 6420.14, 6423.87, 6427.94, 6432.24, 6437.23, 6442.47, 6448.5, 6454.86, 6461.68, 6468.89, 6476.9, 6485.15, 6493.81, 6502.93, 6512.65, 6522.76, 6533.3, 6544.23, 6555.84, 6567.36, 6579.2, 6591.29, 6603.88, 6616.79, 6629.68, 6642.58, 6655.58, 6668.88, 6682.18, 6695.39, 6708.28, 6721.16, 6733.81, 6746.21, 6758.43, 6770.2, 6781.69, 6792.69, 6803.33, 6813.63, 6823.17, 6832.53, 6841.49, 6850.08, 6858.43, 6866.81, 6874.56, 6882.44, 6889.72, 6897.12, 6904.53, 6911.96, 6919.38, 6926.79, 6933.98, 6941.13, 6948.45, 6955.53, 6962.31, 6968.99, 6975.55, 6982.14, 6988.45, 6994.61, 7000.32, 7005.87, 7011.24, 7016.22, 7021.11, 7025.63, 7030.07, 7034.41, 7038.56, 7042.99, 7047.29, 7051.74, 7056.38, 7061.12, 7066.04, 7070.96, 7075.95, 7081.1, 7086.06, 7091.1, 7096.16, 7101.23, 7106.45, 7111.33, 7116.15, 7121.09, 7125.59, 7130.15, 7134.34, 7138.63, 7142.85, 7147.32, 7152.22, 7157.0, 7162.55, 7168.54, 7174.93, 7181.8, 7189.63, 7198.16, 7207.78, 7218.48, 7230.77, 7244.28, 7259.35, 7276.41, 7295.21, 7315.74, 7337.32, 7359.46, 7381.82, 7403.17, 7423.57, 7442.56, 7460.21, 7476.45, 7492.22, 7507.68, 7523.57, 7541.06, 7561.14, 7584.39, 7611.4, 7642.25, 7676.08, 7712.37, 7750.08, 7788.51, 7825.68, 7860.56, 7892.03, 7919.54, 7942.94, 7961.96, 7977.05, 7988.62, 7997.31, 8004.0, 8009.07, 8013.17, 8016.05, 8018.39, 8019.96, 8021.04, 8021.87, 8022.52, 8023.48, 8023.8, 8024.3, 8024.41, 8024.76, 8024.96, 8025.02, 8025.06, 8024.96, 8025.03, 8024.92, 8024.66, 8024.38, 8024.34, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54, 8024.54],
     "background_endpoint_indices": [6, 176],
+    "background_endpoint_rule": "indices into the input as stored",
     "background_endpoint_energies": [1382.61, 1388.56]
   },
   "tolerance": {
@@ -258,9 +259,9 @@
   },
   "provenance": {
     "generator": "tests/web_fixtures.py",
-    "toyomacro_version": "0.6.0",
     "source_commit": "94d1aab004141bfe8f3f9fb68fe128e7d87f5cbb",
     "source_files": ["toyomacro/background/", "toyomacro/lineshape/", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py"],
+    "source_paths": ["toyomacro/background/__init__.py", "toyomacro/background/base.py", "toyomacro/background/linear.py", "toyomacro/background/shirley.py", "toyomacro/background/tougaard.py", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py", "toyomacro/lineshape/__init__.py", "toyomacro/lineshape/base.py", "toyomacro/lineshape/doniach_sunjic.py", "toyomacro/lineshape/factory.py", "toyomacro/lineshape/fermi_dirac.py", "toyomacro/lineshape/gaussian.py", "toyomacro/lineshape/lorentzian.py", "toyomacro/lineshape/pseudovoigt.py", "toyomacro/lineshape/voigt.py"],
     "source_sha256": "8406ed30d2763d3f32e22559f20e2c90c0d15a80873c82e7f90abbaa11023e7a",
     "source_sha256_definition": "sha256 of the lines '<sha256 hex>  <path relative to src/>' of the source files, sorted by path, each ending in a newline"
   }

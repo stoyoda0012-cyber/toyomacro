@@ -124,9 +124,9 @@
   },
   "provenance": {
     "generator": "tests/web_fixtures.py",
-    "toyomacro_version": "0.6.0",
     "source_commit": "94d1aab004141bfe8f3f9fb68fe128e7d87f5cbb",
     "source_files": ["toyomacro/background/", "toyomacro/lineshape/", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py"],
+    "source_paths": ["toyomacro/background/__init__.py", "toyomacro/background/base.py", "toyomacro/background/linear.py", "toyomacro/background/shirley.py", "toyomacro/background/tougaard.py", "toyomacro/core/fitting_result.py", "toyomacro/core/spectrum.py", "toyomacro/core/xps_database.py", "toyomacro/fitting/autofitter.py", "toyomacro/fitting/peak_model.py", "toyomacro/fitting/templates.py", "toyomacro/lineshape/__init__.py", "toyomacro/lineshape/base.py", "toyomacro/lineshape/doniach_sunjic.py", "toyomacro/lineshape/factory.py", "toyomacro/lineshape/fermi_dirac.py", "toyomacro/lineshape/gaussian.py", "toyomacro/lineshape/lorentzian.py", "toyomacro/lineshape/pseudovoigt.py", "toyomacro/lineshape/voigt.py"],
     "source_sha256": "8406ed30d2763d3f32e22559f20e2c90c0d15a80873c82e7f90abbaa11023e7a",
     "source_sha256_definition": "sha256 of the lines '<sha256 hex>  <path relative to src/>' of the source files, sorted by path, each ending in a newline"
   }

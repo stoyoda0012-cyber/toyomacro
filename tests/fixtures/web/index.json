@@ -9,28 +9,28 @@
       "file": "single_voigt_be.json",
       "model": "single_voigt_linear_background",
       "energy_type": "BE",
-      "sha256": "99583ddc0eae22df153620143051f92d7c22d4a2c5537bb5a1e5d43e73d7e925"
+      "sha256": "bbb63ad8d3688ea6386529e708e3fc7b4ca73bbf97bb1e6d619313dae5a625f8"
     },
     {
       "case": "single_voigt_ke",
       "file": "single_voigt_ke.json",
       "model": "single_voigt_linear_background",
       "energy_type": "KE",
-      "sha256": "2548bdfcd615c0db209fe9befc19b13f083a2565f73d5aaa5b12fc688d6c25f1"
+      "sha256": "8b62461873f22e271af94ecaf3577e7b97fb2268824c5e4e20435ab8334b4cde"
     },
     {
       "case": "si2p_oxide_ke",
       "file": "si2p_oxide_ke.json",
       "model": "si2p_oxide_template",
       "energy_type": "KE",
-      "sha256": "6253c0ec230503dab81a48a9e73c2b22126e04a13d4896b76135d4aab7ba8ef1"
+      "sha256": "6cb19fd9c11c83ae4fd8d4b93ade137038f1147d80143e841f39680f34b67758"
     },
     {
       "case": "si2p_oxide_be",
       "file": "si2p_oxide_be.json",
       "model": "si2p_oxide_template",
       "energy_type": "BE",
-      "sha256": "d6a0fc20c82e6e24fb2c3f118d5f00313f1ce037ade3881ac9d7f333aa51abae"
+      "sha256": "323d657cb5fca62c307ddd6f4354876312242aa8bfdbe323f64d427226d0ab63"
     }
   ]
 }

@@ -5,9 +5,12 @@ Three claims, each failing on its own kind of drift:
 - the committed files are what the generator writes today, byte for byte
   (a change to a generator, its contract spectrum, or the numerical
   source -- through ``source_sha256`` -- shows up here first);
-- toyomacro, called with its default settings, reproduces every expected
+- the reference fit at default solver settings reproduces every expected
   value within the fixture's own tolerance (a solver or default change
-  that moves results);
+  that moves results). For the Si 2p cases that fit is toyomacro's
+  ``fit_with_template``; for the single-Voigt cases it is the model and
+  solver defined in ``tests/web_fixtures.py``, through which only
+  ``Voigt.evaluate`` is toyomacro's;
 - where the model matches its generator, the optimum is consistent with
   the generating parameters (the fixture is not just self-consistent).
 
@@ -45,6 +48,14 @@ def test_committed_fixtures_equal_a_fresh_generation():
     assert sorted(on_disk) == sorted(fresh)
     stale = [name for name in fresh if fresh[name] != on_disk[name]]
     assert not stale, f"stale fixtures {stale}: run `python -m tests.web_fixtures --write`"
+
+
+def test_source_commit_matches_the_history():
+    commit = wf.git_source_commit()
+    if commit is None:
+        pytest.skip("no full git history or uncommitted source files: source_commit is "
+                    "checked only against a full history (source_sha256 and bytes still are)")
+    assert wf.committed_source_commit() == commit
 
 
 def test_index_lists_every_case_with_its_digest():
