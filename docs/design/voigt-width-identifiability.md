@@ -941,7 +941,14 @@ Read with these qualifications, not as a judgement:
   the two routes is not evidence that it is: both start from the same
   points. In the narrow window the soft rows can have several branches
   (γ held at 0 or not, a falling or rising amplitude). Which one the
-  outward chain follows is part of the result.
+  outward chain follows is part of the result, and it can differ between
+  platforms. In a development configuration of the same kind
+  (σ/γ = 1/4 on ±0.8γ), CI's Windows runners followed a branch on which
+  the amplitude reaches zero, a stop at t = −0.3. macOS followed one with
+  γ held at 0.
+- These numbers are the macOS run's. CI runs the same test on every job,
+  but asserts only that each grid point produced an entry, and keeps no
+  other platform's values.
 - Where a bound is active the profile is the constrained minimum. No
   boundary correction is applied (§8).
 - The hard row's Δ(±1) agrees with the single-route values computed

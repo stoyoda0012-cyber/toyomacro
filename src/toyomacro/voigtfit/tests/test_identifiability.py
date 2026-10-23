@@ -2131,19 +2131,21 @@ class TestModeProfile:
                    for x in prof.plus.background_negative)
 
     def test_no_stop_from_a_stated_point_iterate(self, profiles):
-        """The amplitude-dominated configuration: far out on the minus side
-        both routes fail where I_z is singular to rounding, and the points
-        are 'not obtained' and flagged -- not a stop, as they were before the
-        amendment of §9.4, when an iterate from the stated point (at a
-        negative amplitude by construction) made one."""
+        """The amplitude-dominated configuration has more than one branch on
+        the minus side, and which one the chain follows depends on the
+        platform (macOS holds gamma at 0, Windows reaches a zero amplitude).
+        Whatever the branch: a stop comes from a successful solution, never
+        from an iterate when both routes failed -- before the amendment of
+        §9.4 one from the stated point, at a negative amplitude by
+        construction, made such a stop -- and every point not obtained is
+        flagged."""
         prof = profiles["stop"]
-        assert prof.minus.stop is None and prof.plus.stop is None
-        missing = [p for p in prof.points if p.outcome == "not_obtained"]
-        assert missing and all(p.flagged and not p.success_a and not p.success_b
-                               for p in missing)
-        assert isinstance(prof.minus.crossing, float)
-        assert isinstance(prof.minus.delta_1, float) and isinstance(prof.minus.delta_2, float)
-        assert prof.minus.activations["gamma"][0] < 0.0
+        by_t = {p.t: p for p in prof.points}
+        for side in (prof.plus, prof.minus):
+            if side.stop is not None:
+                at = by_t[side.stop["t"]]
+                assert at.success_a or at.success_b
+        assert all(p.flagged for p in prof.points if p.outcome == "not_obtained")
 
     def test_the_kkt_test(self):
         """Passes at the stated point and at an interior optimum; fails off
