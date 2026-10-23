@@ -39,6 +39,8 @@ archived on Zenodo for a citable DOI.
   - The design and the checks were registered before the code: design
     record §9. The Monte Carlo check of the bound along the modes is in
     `tests/test_identifiability_mc.py`, and its result is in §9.8.
+    In one single-peak configuration, the replica spread along the three
+    softest modes is 0.985–1.002 of the bound.
 
 - **`ComponentLookup.printed_binding_energy_eV`.** Each component of
   `lookup_with_status()` now carries the binding energy the table itself

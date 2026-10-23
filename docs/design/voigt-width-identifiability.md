@@ -822,6 +822,31 @@ Each part gets an independent audit in a context that did not write it.
 Results of §9.6 are entered here as each check lands; nothing above
 changes because of them.
 
+**P1 — pass.** Run once, at commit dc05fb2 with a clean tree, on
+Python 3.12.11, NumPy 2.3.5 and SciPy 1.17.0 (macOS, arm64). Seed key
+1: all 10 000 replicas converged and none ended at the floor; the
+interior check passed.
+
+| mode | relative SD bound | replica SD / √λ | replica mean / √λ |
+|---|---|---|---|
+| 1 | 0.00708 | 0.991 | +0.004 |
+| 2 | 0.00155 | 1.002 | −0.006 |
+| 3 | 0.000663 | 0.985 | −0.001 |
+
+All three ratios lie within 4 % of 1. Recorded, not judged:
+
+- The first principal axis of the scaled replicas is 0.13° from mode 1,
+  with λ₁/λ₂ = 21.0.
+- Seed keys 2 and 3, all replicas converged and none at the floor, give
+  0.998, 0.993, 0.993 and 0.977, 1.005, 1.003.
+- Over the nine ratios the mean is 0.994. Seven lie within two sampling
+  errors (0.71 % each). The largest departure, 2.3 % (key 3, mode 1),
+  is 3.3 of them.
+
+As §9.6 says, this confirms the bound along the reported directions in
+one single-peak configuration. It says nothing about the scale
+convention.
+
 ## References
 
 - J. J. Olivero and R. L. Longbothum, *J. Quant. Spectrosc. Radiat.
