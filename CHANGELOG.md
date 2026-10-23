@@ -42,6 +42,31 @@ archived on Zenodo for a citable DOI.
     In one single-peak configuration, the replica spread along the three
     softest modes is 0.985–1.002 of the bound.
 
+- **`identifiability_at_estimate` and `identifiability_from_exact_k`
+  (experimental): the labels and the modes at a fit's result.**
+  - The result is a plug-in at a noisy estimate, not a confidence
+    interval and not a statement about that fit's error.
+  - The fitters in this package that produce such estimates are least
+    squares. If they are unbiased and the model is correct, their
+    variance is at least the bound at the true parameters.
+  - **`intensity` is required**, in the readers' vocabulary
+    (`INTENSITY_SEMANTICS`). Anything but `raw_counts` returns a
+    withheld report: the reason, and no numbers. Nothing in a fit result
+    records whether amplitudes are in counts.
+  - **The generic entry** evaluates every peak parameter free.
+  - **The `exact_k` adapter** evaluates the sub-model that fit used —
+    one shared σ, fixed γ, fixed doublet splitting and ratio — through
+    the Jacobian times the matrix of the ties.
+    - It withholds for a plug-in background, a candidate that did not
+      converge, a non-positive amplitude, an estimate at a bound,
+      missing or non-finite background coefficients, or a non-positive
+      mean.
+    - It also flags a shared variance within the boundary margin of the
+      fit's own `sigma_bounds`.
+  - Covered by deterministic tests only. The sub-model's Jacobian is
+    checked against finite differences of the tied model; there is no
+    Monte Carlo check of its own.
+
 - **`ComponentLookup.printed_binding_energy_eV`.** Each component of
   `lookup_with_status()` now carries the binding energy the table itself
   prints for the line: every Yeh–Lindau and Trzhaskovskaya line, and 71

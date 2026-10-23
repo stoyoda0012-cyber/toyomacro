@@ -21,9 +21,11 @@ On top of those, ``assess_identifiability`` sorts each parameter into
 rank deficient, weakly identified or identified, and separately says
 whether the Gaussian variance, or gamma, sits near its boundary;
 ``identifiability_modes`` reports which combinations of peak parameters
-are determined worst and what each looks like in the spectrum. What
-those do and do not mean is in their docstrings; none of them is a
-statement about a fit.
+are determined worst and what each looks like in the spectrum.
+``identifiability_at_estimate`` and ``identifiability_from_exact_k``
+evaluate both at a fit's result -- still bounds from a model, now
+plugged in at a noisy estimate, not a statement about that fit's error.
+What each does and does not mean is in its docstring.
 
 Why the variance. A Voigt profile is a Lorentzian convolved with a
 Gaussian, so it obeys the heat equation in ``v``::
@@ -153,6 +155,7 @@ from ..lineshape.pseudovoigt import PseudoVoigt
 from .crlb import _NULL_PROJECTION_TOL
 
 __all__ = [
+    "INTENSITY_SEMANTICS",
     "PARAMETERIZATIONS",
     "VoigtDerivatives",
     "VoigtPeak",
@@ -163,6 +166,7 @@ __all__ = [
     "ParameterAssessment",
     "WidthAssessment",
     "IdentifiabilityReport",
+    "EstimateReport",
     "Mode",
     "ModeReport",
     "ScanGrid",
@@ -174,6 +178,8 @@ __all__ = [
     "poisson_fisher",
     "effective_information",
     "assess_identifiability",
+    "identifiability_at_estimate",
+    "identifiability_from_exact_k",
     "identifiability_modes",
     "scan_identifiability",
 ]
@@ -1226,6 +1232,385 @@ def identifiability_modes(
         scales=dict(zip(decomposition.target_names, decomposition.scales)),
         thresholds=thresholds, exposure=float(exposure),
         variance_floor=float(variance_floor), fisher=fisher,
+    )
+
+
+# ---------------------------------------------------------------------------
+# At a fitted estimate
+# ---------------------------------------------------------------------------
+
+# The readers' IntensitySemantics vocabulary (toyomacro.io.readers.base_reader),
+# repeated here so that this module does not import the I/O layer; a test
+# keeps the two equal. Only raw counts carry the scale the bound needs.
+INTENSITY_SEMANTICS: tuple[str, ...] = (
+    "raw_counts", "count_rate", "corrected_intensity", "arbitrary", "unknown",
+)
+
+_ESTIMATE_CAVEAT = (
+    "a plug-in at a noisy estimate, not a confidence interval; if the fit's "
+    "estimator is unbiased and the model -- including the fit's ties and "
+    "independent Poisson channels -- is correct, its variance is at least the "
+    "bound at the true parameters, of which this is a plug-in estimate"
+)
+
+
+@dataclass(frozen=True)
+class EstimateReport:
+    """Result of ``identifiability_at_estimate`` and ``identifiability_from_exact_k``.
+
+    Attributes:
+        withheld: None, or why no numbers are reported (the intensity is
+            not raw counts, the background cannot be rebuilt, ...). When
+            set, every other result field is empty.
+        model: Which model the bounds are for: every peak parameter free,
+            or the sub-model a fit actually used
+        intensity: As declared
+        parameters: One ``ParameterAssessment`` per parameter of that
+            model; background coefficients are 'not_assessed' unless rank
+            deficient. For the ``exact_k`` sub-model the same fields mean
+            slightly different things: ``peak`` is the component index (a
+            doublet's two lines share it) and is None for ``var_shared``
+            as well as for the background; ``amp_j`` is the main line's
+            area, the partner's being ``amp_j / branch_ratio``.
+        near_boundary: Width parameter name -> whether it lies within
+            ``boundary_sd`` bounds of its lower limit (variance: the
+            floor; gamma: 0). For the ``exact_k`` sub-model also
+            'var_shared_fit_bounds': whether the shared variance lies
+            within as many bounds of either of the fit's own
+            ``sigma_bounds`` (squared), where the constrained fit stops
+        modes: The ``ModeReport`` of that model
+        assessment: The full ``IdentifiabilityReport`` when every peak
+            parameter is free; None for a sub-model, whose layout it does
+            not fit
+        caveat: What the numbers are, in one sentence
+    """
+
+    withheld: str | None
+    model: str
+    intensity: str
+    parameters: tuple[ParameterAssessment, ...] = ()
+    near_boundary: dict[str, bool] = field(default_factory=dict)
+    modes: ModeReport | None = None
+    assessment: IdentifiabilityReport | None = field(default=None, repr=False)
+    caveat: str = _ESTIMATE_CAVEAT
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-Python summary for ``json.dumps`` (no arrays, no matrix)."""
+        return {
+            "withheld": self.withheld,
+            "model": self.model,
+            "intensity": self.intensity,
+            "caveat": self.caveat,
+            "parameters": [vars(a).copy() for a in self.parameters],
+            "near_boundary": dict(self.near_boundary),
+            "modes": None if self.modes is None else self.modes.to_dict(),
+        }
+
+
+def _check_intensity(intensity: str) -> str | None:
+    if intensity not in INTENSITY_SEMANTICS:
+        raise ValueError(
+            f"intensity must be one of {INTENSITY_SEMANTICS}, got {intensity!r}"
+        )
+    if intensity == "raw_counts":
+        return None
+    return (
+        f"intensity is '{intensity}': the bound needs amplitude * V(E) in counts "
+        "per channel as recorded, and nothing here can recover that scale"
+    )
+
+
+def identifiability_at_estimate(
+    energy: np.ndarray,
+    peaks: list[VoigtPeak],
+    background: Background | None = None,
+    *,
+    intensity: str,
+    k: int = 3,
+    variance_floor: float = 0.0,
+    thresholds: IdentifiabilityThresholds | None = None,
+) -> EstimateReport:
+    """The labels and the modes evaluated at a fitted estimate.
+
+    ``peaks`` and ``background`` are a fit's result. The report is
+    ``assess_identifiability`` and ``identifiability_modes`` at those
+    values: a plug-in at a noisy estimate, not a confidence interval.
+    The fitters in this package that produce such estimates are least
+    squares, not Poisson maximum likelihood. If the fit's estimator is
+    unbiased and the model --
+    including the fit's ties and independent Poisson channels -- is
+    correct, its variance is at least the bound at the true parameters;
+    this is a plug-in estimate of that bound.
+
+    Every peak parameter is evaluated free. For a fit that tied or fixed
+    parameters (a shared sigma, a fixed gamma, a doublet) that answers
+    another question -- it can name a direction the fit did not have;
+    ``identifiability_from_exact_k`` evaluates the sub-model ``exact_k``
+    used.
+
+    The intensity is declared, never guessed. The bound needs ``amplitude
+    * V(E)`` to be counts per channel as recorded, and no fit result in
+    the package records what its intensities are. ``intensity`` takes the
+    readers' vocabulary (``INTENSITY_SEMANTICS``); only 'raw_counts'
+    proceeds, anything else returns a report with ``withheld`` set and no
+    numbers. With raw counts the exposure is 1, so there is no
+    ``exposure`` argument: it would count the acquisition twice.
+
+    Args:
+        energy: Energy axis (eV)
+        peaks: The fitted peaks
+        background: The fitted background, its terms flagged estimated
+            as the fit estimated them; or None
+        intensity: One of ``INTENSITY_SEMANTICS``; required
+        k: Number of modes, as in ``identifiability_modes``
+        variance_floor: As in ``assess_identifiability``
+        thresholds: Defaults to ``IdentifiabilityThresholds()``
+
+    Raises:
+        ValueError: for an ``intensity`` outside the vocabulary, an
+            invalid ``variance_floor``, or a mean that is not positive in
+            every channel (the inputs are the caller's, as for
+            ``assess_identifiability``)
+    """
+    model = "every peak parameter free"
+    withheld = _check_intensity(intensity)
+    if withheld is not None:
+        return EstimateReport(withheld=withheld, model=model, intensity=intensity)
+    assessment = assess_identifiability(
+        energy, peaks, background, variance_floor=variance_floor, thresholds=thresholds,
+    )
+    modes = identifiability_modes(
+        energy, peaks, background, k=k, variance_floor=variance_floor, thresholds=thresholds,
+    )
+    near = {}
+    for width in assessment.widths:
+        near[f"var_{width.peak}"] = width.near_boundary
+        near[f"gamma_{width.peak}"] = width.near_boundary_gamma
+    return EstimateReport(
+        withheld=None, model=model, intensity=intensity, parameters=assessment.parameters,
+        near_boundary=near, modes=modes, assessment=assessment,
+    )
+
+
+def identifiability_from_exact_k(
+    report: Any,
+    k_structured: int,
+    energy: np.ndarray,
+    *,
+    intensity: str,
+    k: int = 3,
+    thresholds: IdentifiabilityThresholds | None = None,
+) -> EstimateReport:
+    """The labels and the modes at an ``exact_k`` candidate, for its own model.
+
+    ``exact_k`` fits K structured components that share one Gaussian
+    width, with gamma fixed and, for a doublet, the splitting and
+    branching ratio fixed. All of these are affine constraints in
+    'var_gamma' coordinates, so the sub-model is evaluated directly: the
+    Voigt Jacobian of every line (doublet partners included) times the
+    matrix L of the ties, giving parameters ``amp_j`` and ``center_j``
+    per component, one ``var_shared`` and the background coefficients.
+    The shared variance is scaled by FWHM**2/(8 ln2) of the narrowest
+    line that shares it, the smallest candidate scale and so the largest
+    relative bound (in ``exact_k`` every line has the same width, so the
+    choice does not arise).
+
+    The same caveats as ``identifiability_at_estimate``: a plug-in at a
+    noisy estimate, not a confidence interval. ``exact_k`` is a weighted
+    least-squares fit, not Poisson maximum likelihood; if it is unbiased
+    and its model -- these ties and independent Poisson channels -- is
+    correct, its variance is at least the bound at the true parameters,
+    of which this is a plug-in estimate. The rows read as described under
+    ``EstimateReport.parameters``: ``amp_j`` is the main line's area and
+    ``peak`` the component index.
+
+    Withheld, with the reason and no numbers, when:
+
+    - ``intensity`` is not 'raw_counts';
+    - the candidate did not converge;
+    - the background was a plug-in Shirley or Tougaard (only a summary of
+      it is stored, so it cannot be rebuilt);
+    - an amplitude is not positive (``exact_k`` allows negative ones);
+    - the candidate carries ``sigma_at_bound`` or a
+      ``center_*_at_energy_bound`` flag (the estimate is not a
+      stationary point);
+    - its background coefficients are missing or not finite;
+    - the fitted mean is not positive in every channel.
+
+    Args:
+        report: An ``exact_k.ExactKReport``
+        k_structured: Which candidate K
+        energy: The energy axis the fit ran on, in either order (the
+            report does not store it). Its length is checked and it must
+            contain the fitted centers; another axis of the same length
+            that still contains them cannot be told apart.
+        intensity: One of ``INTENSITY_SEMANTICS``; required
+        k: Number of modes
+        thresholds: Defaults to ``IdentifiabilityThresholds()``
+
+    Raises:
+        ValueError: for an ``intensity`` outside the vocabulary, a K the
+            report has no candidate for, an energy axis of another length
+            or one that does not contain the fitted centers, or a
+            non-positive branching ratio
+    """
+    from .multipeak_solver import build_bg_design
+
+    thresholds = thresholds or IdentifiabilityThresholds()
+    energy = np.asarray(energy, dtype=np.float64)
+    matches = [c for c in report.candidates if c.k_structured == k_structured]
+    if not matches:
+        raise ValueError(f"the report has no candidate with K = {k_structured}")
+    cand = matches[0]
+    if cand.score.n_points != energy.size:
+        raise ValueError(
+            f"energy has {energy.size} points, the fit ran on {cand.score.n_points}"
+        )
+    components = list(cand.model.components)
+    doublets = any(c.is_doublet for c in components)
+    model = ("exact_k sub-model: shared sigma, fixed gamma"
+             + (", fixed doublet splitting and ratio" if doublets else ""))
+
+    def withheld(reason: str) -> EstimateReport:
+        return EstimateReport(withheld=reason, model=model, intensity=intensity)
+
+    reason = _check_intensity(intensity)
+    if reason is not None:
+        return withheld(reason)
+    if not cand.score.success:
+        return withheld(f"candidate K = {k_structured} did not converge")
+    mode = report.background.get("mode")
+    if mode is None:
+        return withheld("the report does not record how the background was treated")
+    if mode not in ("polynomial", "none"):
+        return withheld(f"background '{mode}' was a plug-in; only its summary is stored")
+    amplitudes = np.asarray(cand.amplitudes, dtype=np.float64)
+    if not np.all(amplitudes > 0.0):
+        return withheld("an amplitude is not positive")
+    flagged = [f for f in cand.boundary_flags
+               if f == "sigma_at_bound" or f.endswith("_at_energy_bound")]
+    if flagged:
+        return withheld(f"the estimate is at a bound: {', '.join(flagged)}")
+
+    if any(c.is_doublet and not c.branch_ratio > 0.0 for c in components):
+        raise ValueError("a doublet's branch_ratio must be positive")
+    if any(not energy.min() <= c.center <= energy.max() for c in components):
+        raise ValueError("the energy axis does not contain the fitted centers: "
+                         "pass the axis the fit ran on")
+
+    # Every line as a VoigtPeak, and L: (amp_j, center_j per component,
+    # var_shared, background) -> (amp, center, var, gamma per line, background)
+    lines: list[VoigtPeak] = []
+    owner: list[tuple[int, float]] = []  # (component, amplitude factor) per line
+    for j, (comp, amp) in enumerate(zip(components, amplitudes)):
+        lines.append(VoigtPeak(float(amp), comp.center, comp.sigma, comp.gamma))
+        owner.append((j, 1.0))
+        if comp.is_doublet:
+            lines.append(VoigtPeak(float(amp) / comp.branch_ratio, comp.center + comp.so_split,
+                                   comp.sigma, comp.gamma))
+            owner.append((j, 1.0 / comp.branch_ratio))
+    degree = cand.model.bg_degree
+    background = None
+    if degree is not None:
+        coefficients = np.asarray(cand.bg_coefficients, dtype=np.float64)
+        if coefficients.size != degree + 1 or not np.all(np.isfinite(coefficients)):
+            return withheld("the background coefficients are missing or not finite")
+        background = Background(
+            basis=build_bg_design(energy, degree).astype(np.float64).T,
+            coefficients=coefficients,
+            names=tuple(f"bg_{i}" for i in range(degree + 1)),
+            estimated=(True,) * (degree + 1),
+        )
+    mean = sum(p.amplitude * voigt_derivatives(energy, p.center, p.variance, p.gamma).value
+               for p in lines)
+    if background is not None:
+        mean = mean + background.counts()
+    if not np.all(mean > 0.0):
+        return withheld("the fitted mean is not positive in every channel")
+
+    full = poisson_fisher(energy, lines, background)
+    n_comp, n_bg = len(components), 0 if background is None else degree + 1
+    names = ([f"amp_{j}" for j in range(n_comp)] + [f"center_{j}" for j in range(n_comp)]
+             + ["var_shared"] + ([] if background is None else list(background.names)))
+    roles = (["amplitude"] * n_comp + ["center"] * n_comp + ["width"]
+             + ["background"] * n_bg)
+    ties = np.zeros((len(full.param_names), len(names)))
+    for line, (j, factor) in enumerate(owner):
+        ties[4 * line, j] = factor                # amplitude
+        ties[4 * line + 1, n_comp + j] = 1.0      # center: a doublet shifts rigidly
+        ties[4 * line + 2, 2 * n_comp] = 1.0      # one shared variance; gamma fixed
+    for b in range(n_bg):
+        ties[4 * len(lines) + b, 2 * n_comp + 1 + b] = 1.0
+    jacobian = full.jacobian @ ties
+    fisher = ties.T @ full.fisher @ ties
+    values = np.concatenate([amplitudes, [c.center for c in components],
+                             [components[0].sigma ** 2],
+                             [] if background is None else background.coefficients])
+
+    fwhm = [voigt_fwhm(p.variance, p.gamma) for p in lines]
+    narrowest = min(fwhm)
+    scales = ([abs(a) for a in amplitudes]
+              + [voigt_fwhm(c.sigma ** 2, c.gamma) for c in components]
+              + [narrowest * narrowest / _EIGHT_LN2])
+    result = PoissonFisherResult(
+        fisher=fisher, param_names=tuple(names), param_roles=tuple(roles),
+        param_values=values, width_index=(2 * n_comp,), jacobian=jacobian,
+        expected_counts=full.expected_counts, parameterization="var_gamma",
+        exposure=1.0,
+        config={
+            "model": model,
+            "peaks": [(p.amplitude, p.center, p.sigma, p.gamma) for p in lines],
+            "background_terms": () if background is None else background.names,
+            "n_energy": int(energy.size),
+            "energy_range": (float(energy[0]), float(energy[-1])),
+        },
+    )
+    target = list(range(2 * n_comp + 1))
+    decomposition = mode_decomposition(
+        fisher, jacobian, full.expected_counts, names, target, scales, k=k,
+        weak_relative_sd=thresholds.weak_relative_sd, projection_tol=_NULL_PROJECTION_TOL,
+    )
+    modes = ModeReport(
+        modes=decomposition.modes, null_modes=decomposition.null_modes,
+        null_space_dim=decomposition.null_space_dim,
+        nuisance_null_dim=decomposition.nuisance_null_dim,
+        scales=dict(zip(decomposition.target_names, decomposition.scales)),
+        thresholds=thresholds, exposure=1.0, variance_floor=0.0, fisher=result,
+    )
+
+    covariance, unbounded, _, _ = _covariance_bound(fisher)
+    width_info = effective_information(fisher, [2 * n_comp])
+    cond_cov, cond_unbounded, _, _ = _covariance_bound(width_info.conditional)
+    parameters = []
+    for i, (name, role) in enumerate(zip(names, roles)):
+        sd = np.inf if unbounded[i] else math.sqrt(max(covariance[i, i], 0.0))
+        scale = scales[i] if i < len(scales) else None
+        relative = None if scale is None else sd / scale
+        if unbounded[i]:
+            status = "rank_deficient"
+        elif relative is None:
+            status = "not_assessed"
+        else:
+            status = "weakly_identified" if relative > thresholds.weak_relative_sd else "identified"
+        conditional = None
+        if role == "width":
+            conditional = np.inf if cond_unbounded[0] else math.sqrt(max(cond_cov[0, 0], 0.0))
+        peak = i if i < n_comp else (i - n_comp if i < 2 * n_comp else None)
+        parameters.append(ParameterAssessment(
+            name=name, role=role, peak=peak, value=float(values[i]), sd=float(sd),
+            sd_conditional=conditional, reference_scale=scale, relative_sd=relative,
+            status=status,
+        ))
+    var_row = parameters[2 * n_comp]
+    reach = thresholds.boundary_sd * var_row.sd
+    near = {"var_shared": bool(var_row.value < reach)}
+    bounds = report.config.get("sigma_bounds")
+    if bounds is not None:
+        near["var_shared_fit_bounds"] = bool(
+            any(abs(var_row.value - float(b) ** 2) < reach for b in bounds))
+    return EstimateReport(
+        withheld=None, model=model, intensity=intensity, parameters=tuple(parameters),
+        near_boundary=near, modes=modes, assessment=None,
     )
 
 

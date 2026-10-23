@@ -33,6 +33,8 @@ from toyomacro.voigtfit.identifiability import (
     assess_identifiability,
     constant_background,
     effective_information,
+    identifiability_at_estimate,
+    identifiability_from_exact_k,
     identifiability_modes,
     linear_background,
     poisson_fisher,
@@ -1758,3 +1760,306 @@ class TestModes:
         assert last.eigenvalue_ratio is None and all(v is None for v in last.shares.values())
         assert report.modes[-2].eigenvalue_ratio is None
         assert all(m.status != "not_resolved" and m.relative_sd > 0.0 for m in report.modes[:-1])
+
+# ===================================================================
+# At a fitted estimate
+# ===================================================================
+
+
+EK_ENERGY = np.arange(280.0, 292.0 + 1e-9, 0.05)
+
+
+def _exact_k_report(*, doublet=False, plugin=None):
+    """A noise-free two-component spectrum on a linear background, fitted
+    by exact_k (which then recovers the truth to rounding)."""
+    from toyomacro.voigtfit.exact_k import ExactKConfig, run_exact_k
+    from toyomacro.voigtfit.multipeak_solver import build_bg_design
+
+    e = EK_ENERGY
+    split, ratio = (1.2, 2.0) if doublet else (0.0, 1.0)
+    y = build_bg_design(e, 1).astype(np.float64) @ np.array([200.0, 30.0])
+    for amp, center in ((3.0e4, 284.8), (1.2e4, 286.4)):
+        y = y + amp * voigt_derivatives(e, center, 0.16, 0.15).value
+        if doublet:
+            y = y + amp / ratio * voigt_derivatives(e, center + split, 0.16, 0.15).value
+    cfg = ExactKConfig(sigma_init=0.4, gamma=0.15, k_max=2, so_split=split,
+                       branch_ratio=ratio,
+                       bg_degree=None if plugin else 1, plugin_background=plugin)
+    return run_exact_k(e, y, cfg, sigma_std=np.sqrt(y))
+
+
+@pytest.fixture(scope="module")
+def ek_singlet():
+    return _exact_k_report()
+
+
+@pytest.fixture(scope="module")
+def ek_doublet():
+    return _exact_k_report(doublet=True)
+
+
+def _tied_mean(theta, e, n_comp, split, ratio, gamma):
+    """The exact_k model written out directly, for finite differences."""
+    from toyomacro.voigtfit.multipeak_solver import build_bg_design
+
+    amps, centers, var, bg = theta[:n_comp], theta[n_comp:2 * n_comp], theta[2 * n_comp], \
+        theta[2 * n_comp + 1:]
+    mu = build_bg_design(e, bg.size - 1).astype(np.float64) @ bg
+    for a, c in zip(amps, centers):
+        mu = mu + a * voigt_derivatives(e, c, var, gamma).value
+        if split:
+            mu = mu + a / ratio * voigt_derivatives(e, c + split, var, gamma).value
+    return mu
+
+
+class TestEstimate:
+    """``identifiability_at_estimate`` and the ``exact_k`` adapter."""
+
+    def test_vocabulary_is_the_readers(self):
+        import typing
+
+        from toyomacro.io.readers.base_reader import IntensitySemantics
+
+        assert idf.INTENSITY_SEMANTICS == typing.get_args(IntensitySemantics)
+
+    def test_anything_but_raw_counts_is_withheld(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        for intensity in idf.INTENSITY_SEMANTICS[1:]:
+            report = identifiability_at_estimate(e, [MODE_PEAK], bg, intensity=intensity)
+            assert report.withheld and intensity in report.withheld
+            assert report.parameters == () and report.modes is None and not report.near_boundary
+            json.dumps(report.to_dict())
+        with pytest.raises(ValueError, match="intensity must be one of"):
+            identifiability_at_estimate(e, [MODE_PEAK], bg, intensity="counts")
+        with pytest.raises(TypeError):
+            identifiability_at_estimate(e, [MODE_PEAK], bg)  # no default
+
+    def test_raw_counts_is_the_labels_and_the_modes(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        report = identifiability_at_estimate(e, [MODE_PEAK], bg, intensity="raw_counts")
+        assert report.withheld is None and report.model == "every peak parameter free"
+        direct = assess_identifiability(e, [MODE_PEAK], bg)
+        assert [a.sd for a in report.parameters] == [a.sd for a in direct.parameters]
+        modes = identifiability_modes(e, [MODE_PEAK], bg)
+        assert [m.relative_sd for m in report.modes.modes] == [m.relative_sd for m in modes.modes]
+        assert report.near_boundary == {"var_0": False, "gamma_0": False}
+        assert "not a confidence interval" in report.caveat
+        text = json.dumps(report.to_dict())
+        assert "signature" not in text
+
+    def test_the_adapter_evaluates_the_tied_model(self, ek_singlet, ek_doublet):
+        """The Jacobian of the sub-model against finite differences of the
+        exact_k model written out directly: that pins the ties."""
+        for rep, split, ratio in ((ek_singlet, 0.0, 1.0), (ek_doublet, 1.2, 2.0)):
+            cand = rep.candidates[1]
+            assert cand.score.success and not cand.boundary_flags
+            report = identifiability_from_exact_k(rep, 2, EK_ENERGY, intensity="raw_counts")
+            assert report.withheld is None and report.assessment is None
+            assert ("doublet" in report.model) == bool(split)
+            fisher = report.modes.fisher
+            assert fisher.param_names == ("amp_0", "amp_1", "center_0", "center_1",
+                                          "var_shared", "bg_0", "bg_1")
+            theta = fisher.param_values.copy()
+            jac = np.empty_like(fisher.jacobian)
+            for i in range(theta.size):
+                h = 1e-6 * max(abs(theta[i]), 1e-3)
+                up, down = theta.copy(), theta.copy()
+                up[i] += h
+                down[i] -= h
+                jac[:, i] = (_tied_mean(up, EK_ENERGY, 2, split, ratio, 0.15)
+                             - _tied_mean(down, EK_ENERGY, 2, split, ratio, 0.15)) / (2 * h)
+            assert np.allclose(fisher.jacobian, jac, rtol=1e-5,
+                               atol=1e-6 * np.abs(jac).max(axis=0))
+            assert np.allclose(fisher.expected_counts,
+                               _tied_mean(theta, EK_ENERGY, 2, split, ratio, 0.15), rtol=1e-12)
+            for mode in report.modes.modes:
+                assert mode.whitened_norm == pytest.approx(1.0, abs=1e-9)
+
+    def test_tying_never_loses_information(self, ek_singlet):
+        """The same estimate with every parameter free: for the parameters
+        both models have, the tied bound is never the larger (Loewner)."""
+        from toyomacro.voigtfit.multipeak_solver import build_bg_design
+
+        cand = ek_singlet.candidates[1]
+        tied = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
+        peaks = [VoigtPeak(a, c, cand.sigma, 0.15) for a, c in zip(cand.amplitudes, cand.centers)]
+        bg = Background(basis=build_bg_design(EK_ENERGY, 1).astype(np.float64).T,
+                        coefficients=np.array(cand.bg_coefficients), names=("bg_0", "bg_1"),
+                        estimated=(True, True))
+        free = identifiability_at_estimate(EK_ENERGY, peaks, bg, intensity="raw_counts")
+        free_sd = {a.name: a.sd for a in free.parameters}
+        tied_sd = {a.name: a.sd for a in tied.parameters}
+        for name in ("amp_0", "amp_1", "center_0", "center_1", "bg_0", "bg_1"):
+            assert tied_sd[name] <= free_sd[name] * (1.0 + 1e-9)
+
+    def test_scales_and_labels_of_the_sub_model(self, ek_doublet):
+        report = identifiability_from_exact_k(ek_doublet, 2, EK_ENERGY, intensity="raw_counts")
+        cand = ek_doublet.candidates[1]
+        fwhm = voigt_fwhm(cand.sigma ** 2, 0.15)
+        assert report.modes.scales["var_shared"] == pytest.approx(fwhm**2 / (8 * math.log(2)))
+        assert report.modes.scales["amp_1"] == pytest.approx(cand.amplitudes[1])
+        covariance = np.linalg.inv(report.modes.fisher.fisher)
+        for i, row in enumerate(report.parameters):
+            assert row.sd == pytest.approx(math.sqrt(covariance[i, i]), rel=1e-8)
+            if row.role == "background":
+                assert row.status == "not_assessed" and row.reference_scale is None
+            else:
+                assert row.relative_sd == pytest.approx(row.sd / row.reference_scale)
+        assert set(report.near_boundary) == {"var_shared", "var_shared_fit_bounds"}
+        two = identifiability_from_exact_k(ek_doublet, 2, EK_ENERGY, intensity="raw_counts", k=2)
+        assert len(two.modes.modes) == 2
+        json.dumps(report.to_dict())
+
+    def test_the_axis_order_does_not_matter(self, ek_singlet):
+        forward = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
+        backward = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY[::-1],
+                                                intensity="raw_counts")
+        for a, b in zip(forward.parameters, backward.parameters):
+            assert b.sd == pytest.approx(a.sd, rel=1e-9)
+
+    def test_withheld_cases(self, ek_singlet):
+        import dataclasses
+
+        def with_candidate(**changes):
+            cands = list(ek_singlet.candidates)
+            cands[1] = dataclasses.replace(cands[1], **changes)
+            return dataclasses.replace(ek_singlet, candidates=tuple(cands))
+
+        def withheld(rep, **kw):
+            return identifiability_from_exact_k(rep, 2, EK_ENERGY, intensity="raw_counts",
+                                                **kw).withheld
+
+        cand = ek_singlet.candidates[1]
+        assert "count_rate" in identifiability_from_exact_k(
+            ek_singlet, 2, EK_ENERGY, intensity="count_rate").withheld
+        assert "not positive" in withheld(with_candidate(amplitudes=(cand.amplitudes[0], -1.0)))
+        assert "sigma_at_bound" in withheld(with_candidate(boundary_flags=("sigma_at_bound",)))
+        assert "center_0_at_energy_bound" in withheld(
+            with_candidate(boundary_flags=("center_0_at_energy_bound",)))
+        assert "mean" in withheld(with_candidate(bg_coefficients=(-1.0e5, 0.0)))
+        assert "converge" in withheld(with_candidate(
+            score=dataclasses.replace(cand.score, success=False)))
+        plugin = _exact_k_report(plugin="shirley")
+        assert "plug-in" in withheld(plugin)
+        with pytest.raises(ValueError, match="no candidate"):
+            identifiability_from_exact_k(ek_singlet, 7, EK_ENERGY, intensity="raw_counts")
+        with pytest.raises(ValueError, match="points"):
+            identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY[:-1], intensity="raw_counts")
+        with pytest.raises(ValueError, match="intensity must be one of"):
+            identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="counts")
+
+    @staticmethod
+    def _variant(rep, **changes):
+        """The report with candidate K = 2 changed; sigma and centers are
+        changed in the components too, where the adapter reads them."""
+        import dataclasses
+
+        cand = rep.candidates[1]
+        comps = list(cand.model.components)
+        if "sigma" in changes:
+            comps = [dataclasses.replace(c, sigma=changes["sigma"]) for c in comps]
+        if "centers" in changes:
+            comps = [dataclasses.replace(c, center=x) for c, x in zip(comps, changes["centers"])]
+        cand = dataclasses.replace(cand, model=dataclasses.replace(
+            cand.model, components=tuple(comps)), **changes)
+        return dataclasses.replace(rep, candidates=(rep.candidates[0], cand))
+
+    def test_labels_and_flags_of_the_sub_model(self, ek_singlet):
+        """Coincident components are rank deficient with two null modes; a
+        threshold below every bound makes every row weak; a small,
+        faint shared width is flagged against 0; the reference scales and
+        the conditional bound are what the docstring says."""
+        twin = self._variant(ek_singlet, centers=(285.5, 285.5))
+        report = identifiability_from_exact_k(twin, 2, EK_ENERGY, intensity="raw_counts")
+        status = {a.name: a.status for a in report.parameters}
+        assert all(status[n] == "rank_deficient"
+                   for n in ("amp_0", "amp_1", "center_0", "center_1"))
+        assert len(report.modes.null_modes) == 2
+
+        strict = identifiability_from_exact_k(
+            ek_singlet, 2, EK_ENERGY, intensity="raw_counts",
+            thresholds=IdentifiabilityThresholds(weak_relative_sd=1e-9))
+        assert all(a.status == "weakly_identified" for a in strict.parameters
+                   if a.role != "background")
+
+        faint = self._variant(ek_singlet, sigma=0.05, amplitudes=(300.0, 100.0))
+        report = identifiability_from_exact_k(faint, 2, EK_ENERGY, intensity="raw_counts")
+        row = {a.name: a for a in report.parameters}["var_shared"]
+        assert row.value < 3.0 * row.sd and report.near_boundary["var_shared"]
+        assert row.peak is None and row.sd_conditional == pytest.approx(
+            1.0 / math.sqrt(report.modes.fisher.fisher[4, 4]))
+        wide = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
+        assert not wide.near_boundary["var_shared"]
+        cand = ek_singlet.candidates[1]
+        by_name = {a.name: a for a in wide.parameters}
+        assert by_name["center_1"].reference_scale == pytest.approx(
+            voigt_fwhm(cand.sigma ** 2, 0.15))
+        assert (by_name["amp_1"].peak, by_name["center_1"].peak) == (1, 1)
+
+    def test_flag_at_the_fits_own_sigma_bound(self, ek_singlet):
+        """exact_k constrains sigma to sigma_bounds. At sigma = 0.0205 eV
+        the variance is 8 bounds above 0 but 0.4 above 0.02**2: flagged at
+        the fit's bound, not at 0. The upper end counts the same way, and
+        the margin is boundary_sd bounds (here 2.5 inside, 5 outside)."""
+        import dataclasses
+
+        near = self._variant(ek_singlet, sigma=0.0205)
+        report = identifiability_from_exact_k(near, 2, EK_ENERGY, intensity="raw_counts")
+        assert report.near_boundary == {"var_shared": False, "var_shared_fit_bounds": True}
+        wide = identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY, intensity="raw_counts")
+        assert wide.near_boundary == {"var_shared": False, "var_shared_fit_bounds": False}
+        row = {a.name: a for a in wide.parameters}["var_shared"]
+        for distance, flagged in ((2.5, True), (5.0, False)):
+            upper = math.sqrt(row.value + distance * row.sd)
+            moved = dataclasses.replace(
+                ek_singlet, config={**ek_singlet.config, "sigma_bounds": [0.02, upper]})
+            report = identifiability_from_exact_k(moved, 2, EK_ENERGY, intensity="raw_counts")
+            assert report.near_boundary["var_shared_fit_bounds"] is flagged
+
+    def test_generic_flags_are_per_width(self):
+        """A nearly Gaussian peak: gamma is flagged, the variance is not."""
+        sigma, gamma = idf._widths_at_fwhm(100.0, 1.0)
+        energy = np.linspace(-5.0, 5.0, 501)
+        peak = VoigtPeak(1.0e4, 0.0, sigma, gamma)
+        report = identifiability_at_estimate(energy, [peak], _flat(energy, peak),
+                                             intensity="raw_counts")
+        assert report.near_boundary == {"var_0": False, "gamma_0": True}
+
+    def test_arguments_reach_the_evaluation(self):
+        e = MODE_ENERGY
+        bg = linear_background(e, 300.0, 10.0)
+        cut = IdentifiabilityThresholds(weak_relative_sd=1e-9)
+        report = identifiability_at_estimate(e, [MODE_PEAK], bg, intensity="raw_counts", k=2,
+                                             variance_floor=0.05, thresholds=cut)
+        assert len(report.modes.modes) == 2 and report.modes.variance_floor == 0.05
+        assert report.assessment.variance_floor == 0.05
+        assert all(m.status == "weakly_identified" for m in report.modes.modes)
+        for word in ("not a confidence interval", "unbiased", "correct"):
+            assert word in report.caveat
+
+    def test_malformed_inputs(self, ek_singlet):
+        import dataclasses
+
+        assert "not finite" in identifiability_from_exact_k(
+            self._variant(ek_singlet, bg_coefficients=(200.0,)), 2, EK_ENERGY,
+            intensity="raw_counts").withheld
+        assert "not finite" in identifiability_from_exact_k(
+            self._variant(ek_singlet, bg_coefficients=(200.0, float("nan"))), 2, EK_ENERGY,
+            intensity="raw_counts").withheld
+        unrecorded = dataclasses.replace(ek_singlet, background={})
+        assert "does not record" in identifiability_from_exact_k(
+            unrecorded, 2, EK_ENERGY, intensity="raw_counts").withheld
+        with pytest.raises(ValueError, match="does not contain the fitted centers"):
+            identifiability_from_exact_k(ek_singlet, 2, EK_ENERGY + 1000.0,
+                                         intensity="raw_counts")
+        doublet = _exact_k_report(doublet=True)
+        cand = doublet.candidates[1]
+        broken = dataclasses.replace(cand, model=dataclasses.replace(
+            cand.model, components=tuple(dataclasses.replace(c, branch_ratio=0.0)
+                                         for c in cand.model.components)))
+        with pytest.raises(ValueError, match="branch_ratio"):
+            identifiability_from_exact_k(
+                dataclasses.replace(doublet, candidates=(doublet.candidates[0], broken)),
+                2, EK_ENERGY, intensity="raw_counts")

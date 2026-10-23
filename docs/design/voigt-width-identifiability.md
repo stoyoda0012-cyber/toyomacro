@@ -573,6 +573,30 @@ ones by design), when the fitted mean is not positive in every channel,
 or when the candidate carries `sigma_at_bound` or a
 `center_*_at_energy_bound` flag (the estimate is not a stationary point).
 
+*Amendment, 2026-10-23, at implementation.* The adapter is
+`identifiability_from_exact_k(report, k_structured, energy, *,
+intensity, k=3, thresholds=None)`. Both entries return an
+`EstimateReport`, which holds:
+
+- the per-parameter rows of the model actually evaluated;
+- the flags of its width parameters (the variance against its floor, γ
+  against 0);
+- its `ModeReport`;
+- for the free model only, the full `IdentifiabilityReport`;
+- a one-sentence caveat.
+
+The adapter also withholds when the candidate did not converge, and when
+its background coefficients are missing or not finite. It raises on a K
+the report has no candidate for, on an energy axis of another length or
+one that does not contain the fitted centers, and on a non-positive
+branching ratio. Because `exact_k` constrains σ to its own
+`sigma_bounds`, the adapter also flags a shared variance within
+`boundary_sd` bounds of either bound squared
+(`near_boundary["var_shared_fit_bounds"]`). The flag against 0 does not
+see that bound, and it is where the constrained fit stops. The generic entry raises, rather than withholds, on a mean that
+is not positive: its inputs are the caller's, as for
+`assess_identifiability`.
+
 **The model the fit used.** `exact_k` shares one σ across the peaks,
 fixes γ and can fix a doublet's splitting and branching ratio. All of
 these are affine constraints in `var_gamma` coordinates, so the adapter
