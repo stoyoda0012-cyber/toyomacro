@@ -55,7 +55,7 @@ import …`) is not exported — see the next tier before depending on it.
 **Experimental.** Research modules that are deliberately *not*
 re-exported from any `__init__`, reachable only by explicit submodule
 import. They are tested, but their API may change or disappear in any
-release. Examples may use them (examples/06 and 09 do); an example is a
+release. Examples may use them (examples/06, 07, 09, 10 and 11 do); an example is a
 demonstration, not a promise that the API it uses is stable, and no CLI
 depends on them:
 

@@ -159,13 +159,22 @@ or two overlapping peaks as two, check whether the spectrum can determine
 it: `toyomacro.voigtfit.identifiability` (experimental).
 
 - `assess_identifiability` labels each parameter.
+  - `identified` on the FWHM scale is **not** detection of a small
+    Gaussian or Lorentzian component. For the component itself read
+    `variance_relative_sd`, `gamma_relative_sd` and the two boundary
+    flags, `near_boundary` and `near_boundary_gamma`.
 - `identifiability_modes` names the combinations of peak parameters
   determined worst, and what each looks like in the spectrum.
-- At a fit's result, use `identifiability_at_estimate(...,
-  intensity="raw_counts")`. Any other intensity returns a withheld
-  report with no numbers. For an `exact_k` candidate, use
-  `identifiability_from_exact_k`, which evaluates the tied model that fit
-  used.
+- At a fit's result, use `identifiability_at_estimate`. For an `exact_k`
+  candidate, use `identifiability_from_exact_k`, which evaluates the tied
+  model that fit used.
+  - Pass as `intensity` what the spectrum's `intensity_semantics` says
+    (§2), **never `raw_counts` because you want numbers**.
+  - Only `raw_counts` returns numbers. Any other value of
+    `INTENSITY_SEMANTICS` returns a withheld report, and a value outside
+    it raises.
+  - If raw counts is your assumption (§3), the report does not record
+    that: state it with the result.
 - `mode_profile` follows the softest direction for a single peak, to
   see whether the Fisher ellipse holds there.
 
@@ -179,7 +188,7 @@ fit.
   looks like, not its vector as a physical fact.
 - `weakly_identified` says that this window, these counts and this
   background are not enough; more counts or a wider window change it.
-  Only `rank_deficient` is a statement about the model.
+  Only `rank_deficient` does not change with the counts.
 - Where the profile meets a width bound within a fraction of a standard
   deviation, the Fisher numbers say nothing beyond that point.
 

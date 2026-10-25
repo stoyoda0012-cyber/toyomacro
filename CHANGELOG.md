@@ -42,7 +42,9 @@ archived on Zenodo for a citable DOI.
     record §9. The Monte Carlo check of the bound along the modes is in
     `tests/test_identifiability_mc.py`, and its result is in §9.8.
     In one single-peak configuration, the replica spread along the three
-    softest modes is 0.985–1.002 of the bound.
+    softest modes is 0.985–1.002 of the bound. The check ran before the
+    computing route was changed to the labels' own decomposition; in
+    that configuration the two routes' modes agree to 4×10⁻¹⁵.
 
 - **`mode_profile` (experimental): the Poisson deviance along a mode,
   against the Fisher prediction.**
@@ -51,8 +53,9 @@ archived on Zenodo for a citable DOI.
     steps of its SD bound. At each step it minimises the deviance over
     everything else, with the Gaussian variance and γ held at or above
     their bounds.
-  - It reports the profile on a grid, its values at ±1 and ±2 and the
-    crossings of 1. Fisher's quadratic predicts t² and 1.
+  - It reports the profile on a grid (`PROFILE_GRID` by default, t =
+    −3…3 in steps of 0.1), its values at ±1 and ±2 and the crossings
+    of 1. Fisher's quadratic predicts t² and 1.
   - It also reports where a width bound becomes active, and where a side
     stops because the amplitude reached zero or below, or both widths
     reached zero.
@@ -66,8 +69,8 @@ archived on Zenodo for a citable DOI.
     - In the well-determined one, Δ(±1) is within 0.4 % of 1 and the
       crossings are within 0.2 % of 1.
     - At the registered counts the narrow window meets a width bound
-      within 0.3–0.5 SD on either side, and Δ(±1) is 42 and 1.0×10⁴.
-    - At 100 times the counts, Δ(±1) is 0.90 and 1.13.
+      within 0.3–0.5 SD on either side; Δ(+1) is 42 and Δ(−1) 1.0×10⁴.
+    - At 100 times the counts, Δ(+1) is 1.13 and Δ(−1) 0.90.
     - Everywhere, Δ is the lowest deviance found from the registered
       starts, not a certified global minimum.
 
@@ -86,10 +89,10 @@ archived on Zenodo for a citable DOI.
   - **The `exact_k` adapter** evaluates the sub-model that fit used —
     one shared σ, fixed γ, fixed doublet splitting and ratio — through
     the Jacobian times the matrix of the ties.
-    - It withholds for a plug-in background, a candidate that did not
-      converge, a non-positive amplitude, an estimate at a bound,
-      missing or non-finite background coefficients, or a non-positive
-      mean.
+    - It withholds for a plug-in or unrecorded background, a candidate
+      that did not converge, a non-positive amplitude, an estimate at a
+      bound, missing or non-finite background coefficients, or a
+      non-positive mean.
     - It also flags a shared variance within the boundary margin of the
       fit's own `sigma_bounds`.
   - Covered by deterministic tests only. The sub-model's Jacobian is
@@ -171,8 +174,9 @@ archived on Zenodo for a citable DOI.
   energy was 0, and `IMFP.tpp2m`'s `ValueError` escaped the tool instead
   of the error object it returns for other refusals. The sweep covered
   every element and label `BindingEnergy` resolves, on all three tables
-  (55,743 calls). hν was set at the binding energy, at 0.001, 0.5, 1, 2
-  and 10 eV below it, and at each shallower level's binding energy. The
+  (55,743 calls, duplicate photon energies not removed). hν was set at
+  the binding energy, at 0.001, 0.5, 1, 2 and 10 eV below it, and at
+  each shallower level's binding energy. The
   tool raised in 114 calls, all at hν == BE: 73 on Scofield and 41 on
   Yeh–Lindau. Trzhaskovskaya no longer reached it, because it is read at
   hν = E + Eb (below) and has no value at E = 0. It now returns an error
@@ -184,7 +188,8 @@ archived on Zenodo for a citable DOI.
   case too. Above the binding energy no output changes: 8,166 calls at Al
   Kα and Ga Kα are identical before and after.
 
-- **Five Trzhaskovskaya cells corrected against the printed tables.** An
+- **Five Trzhaskovskaya corrections against the printed tables: one cell
+  corrected and four missing lines added.** An
   audit read the bundled table against ADNDT 77, 82 and 92 cell by cell.
   All 11,160 cells at 100–5000 eV and all 1,240 binding energies agreed,
   and 1,148 of 1,149 cells at 10 keV. The exception: Eu 5p3/2 at 10 keV
@@ -287,6 +292,14 @@ archived on Zenodo for a citable DOI.
   agreeing is not evidence of one. Where the Fisher matrix in the free
   coordinates is singular to rounding, points are reported as "not
   obtained".
+- **Where a profile has several branches, which one it follows can
+  differ between platforms.** In a development configuration, CI's
+  Windows runners stopped at a zero amplitude where macOS held γ at 0.
+  The registered profiles in §9.8 are the macOS run's. CI re-runs them on
+  every job, but asserts only that each grid point produced an entry.
+- **`identifiability_from_exact_k` cannot tell a wrong energy axis.** It
+  checks only that the axis has the fit's length and contains the fitted
+  centers; another axis that passes both checks is accepted.
 - **A mode can lose digits** at the stiff end of a near-singular design,
   in every mode of a design singular to within rounding, and where the
   background is itself nearly singular. `whitened_norm` departing from
@@ -306,12 +319,15 @@ archived on Zenodo for a citable DOI.
   - The VAMAS reader's legacy fixed-line layout is unverified.
 - **Cross-section tables:**
   - Trzhaskovskaya's values are for completely filled subshells, so
-    `lookup()` overstates an open valence component by (2j+1)/N_j.
-  - For lines `BindingEnergy` lacks, the table's own printed energy is
-    now recorded (`printed_binding_energy_eV`) but not used as a
-    threshold.
+    `lookup()` overstates a component of an open subshell by (2j+1)/N_j.
+  - Lines `BindingEnergy` lacks still get no threshold: 147 Yeh–Lindau,
+    286 Scofield and 190 Trzhaskovskaya lines. The table's own printed
+    energy is now recorded (`printed_binding_energy_eV`) but not used as
+    one.
+  - Yeh–Lindau Cu 3d at 8047.8 eV is withheld as a suspected misprint,
+    so the line has no value above 1486.6 eV. The correct cell is
+    unknown; use Scofield there.
 - **No longer known issues:**
-  - Yeh–Lindau Cu 3d at 8047.8 eV is withheld.
   - Trzhaskovskaya is read on its photoelectron-energy axis.
   - Co 3p is no longer stored with the j = 3/2 member bound more deeply:
     both members are 59 eV.
