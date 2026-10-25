@@ -163,6 +163,25 @@ archived on Zenodo for a citable DOI.
 
 ### Fixed
 
+- **MCP `calculate_sensitivity` returns its JSON error when the photon
+  energy equals the binding energy.** The cross-section's threshold gate
+  is hν < BE, so at hν == BE the table could answer while the kinetic
+  energy was 0, and `IMFP.tpp2m`'s `ValueError` escaped the tool instead
+  of the error object it returns for other refusals. The sweep covered
+  every element and label `BindingEnergy` resolves, on all three tables
+  (55,743 calls). hν was set at the binding energy, at 0.001, 0.5, 1, 2
+  and 10 eV below it, and at each shallower level's binding energy. The
+  tool raised in 114 calls, all at hν == BE: 73 on Scofield and 41 on
+  Yeh–Lindau. Trzhaskovskaya no longer reached it, because it is read at
+  hν = E + Eb (below) and has no value at E = 0. It now returns an error
+  carrying the binding energy, the
+  kinetic energy and the cross-section status and components, whenever
+  the kinetic energy is not finite and positive (a NaN or infinite photon
+  energy raised the same way). hν < BE did not raise in that sweep (the
+  threshold gate refused it first); the tool's own check now covers that
+  case too. Above the binding energy no output changes: 8,166 calls at Al
+  Kα and Ga Kα are identical before and after.
+
 - **Five Trzhaskovskaya cells corrected against the printed tables.** An
   audit read the bundled table against ADNDT 77, 82 and 92 cell by cell.
   All 11,160 cells at 100–5000 eV and all 1,240 binding energies agreed,
