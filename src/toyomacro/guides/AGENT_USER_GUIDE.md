@@ -7,7 +7,7 @@
 > changed and why in your analysis notes. Nothing in it widens what the
 > software supports or makes a result scientifically valid.
 >
-> **Written for: toyomacro v0.6.0.** Read the copy that came with the
+> **Written for: toyomacro v0.7.0.** Read the copy that came with the
 > version you have installed (`python -m toyomacro.guides`), not the
 > repository's main branch, which may describe a newer version.
 
@@ -144,7 +144,7 @@ sensitivity factor: elastic scattering, the angular distribution,
 polarization and geometry are not in it, and the statistical
 uncertainty does not cover them — they are in `not_evaluated`.
 
-So, to "what is the error bar?", a v0.6.0 answer reads like: "the
+So, to "what is the error bar?", a v0.7.0 answer reads like: "the
 statistical standard uncertainty is X, computed under the declaration
 I fixed beforehand and the named assumptions; the result moves by Y
 when the cross-section table is changed, by Z with the background, and
@@ -153,6 +153,46 @@ whether the transmission was applied); these are the ones that matter
 here." `examples/10_composition_ptfe.py` shows the condition dependence
 on public data, where the two assumptions about the stored data move
 the answer more than the table does.
+
+Before reporting a width split into its Gaussian and Lorentzian parts,
+or two overlapping peaks as two, check whether the spectrum can determine
+it: `toyomacro.voigtfit.identifiability` (experimental).
+
+- `assess_identifiability` labels each parameter.
+  - `identified` on the FWHM scale is **not** detection of a small
+    Gaussian or Lorentzian component. For the component itself read
+    `variance_relative_sd`, `gamma_relative_sd` and the two boundary
+    flags, `near_boundary` and `near_boundary_gamma`, in the report's
+    `widths`.
+- `identifiability_modes` names the combinations of peak parameters
+  determined worst, and what each looks like in the spectrum.
+- At a fit's result, use `identifiability_at_estimate`. For an `exact_k`
+  candidate, use `identifiability_from_exact_k`, which evaluates the tied
+  model that fit used.
+  - Pass as `intensity` what the spectrum's `intensity_semantics` says
+    (§2), or `raw_counts` only under an assumption you named (§3);
+    **never `raw_counts` because you want numbers**.
+  - Only `raw_counts` returns numbers. Any other value of
+    `INTENSITY_SEMANTICS` returns a withheld report, and a value outside
+    it raises.
+  - If raw counts is your assumption (§3), the report does not record
+    that: state it with the result.
+- `mode_profile` follows the softest direction for a single peak, to
+  see whether the Fisher ellipse holds there.
+
+Report them for what they are. They are bounds computed from a model at
+stated parameters, or a plug-in at the fit's estimate. They are not
+confidence intervals, not the fit's error, and not weights for another
+fit.
+
+- The directions depend on the reference scales, which are a
+  convention. Report a mode's relative bound and what its signature
+  looks like, not its vector as a physical fact.
+- `weakly_identified` says that this window, these counts and this
+  background are not enough; more counts or a wider window change it.
+  Only `rank_deficient` does not change with the counts.
+- Where the profile meets a width bound within a fraction of a standard
+  deviation, the Fisher numbers say nothing beyond that point.
 
 ## 6. Keep the record with the result
 
@@ -175,10 +215,11 @@ first tabulated energy.
 
 For the version this guide was written for:
 
-- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/API.md>
-- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/DATA_SOURCES.md>
-- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.6.0/docs/design/composition-uncertainty.md>
-- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.6.0/examples>
+- API and stability tiers: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.7.0/docs/API.md>
+- Data sources and their licences: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.7.0/docs/DATA_SOURCES.md>
+- The composition uncertainty validation: <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.7.0/docs/design/composition-uncertainty.md>
+- The identifiability diagnostics (modes, the estimate, the profile): <https://github.com/stoyoda0012-cyber/toyomacro/blob/v0.7.0/docs/design/voigt-width-identifiability.md>
+- Examples: <https://github.com/stoyoda0012-cyber/toyomacro/tree/v0.7.0/examples>
 
 The repository's `AGENTS.md` and `CONTRIBUTING.md` (branches, audits,
 commit practice) apply when you change the package itself or its public

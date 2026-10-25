@@ -25,6 +25,8 @@ are determined worst and what each looks like in the spectrum.
 ``identifiability_at_estimate`` and ``identifiability_from_exact_k``
 evaluate both at a fit's result -- still bounds from a model, now
 plugged in at a noisy estimate, not a statement about that fit's error.
+``mode_profile`` follows one mode of a single peak and compares the
+Poisson deviance there with the Fisher prediction.
 What each does and does not mean is in its docstring.
 
 Why the variance. A Voigt profile is a Lorentzian convolved with a
@@ -1722,7 +1724,9 @@ class ModeProfile:
     exposure: float
     variance_floor: float
     caveat: str = (
-        "the minimum Poisson deviance along a mode on expected counts (no noise), "
+        "the lowest Poisson deviance found from the registered starts along a mode, "
+        "on expected counts (no noise); not a certified global minimum, and the "
+        "branch it follows can differ between platforms; "
         "against the Fisher prediction t**2; a property of the model, not the "
         "coverage of any interval; no boundary correction"
     )
@@ -2129,7 +2133,11 @@ def mode_profile(
     constraint ``w^T S^-1 (theta_peak - theta_0) = t sqrt(lambda)`` is
     imposed and the deviance minimised over everything else -- the other
     peak directions and the background -- with the Gaussian variance held
-    at or above ``variance_floor`` and gamma at or above 0. At theta_0 the
+    at or above ``variance_floor`` and gamma at or above 0. What is
+    reported is the lowest deviance found from the registered starts, not
+    a certified global minimum: where the profile has several branches,
+    which one the chain follows is part of the result and can differ
+    between platforms. At theta_0 the
     Hessian of the deviance is exactly twice the Fisher matrix, so the
     Fisher prediction is Delta(t) = t**2 and any departure is curvature or
     a boundary. It is a property of the model, not the coverage of any

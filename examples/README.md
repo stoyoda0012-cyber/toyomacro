@@ -17,6 +17,7 @@ python examples/07_width_identifiability_map.py
 python examples/08_map_viewer_frontend.py          # opens a window; --smoke to skip it
 python examples/09_fermi_edge_identifiability.py
 python examples/10_composition_ptfe.py            # or: ... --data "Degradation Polymers.zip"
+python examples/11_identifiability_modes.py
 ```
 
 | Script | What it shows | Key API |

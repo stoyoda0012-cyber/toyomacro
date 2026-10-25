@@ -181,7 +181,7 @@ Without cloning the repository (needs Git; installs the core package,
 while `examples/` and the benchmarks come with a clone):
 
 ```bash
-pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.6.0"
+pip install "git+https://github.com/stoyoda0012-cyber/toyomacro.git@v0.7.0"
 ```
 
 From a clone — we recommend [`uv`](https://docs.astral.sh/uv/):
@@ -266,7 +266,7 @@ GPU acceleration; the API is unchanged.
 
 ### More examples
 
-The [`examples/`](examples/) directory contains ten self-contained,
+The [`examples/`](examples/) directory contains eleven self-contained,
 runnable scripts (synthetic data, no measurement files needed): template
 peak decomposition with `AutoFitter`, batch chemical-state mapping with
 `FastVoigtFitter`, quantification with the bundled cross-section /
@@ -289,7 +289,10 @@ simulated spectrum; see
 Example 10 estimates the F:C composition of PTFE from a public Zenodo
 dataset (not bundled; a synthetic stand-in runs offline) and lists
 what moves the estimate, what it assumes and what is not evaluated.
-They run in CI on every commit.
+Example 11 draws which combinations of a peak's parameters a spectrum
+determines worst, and what a one-standard-deviation move along each
+looks like in the spectrum (model bounds, not a fit). They run in CI on
+every commit.
 
 ### GVRT roundtrip demo
 

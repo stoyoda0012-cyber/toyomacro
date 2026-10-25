@@ -134,7 +134,7 @@ one value that is probably a misprint. Cu 3d at 8047.8 eV is printed
 against 300-fold for Ni and 2,600-fold for Zn, and it is 68x Zn's
 `.47E-5` and 30x the bundled Scofield value (Zn is 0.31x, Ni 3.0x).
 No erratum has been found, so the file keeps it as printed; it would be
-changed only against a published correction, cited here. Since 2026-10
+changed only against a published correction, cited here. Since v0.7.0
 `lookup()` withholds it instead of using it: the cell counts as absent,
 and the line is not extrapolated across it, so Yeh–Lindau Cu 3d returns
 no value above 1486.6 eV (`CrossSection.withheld_cells()` lists the cell
