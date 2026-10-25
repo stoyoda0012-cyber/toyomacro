@@ -10,6 +10,9 @@ archived on Zenodo for a citable DOI.
 
 ## [0.7.0] - 2026-10-25
 
+Archived on Zenodo:
+[10.5281/zenodo.23643238](https://doi.org/10.5281/zenodo.23643238).
+
 ### Added
 
 - **`identifiability_modes` (experimental): which combinations of peak
