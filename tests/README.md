@@ -1,16 +1,16 @@
 # Test inventory
 
-This suite has **2,773 automated tests** across **104 files**, in two
+This suite has **2,779 automated tests** across **104 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 66 | 1,634 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 66 | 1,640 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,139 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
 data required). Counts below come from `pytest --collect-only` on an
-install with the `mcp` extra, which is what CI uses; without it the 13
+install with the `mcp` extra, which is what CI uses; without it the 20
 MCP-server tests collapse into one skipped module. The MLX extra does
 not change what is collected. `test_readme_inventory.py` compares every
 number on this page with a fresh collection and fails, listing the
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,341 tests, 84%) — guarantee the library
+- **Contract / regression** (2,347 tests, 84%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,761. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,767. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -98,7 +98,7 @@ numerical source, commit it first and then regenerate, so that
 cannot check `source_commit` and skips that one test; the source digest
 and the bytes are checked everywhere.
 
-## Library body — `tests/` (1,634)
+## Library body — `tests/` (1,640)
 
 ### Claim guards — noise model, versions, backends, comparisons (148)
 | Tests | File | Guards |
@@ -193,10 +193,10 @@ and the bytes are checked everywhere.
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
 
-### MCP server (15)
+### MCP server (21)
 | Tests | File | Guards |
 |--:|---|---|
-| 15 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through, and the startup preload of what they import |
+| 21 | `test_mcp_server.py` | MCP server tools (direct call, no transport), including unit-status pass-through, the refusal of hν ≤ BE as a JSON error, and the startup preload of what they import |
 
 ## VoigtFit engine — `src/toyomacro/voigtfit/tests/` (1,139)
 
