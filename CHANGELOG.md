@@ -8,6 +8,8 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-25
+
 ### Added
 
 - **`identifiability_modes` (experimental): which combinations of peak
@@ -269,6 +271,50 @@ archived on Zenodo for a citable DOI.
   equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p
   (59.70, Strydom & Strydom 1989; 60.20, Mandale et al. 1984) lie
   closer to the old 60.
+
+### Known issues
+
+- **The new identifiability diagnostics are checked in few
+  configurations.**
+  - A Monte Carlo check covers the bound along the modes in one
+    single-peak configuration (design record §9.8).
+  - The profile is recorded in three configurations, and judged in none.
+  - The estimate entries have deterministic tests only.
+  - The modes' directions depend on the reference scales, which are a
+    convention.
+- **The profile's Δ is the lowest deviance found from the registered
+  starts.** It is not a certified global minimum, and the two routes
+  agreeing is not evidence of one. Where the Fisher matrix in the free
+  coordinates is singular to rounding, points are reported as "not
+  obtained".
+- **A mode can lose digits** at the stiff end of a near-singular design,
+  in every mode of a design singular to within rounding, and where the
+  background is itself nearly singular. `whitened_norm` departing from
+  1 measures by how much.
+- **Unchanged in the identifiability diagnostics:** the Shirley step's
+  own dependence on the peak parameters is not differentiated, so its
+  coupling to the widths is under-counted. No boundary (chi-bar)
+  correction is applied near a bound, and the Doniach–Šunjić asymmetry
+  is not covered.
+- **Unchanged from v0.6.0:**
+  - The composition uncertainty's calibration was shown on registered
+    synthetic conditions only.
+  - At r = 0.08 with a Shirley background two of four registered
+    configurations did not pass, and the Shirley iteration's
+    convergence was not evaluated.
+  - `fit_fermi_edge`'s errors assume independent channels.
+  - The VAMAS reader's legacy fixed-line layout is unverified.
+- **Cross-section tables:**
+  - Trzhaskovskaya's values are for completely filled subshells, so
+    `lookup()` overstates an open valence component by (2j+1)/N_j.
+  - For lines `BindingEnergy` lacks, the table's own printed energy is
+    now recorded (`printed_binding_energy_eV`) but not used as a
+    threshold.
+- **No longer known issues:**
+  - Yeh–Lindau Cu 3d at 8047.8 eV is withheld.
+  - Trzhaskovskaya is read on its photoelectron-energy axis.
+  - Co 3p is no longer stored with the j = 3/2 member bound more deeply:
+    both members are 59 eV.
 
 ## [0.6.0] - 2026-10-21
 
@@ -2590,7 +2636,8 @@ still listed under "Unreleased"; they are moved here unedited.
   (PXT/VAMAS/NPL/two-column text).
 - Runnable examples, MCP server, CI on Linux/macOS × Python 3.11/3.12.
 
-[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/stoyoda0012-cyber/toyomacro/compare/v0.4.0...v0.5.0
