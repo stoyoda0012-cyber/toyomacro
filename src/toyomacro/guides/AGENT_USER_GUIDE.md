@@ -162,14 +162,16 @@ it: `toyomacro.voigtfit.identifiability` (experimental).
   - `identified` on the FWHM scale is **not** detection of a small
     Gaussian or Lorentzian component. For the component itself read
     `variance_relative_sd`, `gamma_relative_sd` and the two boundary
-    flags, `near_boundary` and `near_boundary_gamma`.
+    flags, `near_boundary` and `near_boundary_gamma`, in the report's
+    `widths`.
 - `identifiability_modes` names the combinations of peak parameters
   determined worst, and what each looks like in the spectrum.
 - At a fit's result, use `identifiability_at_estimate`. For an `exact_k`
   candidate, use `identifiability_from_exact_k`, which evaluates the tied
   model that fit used.
   - Pass as `intensity` what the spectrum's `intensity_semantics` says
-    (§2), **never `raw_counts` because you want numbers**.
+    (§2), or `raw_counts` only under an assumption you named (§3);
+    **never `raw_counts` because you want numbers**.
   - Only `raw_counts` returns numbers. Any other value of
     `INTENSITY_SEMANTICS` returns a withheld report, and a value outside
     it raises.

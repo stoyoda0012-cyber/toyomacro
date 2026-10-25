@@ -174,7 +174,7 @@ archived on Zenodo for a citable DOI.
   energy was 0, and `IMFP.tpp2m`'s `ValueError` escaped the tool instead
   of the error object it returns for other refusals. The sweep covered
   every element and label `BindingEnergy` resolves, on all three tables
-  (55,743 calls, duplicate photon energies not removed). hν was set at
+  (55,743 calls; duplicate photon energies kept, energies ≤ 0 skipped). hν was set at
   the binding energy, at 0.001, 0.5, 1, 2 and 10 eV below it, and at
   each shallower level's binding energy. The
   tool raised in 114 calls, all at hν == BE: 73 on Scofield and 41 on
