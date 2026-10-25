@@ -2130,22 +2130,23 @@ class TestModeProfile:
         assert all(next(p for p in prof.points if p.t == x).background_negative
                    for x in prof.plus.background_negative)
 
-    def test_no_stop_from_a_stated_point_iterate(self, profiles):
-        """The amplitude-dominated configuration has more than one branch on
-        the minus side, and which one the chain follows depends on the
-        platform (macOS holds gamma at 0, Windows reaches a zero amplitude).
-        Whatever the branch: a stop comes from a successful solution, never
-        from an iterate when both routes failed -- before the amendment of
-        §9.4 one from the stated point, at a negative amplitude by
-        construction, made such a stop -- and every point not obtained is
-        flagged."""
+    def test_the_amplitude_dominated_configuration(self, profiles):
+        """This configuration has more than one branch on the minus side, and
+        which one the chain follows depends on the platform: macOS holds
+        gamma at 0, CI's Windows runners reach a zero amplitude and stop.
+        What holds on any branch is asserted here; that an iterate from the
+        stated point never makes a stop is pinned deterministically by
+        test_an_iterate_from_the_stated_point_makes_no_stop."""
         prof = profiles["stop"]
         by_t = {p.t: p for p in prof.points}
-        for side in (prof.plus, prof.minus):
-            if side.stop is not None:
-                at = by_t[side.stop["t"]]
-                assert at.success_a or at.success_b
         assert all(p.flagged for p in prof.points if p.outcome == "not_obtained")
+        for side, sign in ((prof.plus, 1.0), (prof.minus, -1.0)):
+            if side.stop is None:
+                continue
+            at = by_t[side.stop["t"]]
+            assert at.outcome == side.stop["event"]
+            beyond = [p for p in prof.points if sign * p.t > sign * side.stop["t"]]
+            assert all(p.outcome == side.stop["event"] for p in beyond)
 
     def test_the_kkt_test(self):
         """Passes at the stated point and at an interior optimum; fails off
