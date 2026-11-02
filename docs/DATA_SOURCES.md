@@ -376,7 +376,8 @@ cubic values would silently redefine what the name `SiC` means here. Phase-speci
 entries would be the better route, and are not attempted.
 
 The `investigation` records also carry two findings contributed by the
-depthprofiler project, which consumes this table:
+[depthprofiler](https://github.com/stoyoda0012-cyber/depthprofiler) project
+(package `deppro`), which consumes this table:
 
 - **Where the circulating Si3N4 E_g of 5.3 eV comes from — one step of
   it.** The trail leads to Robertson, *J. Vac. Sci. Technol. B* **18**,
