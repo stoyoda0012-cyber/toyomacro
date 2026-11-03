@@ -523,7 +523,7 @@ used; take the version DOI for that release from the list above.
 
 | Published figure | Release it was computed with |
 |---|---|
-| Angular-modulation figure (Fig. S11) of the HAXPES paper that cites this repository as Ref. 29 (Surface and Interface Analysis; DOI to be added on publication) | v0.1.0 |
+| Angular-modulation figure (Fig. S11) of the HAXPES paper that cites this repository as Ref. 29 (Toyoda *et al.*, *Surf. Interface Anal.* **58**, 1112–1128 (2026), [doi:10.1002/sia.70123](https://doi.org/10.1002/sia.70123)) | v0.1.0 |
 
 Later releases do not necessarily reproduce an earlier figure. Where
 they do, it is recorded here. For the row above: between v0.1.0 and
