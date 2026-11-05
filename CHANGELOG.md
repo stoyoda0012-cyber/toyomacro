@@ -20,8 +20,11 @@ archived on Zenodo for a citable DOI.
     jointly with the peak amplitudes in the same inner linear solve,
     and are returned under the new key `background` (shape `(0,)`
     when no design is given). `chi2` is then the residual of peaks
-    plus background. A design of any other shape, or with non-finite
-    entries, raises `ValueError`. No background columns are bundled.
+    plus background. A design of any other shape, with non-finite
+    entries, or with linearly dependent columns raises `ValueError`.
+    `reg_lambda` is absolute, so columns should be scaled to a norm
+    comparable to the Voigt columns; a small-norm column is shrunk and
+    biases the amplitudes. No background columns are bundled.
   - `fixed_shape=False`: when true, the Gaussian widths are held at
     `initial_sigmas` and only the centers are optimized, within
     `bounds_center_delta`. With `bounds_center_delta=0` no non-linear
@@ -31,7 +34,9 @@ archived on Zenodo for a citable DOI.
     leading axis is a batch axis, for example `(K, n_spectra,
     n_energy)`, and the parameter arrays come back as
     `batch_shape + (n_components,)`. The batch is still a loop over
-    `fit_single`, and each entry equals the corresponding single fit.
+    `fit_single`, and each entry equals the corresponding single fit;
+    nothing is shared across the batch. An out-of-range `energy_axis`
+    raises `ValueError`.
   - `VarProFitter` stays a per-spectrum reference fitter, not part of
     the high-throughput path.
 

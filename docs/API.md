@@ -330,7 +330,14 @@ solved jointly with the amplitudes, coefficients returned as
 `background`), `fixed_shape` (hold the widths at `initial_sigmas`,
 optimize the centers only), and `fit_batch(..., energy_axis=-1)` for
 stacks whose leading axes are batch axes. `fit_batch` remains a loop
-over `fit_single`.
+over `fit_single`: each spectrum is fitted on its own, so nothing (not
+even the centers) is shared across the batch. `reg_lambda` is an
+absolute Tikhonov term over every column of `[Φ | B]`, so background
+columns should be scaled to a norm comparable to the Voigt columns;
+a small-norm column is shrunk and the bias moves into the amplitudes
+without the fit reporting failure. Linearly dependent background
+columns raise `ValueError`; collinearity of a background column with
+a Voigt column is not diagnosed.
 
 ## 4. Quality flags and failure modes
 

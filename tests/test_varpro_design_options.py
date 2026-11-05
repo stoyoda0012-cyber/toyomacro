@@ -81,18 +81,59 @@ def test_background_design_free_fit_recovers_noise_free():
     np.testing.assert_allclose(res["background"], BG_COEF, atol=1e-3)
 
 
-def test_no_background_reports_empty_coefficients_and_is_unchanged():
-    """Without a design the result is the pre-existing fit plus an empty key."""
+def test_no_background_reports_empty_coefficients():
+    """Without a design the result carries an empty ``background`` key."""
     fitter = VarProFitter()
     y = fitter.voigt_basis(ENERGY, CENTERS, SIGMAS, GAMMA) @ AMPS
 
     res = fitter.fit_single(y, ENERGY, CENTERS + 0.2, SIGMAS + 0.1, GAMMA)
-    res_none = fitter.fit_single(y, ENERGY, CENTERS + 0.2, SIGMAS + 0.1, GAMMA,
-                                 background_design=None)
-
     assert res["background"].shape == (0,)
-    for key in ("centers", "sigmas", "amplitudes"):
-        np.testing.assert_array_equal(res[key], res_none[key])
+    batch = fitter.fit_batch(np.column_stack([y, y, y]), ENERGY, CENTERS + 0.2,
+                             SIGMAS + 0.1, GAMMA)
+    assert batch["background"].shape == (0, 3)
+
+
+# Default-argument fit_batch output on a fixed noisy fixture, computed with the
+# VarProFitter that preceded the background/fixed-shape/energy-axis options.
+# It pins the default path: any change to it fails here. Tolerances allow
+# BLAS-level roundoff in the L-BFGS-B path, not a change of estimator.
+_DEFAULT_PIN = {
+    "centers": np.array([[98.79785563362022, 98.79802784074295, 98.80080230692137],
+                         [101.20443060960395, 101.18721830035409, 101.19915004947507]]),
+    "sigmas": np.array([[0.5504621055895663, 0.5558431829687132, 0.5467071099388755],
+                        [0.697649836554396, 0.7188400943150302, 0.7021185243354192]]),
+    "amplitudes": np.array([[3.0094324250038316, 2.083361660348194, 3.902230584650578],
+                            [1.6957942606042093, 1.2010597202134787, 2.2158633008638624]]),
+    "chi2": np.array([0.00044873214901548, 0.00047120213282459, 0.00044978672556238]),
+}
+
+
+def _default_fixture(fitter: VarProFitter) -> np.ndarray:
+    phi = fitter.voigt_basis(ENERGY, CENTERS, SIGMAS, GAMMA)
+    rng = np.random.default_rng(20261105)
+    return (np.column_stack([phi @ (AMPS * s) for s in (1.0, 0.7, 1.3)])
+            + 0.02 * rng.standard_normal((len(ENERGY), 3)))
+
+
+def test_default_path_matches_pinned_pre_change_output():
+    fitter = VarProFitter()
+    Y = _default_fixture(fitter)
+    res = fitter.fit_batch(Y, ENERGY, CENTERS + np.array([0.1, -0.1]), SIGMAS + 0.05,
+                           GAMMA)
+
+    assert res["success"].all()
+    np.testing.assert_allclose(res["centers"], _DEFAULT_PIN["centers"], rtol=0, atol=1e-6)
+    np.testing.assert_allclose(res["sigmas"], _DEFAULT_PIN["sigmas"], rtol=0, atol=1e-6)
+    np.testing.assert_allclose(res["amplitudes"], _DEFAULT_PIN["amplitudes"], rtol=1e-6)
+    np.testing.assert_allclose(res["chi2"], _DEFAULT_PIN["chi2"], rtol=1e-6)
+    # independent oracle at the returned shape: amplitudes are the (tiny-ridge)
+    # least-squares solution and chi2 is its mean squared residual
+    for j in range(Y.shape[1]):
+        phi = fitter.voigt_basis(ENERGY, res["centers"][:, j], res["sigmas"][:, j], GAMMA)
+        amps = np.linalg.lstsq(phi, Y[:, j], rcond=None)[0]
+        np.testing.assert_allclose(res["amplitudes"][:, j], amps, rtol=1e-7)
+        np.testing.assert_allclose(res["chi2"][j],
+                                   np.mean((Y[:, j] - phi @ amps) ** 2), rtol=1e-7)
 
 
 @pytest.mark.parametrize("bad", [
@@ -118,6 +159,49 @@ def test_background_design_non_finite_raises():
     with pytest.raises(ValueError, match="non-finite"):
         fitter.fit_single(_clean(fitter), ENERGY, CENTERS, SIGMAS, GAMMA,
                           background_design=bad)
+
+
+def test_background_design_linearly_dependent_columns_raise():
+    """Duplicate columns are refused rather than split by the regularizer."""
+    fitter = VarProFitter()
+    dup = np.column_stack([BG, BG[:, 0]])
+    for reg in (fitter, VarProFitter(reg_lambda=0.0)):
+        with pytest.raises(ValueError, match="linearly dependent"):
+            reg.fit_single(_clean(fitter), ENERGY, CENTERS, SIGMAS, GAMMA,
+                           background_design=dup)
+    combo = np.column_stack([BG, BG[:, 0] - 2.0 * BG[:, 1]])
+    with pytest.raises(ValueError, match="linearly dependent"):
+        fitter.fit_batch(np.column_stack([_clean(fitter)] * 2), ENERGY, CENTERS,
+                         SIGMAS, GAMMA, background_design=combo)
+
+
+def test_default_reg_bias_is_negligible_for_unit_scale_columns():
+    """With O(1) columns the default absolute ridge biases nothing visibly."""
+    fitter = VarProFitter(bounds_center_delta=0.0)          # reg_lambda=1e-8
+    res = fitter.fit_single(_clean(fitter), ENERGY, CENTERS, SIGMAS, GAMMA,
+                            background_design=BG, fixed_shape=True)
+    np.testing.assert_allclose(res["amplitudes"], AMPS, rtol=1e-7)
+    np.testing.assert_allclose(res["background"], BG_COEF, rtol=0, atol=1e-7)
+
+
+def test_default_reg_biases_small_norm_columns():
+    """The ridge is absolute: a tiny-norm column is shrunk and biases the peaks.
+
+    This pins the documented limitation (scale the columns), not a feature.
+    """
+    fitter = VarProFitter(bounds_center_delta=0.0)
+    scale = 1e-5
+    y = _clean(fitter)
+    small = BG.copy()
+    small[:, 2] *= scale
+    res = fitter.fit_single(y, ENERGY, CENTERS, SIGMAS, GAMMA,
+                            background_design=small, fixed_shape=True)
+    # true coefficient on the scaled column is BG_COEF[2] / scale
+    assert abs(res["background"][2] * scale - BG_COEF[2]) > 1e-2
+    assert np.max(np.abs(res["amplitudes"] - AMPS)) > 1e-3
+    exact = VarProFitter(reg_lambda=0.0, bounds_center_delta=0.0).fit_single(
+        y, ENERGY, CENTERS, SIGMAS, GAMMA, background_design=small, fixed_shape=True)
+    np.testing.assert_allclose(exact["background"][2] * scale, BG_COEF[2], rtol=1e-6)
 
 
 # ---------------------------------------------------------------- T2: fixed shape
@@ -229,3 +313,40 @@ def test_batch_energy_length_mismatch_raises():
     Y = _stack(fitter, k=2, m=1)[:, 0, :]
     with pytest.raises(ValueError, match="energy_axis"):
         fitter.fit_batch(Y, ENERGY, CENTERS, SIGMAS, GAMMA)   # energy is axis -1 here
+
+
+@pytest.mark.parametrize("energy_axis", [2, -3, 5])
+def test_batch_energy_axis_out_of_range_raises(energy_axis):
+    """An out-of-range axis is refused, not wrapped round."""
+    fitter = VarProFitter()
+    Y = np.column_stack([_clean(fitter)] * 3)                 # (n_energy, 3)
+    with pytest.raises(ValueError, match="out of range"):
+        fitter.fit_batch(Y, ENERGY, CENTERS, SIGMAS, GAMMA, energy_axis=energy_axis)
+
+
+@pytest.mark.parametrize("energy_axis", [0, 1, 2, -1, -2])
+def test_three_d_batch_every_energy_axis_matches_single_fit(energy_axis):
+    """Parameter axis sits where the energy axis was, for first, middle and last."""
+    fitter = VarProFitter()
+    base = _stack(fitter, k=2, m=3)                           # (2, 3, n_energy)
+    Y = np.moveaxis(base, -1, energy_axis)
+    start = CENTERS + np.array([0.1, -0.1])
+
+    res = fitter.fit_batch(Y, ENERGY, start, SIGMAS, GAMMA, background_design=BG,
+                           fixed_shape=True, energy_axis=energy_axis)
+
+    axis = energy_axis % 3
+    expect = list((2, 3))
+    expect.insert(axis, 2)
+    assert res["centers"].shape == tuple(expect)
+    expect[axis] = 3
+    assert res["background"].shape == tuple(expect)
+    assert res["chi2"].shape == (2, 3)
+    for i in range(2):
+        for j in range(3):
+            ref = fitter.fit_single(base[i, j], ENERGY, start, SIGMAS, GAMMA,
+                                    background_design=BG, fixed_shape=True)
+            for key in ("centers", "amplitudes", "background"):
+                got = np.moveaxis(res[key], axis, -1)[i, j]
+                np.testing.assert_allclose(got, ref[key], rtol=0, atol=1e-12)
+            assert res["chi2"][i, j] == ref["chi2"]

@@ -147,6 +147,13 @@ class VarProFitter:
             )
         if not np.all(np.isfinite(B)):
             raise ValueError("background_design contains non-finite values")
+        rank = np.linalg.matrix_rank(B)
+        if rank < B.shape[1]:
+            raise ValueError(
+                f"background_design columns are linearly dependent: rank {rank} "
+                f"for {B.shape[1]} columns; their coefficients would not be "
+                f"determined"
+            )
         return B
 
     def _design(
@@ -227,7 +234,15 @@ class VarProFitter:
                 solved jointly with the peak amplitudes in the same inner linear
                 solve (the Tikhonov term ``reg_lambda`` applies to every column
                 of the joint design). The caller supplies the columns; none are
-                built here. A wrong shape raises ``ValueError``.
+                built here. A wrong shape, non-finite entries or linearly
+                dependent columns raise ``ValueError``. ``reg_lambda`` is an
+                absolute term, not scaled to the columns: a column of small
+                norm is shrunk towards zero, and the bias moves into the peak
+                amplitudes, without the fit reporting failure. Scale the
+                columns to a norm comparable to the Voigt columns (O(1)
+                entries for unit-area peaks), or set ``reg_lambda=0``.
+                Collinearity between a background column and a Voigt column
+                at the fitted shape is not diagnosed.
             fixed_shape: If True, the Gaussian widths are held at
                 ``initial_sigmas`` and only the centers are optimized (within
                 ``bounds_center_delta``). With ``bounds_center_delta=0`` no
@@ -333,7 +348,7 @@ class VarProFitter:
             fixed_shape: Hold the widths at ``initial_sigmas`` (see
                 ``fit_single``)
             energy_axis: Axis of ``Y`` that runs over energy; every other
-                axis is a batch axis
+                axis is a batch axis. Out of range raises ``ValueError``.
 
         Returns:
             Dict with arrays of results. ``centers``, ``sigmas``, ``amplitudes``
@@ -347,6 +362,11 @@ class VarProFitter:
         if Y.ndim < 2:
             raise ValueError(f"Y must have an energy axis and at least one batch axis, "
                              f"got shape {Y.shape}")
+        if not -Y.ndim <= energy_axis < Y.ndim:
+            raise ValueError(
+                f"energy_axis={energy_axis} is out of range for Y with "
+                f"{Y.ndim} dimensions"
+            )
         axis = energy_axis % Y.ndim
         Y_last = np.moveaxis(Y, axis, -1)
         n_energy = Y_last.shape[-1]
