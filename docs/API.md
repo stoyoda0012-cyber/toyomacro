@@ -324,6 +324,14 @@ unregularized inner solve is what makes it match the projection law's
 assumptions; solvers with other regularizers are only directionally
 described — see `docs/projection_law_validation.md`).
 
+Three opt-in arguments extend it without changing its default results:
+`background_design` (caller-built `(n_energy, n_background)` columns
+solved jointly with the amplitudes, coefficients returned as
+`background`), `fixed_shape` (hold the widths at `initial_sigmas`,
+optimize the centers only), and `fit_batch(..., energy_axis=-1)` for
+stacks whose leading axes are batch axes. `fit_batch` remains a loop
+over `fit_single`.
+
 ## 4. Quality flags and failure modes
 
 - Every solver returns per-spectrum `chi2`; anomalously high values

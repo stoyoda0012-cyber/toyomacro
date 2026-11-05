@@ -8,6 +8,33 @@ archived on Zenodo for a citable DOI.
 
 ## [Unreleased]
 
+### Added
+
+- **`VarProFitter`: caller-supplied background columns, fixed widths,
+  and a leading-axis batch layout.** All three are opt-in; with the
+  defaults, `fit_single` and `fit_batch` return the same numbers as
+  before, plus one new key.
+  - `background_design=None` takes an `(n_energy, n_background)`
+    matrix of extra linear columns, such as a constant, a ramp or a
+    background curve the caller built. Their coefficients are solved
+    jointly with the peak amplitudes in the same inner linear solve,
+    and are returned under the new key `background` (shape `(0,)`
+    when no design is given). `chi2` is then the residual of peaks
+    plus background. A design of any other shape, or with non-finite
+    entries, raises `ValueError`. No background columns are bundled.
+  - `fixed_shape=False`: when true, the Gaussian widths are held at
+    `initial_sigmas` and only the centers are optimized, within
+    `bounds_center_delta`. With `bounds_center_delta=0` no non-linear
+    parameter is free and the fit is the linear solve alone.
+  - `fit_batch(..., energy_axis=0)`: the default keeps the
+    `(n_energy, n_spectra)` layout. With `energy_axis=-1`, every
+    leading axis is a batch axis, for example `(K, n_spectra,
+    n_energy)`, and the parameter arrays come back as
+    `batch_shape + (n_components,)`. The batch is still a loop over
+    `fit_single`, and each entry equals the corresponding single fit.
+  - `VarProFitter` stays a per-spectrum reference fitter, not part of
+    the high-throughput path.
+
 ## [0.7.0] - 2026-10-25
 
 Archived on Zenodo:
