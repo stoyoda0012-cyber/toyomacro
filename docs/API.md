@@ -728,7 +728,8 @@ rejecting or warning on it, and deciding what it should mean, is
 deferred rather than guessed at.
 
 **Its β/γ/δ grid starts at 1500 eV** (2018 outer shells 1.5–10 keV; 2019
-inner shells 2–18 keV), and lookups below that clamp to the edge value
+inner shells on a grid per element, 2–12 keV at the lowest and 9–30 keV
+at the highest), and lookups below that clamp to the edge value
 instead of refusing, so `lookup('Si', '2p3/2', 1486.6)` returns the
 1500 eV parameters unchanged. Al Kα — the most common lab source — sits
 just under that floor. That is the same failure mode flagged for σ, λ

@@ -518,7 +518,8 @@ def _xlsx_to_json_trzh2019(xlsx_path: Path) -> dict[str, Any]:
 
     Same 4-row orbital block format as 2018, but:
     - Only inner shells (Eb ≥ ~1.5 keV)
-    - Energy grid varies per element (2-18 keV range)
+    - Energy grid varies per element: eleven energies, from 2-12 keV
+      for the lowest grid to 9-30 keV for the highest
     - Z=13 to Z=100
 
     Returns per-element-orbital structure with individual energy grids:
@@ -653,7 +654,9 @@ def load_trzh2019_data() -> dict[str, Any]:
     """Load Trzhaskovskaya 2019 inner-shell data, using cache if available.
 
     Contains σ, β, γ, δ for inner shells (Eb ≥ ~1.5 keV), Z=13-100.
-    Each orbital has its own photon energy grid (variable, 2-18 keV).
+    The photon energy grid is per element: eleven energies, from 2-12 keV
+    for the lowest grid to 9-30 keV for the highest. An orbital stores the
+    grid of its element.
     """
     cache_file = get_cache_dir() / "trzh2019_inner.json"
 
