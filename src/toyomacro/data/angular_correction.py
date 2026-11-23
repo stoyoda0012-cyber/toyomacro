@@ -286,7 +286,8 @@ class AngularCorrection:
 
     Merges two datasets:
     - 2018: outer shells, Z=1-100, 1.5-10 keV (fixed grid)
-    - 2019: inner shells (Eb ≥ ~1.5 keV), Z=13-100, 2-18 keV (variable grid)
+    - 2019: inner shells (Eb ≥ ~1.5 keV), Z=13-100, eleven energies per
+      element, from 2-12 keV for the lowest grid to 9-30 keV for the highest
 
     All methods are class methods — no instantiation needed.
     Parameters are lazily loaded from Excel (cached as JSON after first parse).

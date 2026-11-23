@@ -5,7 +5,8 @@ These tests do not promote it: they pin the two limits that section
 states, so the documentation cannot drift away from the behavior.
 
 The β/γ/δ parameters come from Trzhaskovskaya tables gridded from
-1500 eV up (2018 outer shells 1.5–10 keV; 2019 inner shells 2–18 keV).
+1500 eV up (2018 outer shells 1.5–10 keV; 2019 inner shells on a grid per
+element, 2–12 keV at the lowest and 9–30 keV at the highest).
 Below the grid floor the lookup clamps to the edge value instead of
 refusing, which matters because Al Kα (1486.6 eV) — the most common
 laboratory source — sits just underneath it.
