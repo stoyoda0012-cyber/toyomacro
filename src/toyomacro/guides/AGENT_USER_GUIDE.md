@@ -211,6 +211,14 @@ not an instrument RSF. Its result says whether the cross-section was
 tabulated or extrapolated for that line, and refuses below a line's
 first tabulated energy.
 
+`lookup_binding_energy` also returns a spin-orbit splitting. It is the
+difference of two tabulated binding energies, each printed to 0.1 eV:
+use it to say where a doublet partner is expected, as approximate, and
+do not hold a fit at it. `spin_orbit_split_eV` is `null` when the entry's
+state is `to_verify` or `not_covered`, or when the two members are
+printed equal; the `spin_orbit` object then says why. Report the state
+with the value.
+
 ## 8. Where the details are
 
 For the version this guide was written for:

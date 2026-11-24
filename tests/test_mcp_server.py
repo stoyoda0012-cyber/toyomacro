@@ -17,6 +17,39 @@ class TestReferenceDataTools:
         out = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))
         assert out["binding_energy_eV"] == pytest.approx(99.0, abs=1.0)
 
+    def test_spin_orbit_split_is_the_reference_value(self):
+        """Si 2p: 0.6 from the 0.1 eV table, where the integer table's 1.0
+        was reported before."""
+        out = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))
+        assert out["spin_orbit_split_eV"] == 0.6
+        so = out["spin_orbit"]
+        assert (so["precision_eV"], so["source_table"], so["state"]) == (
+            0.1, "trzh2018", "provisional")
+
+    def test_spin_orbit_state_is_reported_where_unsettled(self):
+        ga = json.loads(mcp_server.lookup_binding_energy("Ga", "3d"))["spin_orbit"]
+        assert (ga["split_eV"], ga["state"]) == (5.0, "to_verify")
+        # No position for a value that is to be verified; raw value nested
+        flat = json.loads(mcp_server.lookup_binding_energy("Ga", "3d"))
+        assert flat["spin_orbit_split_eV"] is None
+        assert "disagrees" in ga["state_reason"]
+        s = json.loads(mcp_server.lookup_binding_energy("O", "1s"))
+        assert s["spin_orbit_split_eV"] is None
+        assert s["spin_orbit"]["state"] == "not_covered"
+
+    def test_a_pair_printed_equal_is_not_reported_as_zero(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Am", "5f"))
+        assert out["spin_orbit_split_eV"] is None
+        so = out["spin_orbit"]
+        assert (so["split_eV"], so["state"], so["unresolved_at_precision"]) == (
+            0.0, "provisional", True)
+
+    def test_a_negative_pair_keeps_its_sign_in_the_nested_object(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Zn", "3d"))
+        assert out["spin_orbit_split_eV"] is None
+        assert (out["spin_orbit"]["split_eV"], out["spin_orbit"]["state"]) == (
+            -0.1, "to_verify")
+
     def test_lookup_binding_energy_unknown(self):
         out = json.loads(mcp_server.lookup_binding_energy("Xx", "9z"))
         assert "error" in out

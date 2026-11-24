@@ -40,6 +40,74 @@ archived on Zenodo for a citable DOI.
   - `VarProFitter` stays a per-spectrum reference fitter, not part of
     the high-throughput path.
 
+- **A spin-orbit splitting reference: `BindingEnergy.get_spin_orbit`.**
+  For showing where a doublet partner is expected and assigning it,
+  from a stated source. It returns a `SpinOrbitReference`:
+  - both j labels, both binding energies, and the splitting
+    BE(j−) − BE(j+) **with its sign as printed**;
+  - the source table (`trzh2018`, `trzh2019`, `trzh2018+trzh2019`,
+    `binding_energy`), the resolution the energies are printed to, and
+    the statistical ratio (2j− + 1)/(2j+ + 1);
+  - a state, `adopted`, `provisional`, `to_verify` or `not_covered`,
+    with its reason. A level the reference cannot settle is answered
+    with its state, never an exception, and a pair printed equal is
+    *unresolved at the table's resolution*, not a splitting of zero.
+  - **What the value is.** The difference of the two binding energies
+    Trzhaskovskaya & Yarzhemsky 2018 and 2019 print for the level, each
+    to 0.1 eV, so it can be 0.1 eV off from rounding alone. Both papers
+    take the energies from Kibédi et al. 2008, which was not read for
+    this package: whether an entry is measured, and whether it is a
+    free-atom or a solid-state energy, is not established.
+  - **It is not a fit constraint, and the fitters do not read it.**
+    `get_so_info`, `AutoFitter` and the templates keep their in-code
+    splittings, and no fit result changes. The two differ for 42 of the
+    46 in-code levels, by up to 0.15 eV where the reference entry is
+    `provisional` (Ge 3d: 0.55 in the fitters, 0.7 in the reference).
+  - The new bundled table `spin_orbit.json` holds 579 levels of 99
+    elements: 308 `provisional` (nine of them printed equal), 184
+    `to_verify` (the eight negative pairs, and 176 where another
+    bundled value or the in-code value disagrees beyond tolerance), 87
+    `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
+    where the two papers divide, and take one member from each. It is
+    built by `python -m toyomacro.data._spin_orbit_build` from tables
+    already bundled, and a test compares the file with a fresh build.
+    Provenance and the rules: `docs/DATA_SOURCES.md`, *The spin-orbit
+    reference*.
+  - `BindingEnergy.spin_orbit_levels()` lists the levels it carries.
+- **`CrossSection.get_spin_orbit_intensity_ratio(element, subshell,
+  photon_energy, table=...)`**: σ(j−)/σ(j+) with both components read
+  by `lookup_with_status` at the same photon energy (on
+  `trzhaskovskaya`, each line at its own E + Eb), returned as a
+  `SpinOrbitIntensityRatio` with both lookups. `None`, with the status
+  that stopped it, when either component has no positive value; always
+  `None` on Yeh–Lindau, which has no j-resolved lines. A theoretical
+  cross-section ratio does not guarantee the measured peak-area ratio;
+  the difference is often inconspicuous in a wide scan and can become
+  visible in a narrow scan. Instrument, emission angle and polarization
+  are outside it.
+
+### Changed
+
+- **MCP `lookup_binding_energy`**: `spin_orbit_split_eV` is now the
+  reference value (Si 2p 0.6, was 1.0 from the integer table). It is
+  `null` when the entry is `to_verify` or `not_covered`, for an s level
+  (was `0.0`), and when the two members are printed equal (was `0.0`):
+  Ga 3d, for instance, is `null` where `0.0` was returned. A new
+  `spin_orbit` object carries the whole entry: the raw value with its
+  sign (Zn 3d −0.1), both binding energies, source, state and reason.
+  The value is approximate and is not what the fitters hold a doublet
+  at.
+
+### Known issues
+
+- **`binding_energy.json` stores one value for both members of 125 of
+  its 472 doublets**, so `BindingEnergy.get_spin_orbit_split` returns
+  0.0 for them. For Np–Fm 4p the 2018 and 2019 Trzhaskovskaya papers
+  print members 242–363 eV apart. The table is not corrected in this
+  change; `get_spin_orbit` reads those levels from the papers' tables.
+- **The in-code splitting `"Ti3d"` (6.1 eV)** is held for a level of
+  which the 2018 paper prints one member only. Unchanged here.
+
 ## [0.7.0] - 2026-10-25
 
 Archived on Zenodo:

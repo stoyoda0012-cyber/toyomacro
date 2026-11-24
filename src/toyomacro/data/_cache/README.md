@@ -40,6 +40,7 @@ correct use.
 | `trzh2018_haxpes.json` | Trzhaskovskaya 2018 xlsx (not distributed) | HAXPES σ/β/γ/δ, Z=1–100, 1.5–10 keV |
 | `trzh2019_inner.json` | Trzhaskovskaya 2019 xlsx (not distributed) | Inner-shell σ/β/γ/δ, Z=13–100 |
 | `compounds_provenance.json` | hand-authored | Per-field provenance for `compounds.json` (no source to rebuild from) |
+| `spin_orbit.json` | `python -m toyomacro.data._spin_orbit_build` from the bundled `trzh2018_haxpes.json`, `trzh2019_inner.json`, `trzhaskovskaya.json`, `binding_energy.json` and the in-code splittings of `core/xps_database.py` | Spin-orbit reference: BE(j−) − BE(j+) per element and n, l, with source and state. For showing and assigning a partner, not a fit constraint |
 
 "Generated from" records where a table originally came from, not a
 current equivalence: see the `compounds.json` section of

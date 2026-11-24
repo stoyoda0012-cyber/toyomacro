@@ -13,6 +13,7 @@ Usage:
     # Binding energy lookup
     be = BindingEnergy.lookup('Si', '2p')      # → 99.0 eV
     be = BindingEnergy.from_string('Si2p')     # → 99.0 eV
+    so = BindingEnergy.get_spin_orbit('Si', '2p')  # → split_eV 0.6, provisional
 
     # Cross-section (Al K-α = 1486.6 eV)
     sigma = CrossSection.lookup('Si', '2p', 1486.6)
@@ -26,12 +27,13 @@ Usage:
 """
 
 from toyomacro.data.angular_correction import AngularCorrection
-from toyomacro.data.binding_energy import BindingEnergy
+from toyomacro.data.binding_energy import BindingEnergy, SpinOrbitReference
 from toyomacro.data.compound_db import CompoundDB
 from toyomacro.data.cross_section import (
     ComponentLookup,
     CrossSection,
     CrossSectionLookup,
+    SpinOrbitIntensityRatio,
 )
 from toyomacro.data.imfp import IMFP
 from toyomacro.data.paths import (
@@ -48,6 +50,8 @@ __all__ = [
     "CrossSection",
     "CrossSectionLookup",
     "ComponentLookup",
+    "SpinOrbitReference",
+    "SpinOrbitIntensityRatio",
     "CompoundDB",
     "IMFP",
     # Utility functions

@@ -36,6 +36,7 @@ been granted where none is stated.
 | `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
 | `trzh2019_inner.json` | σ, β, γ, δ (inner shells; eleven photon energies per element, from 2–12 keV for the lowest grid to 9–30 keV for the highest) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (eV; integers except some rows of Np–Lr), per subshell | Standard elemental BE compilation — values follow the LBNL X-ray Data Booklet, except where noted at the end of this row "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values largely appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. **Co 3p departs from the Booklet on purpose** (the table also departs from it elsewhere — N, O and F 1s, absent Ce and Eu 4f, the 7s of Ra–U and the rows of Np–Lr, which the Booklet does not have — for reasons not recorded): it is stored unresolved at 59 eV for both members, as Fuggle & Mårtensson, *J. Electron Spectrosc. Relat. Phenom.* **21**, 275 (1980), doi:10.1016/0368-2048(80)85056-0, Table 2 prints it — 58.8 and 59.0 eV from two instruments, in the column between 3p1/2 and 3p3/2, as for Mn and Fe. The Booklet marks its Co values † ("values taken from Ref. 3", i.e. Fuggle & Mårtensson, Booklet §1.1) and lists 3p1/2 = 58.9, the mean of the two, but 3p3/2 = 59.9, which appears in none of its cited sources: evidently a misprint of 58.9. It was the only spin-orbit pair in the table stored with 3p3/2 deeper than 3p1/2. Bearden & Burr 1967 give one Co M<sub>II,III</sub> level, 59.5 ± 0.3 eV, equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p (59.70, 60.20) lie closer to the old 60. An equal pair records unresolved data, not degenerate levels: free-atom values put Co 3p3/2 about 2 eV less bound than 3p1/2 (e.g. Trzhaskovskaya et al. 2001, 66 and 68 eV). |
+| `spin_orbit.json` | Spin-orbit reference: BE(j−) − BE(j+) per element and n, l (l = p, d, f), 579 levels of 99 elements, each with both binding energies, the source table and a state (see *The spin-orbit reference* below) | Derived, by `python -m toyomacro.data._spin_orbit_build`, from tables already bundled: the per-line binding energies of `trzh2018_haxpes.json` and `trzh2019_inner.json` (492 pairs), and `binding_energy.json` where those do not hold both members and it stores two different values (22 pairs). `trzhaskovskaya.json` and the in-code splittings of `core/xps_database.py` are compared with, not copied. | Nothing new is taken from a source: every binding energy in it is already in one of the bundled tables above, under that table's own row. |
 | `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and every entry that overlaps a TPP-series parameter table differs from it. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
 
 ## Cross-section units
@@ -415,16 +416,105 @@ span 2.31–3.26 eV, so `applies_to` is `Eg` there. Where a phase *is*
 identified, the identification is an inference made here and carries an
 origin saying so.
 
+## The spin-orbit reference
+
+`spin_orbit.json`, read through `BindingEnergy.get_spin_orbit`, holds
+one splitting per element and n, l, with its source and how far it is
+supported. It exists so that a doublet partner can be shown and
+assigned from a stated source. Before it, the only splitting a lookup
+returned was the `binding_energy.json` difference (Si 2p: 1.0 eV, and
+0.0 for the 125 of that table's 472 pairs stored as one value).
+
+**It is not what the fitters use.** `core/xps_database.py` keeps its 46
+in-code splittings (*In-code constants* below), and `get_so_info`,
+`AutoFitter` and the templates read those. The reference differs from
+42 of the 46, by up to 0.15 eV where its entry is `provisional` (Ge 3d:
+0.55 in code, 0.7 here from 29.2 and 29.9 printed). A difference of two
+energies each printed to 0.1 eV can be 0.1 eV off from rounding alone,
+which is too coarse to hold a doublet at. The in-code values have no
+recorded per-value source. So neither set is derived from the other,
+and both are stated for what they are.
+
+**Where the values come from.** Table 1 of Trzhaskovskaya & Yarzhemsky
+2018 and 2019 prints a binding energy for every line, in a column both
+papers call "Experimental subshell binding energy in eV". Both say the
+values were taken from Kibédi, Burrows, Trzhaskovskaya, Davidson &
+Nestor, *Nucl. Instrum. Methods Phys. Res. A* **589**, 202 (2008). The
+2018 paper holds lines bound by less than 1.5 keV and the 2019 paper
+the others; no line is in both. The bundled JSONs carry that column as
+`binding_energy`.
+
+- **Checked against the papers:** the binding energy of every line of
+  both tables (1094 lines of the 2018 paper, 324 of the 2019 paper)
+  equals the value the paper prints. `tests/test_spin_orbit_reference.py`
+  pins the printed values the rules turn on: the eight negative pairs
+  and the seven doublets that lie across 1.5 keV.
+- **Not established:** Kibédi 2008 and the compilations behind it were
+  not read for this package. Which entries are measured and which are
+  calculated, and whether the energies are free-atom or solid-state
+  values, is therefore not recorded here. The papers' word
+  "experimental" is quoted, not confirmed, and the entries of the
+  heaviest elements in particular should not be assumed to be measured.
+- **Printed so, not transcription errors of this package:** eight pairs
+  have the j− member printed less bound than the j+ member (N, O and F
+  2p; P and S 3p; Co and Zn 3d; Os 5d), and Ga 3d is printed 15.7 and
+  20.7. They keep their sign and value and are `to_verify`.
+
+**The rules.** For each element and n, l the two members are looked up
+in the 2018 table, then the 2019 table.
+
+| case | state | entries |
+|---|---|--:|
+| both members found, splitting negative | `to_verify` | 8 |
+| both found, printed equal (Cl 3p, As and Se 4p, Am–Fm 5f) | `provisional`, `unresolved_at_precision` | 9 |
+| both found, positive, another value disagrees beyond tolerance | `to_verify` | 176 |
+| both found, positive, nothing disagrees | `provisional` | 299 |
+| one member or none found | `not_covered` | 87 |
+
+- Seven doublets lie across 1.5 keV and take the j+ member from the
+  2018 table and the j− member from the 2019 table (`source_table`
+  `trzh2018+trzh2019`): Sm and Eu 3p, Tm 3d, Bk–Fm 4p.
+- A positive splitting is compared with the `binding_energy.json` pair
+  and the `trzhaskovskaya.json` (2001/2002) pair, tolerance 1.0 eV, and
+  with the in-code value where there is one, tolerance 0.15 eV. The
+  1.0 eV is the most two values each rounded to 1 eV can put their
+  difference off. **A pair those two tables store as one value is not
+  compared**: one number for two members says nothing about the
+  splitting. `binding_energy.json` does this for Np–Fm 4p, among
+  others, where the 2018 and 2019 papers print members 242–363 eV
+  apart; that is a defect of `binding_energy.json`, recorded here and
+  not corrected by this table.
+- Agreement does not adopt. `adopted` is assigned by hand and no entry
+  has it. `provisional` means the two energies are the source's and
+  nothing bundled contradicts their difference, with the limits under
+  *Not established* above.
+- `not_covered`: the Trzhaskovskaya tables print one member only (41
+  levels, e.g. Ti 3d3/2 alone) or none (46). The `binding_energy.json`
+  pair is carried, still `not_covered`, for the 22 of them where that
+  table stores two different values; the other 65 have no value.
+- Levels outside the 579, s levels and unknown element symbols are
+  answered `not_covered` with no value and a reason that says which.
+
+The file is rebuilt, never edited by hand:
+`python -m toyomacro.data._spin_orbit_build OUT.json`. A test compares
+the bundled file with a fresh build byte for byte, so a change to any
+of its inputs, the in-code splittings included, fails until the file is
+rebuilt and the change to the reference is reviewed.
+
 ## In-code constants
 
 Two modules carry small curated sets of scalar physical constants
 directly in source (no external database is extracted or shipped):
 
-- `core/xps_database.py`: ~50 spin-orbit splitting values (one number
+- `core/xps_database.py`: 46 spin-orbit splitting values (one number
   per element/orbital, e.g. Au 4f = 3.67 eV) plus branch ratios from
-  the quantum-mechanical degeneracy formula (2l)/(2l+2). These are
-  element-level physical constants reported consistently across the
-  primary XPS literature, intended as fitting initial guesses.
+  the quantum-mechanical degeneracy formula (2l)/(2l+2). The fitters
+  hold a doublet at these. No per-value source is recorded for them.
+  They are compared with the spin-orbit reference above and not
+  replaced by it; eleven disagree with it by more than 0.15 eV (Ti, V
+  and Cr 2p; Ge 3p; Ga and Ce 3d; Hf, Ta and W 4d; Hf and Bi 4f),
+  and the key `"Ti3d"` holds 6.1 eV for a level of which the 2018 paper
+  prints one member only.
 - `fitting/templates.py`: chemical-shift starting values for the three
   bundled fitting templates (Si 2p oxide, Ta 4f oxide, C 1s organic),
   likewise widely published reference values used as initial guesses.

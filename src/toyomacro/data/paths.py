@@ -345,6 +345,25 @@ def load_compound_provenance() -> dict[str, Any]:
         return json.load(f)
 
 
+def load_spin_orbit_data() -> dict[str, Any]:
+    """Load the bundled spin-orbit splitting reference.
+
+    Built by ``python -m toyomacro.data._spin_orbit_build`` from the
+    bundled Trzhaskovskaya and binding-energy tables, never at run time:
+    a missing file raises.
+    """
+    spin_orbit_file = get_cache_dir() / "spin_orbit.json"
+    if not spin_orbit_file.exists():
+        raise FileNotFoundError(
+            f"Bundled reference table spin_orbit.json is missing from "
+            f"{get_cache_dir()}. It ships with this package and is built "
+            f"from the other bundled tables, not at run time. Restore it "
+            f"(e.g. `git checkout` the file, or reinstall)."
+        )
+    with open(spin_orbit_file, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def load_cross_section_data() -> dict[str, Any]:
     """Load the bundled Yeh & Lindau cross-section table."""
     return _load_shipped_table(

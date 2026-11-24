@@ -929,6 +929,86 @@ This module is experimental in the sense of the stability section — it
 is not re-exported from `toyomacro.data` and no other part of the
 package calls it.
 
+### Spin-orbit splittings
+
+```python
+from toyomacro.data import BindingEnergy, CrossSection
+
+ref = BindingEnergy.get_spin_orbit("Si", "2p")
+# SpinOrbitReference(split_eV=0.6, precision_eV=0.1, source_table='trzh2018',
+#                    be_j_plus_eV=98.9, be_j_minus_eV=99.5,
+#                    state='provisional', statistical_ratio=0.5, ...)
+BindingEnergy.get_spin_orbit("Hf", "4d").state     # 'to_verify' (10.1 eV)
+BindingEnergy.get_spin_orbit("N", "2p").split_eV   # -0.8: sign kept
+
+r = CrossSection.get_spin_orbit_intensity_ratio("Au", "4f", 1486.6, table="scofield")
+r.ratio, r.status                                  # (0.787, 'tabulated')
+```
+
+`get_spin_orbit(element, subshell)` returns one `SpinOrbitReference`
+per level: both j labels, both binding energies, the splitting
+BE(j−) − BE(j+) **with its sign as printed**, the source table, the
+statistical ratio (2j− + 1)/(2j+ + 1), and a state with its reason.
+
+**What it is for.** Showing where a doublet partner is expected and
+assigning it. The value is the difference of two tabulated binding
+energies, each printed to 0.1 eV, so it can be 0.1 eV off from rounding
+alone; it is an elemental value and says nothing about a chemical
+state. **It is not a fit constraint, and the fitters do not read it**:
+`get_so_info`, `AutoFitter` and the templates keep their own in-code
+splittings, which differ from the reference by up to 0.15 eV for
+common levels (Ge 3d: 0.55 in the fitters, 0.7 here). No entry is
+`adopted`.
+
+| state | meaning | show the partner's position? |
+|---|---|---|
+| `adopted` | checked and judged fit for the use; assigned by hand, to no entry yet | yes |
+| `provisional` | both binding energies are the source table's, and no other bundled value contradicts the splitting beyond tolerance | only marked as approximate |
+| `to_verify` | negative as printed, or another value disagrees beyond tolerance | no; show the reason |
+| `not_covered` | the Trzhaskovskaya tables do not hold both members; also an s level, and a level or element the reference does not carry | no; show the reason |
+
+- `source_table` is `trzh2018`, `trzh2019`, `trzh2018+trzh2019` (the
+  doublet lies across 1.5 keV, where the two papers divide, and takes
+  one member from each), `binding_energy` (carried, `not_covered`), or
+  `None`.
+- `precision_eV` is the resolution the two energies are printed to
+  (0.1 for the Trzhaskovskaya tables, `None` otherwise), not the
+  uncertainty of the difference.
+- `split_eV == 0.0` comes with `unresolved_at_precision`: the two
+  members are printed equal, which is not a splitting of zero.
+- It never raises for a level it cannot settle. It raises `ValueError`
+  for a label that is not a subshell (`'2x'`) or names a j that does
+  not exist for its l (`'2p5/2'`).
+
+The field names and the four state names are the supported surface,
+like the `lookup_with_status` statuses. The values, the state of an
+individual entry and the number of entries are data: they change when
+an entry is checked or a source table is corrected, with a changelog
+entry. Provenance and the rules: [`DATA_SOURCES.md`](DATA_SOURCES.md),
+*The spin-orbit reference*.
+
+`BindingEnergy.get_spin_orbit_split()` is kept for compatibility and
+still returns the `binding_energy.json` difference (Si 2p: 1.0; 0.0
+where that table stores one value for both members);
+`BindingEnergy.spin_orbit_levels()` lists every level the reference
+carries. The MCP tool `lookup_binding_energy` reports the reference
+value as `spin_orbit_split_eV` only for an `adopted` or `provisional`
+entry whose members are not printed equal (`null` otherwise) and the
+whole entry, raw value included, under `spin_orbit`.
+
+`CrossSection.get_spin_orbit_intensity_ratio(element, subshell,
+photon_energy, table=...)` returns σ(j−)/σ(j+), both components read
+through `lookup_with_status` at the same photon energy — on
+`trzhaskovskaya` each line at its own E + Eb — with both lookups
+attached. The ratio is `None`, with the status that stopped it, when
+either component has no positive value; Yeh–Lindau stores no
+j-resolved line, so it always gives `None` with `not_in_table`. A
+theoretical cross-section ratio does not guarantee the measured
+peak-area ratio; the difference is often inconspicuous in a wide scan
+and can become visible in a narrow scan. Instrument response, emission
+angle, polarization and the occupancy of an open subshell
+(Trzhaskovskaya values are for filled subshells) are outside it.
+
 ## 6. Synthetic data and GVRT
 
 ```python

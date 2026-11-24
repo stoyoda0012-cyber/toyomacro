@@ -442,6 +442,27 @@ class CrossSectionLookup:
     components: tuple[ComponentLookup, ...]
 
 
+@dataclass(frozen=True)
+class SpinOrbitIntensityRatio:
+    """σ(j-)/σ(j+) of one subshell, both read at the same photon energy.
+
+    ``ratio`` is None unless both components have a positive value.
+    ``status`` is the status of the component that stopped the ratio, or,
+    when there is a ratio, the least supported of the two (``tabulated``
+    unless one was extrapolated). ``j_minus`` and ``j_plus`` are the two
+    :class:`CrossSectionLookup` results the ratio was taken from.
+    """
+
+    element: str
+    subshell: str
+    photon_energy: float
+    table: str
+    ratio: float | None
+    status: LookupStatus
+    j_minus: CrossSectionLookup
+    j_plus: CrossSectionLookup
+
+
 class CrossSection:
     """
     Photoionization cross-section database with multiple table support.
@@ -1148,6 +1169,84 @@ class CrossSection:
             return None
 
         return sigma1 / sigma2
+
+    @classmethod
+    def get_spin_orbit_intensity_ratio(
+        cls,
+        element: str,
+        subshell: str,
+        photon_energy: float,
+        table: str | None = None,
+    ) -> SpinOrbitIntensityRatio:
+        """σ(j-)/σ(j+) of a doublet, both components at one photon energy.
+
+        Each component is read with :meth:`lookup_with_status` at
+        ``photon_energy``, so on ``"trzhaskovskaya"`` — tabulated at
+        photoelectron energies — each line is read at its own E + Eb and
+        both components end up at the same photon energy; dividing two raw
+        columns of that table would compare different photon energies. A
+        table that stores only bare subshells (``"yeh_lindau"``) has no
+        j-resolved value, so its ratio is None with ``not_in_table``. The
+        ratio is None too when either component has no value or is a known
+        zero (below its threshold, unoccupied); ``status`` then says which.
+
+        This is a theoretical, atomic quantity. **A theoretical
+        cross-section ratio does not guarantee the measured peak-area
+        ratio; the difference is often inconspicuous in a wide scan and can
+        become visible in a narrow scan.** Instrument effects (transmission,
+        detector response and non-linearity), the emission angle and the
+        polarization are outside this lookup, and so is the occupancy of an
+        open subshell: Trzhaskovskaya values are for completely filled
+        subshells. The statistical (2j+1) ratio is
+        :attr:`toyomacro.data.SpinOrbitReference.statistical_ratio`.
+
+        Args:
+            element: Element symbol.
+            subshell: ``'2p'``, ``'3d'``, ``'4f'``; a j-resolved label is
+                read as its subshell.
+            photon_energy: Photon energy in eV.
+            table: ``"scofield"``, ``"trzhaskovskaya"`` or ``"yeh_lindau"``
+                (default: the current default table).
+
+        Returns:
+            A :class:`SpinOrbitIntensityRatio`.
+
+        Raises:
+            ValueError: if ``subshell`` is not a p, d or f subshell label,
+                or ``photon_energy`` is not a finite number.
+
+        Examples:
+            >>> r = CrossSection.get_spin_orbit_intensity_ratio(
+            ...     'Au', '4f', 1486.6, table='scofield')
+            >>> round(r.ratio, 3), r.status
+            (0.787, 'tabulated')
+        """
+        base, _ = _split_orbital(subshell)
+        components = _J_COMPONENTS.get(base[-1:]) if len(base) == 2 else None
+        if components is None or len(components) != 2 or not base[0].isdigit():
+            raise ValueError(f"Not a p, d or f subshell label: {subshell!r}")
+        if not math.isfinite(photon_energy):
+            raise ValueError(f"photon_energy must be finite, got {photon_energy!r}")
+        j_lo, j_hi = components
+        minus = cls.lookup_with_status(element, f"{base}{j_lo}", photon_energy, table)
+        plus = cls.lookup_with_status(element, f"{base}{j_hi}", photon_energy, table)
+
+        ratio = None
+        status: LookupStatus
+        stopped = [r for r in (minus, plus) if r.value is None or r.value <= 0.0]
+        if stopped:
+            status = stopped[0].status
+        else:
+            ratio = minus.value / plus.value
+            # A component with a value is tabulated or extrapolated above
+            # (outside_range_below has no value without extrapolate_below)
+            extrapolated = "extrapolated_above" in (minus.status, plus.status)
+            status = "extrapolated_above" if extrapolated else "tabulated"
+        return SpinOrbitIntensityRatio(
+            element=element, subshell=base, photon_energy=float(photon_energy),
+            table=table or cls._default_table, ratio=ratio, status=status,
+            j_minus=minus, j_plus=plus,
+        )
 
     @classmethod
     def get_available_photon_energies(cls, table: str | None = None) -> list[float]:
