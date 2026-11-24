@@ -36,6 +36,22 @@ mcp = FastMCP("toyomacro", instructions=(
 def lookup_binding_energy(element: str, orbital: str) -> str:
     """Look up the reference binding energy for a core level.
 
+    The binding energy is the elemental table (mostly integer eV). The
+    spin-orbit splitting is the spin-orbit reference
+    (BindingEnergy.get_spin_orbit): the difference of two tabulated
+    binding energies each printed to 0.1 eV, for showing or assigning a
+    doublet partner. It is approximate, not a measurement of the sample,
+    and not the value the fitters hold a doublet at.
+    `spin_orbit_split_eV` is given only when the state is "adopted" or
+    "provisional"; it is null otherwise. The `spin_orbit` object always carries the raw
+    BE(j-) - BE(j+) where the reference has one (negative ones with
+    their sign), the source table, state and reason. There, 0.0 with
+    `unresolved_at_precision` means the two members are printed equal,
+    not a splitting of zero. `spin_orbit` is null for a label the
+    reference cannot read. A level this tool has no binding energy for
+    returns the error and no spin-orbit entry, although the reference
+    may hold one.
+
     Args:
         element: Element symbol (e.g. 'Si', 'O', 'C', 'Ta', 'Au').
         orbital: Orbital name (e.g. '2p', '1s', '4f', '3d').
@@ -45,11 +61,36 @@ def lookup_binding_energy(element: str, orbital: str) -> str:
     be = BindingEnergy.lookup(element, orbital)
     if be is None:
         return json.dumps({"error": f"No binding energy for {element} {orbital}"})
+    try:
+        so = BindingEnergy.get_spin_orbit(element, orbital.strip())
+    except ValueError:
+        return json.dumps({
+            "element": element,
+            "orbital": orbital,
+            "binding_energy_eV": be,
+            "spin_orbit_split_eV": None,
+            "spin_orbit": None,
+        })
     return json.dumps({
         "element": element,
         "orbital": orbital,
         "binding_energy_eV": be,
-        "spin_orbit_split_eV": BindingEnergy.get_spin_orbit_split(element, orbital),
+        "spin_orbit_split_eV": (
+            so.split_eV if so.state in ("adopted", "provisional") else None
+        ),
+        "spin_orbit": {
+            "j_plus": so.j_plus,
+            "j_minus": so.j_minus,
+            "split_eV": so.split_eV,
+            "precision_eV": so.precision_eV,
+            "source_table": so.source_table,
+            "be_j_plus_eV": so.be_j_plus_eV,
+            "be_j_minus_eV": so.be_j_minus_eV,
+            "state": so.state,
+            "state_reason": so.state_reason,
+            "unresolved_at_precision": so.unresolved_at_precision,
+            "statistical_ratio": so.statistical_ratio,
+        },
     })
 
 

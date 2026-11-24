@@ -17,6 +17,90 @@ class TestReferenceDataTools:
         out = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))
         assert out["binding_energy_eV"] == pytest.approx(99.0, abs=1.0)
 
+    def test_spin_orbit_split_is_the_reference_value(self):
+        """Si 2p: 0.6 from the 0.1 eV table, where the integer table's 1.0
+        was reported before."""
+        out = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))
+        assert out["spin_orbit_split_eV"] == 0.6
+        so = out["spin_orbit"]
+        assert (so["precision_eV"], so["source_table"], so["state"]) == (
+            0.1, "trzh2018", "provisional")
+
+    def test_spin_orbit_state_is_reported_where_unsettled(self):
+        ga = json.loads(mcp_server.lookup_binding_energy("Ga", "3d"))["spin_orbit"]
+        assert (ga["split_eV"], ga["state"]) == (5.0, "to_verify")
+        # No position for a value that is to be verified; raw value nested
+        flat = json.loads(mcp_server.lookup_binding_energy("Ga", "3d"))
+        assert flat["spin_orbit_split_eV"] is None
+        assert "disagrees" in ga["state_reason"]
+        s = json.loads(mcp_server.lookup_binding_energy("O", "1s"))
+        assert s["spin_orbit_split_eV"] is None
+        assert s["spin_orbit"]["state"] == "not_covered"
+
+    def test_the_nested_entry_is_the_reference_entry(self):
+        from toyomacro.data import BindingEnergy
+
+        so = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))["spin_orbit"]
+        ref = BindingEnergy.get_spin_orbit("Si", "2p")
+        assert so == {
+            "j_plus": "2p3/2", "j_minus": "2p1/2", "split_eV": 0.6,
+            "precision_eV": 0.1, "source_table": "trzh2018",
+            "be_j_plus_eV": 98.9, "be_j_minus_eV": 99.5,
+            "state": "provisional", "state_reason": ref.state_reason,
+            "unresolved_at_precision": False, "statistical_ratio": 0.5,
+        }
+
+    def test_a_carried_pair_gives_no_headline(self):
+        """Lu 2p: the binding_energy.json pair, not_covered."""
+        out = json.loads(mcp_server.lookup_binding_energy("Lu", "2p"))
+        assert out["spin_orbit_split_eV"] is None
+        assert (out["spin_orbit"]["split_eV"], out["spin_orbit"]["state"]) == (
+            1105.0, "not_covered")
+
+    def test_the_headline_is_never_zero_negative_or_unsettled(self):
+        from toyomacro.data import BindingEnergy
+
+        given = 0
+        for el in BindingEnergy.get_all_elements():
+            for n in range(1, 8):
+                for letter in "spdf":
+                    out = json.loads(mcp_server.lookup_binding_energy(el, f"{n}{letter}"))
+                    head = out.get("spin_orbit_split_eV")
+                    if head is None:
+                        continue
+                    given += 1
+                    so = out["spin_orbit"]
+                    assert head > 0 and head == so["split_eV"]
+                    assert so["state"] == "provisional" and not so["unresolved_at_precision"]
+        assert given == 258
+
+    @pytest.mark.parametrize("label", ["2p ", "2p\t", "2p\n"])
+    def test_a_padded_label_is_still_answered(self, label):
+        out = json.loads(mcp_server.lookup_binding_energy("Si", label))
+        assert out["binding_energy_eV"] == 99.0 and out["spin_orbit_split_eV"] == 0.6
+
+    @pytest.mark.parametrize("label", ["2p3", "2p1"])
+    def test_a_label_the_reference_cannot_read_is_answered_without_it(self, label):
+        """The binding-energy lookup accepts these; the answer must stay a
+        JSON result, not an exception."""
+        out = json.loads(mcp_server.lookup_binding_energy("Si", label))
+        assert out["binding_energy_eV"] == 99.0
+        assert out == {"element": "Si", "orbital": label, "binding_energy_eV": 99.0,
+                       "spin_orbit_split_eV": None, "spin_orbit": None}
+
+    def test_a_pair_printed_equal_is_not_reported_as_zero(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Am", "5f"))
+        assert out["spin_orbit_split_eV"] is None
+        so = out["spin_orbit"]
+        assert (so["split_eV"], so["state"], so["unresolved_at_precision"]) == (
+            0.0, "to_verify", True)
+
+    def test_a_negative_pair_keeps_its_sign_in_the_nested_object(self):
+        out = json.loads(mcp_server.lookup_binding_energy("Zn", "3d"))
+        assert out["spin_orbit_split_eV"] is None
+        assert (out["spin_orbit"]["split_eV"], out["spin_orbit"]["state"]) == (
+            -0.1, "to_verify")
+
     def test_lookup_binding_energy_unknown(self):
         out = json.loads(mcp_server.lookup_binding_energy("Xx", "9z"))
         assert "error" in out

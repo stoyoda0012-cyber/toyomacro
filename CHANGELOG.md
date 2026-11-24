@@ -40,6 +40,91 @@ archived on Zenodo for a citable DOI.
   - `VarProFitter` stays a per-spectrum reference fitter, not part of
     the high-throughput path.
 
+- **A spin-orbit splitting reference: `BindingEnergy.get_spin_orbit`.**
+  For showing where a doublet partner is expected and assigning it,
+  from a stated source. It returns a `SpinOrbitReference`:
+  - both j labels, both binding energies, and the splitting
+    BE(j−) − BE(j+) **with its sign as printed**;
+  - the source table (`trzh2018`, `trzh2019`, `trzh2018+trzh2019`,
+    `binding_energy`), the resolution the energies are printed to, and
+    the statistical ratio (2j− + 1)/(2j+ + 1);
+  - a state, `adopted`, `provisional`, `to_verify` or `not_covered`,
+    with its reason. A level the reference cannot settle is answered
+    with its state, never an exception, and a pair printed equal is
+    flagged as one no splitting can be read from, not a splitting of
+    zero.
+  - **What the value is.** The difference of the two binding energies
+    Trzhaskovskaya & Yarzhemsky 2018 and 2019 print for the level, each
+    to 0.1 eV, so it can be 0.1 eV off from rounding alone. Both papers
+    take the energies from Kibédi et al. 2008, which was not read for
+    this package: whether an entry is measured, and whether it is a
+    free-atom or a solid-state energy, is not established.
+  - **It is not a fit constraint, and the fitters do not read it.**
+    `get_so_info`, `AutoFitter` and the templates keep their in-code
+    splittings, and no fit result changes. The two differ for 41 of the
+    45 in-code levels the reference has a value for, by up to 0.15 eV
+    where the reference entry is `provisional` (Ge 3d: 0.55 in the
+    fitters, 0.7 in the reference) and by up to 6.7 eV where it is
+    `to_verify` (Hf 4d: 16.8 and 10.1).
+  - The new bundled table `spin_orbit.json` holds 579 levels of 99
+    elements: 259 `provisional` (another bundled value supports the
+    splitting and none contradicts it; for 33 that value is or includes
+    the in-code one, which has no recorded source), 233 `to_verify` (the eight
+    negative pairs, nine printed equal, 164 where another bundled value
+    or the in-code value disagrees beyond tolerance, 44 with no other
+    value to compare with, eight compared only with values too coarse
+    to support them), 87 `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
+    where the two papers divide, and take one member from each. It is
+    built by `python -m toyomacro.data._spin_orbit_build` from tables
+    already bundled, and a test compares the file with a fresh build.
+    Provenance and the rules: `docs/DATA_SOURCES.md`, *The spin-orbit
+    reference*.
+  - `BindingEnergy.spin_orbit_levels()` lists the levels it carries.
+- **`CrossSection.get_spin_orbit_intensity_ratio(element, subshell,
+  photon_energy, table=...)`**: σ(j−)/σ(j+) with both components read
+  by `lookup_with_status` at the same photon energy (on
+  `trzhaskovskaya`, each line at its own E + Eb), returned as a
+  `SpinOrbitIntensityRatio` with both lookups. `None`, with the status
+  that stopped it, when either component has no positive value; always
+  `None` on Yeh–Lindau, which has no j-resolved lines. A theoretical
+  cross-section ratio does not guarantee the measured peak-area ratio;
+  the difference is often inconspicuous in a wide scan and can become
+  visible in a narrow scan. Instrument, emission angle and polarization
+  are outside it.
+
+### Changed
+
+- **MCP `lookup_binding_energy`**: `spin_orbit_split_eV` is now the
+  reference value, given only for a `provisional` entry, and `null`
+  otherwise. Of the 888 levels the tool answers:
+  - 396 s levels: `0.0` → `null`;
+  - 219 keep a value, 194 of them a different one (Si 2p 1.0 → 0.6)
+    and 25 the same;
+  - 39 gain a value where `0.0` was returned (Mg 2p 0.2; Np 4p 241.7);
+  - 128 lose their value: 106 `to_verify` (Ti 2p, was 6.0) and 22
+    `not_covered` (Lu 2p, was 1105.0);
+  - 86 go from `0.0` to `null`: 65 `to_verify` (Ga 3d) and 21
+    `not_covered`;
+  - 20 were `null` and stay `null`.
+
+  A new `spin_orbit` object carries the whole entry: the raw value with
+  its sign (Zn 3d −0.1), both binding energies, source, state and
+  reason; it is `null` for a label the reference cannot read (`'2p3'`).
+  The tool still answers only levels it has a binding energy for, so 87
+  of the 579 reference levels are reachable through `get_spin_orbit`
+  only. The value is approximate and is not what the fitters hold a
+  doublet at.
+
+### Known issues
+
+- **`binding_energy.json` stores one value for both members of 125 of
+  its 472 doublets**, so `BindingEnergy.get_spin_orbit_split` returns
+  0.0 for them. For Np–Fm 4p the 2018 and 2019 Trzhaskovskaya papers
+  print members 242–363 eV apart. The table is not corrected in this
+  change; `get_spin_orbit` reads those levels from the papers' tables.
+- **The in-code splitting `"Ti3d"` (6.1 eV)** is held for a level of
+  which the 2018 paper prints one member only. Unchanged here.
+
 ## [0.7.0] - 2026-10-25
 
 Archived on Zenodo:
