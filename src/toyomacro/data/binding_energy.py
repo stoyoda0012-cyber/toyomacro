@@ -197,7 +197,11 @@ class BindingEnergy:
         ``toyomacro.core.xps_database.get_so_info`` keeps its own values.
         Those differ from ``provisional`` entries by up to 0.15 eV (Ge 3d:
         0.55 there, 0.7 here) and from ``to_verify`` entries by up to 6.7
-        eV (Hf 4d: 16.8 there, 10.1 here). No entry is ``adopted``.
+        eV (Hf 4d: 16.8 there, 10.1 here). No entry is ``adopted``, and a
+        ``provisional`` one is only as good as what it agreed with, which
+        ``state_reason`` names: for some levels that is an integer-eV
+        table, for some the fitters' in-code value, which has no recorded
+        source.
 
         Where the Trzhaskovskaya tables do not hold both members, a
         ``binding_energy.json`` pair is carried with state ``not_covered``

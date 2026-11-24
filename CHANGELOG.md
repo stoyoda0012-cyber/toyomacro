@@ -68,7 +68,8 @@ archived on Zenodo for a citable DOI.
     `to_verify` (Hf 4d: 16.8 and 10.1).
   - The new bundled table `spin_orbit.json` holds 579 levels of 99
     elements: 259 `provisional` (another bundled value supports the
-    splitting and none contradicts it), 233 `to_verify` (the eight
+    splitting and none contradicts it; for 33 that value is or includes
+    the in-code one, which has no recorded source), 233 `to_verify` (the eight
     negative pairs, nine printed equal, 164 where another bundled value
     or the in-code value disagrees beyond tolerance, 44 with no other
     value to compare with, eight compared only with values too coarse

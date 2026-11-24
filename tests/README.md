@@ -193,7 +193,7 @@ and the bytes are checked everywhere.
 | 5 | `test_cross_section_trzhaskovskaya_transcription.py` | Five Trzhaskovskaya corrections pinned to the printed tables: Eu 5p3/2 at 10 keV (was 10x low), and Er, Tm, Yb 3p3/2 and Os 3d5/2, printed in ADNDT 82 but missing from the bundled file |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
-| 81 | `test_spin_orbit_reference.py` | The spin-orbit reference: the bundled file equals its build, binding energies the 2018/2019 papers print, every answer by digest, the rules (signs kept, printed-equal is unresolved, one stored value is no splitting), that the fitters do not read it, and the j-resolved cross-section ratio |
+| 81 | `test_spin_orbit_reference.py` | The spin-orbit reference: the bundled file equals its build, binding energies the 2018/2019 papers print, every answer by digest, the rules (signs kept, no splitting read from a pair printed equal or stored as one value, support needs a tolerance below the splitting), that the fitters do not read it, and the j-resolved cross-section ratio |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
 
 ### MCP server (33)

@@ -339,10 +339,10 @@ class TestFittersDoNotReadTheReference:
         assert max(gaps.values()) == gaps["Hf4d"] == 6.7
 
     @pytest.mark.filterwarnings("ignore:Template peak")
-    def test_fits_and_templates_run_with_the_reference_unreadable(self, monkeypatch):
-        """Whatever a fitting path reads, it is not the reference: with every
-        way into it raising, the fitters still give their in-code values."""
+    def test_fits_and_templates_run_without_reading_the_reference(self, monkeypatch):
+        """Whatever a fitting path reads, it is not the reference file."""
         import builtins
+        import io
 
         from toyomacro.data import paths
         from toyomacro.fitting.autofitter import AutoFitter
@@ -355,16 +355,19 @@ class TestFittersDoNotReadTheReference:
         real_open = builtins.open
 
         def spying_open(file, *args, **kwargs):
-            # the one place every path into the reference ends, however the
-            # loader was imported
+            # open(), io.open() and pathlib's read_text all end here, however
+            # the loader was imported. A read made once at import time, before
+            # this test runs, is not seen.
             if str(file).endswith("spin_orbit.json"):
                 reads.append(str(file))
             return real_open(file, *args, **kwargs)
 
         monkeypatch.setattr(BindingEnergy, "_spin_orbit_data", None)
         monkeypatch.setattr(builtins, "open", spying_open)
+        monkeypatch.setattr(io, "open", spying_open)
         paths.load_spin_orbit_data()
-        assert len(reads) == 1, "the spy must see a read of the reference"
+        (paths.get_cache_dir() / "spin_orbit.json").read_text(encoding="utf-8")
+        assert len(reads) == 2, "the spy must see both kinds of read"
         reads.clear()
 
         for key, value in xps_database._SO_SPLITS.items():

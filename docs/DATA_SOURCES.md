@@ -490,8 +490,8 @@ in the 2018 table, then the 2019 table.
     Pa 5d, U and Cm 4p.
   - 0.15 eV: the 0.1 eV that rounding can put the reference off, plus
     0.05 eV allowed for the in-code value, whose uncertainty is not
-    recorded. The 0.05 is a convention, not a derived bound; Ge 3d and
-    Mo 3d sit exactly on it and count as agreeing.
+    recorded. The 0.05 is a convention, not a derived bound; Ge 3d
+    sits exactly on it and counts as agreeing.
 - **A pair those two tables store as one value is not compared.** It is
   not a splitting of zero: `binding_energy.json` stores one value for
   Np–Fm 4p, where the 2018 and 2019 papers print members 242–363 eV
@@ -510,12 +510,17 @@ in the 2018 table, then the 2019 table.
   to 2.1 eV and cannot tell 0.3 eV from nothing; eight levels have only
   such values and are `to_verify` (Cu 3d, Pd, Ag, Cd and In 4d, Kr and
   Rb 4p, Br 3d). For a splitting just above the tolerance the check is
-  still coarse (Kr 3d: 1.2 against 1). For 33 levels the supporting
-  value is, or includes, the in-code value, which has no recorded
-  source; the entry's reason names what it agreed with.
+  still coarse: 18 `provisional` levels between 1.2 and 2.1 eV are
+  supported by integer-table values only (Kr 3d: 1.2 against 1), which
+  could have rejected them only by being 3 or more.
+- **For 33 `provisional` levels the supporting value is, or includes,
+  the in-code value, which has no recorded source.** For seven it is
+  the only support: Mg, Al, Si and P 2p, and Ge, As and Se 3d. An
+  entry's reason names what it agreed with.
 - **A pair printed equal is `to_verify`** (nine levels). Am–Fm 5f are
-  printed as whole numbers equal to the single value the 2001/2002
-  table stores, which looks like one value given for both members; Cl
+  printed as whole numbers (6.0, and 7.0 for Fm), and the 2001/2002
+  table stores 6 for both members of each, which looks like one value
+  given for both; Cl
   3p and As and Se 4p may be unresolved levels. In neither case can a
   splitting be read, and `unresolved_at_precision` marks them.
 - Agreement does not adopt. `adopted` is assigned by hand and no entry

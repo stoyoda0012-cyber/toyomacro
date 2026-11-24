@@ -956,7 +956,8 @@ energies, each printed to 0.1 eV, so it can be 0.1 eV off from rounding
 alone; it is an elemental value and says nothing about a chemical
 state. **It is not a fit constraint, and the fitters do not read it**:
 `get_so_info`, `AutoFitter` and the templates keep their own in-code
-splittings, which differ from `provisional` entries by up to 0.15 eV
+splittings (which have no recorded source, and are the only support of
+seven `provisional` entries, Si 2p among them), which differ from `provisional` entries by up to 0.15 eV
 (Ge 3d: 0.55 in the fitters, 0.7 here) and from `to_verify` entries by
 up to 6.7 eV (Hf 4d: 16.8 in the fitters, 10.1 here). No entry is
 `adopted`.
@@ -980,9 +981,9 @@ up to 6.7 eV (Hf 4d: 16.8 in the fitters, 10.1 here). No entry is
   splitting can be read. It is not a splitting of zero.
 - It never raises for a level it cannot settle. It raises `ValueError`
   for a label that is not a subshell (`'2x'`) or names a j that does
-  not exist for its l (`'2p5/2'`);
-  `get_spin_orbit_intensity_ratio` does the same, and for a photon
-  energy that is not a finite number.
+  not exist for its l (`'2p5/2'`).
+  `get_spin_orbit_intensity_ratio` raises for those too, for an s
+  level, and for a photon energy that is not a finite number.
 
 The field names and the four state names are the supported surface,
 like the `lookup_with_status` statuses. The values, the state of an
