@@ -26,10 +26,11 @@ from toyomacro.data.paths import load_binding_energy_data, load_spin_orbit_data
 SpinOrbitState = Literal[
     "adopted",      # checked and judged fit for the use; assigned by hand, to no
                     # entry yet
-    "provisional",  # both binding energies are the source table's and no other
-                    # bundled value contradicts the splitting: approximate
-    "to_verify",    # negative as printed, or another value disagrees beyond
-                    # tolerance: no position to show
+    "provisional",  # both binding energies are the source table's, another
+                    # bundled value agrees with the splitting and none
+                    # disagrees: approximate
+    "to_verify",    # negative as printed, another value disagrees beyond
+                    # tolerance, or nothing to compare with: no position to show
     "not_covered",  # the Trzhaskovskaya tables do not hold both members
 ]
 
@@ -178,7 +179,8 @@ class BindingEnergy:
 
         **What the value is.** The difference of two binding energies
         printed in Trzhaskovskaya & Yarzhemsky 2018 (lines bound by less
-        than 1.5 keV) and 2019 (the others). Both papers call the column
+        than 1.5 keV) and 2019 (lines from 1.5 keV to about 11 keV; deeper
+        ones are in neither). Both papers call the column
         experimental and take it from Kibedi et al. 2008; that compilation
         was not read for this package, so which entries are measured, and
         whether they are free-atom or solid-state energies, is not
@@ -189,9 +191,10 @@ class BindingEnergy:
         difference can be 0.1 eV off from rounding alone. That is enough
         to show or assign a doublet partner. It is not enough to fix a
         splitting in a fit, and the fitters do not read this reference:
-        ``toyomacro.core.xps_database.get_so_info`` keeps its own values,
-        which differ from these by up to 0.15 eV for common levels. No
-        entry is ``adopted``.
+        ``toyomacro.core.xps_database.get_so_info`` keeps its own values.
+        Those differ from ``provisional`` entries by up to 0.15 eV (Ge 3d:
+        0.55 there, 0.7 here) and from ``to_verify`` entries by up to 6.7
+        eV (Hf 4d: 16.8 there, 10.1 here). No entry is ``adopted``.
 
         Where the Trzhaskovskaya tables do not hold both members, a
         ``binding_energy.json`` pair is carried with state ``not_covered``

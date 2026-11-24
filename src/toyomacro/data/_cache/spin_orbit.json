@@ -10,13 +10,13 @@
     },
     "states": {
       "adopted": "checked and judged fit for the use; assigned by hand, to no entry yet",
-      "provisional": "both binding energies are those of the source table and no other bundled value contradicts the splitting beyond tolerance. Approximate: each energy is printed to 0.1 eV, and whether the compiled energies are free-atom or solid-state values is not established",
-      "to_verify": "negative as printed, or another value disagrees beyond tolerance",
+      "provisional": "both binding energies are those of the source table, and at least one other bundled value agrees with the splitting within tolerance while none disagrees; or the two members are printed equal. Approximate: each energy is printed to 0.1 eV, and whether the compiled energies are free-atom or solid-state values is not established",
+      "to_verify": "negative as printed, another value disagrees beyond tolerance, or there is no other value to compare it with",
       "not_covered": "the Trzhaskovskaya tables do not hold both members"
     },
     "tolerances_eV": {
       "in_code": 0.15,
-      "integer_tables": 1.0
+      "integer_tables": 1.1
     }
   },
   "levels": {
@@ -110,8 +110,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 21.6,
         "be_j_minus_eV": 21.7,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -126,8 +126,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 31.0,
         "be_j_minus_eV": 31.1,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -143,7 +143,7 @@
         "be_j_plus_eV": 51.3,
         "be_j_minus_eV": 51.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: the fitters' in-code value 0.28",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -159,7 +159,7 @@
         "be_j_plus_eV": 72.7,
         "be_j_minus_eV": 73.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: the fitters' in-code value 0.44",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -189,7 +189,7 @@
         "be_j_plus_eV": 98.9,
         "be_j_minus_eV": 99.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, the fitters' in-code value 0.6",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -219,7 +219,7 @@
         "be_j_plus_eV": 135.3,
         "be_j_minus_eV": 136.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1, the fitters' in-code value 0.84",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -249,7 +249,7 @@
         "be_j_plus_eV": 164.2,
         "be_j_minus_eV": 165.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 2, the fitters' in-code value 1.16",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -279,7 +279,7 @@
         "be_j_plus_eV": 200.0,
         "be_j_minus_eV": 201.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2, the fitters' in-code value 1.6",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -309,7 +309,7 @@
         "be_j_plus_eV": 248.5,
         "be_j_minus_eV": 250.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -322,8 +322,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 15.8,
         "be_j_minus_eV": 15.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -339,7 +339,7 @@
         "be_j_plus_eV": 293.6,
         "be_j_minus_eV": 296.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -352,8 +352,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 17.8,
         "be_j_minus_eV": 18.1,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -369,7 +369,7 @@
         "be_j_plus_eV": 346.4,
         "be_j_minus_eV": 350.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -382,8 +382,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 25.5,
         "be_j_minus_eV": 25.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -399,7 +399,7 @@
         "be_j_plus_eV": 402.2,
         "be_j_minus_eV": 406.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 5, trzhaskovskaya.json (2001/2002) 5",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -426,8 +426,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 31.5,
         "be_j_minus_eV": 33.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -544,8 +544,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.2,
         "be_j_minus_eV": 2.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -575,7 +575,7 @@
         "be_j_plus_eV": 640.3,
         "be_j_minus_eV": 651.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 11, trzhaskovskaya.json (2001/2002) 11, the fitters' in-code value 11.2",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -588,8 +588,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.7,
         "be_j_minus_eV": 3.5,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -619,7 +619,7 @@
         "be_j_plus_eV": 708.1,
         "be_j_minus_eV": 721.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 13, trzhaskovskaya.json (2001/2002) 13, the fitters' in-code value 13.1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -632,8 +632,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 3.1,
         "be_j_minus_eV": 3.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -663,7 +663,7 @@
         "be_j_plus_eV": 778.6,
         "be_j_minus_eV": 793.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 15, trzhaskovskaya.json (2001/2002) 15, the fitters' in-code value 15",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -707,7 +707,7 @@
         "be_j_plus_eV": 854.7,
         "be_j_minus_eV": 871.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 17, trzhaskovskaya.json (2001/2002) 17, the fitters' in-code value 17.3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -720,8 +720,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 3.3,
         "be_j_minus_eV": 3.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -735,7 +735,7 @@
         "be_j_plus_eV": 69.7,
         "be_j_minus_eV": 71.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -751,7 +751,7 @@
         "be_j_plus_eV": 931.1,
         "be_j_minus_eV": 951.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 19, trzhaskovskaya.json (2001/2002) 20, the fitters' in-code value 19.8",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -765,7 +765,7 @@
         "be_j_plus_eV": 1.5,
         "be_j_minus_eV": 1.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -779,7 +779,7 @@
         "be_j_plus_eV": 72.8,
         "be_j_minus_eV": 75.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -795,7 +795,7 @@
         "be_j_plus_eV": 1019.7,
         "be_j_minus_eV": 1042.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 23, trzhaskovskaya.json (2001/2002) 23, the fitters' in-code value 23",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -823,7 +823,7 @@
         "be_j_plus_eV": 85.6,
         "be_j_minus_eV": 88.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -839,7 +839,7 @@
         "be_j_plus_eV": 1115.4,
         "be_j_minus_eV": 1142.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 27, trzhaskovskaya.json (2001/2002) 27",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -867,7 +867,7 @@
         "be_j_plus_eV": 102.9,
         "be_j_minus_eV": 106.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -897,7 +897,7 @@
         "be_j_plus_eV": 1216.7,
         "be_j_minus_eV": 1247.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 31, trzhaskovskaya.json (2001/2002) 31",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -911,7 +911,7 @@
         "be_j_plus_eV": 28.5,
         "be_j_minus_eV": 29.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1, the fitters' in-code value 0.55",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -955,7 +955,7 @@
         "be_j_plus_eV": 1323.1,
         "be_j_minus_eV": 1358.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 35, trzhaskovskaya.json (2001/2002) 35",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -969,7 +969,7 @@
         "be_j_plus_eV": 40.9,
         "be_j_minus_eV": 41.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 1, the fitters' in-code value 0.69",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -983,7 +983,7 @@
         "be_j_plus_eV": 140.5,
         "be_j_minus_eV": 146.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 5, trzhaskovskaya.json (2001/2002) 6",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1027,7 +1027,7 @@
         "be_j_plus_eV": 56.4,
         "be_j_minus_eV": 57.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1, the fitters' in-code value 0.86",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1041,7 +1041,7 @@
         "be_j_plus_eV": 161.9,
         "be_j_minus_eV": 168.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 7",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1071,7 +1071,7 @@
         "be_j_plus_eV": 1549.9,
         "be_j_minus_eV": 1596.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 46, trzhaskovskaya.json (2001/2002) 46",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1085,7 +1085,7 @@
         "be_j_plus_eV": 69.0,
         "be_j_minus_eV": 70.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1099,7 +1099,7 @@
         "be_j_plus_eV": 181.5,
         "be_j_minus_eV": 189.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 7, trzhaskovskaya.json (2001/2002) 8",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1112,8 +1112,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 4.6,
         "be_j_minus_eV": 5.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -1129,7 +1129,7 @@
         "be_j_plus_eV": 1674.9,
         "be_j_minus_eV": 1727.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 53, trzhaskovskaya.json (2001/2002) 53",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1143,7 +1143,7 @@
         "be_j_plus_eV": 93.8,
         "be_j_minus_eV": 95.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1157,7 +1157,7 @@
         "be_j_plus_eV": 214.4,
         "be_j_minus_eV": 222.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 8, trzhaskovskaya.json (2001/2002) 8",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1171,7 +1171,7 @@
         "be_j_plus_eV": 14.0,
         "be_j_minus_eV": 14.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -1187,7 +1187,7 @@
         "be_j_plus_eV": 1804.4,
         "be_j_minus_eV": 1863.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 60, trzhaskovskaya.json (2001/2002) 59",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1201,7 +1201,7 @@
         "be_j_plus_eV": 110.3,
         "be_j_minus_eV": 111.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1214,8 +1214,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 238.5,
         "be_j_minus_eV": 247.4,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: binding_energy.json 10",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 10, trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1229,7 +1229,7 @@
         "be_j_plus_eV": 14.0,
         "be_j_minus_eV": 14.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -1245,7 +1245,7 @@
         "be_j_plus_eV": 1939.6,
         "be_j_minus_eV": 2006.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 67, trzhaskovskaya.json (2001/2002) 67",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1259,7 +1259,7 @@
         "be_j_plus_eV": 133.1,
         "be_j_minus_eV": 135.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1273,7 +1273,7 @@
         "be_j_plus_eV": 269.1,
         "be_j_minus_eV": 279.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 10, trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1287,7 +1287,7 @@
         "be_j_plus_eV": 19.5,
         "be_j_minus_eV": 20.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -1303,7 +1303,7 @@
         "be_j_plus_eV": 2080.0,
         "be_j_minus_eV": 2155.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 76, trzhaskovskaya.json (2001/2002) 75",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1317,7 +1317,7 @@
         "be_j_plus_eV": 157.4,
         "be_j_minus_eV": 159.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1331,7 +1331,7 @@
         "be_j_plus_eV": 300.3,
         "be_j_minus_eV": 312.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 12, trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1375,7 +1375,7 @@
         "be_j_plus_eV": 2222.3,
         "be_j_minus_eV": 2306.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 84, trzhaskovskaya.json (2001/2002) 84",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1389,7 +1389,7 @@
         "be_j_plus_eV": 180.0,
         "be_j_minus_eV": 182.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 3, the fitters' in-code value 2.43",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1403,7 +1403,7 @@
         "be_j_plus_eV": 330.5,
         "be_j_minus_eV": 344.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 14, trzhaskovskaya.json (2001/2002) 14",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1447,7 +1447,7 @@
         "be_j_plus_eV": 2370.5,
         "be_j_minus_eV": 2464.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 94, trzhaskovskaya.json (2001/2002) 94",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1461,7 +1461,7 @@
         "be_j_plus_eV": 204.6,
         "be_j_minus_eV": 207.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 3, the fitters' in-code value 2.72",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1519,7 +1519,7 @@
         "be_j_plus_eV": 2520.2,
         "be_j_minus_eV": 2625.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 105, trzhaskovskaya.json (2001/2002) 105",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1547,7 +1547,7 @@
         "be_j_plus_eV": 392.3,
         "be_j_minus_eV": 409.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 18, trzhaskovskaya.json (2001/2002) 17",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1560,8 +1560,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.2,
         "be_j_minus_eV": 1.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1591,7 +1591,7 @@
         "be_j_plus_eV": 2676.9,
         "be_j_minus_eV": 2793.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 116, trzhaskovskaya.json (2001/2002) 117",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1605,7 +1605,7 @@
         "be_j_plus_eV": 252.9,
         "be_j_minus_eV": 256.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1632,8 +1632,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.2,
         "be_j_minus_eV": 2.0,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1663,7 +1663,7 @@
         "be_j_plus_eV": 2837.9,
         "be_j_minus_eV": 2966.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 129, trzhaskovskaya.json (2001/2002) 129",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1677,7 +1677,7 @@
         "be_j_plus_eV": 279.4,
         "be_j_minus_eV": 283.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4, the fitters' in-code value 4.17",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1691,7 +1691,7 @@
         "be_j_plus_eV": 460.6,
         "be_j_minus_eV": 482.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 23, trzhaskovskaya.json (2001/2002) 22",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1704,8 +1704,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.8,
         "be_j_minus_eV": 2.4,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1735,7 +1735,7 @@
         "be_j_plus_eV": 3003.8,
         "be_j_minus_eV": 3146.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 142, trzhaskovskaya.json (2001/2002) 142",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1749,7 +1749,7 @@
         "be_j_plus_eV": 307.0,
         "be_j_minus_eV": 311.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 5, trzhaskovskaya.json (2001/2002) 5, the fitters' in-code value 4.74",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1763,7 +1763,7 @@
         "be_j_plus_eV": 496.2,
         "be_j_minus_eV": 521.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 24, trzhaskovskaya.json (2001/2002) 25",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1776,8 +1776,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.2,
         "be_j_minus_eV": 2.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1807,7 +1807,7 @@
         "be_j_plus_eV": 3173.3,
         "be_j_minus_eV": 3330.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 157, trzhaskovskaya.json (2001/2002) 157",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1821,7 +1821,7 @@
         "be_j_plus_eV": 334.7,
         "be_j_minus_eV": 340.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 5, the fitters' in-code value 5.26",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1835,7 +1835,7 @@
         "be_j_plus_eV": 531.5,
         "be_j_minus_eV": 559.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 28, trzhaskovskaya.json (2001/2002) 28",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1849,7 +1849,7 @@
         "be_j_plus_eV": 1.3,
         "be_j_minus_eV": 1.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1879,7 +1879,7 @@
         "be_j_plus_eV": 3351.1,
         "be_j_minus_eV": 3523.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 173, trzhaskovskaya.json (2001/2002) 173",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1893,7 +1893,7 @@
         "be_j_plus_eV": 366.7,
         "be_j_minus_eV": 372.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 6, the fitters' in-code value 6",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1907,7 +1907,7 @@
         "be_j_plus_eV": 571.4,
         "be_j_minus_eV": 602.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 31, trzhaskovskaya.json (2001/2002) 31",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1921,7 +1921,7 @@
         "be_j_plus_eV": 3.1,
         "be_j_minus_eV": 3.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1935,7 +1935,7 @@
         "be_j_plus_eV": 55.9,
         "be_j_minus_eV": 62.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 6",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -1951,7 +1951,7 @@
         "be_j_plus_eV": 3537.5,
         "be_j_minus_eV": 3727.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 189, trzhaskovskaya.json (2001/2002) 190",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1965,7 +1965,7 @@
         "be_j_plus_eV": 403.7,
         "be_j_minus_eV": 410.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 7, trzhaskovskaya.json (2001/2002) 7, the fitters' in-code value 6.75",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -1979,7 +1979,7 @@
         "be_j_plus_eV": 616.5,
         "be_j_minus_eV": 650.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 35, trzhaskovskaya.json (2001/2002) 34",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -1993,7 +1993,7 @@
         "be_j_plus_eV": 9.0,
         "be_j_minus_eV": 9.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2023,7 +2023,7 @@
         "be_j_plus_eV": 3730.1,
         "be_j_minus_eV": 3938.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 208, trzhaskovskaya.json (2001/2002) 208",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2037,7 +2037,7 @@
         "be_j_plus_eV": 443.1,
         "be_j_minus_eV": 450.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 7, trzhaskovskaya.json (2001/2002) 8, the fitters' in-code value 7.56",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2051,7 +2051,7 @@
         "be_j_plus_eV": 664.3,
         "be_j_minus_eV": 702.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 38, trzhaskovskaya.json (2001/2002) 38",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2065,7 +2065,7 @@
         "be_j_plus_eV": 15.8,
         "be_j_minus_eV": 16.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2109,7 +2109,7 @@
         "be_j_plus_eV": 3928.8,
         "be_j_minus_eV": 4156.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 227, trzhaskovskaya.json (2001/2002) 227",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2123,7 +2123,7 @@
         "be_j_plus_eV": 484.8,
         "be_j_minus_eV": 493.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 8, trzhaskovskaya.json (2001/2002) 9, the fitters' in-code value 8.42",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2137,7 +2137,7 @@
         "be_j_plus_eV": 714.4,
         "be_j_minus_eV": 756.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 42, trzhaskovskaya.json (2001/2002) 42",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2151,7 +2151,7 @@
         "be_j_plus_eV": 23.4,
         "be_j_minus_eV": 24.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2164,8 +2164,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 86.0,
         "be_j_minus_eV": 93.9,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 9",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2195,7 +2195,7 @@
         "be_j_plus_eV": 4132.3,
         "be_j_minus_eV": 4380.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 248, trzhaskovskaya.json (2001/2002) 248",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2209,7 +2209,7 @@
         "be_j_plus_eV": 527.5,
         "be_j_minus_eV": 536.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 10, trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2223,7 +2223,7 @@
         "be_j_plus_eV": 765.6,
         "be_j_minus_eV": 811.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 47, trzhaskovskaya.json (2001/2002) 46",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2237,7 +2237,7 @@
         "be_j_plus_eV": 30.8,
         "be_j_minus_eV": 32.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2250,8 +2250,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 95.4,
         "be_j_minus_eV": 104.3,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 10",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2264,8 +2264,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.0,
         "be_j_minus_eV": 2.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2281,7 +2281,7 @@
         "be_j_plus_eV": 4341.4,
         "be_j_minus_eV": 4612.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 271, trzhaskovskaya.json (2001/2002) 271",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2295,7 +2295,7 @@
         "be_j_plus_eV": 572.1,
         "be_j_minus_eV": 582.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 10, trzhaskovskaya.json (2001/2002) 11",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2309,7 +2309,7 @@
         "be_j_plus_eV": 818.7,
         "be_j_minus_eV": 869.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 51, trzhaskovskaya.json (2001/2002) 51",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2323,7 +2323,7 @@
         "be_j_plus_eV": 39.2,
         "be_j_minus_eV": 40.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2350,8 +2350,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.0,
         "be_j_minus_eV": 2.6,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2367,7 +2367,7 @@
         "be_j_plus_eV": 4557.1,
         "be_j_minus_eV": 4852.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 295, trzhaskovskaya.json (2001/2002) 295",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2381,7 +2381,7 @@
         "be_j_plus_eV": 619.4,
         "be_j_minus_eV": 631.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 12, trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2395,7 +2395,7 @@
         "be_j_plus_eV": 874.6,
         "be_j_minus_eV": 930.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 56, trzhaskovskaya.json (2001/2002) 56",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2409,7 +2409,7 @@
         "be_j_plus_eV": 48.9,
         "be_j_minus_eV": 50.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2422,8 +2422,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 119.0,
         "be_j_minus_eV": 130.1,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 10",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2436,8 +2436,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.9,
         "be_j_minus_eV": 3.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2453,7 +2453,7 @@
         "be_j_plus_eV": 4782.2,
         "be_j_minus_eV": 5103.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 321, trzhaskovskaya.json (2001/2002) 321",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2481,7 +2481,7 @@
         "be_j_plus_eV": 937.0,
         "be_j_minus_eV": 999.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 61, trzhaskovskaya.json (2001/2002) 62",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2495,7 +2495,7 @@
         "be_j_plus_eV": 67.6,
         "be_j_minus_eV": 69.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2523,7 +2523,7 @@
         "be_j_plus_eV": 12.1,
         "be_j_minus_eV": 13.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2539,7 +2539,7 @@
         "be_j_plus_eV": 5011.9,
         "be_j_minus_eV": 5359.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 347",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2553,7 +2553,7 @@
         "be_j_plus_eV": 725.5,
         "be_j_minus_eV": 739.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 14, trzhaskovskaya.json (2001/2002) 14",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2567,7 +2567,7 @@
         "be_j_plus_eV": 997.6,
         "be_j_minus_eV": 1065.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 68, trzhaskovskaya.json (2001/2002) 68",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2581,7 +2581,7 @@
         "be_j_plus_eV": 76.5,
         "be_j_minus_eV": 78.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2595,7 +2595,7 @@
         "be_j_plus_eV": 161.6,
         "be_j_minus_eV": 172.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 11, trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2609,7 +2609,7 @@
         "be_j_plus_eV": 11.4,
         "be_j_minus_eV": 13.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2625,7 +2625,7 @@
         "be_j_plus_eV": 5247.0,
         "be_j_minus_eV": 5623.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 377",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2639,7 +2639,7 @@
         "be_j_plus_eV": 780.7,
         "be_j_minus_eV": 796.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 15, trzhaskovskaya.json (2001/2002) 15",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2653,7 +2653,7 @@
         "be_j_plus_eV": 1062.2,
         "be_j_minus_eV": 1136.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 74, trzhaskovskaya.json (2001/2002) 74",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2667,7 +2667,7 @@
         "be_j_plus_eV": 89.9,
         "be_j_minus_eV": 92.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2681,7 +2681,7 @@
         "be_j_plus_eV": 179.7,
         "be_j_minus_eV": 191.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 13, trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2695,7 +2695,7 @@
         "be_j_plus_eV": 14.6,
         "be_j_minus_eV": 16.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2711,7 +2711,7 @@
         "be_j_plus_eV": 5482.7,
         "be_j_minus_eV": 5890.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 408",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2725,7 +2725,7 @@
         "be_j_plus_eV": 831.7,
         "be_j_minus_eV": 848.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 17, trzhaskovskaya.json (2001/2002) 17, the fitters' in-code value 16.8",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2739,7 +2739,7 @@
         "be_j_plus_eV": 1123.4,
         "be_j_minus_eV": 1204.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 81, trzhaskovskaya.json (2001/2002) 82",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2753,7 +2753,7 @@
         "be_j_plus_eV": 97.7,
         "be_j_minus_eV": 100.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2811,7 +2811,7 @@
         "be_j_plus_eV": 5723.4,
         "be_j_minus_eV": 6164.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 441",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2881,7 +2881,7 @@
         "be_j_plus_eV": 207.2,
         "be_j_minus_eV": 223.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 16, trzhaskovskaya.json (2001/2002) 16",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2895,7 +2895,7 @@
         "be_j_plus_eV": 18.8,
         "be_j_minus_eV": 21.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -2911,7 +2911,7 @@
         "be_j_plus_eV": 5964.3,
         "be_j_minus_eV": 6440.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 476",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -2924,8 +2924,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 931.0,
         "be_j_minus_eV": 951.1,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: binding_energy.json 19",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 19, trzhaskovskaya.json (2001/2002) 20",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -2995,7 +2995,7 @@
         "be_j_plus_eV": 21.2,
         "be_j_minus_eV": 24.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3011,7 +3011,7 @@
         "be_j_plus_eV": 6207.9,
         "be_j_minus_eV": 6721.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 514",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3025,7 +3025,7 @@
         "be_j_plus_eV": 977.7,
         "be_j_minus_eV": 999.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 23, trzhaskovskaya.json (2001/2002) 22",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3039,7 +3039,7 @@
         "be_j_plus_eV": 1297.4,
         "be_j_minus_eV": 1402.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 106, trzhaskovskaya.json (2001/2002) 105",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3081,7 +3081,7 @@
         "be_j_plus_eV": 224.6,
         "be_j_minus_eV": 243.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 18, trzhaskovskaya.json (2001/2002) 19",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3095,7 +3095,7 @@
         "be_j_plus_eV": 19.8,
         "be_j_minus_eV": 23.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3111,7 +3111,7 @@
         "be_j_plus_eV": 6459.3,
         "be_j_minus_eV": 7012.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 554",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3125,7 +3125,7 @@
         "be_j_plus_eV": 1026.9,
         "be_j_minus_eV": 1051.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 25, trzhaskovskaya.json (2001/2002) 25",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3139,7 +3139,7 @@
         "be_j_plus_eV": 1356.9,
         "be_j_minus_eV": 1471.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 114, trzhaskovskaya.json (2001/2002) 114",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3211,7 +3211,7 @@
         "be_j_plus_eV": 6716.2,
         "be_j_minus_eV": 7311.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 596",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3295,7 +3295,7 @@
         "be_j_plus_eV": 18.9,
         "be_j_minus_eV": 23.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3311,7 +3311,7 @@
         "be_j_plus_eV": 6976.9,
         "be_j_minus_eV": 7617.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 640",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3339,7 +3339,7 @@
         "be_j_plus_eV": 1480.6,
         "be_j_minus_eV": 1613.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance; the doublet straddles 1.5 keV, one member from each table",
+        "state_reason": "agrees within tolerance with: binding_energy.json 133, trzhaskovskaya.json (2001/2002) 134; the doublet straddles 1.5 keV, one member from each table",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3366,8 +3366,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.2,
         "be_j_minus_eV": 1.5,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -3395,7 +3395,7 @@
         "be_j_plus_eV": 20.4,
         "be_j_minus_eV": 25.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3411,7 +3411,7 @@
         "be_j_plus_eV": 7242.8,
         "be_j_minus_eV": 7930.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 687",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3425,7 +3425,7 @@
         "be_j_plus_eV": 1185.2,
         "be_j_minus_eV": 1217.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 32, trzhaskovskaya.json (2001/2002) 32",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3439,7 +3439,7 @@
         "be_j_plus_eV": 1544.0,
         "be_j_minus_eV": 1688.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 144, trzhaskovskaya.json (2001/2002) 145",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3466,8 +3466,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.3,
         "be_j_minus_eV": 2.0,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -3525,7 +3525,7 @@
         "be_j_plus_eV": 7514.0,
         "be_j_minus_eV": 8251.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 738",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3553,7 +3553,7 @@
         "be_j_plus_eV": 1611.3,
         "be_j_minus_eV": 1767.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 157, trzhaskovskaya.json (2001/2002) 156",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3609,7 +3609,7 @@
         "be_j_plus_eV": 21.3,
         "be_j_minus_eV": 26.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3625,7 +3625,7 @@
         "be_j_plus_eV": 7790.1,
         "be_j_minus_eV": 8580.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 791",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3709,7 +3709,7 @@
         "be_j_plus_eV": 22.9,
         "be_j_minus_eV": 28.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 5",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3725,7 +3725,7 @@
         "be_j_plus_eV": 8071.1,
         "be_j_minus_eV": 8917.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 847",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3739,7 +3739,7 @@
         "be_j_plus_eV": 1351.4,
         "be_j_minus_eV": 1391.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 41, trzhaskovskaya.json (2001/2002) 41",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3794,8 +3794,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 306.6,
         "be_j_minus_eV": 343.5,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 38",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 36, trzhaskovskaya.json (2001/2002) 38",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3825,7 +3825,7 @@
         "be_j_plus_eV": 8357.9,
         "be_j_minus_eV": 9264.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 906",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3839,7 +3839,7 @@
         "be_j_plus_eV": 1409.3,
         "be_j_minus_eV": 1453.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 44, trzhaskovskaya.json (2001/2002) 44",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3853,7 +3853,7 @@
         "be_j_plus_eV": 1811.8,
         "be_j_minus_eV": 2005.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 194",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3867,7 +3867,7 @@
         "be_j_plus_eV": 167.6,
         "be_j_minus_eV": 176.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3880,8 +3880,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 3.6,
         "be_j_minus_eV": 5.3,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -3909,7 +3909,7 @@
         "be_j_plus_eV": 22.3,
         "be_j_minus_eV": 27.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 5",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -3925,7 +3925,7 @@
         "be_j_plus_eV": 8648.0,
         "be_j_minus_eV": 9616.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 969",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3939,7 +3939,7 @@
         "be_j_plus_eV": 1467.7,
         "be_j_minus_eV": 1514.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance; the doublet straddles 1.5 keV, one member from each table",
+        "state_reason": "agrees within tolerance with: binding_energy.json 47, trzhaskovskaya.json (2001/2002) 47; the doublet straddles 1.5 keV, one member from each table",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3953,7 +3953,7 @@
         "be_j_plus_eV": 1884.5,
         "be_j_minus_eV": 2089.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 205",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -3967,7 +3967,7 @@
         "be_j_plus_eV": 175.7,
         "be_j_minus_eV": 185.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -3980,8 +3980,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 4.7,
         "be_j_minus_eV": 6.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4025,7 +4025,7 @@
         "be_j_plus_eV": 8943.6,
         "be_j_minus_eV": 9978.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1034",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4039,7 +4039,7 @@
         "be_j_plus_eV": 1527.8,
         "be_j_minus_eV": 1576.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 48, trzhaskovskaya.json (2001/2002) 49",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4053,7 +4053,7 @@
         "be_j_plus_eV": 1949.8,
         "be_j_minus_eV": 2173.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 223",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4081,7 +4081,7 @@
         "be_j_plus_eV": 5.8,
         "be_j_minus_eV": 7.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4109,7 +4109,7 @@
         "be_j_plus_eV": 21.4,
         "be_j_minus_eV": 27.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 6, trzhaskovskaya.json (2001/2002) 6",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -4139,7 +4139,7 @@
         "be_j_plus_eV": 1588.5,
         "be_j_minus_eV": 1639.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 50, trzhaskovskaya.json (2001/2002) 51",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4153,7 +4153,7 @@
         "be_j_plus_eV": 2023.6,
         "be_j_minus_eV": 2263.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 240",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4167,7 +4167,7 @@
         "be_j_plus_eV": 195.0,
         "be_j_minus_eV": 204.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 10, trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4181,7 +4181,7 @@
         "be_j_plus_eV": 6.2,
         "be_j_minus_eV": 7.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 1, trzhaskovskaya.json (2001/2002) 1",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4223,7 +4223,7 @@
         "be_j_plus_eV": 25.8,
         "be_j_minus_eV": 33.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 7, trzhaskovskaya.json (2001/2002) 7",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -4253,7 +4253,7 @@
         "be_j_plus_eV": 1661.7,
         "be_j_minus_eV": 1716.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 54, trzhaskovskaya.json (2001/2002) 55",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4267,7 +4267,7 @@
         "be_j_plus_eV": 2107.6,
         "be_j_minus_eV": 2365.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 257",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4309,7 +4309,7 @@
         "be_j_plus_eV": 380.4,
         "be_j_minus_eV": 437.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 57, trzhaskovskaya.json (2001/2002) 57",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4367,7 +4367,7 @@
         "be_j_plus_eV": 1735.1,
         "be_j_minus_eV": 1793.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 58, trzhaskovskaya.json (2001/2002) 59",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4381,7 +4381,7 @@
         "be_j_plus_eV": 2194.0,
         "be_j_minus_eV": 2468.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 275",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4409,7 +4409,7 @@
         "be_j_plus_eV": 25.6,
         "be_j_minus_eV": 27.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2, the fitters' in-code value 1.91",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4451,7 +4451,7 @@
         "be_j_plus_eV": 34.7,
         "be_j_minus_eV": 43.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 9, trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -4481,7 +4481,7 @@
         "be_j_plus_eV": 1809.2,
         "be_j_minus_eV": 1871.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 63, trzhaskovskaya.json (2001/2002) 62",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4495,7 +4495,7 @@
         "be_j_plus_eV": 2281.0,
         "be_j_minus_eV": 2574.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 294",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4523,7 +4523,7 @@
         "be_j_plus_eV": 35.1,
         "be_j_minus_eV": 37.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 3, the fitters' in-code value 2.18",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4537,7 +4537,7 @@
         "be_j_plus_eV": 425.3,
         "be_j_minus_eV": 491.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 66, trzhaskovskaya.json (2001/2002) 67",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4595,7 +4595,7 @@
         "be_j_plus_eV": 1882.9,
         "be_j_minus_eV": 1948.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 66, trzhaskovskaya.json (2001/2002) 66",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4609,7 +4609,7 @@
         "be_j_plus_eV": 2367.3,
         "be_j_minus_eV": 2681.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 315",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4623,7 +4623,7 @@
         "be_j_plus_eV": 260.2,
         "be_j_minus_eV": 273.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 13, trzhaskovskaya.json (2001/2002) 14",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4637,7 +4637,7 @@
         "be_j_plus_eV": 45.7,
         "be_j_minus_eV": 48.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 3, the fitters' in-code value 2.43",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4664,8 +4664,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 2.5,
         "be_j_minus_eV": 3.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4679,7 +4679,7 @@
         "be_j_plus_eV": 36.8,
         "be_j_minus_eV": 48.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 11, trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -4709,7 +4709,7 @@
         "be_j_plus_eV": 1960.1,
         "be_j_minus_eV": 2030.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 71",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4723,7 +4723,7 @@
         "be_j_plus_eV": 2457.2,
         "be_j_minus_eV": 2792.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 335",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4751,7 +4751,7 @@
         "be_j_plus_eV": 51.0,
         "be_j_minus_eV": 53.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2, the fitters' in-code value 2.74",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4765,7 +4765,7 @@
         "be_j_plus_eV": 468.2,
         "be_j_minus_eV": 546.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 78, trzhaskovskaya.json (2001/2002) 78",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4793,7 +4793,7 @@
         "be_j_plus_eV": 45.4,
         "be_j_minus_eV": 58.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 13, trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -4823,7 +4823,7 @@
         "be_j_plus_eV": 2040.4,
         "be_j_minus_eV": 2116.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 76",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4837,7 +4837,7 @@
         "be_j_plus_eV": 2550.7,
         "be_j_minus_eV": 2908.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 358",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4851,7 +4851,7 @@
         "be_j_plus_eV": 294.9,
         "be_j_minus_eV": 311.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 16, trzhaskovskaya.json (2001/2002) 16",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4865,7 +4865,7 @@
         "be_j_plus_eV": 60.8,
         "be_j_minus_eV": 63.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 3, the fitters' in-code value 2.98",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4892,8 +4892,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 3.2,
         "be_j_minus_eV": 4.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4937,7 +4937,7 @@
         "be_j_plus_eV": 2121.4,
         "be_j_minus_eV": 2201.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 80",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4951,7 +4951,7 @@
         "be_j_plus_eV": 2645.7,
         "be_j_minus_eV": 3026.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 382",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -4965,7 +4965,7 @@
         "be_j_plus_eV": 313.4,
         "be_j_minus_eV": 330.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 17, trzhaskovskaya.json (2001/2002) 17",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -4979,7 +4979,7 @@
         "be_j_plus_eV": 70.9,
         "be_j_minus_eV": 74.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4, the fitters' in-code value 3.33",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -4993,7 +4993,7 @@
         "be_j_plus_eV": 519.0,
         "be_j_minus_eV": 608.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 90, trzhaskovskaya.json (2001/2002) 90",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5006,8 +5006,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.4,
         "be_j_minus_eV": 2.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5051,7 +5051,7 @@
         "be_j_plus_eV": 2205.7,
         "be_j_minus_eV": 2291.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 85",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5065,7 +5065,7 @@
         "be_j_plus_eV": 2743.0,
         "be_j_minus_eV": 3147.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 405",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5078,8 +5078,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 333.9,
         "be_j_minus_eV": 352.0,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 17",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 18, trzhaskovskaya.json (2001/2002) 17",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5093,7 +5093,7 @@
         "be_j_plus_eV": 83.7,
         "be_j_minus_eV": 87.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4, the fitters' in-code value 3.67",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5120,8 +5120,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.8,
         "be_j_minus_eV": 3.3,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5165,7 +5165,7 @@
         "be_j_plus_eV": 2294.9,
         "be_j_minus_eV": 2384.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 90",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5179,7 +5179,7 @@
         "be_j_plus_eV": 2847.1,
         "be_j_minus_eV": 3278.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 432",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5193,7 +5193,7 @@
         "be_j_plus_eV": 359.8,
         "be_j_minus_eV": 378.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 19, trzhaskovskaya.json (2001/2002) 19",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5207,7 +5207,7 @@
         "be_j_plus_eV": 99.4,
         "be_j_minus_eV": 103.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5235,7 +5235,7 @@
         "be_j_plus_eV": 5.7,
         "be_j_minus_eV": 7.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5279,7 +5279,7 @@
         "be_j_plus_eV": 2389.3,
         "be_j_minus_eV": 2485.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 96",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5293,7 +5293,7 @@
         "be_j_plus_eV": 2956.6,
         "be_j_minus_eV": 3415.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 459",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5307,7 +5307,7 @@
         "be_j_plus_eV": 386.2,
         "be_j_minus_eV": 406.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 21, trzhaskovskaya.json (2001/2002) 20",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5321,7 +5321,7 @@
         "be_j_plus_eV": 118.7,
         "be_j_minus_eV": 123.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 4, trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5349,7 +5349,7 @@
         "be_j_plus_eV": 13.1,
         "be_j_minus_eV": 15.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 2, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5407,7 +5407,7 @@
         "be_j_plus_eV": 2484.0,
         "be_j_minus_eV": 2585.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 102",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5421,7 +5421,7 @@
         "be_j_plus_eV": 3066.4,
         "be_j_minus_eV": 3554.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 488",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5435,7 +5435,7 @@
         "be_j_plus_eV": 412.9,
         "be_j_minus_eV": 435.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 22, trzhaskovskaya.json (2001/2002) 22",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5449,7 +5449,7 @@
         "be_j_plus_eV": 136.9,
         "be_j_minus_eV": 141.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 5, trzhaskovskaya.json (2001/2002) 4, the fitters' in-code value 4.86",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5477,7 +5477,7 @@
         "be_j_plus_eV": 19.2,
         "be_j_minus_eV": 21.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5535,7 +5535,7 @@
         "be_j_plus_eV": 2579.6,
         "be_j_minus_eV": 2687.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 108",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5549,7 +5549,7 @@
         "be_j_plus_eV": 3176.9,
         "be_j_minus_eV": 3696.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 519",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5563,7 +5563,7 @@
         "be_j_plus_eV": 440.0,
         "be_j_minus_eV": 463.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 24, trzhaskovskaya.json (2001/2002) 24",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5591,7 +5591,7 @@
         "be_j_plus_eV": 678.9,
         "be_j_minus_eV": 805.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 126, trzhaskovskaya.json (2001/2002) 126",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5605,7 +5605,7 @@
         "be_j_plus_eV": 24.4,
         "be_j_minus_eV": 26.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 3, trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5632,8 +5632,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 0.2,
         "be_j_minus_eV": 1.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -5663,7 +5663,7 @@
         "be_j_plus_eV": 2679.2,
         "be_j_minus_eV": 2793.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 115",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5676,8 +5676,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 3293.4,
         "be_j_minus_eV": 3844.3,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: binding_energy.json 552",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 552",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5705,7 +5705,7 @@
         "be_j_plus_eV": 178.9,
         "be_j_minus_eV": 184.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 6",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5733,7 +5733,7 @@
         "be_j_plus_eV": 30.6,
         "be_j_minus_eV": 33.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 3",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5746,8 +5746,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 103.7,
         "be_j_minus_eV": 131.8,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 27",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 28, trzhaskovskaya.json (2001/2002) 27",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5760,8 +5760,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1.4,
         "be_j_minus_eV": 3.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -5791,7 +5791,7 @@
         "be_j_plus_eV": 2780.7,
         "be_j_minus_eV": 2901.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 122",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5833,7 +5833,7 @@
         "be_j_plus_eV": 200.8,
         "be_j_minus_eV": 207.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 6",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5861,7 +5861,7 @@
         "be_j_plus_eV": 37.4,
         "be_j_minus_eV": 40.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -5889,7 +5889,7 @@
         "be_j_plus_eV": 2.8,
         "be_j_minus_eV": 5.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 2",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -5933,7 +5933,7 @@
         "be_j_plus_eV": 3530.5,
         "be_j_minus_eV": 4151.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 621",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -5961,7 +5961,7 @@
         "be_j_plus_eV": 223.6,
         "be_j_minus_eV": 230.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 7",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -5989,7 +5989,7 @@
         "be_j_plus_eV": 44.2,
         "be_j_minus_eV": 48.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6089,7 +6089,7 @@
         "be_j_plus_eV": 251.6,
         "be_j_minus_eV": 258.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 8",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -6117,7 +6117,7 @@
         "be_j_plus_eV": 55.6,
         "be_j_minus_eV": 60.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 4",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6175,7 +6175,7 @@
         "be_j_plus_eV": 3104.9,
         "be_j_minus_eV": 3248.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 143",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6189,7 +6189,7 @@
         "be_j_plus_eV": 3786.6,
         "be_j_minus_eV": 4485.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 698",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6203,7 +6203,7 @@
         "be_j_plus_eV": 602.7,
         "be_j_minus_eV": 635.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 33, trzhaskovskaya.json (2001/2002) 33",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6273,7 +6273,7 @@
         "be_j_plus_eV": 13.7,
         "be_j_minus_eV": 19.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 5",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       }
@@ -6303,7 +6303,7 @@
         "be_j_plus_eV": 3219.7,
         "be_j_minus_eV": 3370.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 151",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6345,7 +6345,7 @@
         "be_j_plus_eV": 308.4,
         "be_j_minus_eV": 316.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -6373,7 +6373,7 @@
         "be_j_plus_eV": 77.7,
         "be_j_minus_eV": 83.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 5",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6387,7 +6387,7 @@
         "be_j_plus_eV": 167.8,
         "be_j_minus_eV": 216.9,
         "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: binding_energy.json 48, trzhaskovskaya.json (2001/2002) 44",
+        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 44",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6445,7 +6445,7 @@
         "be_j_plus_eV": 3332.0,
         "be_j_minus_eV": 3490.8,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 159",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6459,7 +6459,7 @@
         "be_j_plus_eV": 4046.1,
         "be_j_minus_eV": 4830.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 784",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6473,7 +6473,7 @@
         "be_j_plus_eV": 676.6,
         "be_j_minus_eV": 713.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 37, trzhaskovskaya.json (2001/2002) 38",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6487,7 +6487,7 @@
         "be_j_plus_eV": 335.0,
         "be_j_minus_eV": 344.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 9, trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -6656,8 +6656,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 89.2,
         "be_j_minus_eV": 97.3,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 7",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 7",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6743,7 +6743,7 @@
         "be_j_plus_eV": 3551.7,
         "be_j_minus_eV": 3727.6,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 176",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6757,7 +6757,7 @@
         "be_j_plus_eV": 4303.4,
         "be_j_minus_eV": 5182.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 879",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6771,7 +6771,7 @@
         "be_j_plus_eV": 737.7,
         "be_j_minus_eV": 780.2,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 42, trzhaskovskaya.json (2001/2002) 42",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6785,7 +6785,7 @@
         "be_j_plus_eV": 379.9,
         "be_j_minus_eV": 390.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 11, trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -6798,8 +6798,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1044.9,
         "be_j_minus_eV": 1271.8,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: binding_energy.json 228, trzhaskovskaya.json (2001/2002) 228",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: binding_energy.json 228, trzhaskovskaya.json (2001/2002) 228",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6813,7 +6813,7 @@
         "be_j_plus_eV": 95.2,
         "be_j_minus_eV": 104.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: binding_energy.json 9, trzhaskovskaya.json (2001/2002) 9",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6884,8 +6884,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 3665.2,
         "be_j_minus_eV": 3849.8,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6898,8 +6898,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4433.4,
         "be_j_minus_eV": 5366.7,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -6913,7 +6913,7 @@
         "be_j_plus_eV": 770.8,
         "be_j_minus_eV": 816.1,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 45",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -6927,7 +6927,7 @@
         "be_j_plus_eV": 403.4,
         "be_j_minus_eV": 414.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 10",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -6941,7 +6941,7 @@
         "be_j_plus_eV": 1086.0,
         "be_j_minus_eV": 1327.7,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 242",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7026,8 +7026,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 3778.1,
         "be_j_minus_eV": 3972.6,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7040,8 +7040,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4556.6,
         "be_j_minus_eV": 5541.2,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7055,7 +7055,7 @@
         "be_j_plus_eV": 801.5,
         "be_j_minus_eV": 848.9,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 48",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7069,7 +7069,7 @@
         "be_j_plus_eV": 425.2,
         "be_j_minus_eV": 437.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 12",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -7083,7 +7083,7 @@
         "be_j_plus_eV": 1120.9,
         "be_j_minus_eV": 1377.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 256",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7097,7 +7097,7 @@
         "be_j_plus_eV": 105.2,
         "be_j_minus_eV": 116.0,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 11",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7125,7 +7125,7 @@
         "be_j_plus_eV": 215.3,
         "be_j_minus_eV": 282.5,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 68",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7154,8 +7154,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 3886.9,
         "be_j_minus_eV": 4092.1,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7168,8 +7168,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4706.0,
         "be_j_minus_eV": 5747.0,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7183,7 +7183,7 @@
         "be_j_plus_eV": 830.0,
         "be_j_minus_eV": 880.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 51",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7282,8 +7282,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4014.9,
         "be_j_minus_eV": 4229.4,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7296,8 +7296,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4841.5,
         "be_j_minus_eV": 5943.3,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7311,7 +7311,7 @@
         "be_j_plus_eV": 864.8,
         "be_j_minus_eV": 919.3,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 55",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7338,8 +7338,8 @@
         "source_table": "trzh2018",
         "be_j_plus_eV": 1211.0,
         "be_j_minus_eV": 1499.9,
-        "state": "to_verify",
-        "state_reason": "another value disagrees beyond tolerance: trzhaskovskaya.json (2001/2002) 290",
+        "state": "provisional",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 290",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7424,8 +7424,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4128.8,
         "be_j_minus_eV": 4353.4,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7438,8 +7438,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4975.3,
         "be_j_minus_eV": 6139.9,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7467,7 +7467,7 @@
         "be_j_plus_eV": 498.5,
         "be_j_minus_eV": 514.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 15",
         "statistical_ratio": 0.75,
         "unresolved_at_precision": false
       },
@@ -7495,7 +7495,7 @@
         "be_j_plus_eV": 115.1,
         "be_j_minus_eV": 130.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 15",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7566,8 +7566,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4249.9,
         "be_j_minus_eV": 4485.3,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7580,8 +7580,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 5117.1,
         "be_j_minus_eV": 6347.5,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7708,8 +7708,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4372.7,
         "be_j_minus_eV": 4619.1,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7722,8 +7722,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 5260.8,
         "be_j_minus_eV": 6560.7,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },
@@ -7737,7 +7737,7 @@
         "be_j_plus_eV": 968.4,
         "be_j_minus_eV": 1032.4,
         "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state_reason": "agrees within tolerance with: trzhaskovskaya.json (2001/2002) 65",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7850,8 +7850,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 4496.7,
         "be_j_minus_eV": 4754.7,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.6666666666666666,
         "unresolved_at_precision": false
       },
@@ -7864,8 +7864,8 @@
         "source_table": "trzh2019",
         "be_j_plus_eV": 5408.7,
         "be_j_minus_eV": 6779.0,
-        "state": "provisional",
-        "state_reason": "no other bundled value contradicts it beyond tolerance",
+        "state": "to_verify",
+        "state_reason": "no other value to compare it with: the other bundled tables store one value for both members, or none",
         "statistical_ratio": 0.5,
         "unresolved_at_precision": false
       },

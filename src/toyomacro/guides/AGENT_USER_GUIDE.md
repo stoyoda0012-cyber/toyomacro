@@ -217,7 +217,8 @@ use it to say where a doublet partner is expected, as approximate, and
 do not hold a fit at it. `spin_orbit_split_eV` is `null` when the entry's
 state is `to_verify` or `not_covered`, or when the two members are
 printed equal; the `spin_orbit` object then says why. Report the state
-with the value.
+with the value. The tool answers only levels it has a binding energy
+for; `BindingEnergy.get_spin_orbit` reaches the others.
 
 ## 8. Where the details are
 

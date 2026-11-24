@@ -11,23 +11,29 @@ Rules, in the order they are applied to one element and n, l (l = p, d, f):
 
 1. The two binding energies are those of the Trzhaskovskaya tables
    (``trzh2018_haxpes.json`` holds lines bound by less than 1.5 keV,
-   ``trzh2019_inner.json`` the others; no line is in both). A doublet whose
-   members fall on either side of 1.5 keV takes one member from each.
+   ``trzh2019_inner.json`` lines from 1.5 keV to about 11 keV; no line is
+   in both). A doublet whose members fall on either side of 1.5 keV takes
+   one member from each.
 2. With both members: the splitting is BE(j-) - BE(j+), sign kept.
    Negative: ``to_verify``. Printed equal: ``provisional`` and
    ``unresolved_at_precision``. Positive: ``to_verify`` when another value
-   disagrees beyond tolerance, else ``provisional``.
+   disagrees beyond tolerance or when there is no other value to compare
+   it with, else ``provisional``.
 3. Without both members: ``not_covered``. The ``binding_energy.json`` pair
    is carried when that table stores two different values.
 
 Other values a positive splitting is compared with:
 
 - ``binding_energy.json`` and ``trzhaskovskaya.json`` (2001/2002),
-  tolerance 1.0 eV: both are mostly integer eV, and the difference of two
-  values each rounded to 1 eV can be 1.0 eV off. A pair those tables store
-  as one value says nothing about the splitting and is not compared.
+  tolerance 1.1 eV. Both are mostly integer eV: two values each rounded
+  to 1 eV can put their difference 1.0 eV off, and two each printed to
+  0.1 eV another 0.1 eV. A pair those tables store as one value is not
+  compared. It does not say the splitting is zero (for Np 4p the papers
+  print members 241.7 eV apart), and it is not counted as agreement.
 - the in-code ``_SO_SPLITS`` of ``toyomacro.core.xps_database``, tolerance
-  0.15 eV.
+  0.15 eV: the 0.1 eV that rounding can put the reference off, plus 0.05
+  eV allowed for the in-code value, whose uncertainty is not recorded.
+  The 0.05 is a convention, not a derived bound.
 
 No rule adopts a value: ``adopted`` is assigned by hand, to nothing yet.
 """
@@ -41,7 +47,7 @@ from typing import Any
 from toyomacro.data.paths import get_cache_dir
 
 TOL_FINE_EV = 0.15
-TOL_INTEGER_EV = 1.0
+TOL_INTEGER_EV = 1.1
 
 #: (j+ suffix, j- suffix) per l
 _J = {"p": ("3/2", "1/2"), "d": ("5/2", "3/2"), "f": ("7/2", "5/2")}
@@ -89,13 +95,17 @@ META = {
     "states": {
         "adopted": "checked and judged fit for the use; assigned by hand, to no entry yet",
         "provisional": (
-            "both binding energies are those of the source table and no "
-            "other bundled value contradicts the splitting beyond tolerance. "
-            "Approximate: each energy is printed to 0.1 eV, and whether the "
-            "compiled energies are free-atom or solid-state values is not "
-            "established"
+            "both binding energies are those of the source table, and at "
+            "least one other bundled value agrees with the splitting within "
+            "tolerance while none disagrees; or the two members are printed "
+            "equal. Approximate: each energy is printed to 0.1 eV, and "
+            "whether the compiled energies are free-atom or solid-state "
+            "values is not established"
         ),
-        "to_verify": "negative as printed, or another value disagrees beyond tolerance",
+        "to_verify": (
+            "negative as printed, another value disagrees beyond tolerance, "
+            "or there is no other value to compare it with"
+        ),
         "not_covered": "the Trzhaskovskaya tables do not hold both members",
     },
     "tolerances_eV": {"in_code": TOL_FINE_EV, "integer_tables": TOL_INTEGER_EV},
@@ -189,18 +199,24 @@ def build() -> dict[str, Any]:
                     "that resolution, not a splitting of zero"
                 )
             else:
+                named = {k: f"{_OTHER_NAME[k]} {v:g}" for k, v in compared.items()}
                 against = [
-                    f"{_OTHER_NAME[k]} {v:g}"
-                    for k, v in compared.items()
+                    named[k] for k, v in compared.items()
                     if round(abs(v - split), 2) > tolerance[k]
                 ]
                 if against:
                     state = "to_verify"
                     reason = "another value disagrees beyond tolerance: " + ", ".join(against)
+                elif not compared:
+                    state = "to_verify"
+                    reason = (
+                        "no other value to compare it with: the other bundled "
+                        "tables store one value for both members, or none"
+                    )
                 else:
                     state = "provisional"
-                    reason = "no other bundled value contradicts it beyond tolerance"
-            if source == "trzh2018+trzh2019":
+                    reason = "agrees within tolerance with: " + ", ".join(named.values())
+            if "+" in source:
                 reason += "; the doublet straddles 1.5 keV, one member from each table"
         else:
             state = "not_covered"
@@ -246,5 +262,7 @@ def dumps(table: dict[str, Any]) -> str:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("usage: python -m toyomacro.data._spin_orbit_build OUT.json")
     with open(sys.argv[1], "w", encoding="utf-8") as _f:
         _f.write(dumps(build()))

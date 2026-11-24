@@ -213,6 +213,14 @@ def test_missing_provenance_table_raises(empty_cache):
         paths.load_compound_provenance()
 
 
+def test_missing_spin_orbit_table_raises(empty_cache):
+    """It is built from the other bundled tables by an explicit command,
+    never at run time: a missing file is an error, and nothing is written."""
+    with pytest.raises(FileNotFoundError, match="spin_orbit.json"):
+        paths.load_spin_orbit_data()
+    assert not (empty_cache / "spin_orbit.json").exists()
+
+
 def test_shipped_compound_table_is_the_reviewed_one():
     """Guard the specific divergence that motivated this module.
 

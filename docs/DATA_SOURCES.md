@@ -33,10 +33,10 @@ been granted where none is stated.
 | `scofield.json` | Photoionization cross sections σ(hν), 1–30 keV, Z = 1–100 | Scofield, *Theoretical photoionization cross sections from 1 to 1500 keV*, UCRL-51326, Lawrence Livermore Laboratory (1973). DOI: 10.2172/4545040 | U.S. government-sponsored scientific report; factual numerical data transformed and fully cited. The OSTI record (biblio/4545040) displays no rights, copyright or access-limitation statement, and gives DOE contract W-7405-ENG-48. Bundled cache truncated at 30 keV (covers all lab / HAXPES sources). The report also prints each element's subshell energies ("STATE NE E(KEV)"); 71 of them — the Scofield lines `BindingEnergy` lacks among Np–Fm and Pm: the L and M levels of Np–Fm and Pm 3s, which start inside the bundled grid, and Np 5f/6d and Pu 5f — were read from the scanned report (pp. 166, 319–361) and are held in `cross_section.py`. Lookups report them as `printed_binding_energy_eV` and do not use them as thresholds; the cache itself is unchanged. |
 | `cross_section.json` | σ(hν) at 16 photon energies, 10.2 eV–8.05 keV | Yeh & Lindau, *At. Data Nucl. Data Tables* **32**, 1 (1985). DOI: 10.1016/0092-640X(85)90016-6 | Factual numerical values, transformed into this project's schema and fully cited. No express restrictive notice applies to the values themselves. (The same dataset is redistributed by other open-source projects, e.g. `galore`, JOSS 2018 — noted as context, not as a grant of permission.) |
 | `trzhaskovskaya.json` | Relativistic σ, 10-energy grid 0.1–10 keV, Z = 1–100 | Hand-digitized (in the MATLAB Toyomacro era) from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **77**, 97 (2001), DOI: 10.1006/adnd.2000.0849 (Z = 1–54) and **82**, 257 (2002), DOI: 10.1006/adnd.2002.0886 (Z = 55–100); the 10 keV column comes from Trzhaskovskaya, Nefedov & Yarzhemsky, *At. Data Nucl. Data Tables* **92**, 245 (2006), DOI: 10.1016/j.adt.2005.12.002, Table 2 (E = 10 keV). All three tabulate against *photoelectron* (kinetic) energy E — nine energies 100–5000 eV, then 10 keV — and print an experimental binding energy Eb per subshell. After v0.6.0 each line is read at photon energy E + Eb with its own Eb (stored per line as `binding_energy`); up to v0.6.0 the grid was read as photon energy, inherited from the MATLAB implementation. σ is in kb **for completely filled subshells**; see the units section. After v0.6.0 the table was read against all three papers cell by cell; five corrections were made (Eu 5p3/2 at 10 keV was 10x low; Er, Tm and Yb 3p3/2 and Os 3d5/2, printed in ADNDT 82, were missing), pinned by `tests/test_cross_section_trzhaskovskaya_transcription.py`. | Factual numerical values, hand-transcribed in the MATLAB era and re-expressed in this project's schema, fully cited. No publisher typography or prose is reproduced. |
-| `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
-| `trzh2019_inner.json` | σ, β, γ, δ (inner shells; eleven photon energies per element, from 2–12 keV for the lowest grid to 9–30 keV for the highest) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
+| `trzh2018_haxpes.json` | σ, β, γ, δ (outer shells, hν = 1.5–10 keV), and each line's binding energy as the paper prints it (taken there from Kibédi et al. 2008) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **119**, 99 (2018). DOI: 10.1016/j.adt.2017.04.003. Converted from the digitization by J. Willis, C. Kalha, M. B. Trzhaskovskaya, V. G. Yarzhemsky, D. O. Scanlon, A. Regoutz (UCL — Scanlon Materials Theory Group / Applied X-ray Spectroscopy Group). | Strongest basis in this table: the upstream UCL digitization records the lead author's approval — *"The reproduction of this data is approved by the lead author of the original paper, Malvina Trzhaskovskaya."* Retain a copy or permanent reference to that statement alongside this file. |
+| `trzh2019_inner.json` | σ, β, γ, δ (inner shells; eleven photon energies per element, from 2–12 keV for the lowest grid to 9–30 keV for the highest), and each line's binding energy as the paper prints it (same compilation) | Trzhaskovskaya & Yarzhemsky, *At. Data Nucl. Data Tables* **129–130**, 101280 (2019). DOI: 10.1016/j.adt.2019.05.001. Same UCL digitization team as above. | Same recorded author approval as above; same evidence retention applies. |
 | `binding_energy.json` | Elemental core-level binding energies (eV; integers except some rows of Np–Lr), per subshell | Standard elemental BE compilation — values follow the LBNL X-ray Data Booklet, except where noted at the end of this row "Electron binding energies" table (after Bearden & Burr 1967; Fuggle & Mårtensson 1980), e.g. Au 1s = 80725, Si 2p3/2 = 99, C 1s = 284. | Standard experimental constants, editorially compiled into this project's own schema. The values largely appear identically across compilations and derive from the primary literature cited (Bearden & Burr 1967; Fuggle & Mårtensson 1980); the LBNL X-Ray Data Booklet is given as a convenient cross-check, and its own presentation (which carries "©2000") is not reproduced. **Co 3p departs from the Booklet on purpose** (the table also departs from it elsewhere — N, O and F 1s, absent Ce and Eu 4f, the 7s of Ra–U and the rows of Np–Lr, which the Booklet does not have — for reasons not recorded): it is stored unresolved at 59 eV for both members, as Fuggle & Mårtensson, *J. Electron Spectrosc. Relat. Phenom.* **21**, 275 (1980), doi:10.1016/0368-2048(80)85056-0, Table 2 prints it — 58.8 and 59.0 eV from two instruments, in the column between 3p1/2 and 3p3/2, as for Mn and Fe. The Booklet marks its Co values † ("values taken from Ref. 3", i.e. Fuggle & Mårtensson, Booklet §1.1) and lists 3p1/2 = 58.9, the mean of the two, but 3p3/2 = 59.9, which appears in none of its cited sources: evidently a misprint of 58.9. It was the only spin-orbit pair in the table stored with 3p3/2 deeper than 3p1/2. Bearden & Burr 1967 give one Co M<sub>II,III</sub> level, 59.5 ± 0.3 eV, equidistant from 59 and 60; two NIST SRD 20 entries for Co metal 3p (59.70, 60.20) lie closer to the old 60. An equal pair records unresolved data, not degenerate levels: free-atom values put Co 3p3/2 about 2 eV less bound than 3p1/2 (e.g. Trzhaskovskaya et al. 2001, 66 and 68 eV). |
-| `spin_orbit.json` | Spin-orbit reference: BE(j−) − BE(j+) per element and n, l (l = p, d, f), 579 levels of 99 elements, each with both binding energies, the source table and a state (see *The spin-orbit reference* below) | Derived, by `python -m toyomacro.data._spin_orbit_build`, from tables already bundled: the per-line binding energies of `trzh2018_haxpes.json` and `trzh2019_inner.json` (492 pairs), and `binding_energy.json` where those do not hold both members and it stores two different values (22 pairs). `trzhaskovskaya.json` and the in-code splittings of `core/xps_database.py` are compared with, not copied. | Nothing new is taken from a source: every binding energy in it is already in one of the bundled tables above, under that table's own row. |
+| `spin_orbit.json` | Spin-orbit reference: BE(j−) − BE(j+) per element and n, l (l = p, d, f), 579 levels of 99 elements, each with both binding energies, the source table and a state (see *The spin-orbit reference* below) | Derived, by `python -m toyomacro.data._spin_orbit_build`, from tables already bundled: the per-line binding energies of `trzh2018_haxpes.json` and `trzh2019_inner.json` (492 pairs), and `binding_energy.json` where those do not hold both members and it stores two different values (22 pairs). `trzhaskovskaya.json` and the in-code splittings of `core/xps_database.py` are compared with, not copied. | No value is newly taken from a source: every binding energy in it is already in a bundled table. The per-line binding energies of the 2018/2019 tables are a column those papers take from Kibédi et al. 2008 (see *The spin-orbit reference*); the review recorded for those two tables is the one in their rows, and none is recorded for that column separately. |
 | `compounds.json` | Compound and element properties for IMFP (N_v, density, M_w, E_g), 109 entries: 96 elements — including 11 transactinides (Rf, Db, Sg, Bh, Hs, Mt, Fl, Mc, Lv, Ts, Og) — 11 compounds, and two non-materials (`AVERAGE`, `Oxide`) | **Hand-entered by the author in 2020–2021 from Wikipedia and commonly quoted literature values.** Per-entry sources were not recorded at the time and cannot now be reconstructed. See *`compounds.json` — where these numbers came from* below. | Project-original selection and machine-readable arrangement, released under this package's licence. No published table is reproduced: the entry set is this project's own, and every entry that overlaps a TPP-series parameter table differs from it. **The constants are asserted, not cited** — that is a limitation of the data, not a rights question. Pass parameters explicitly where the value matters. |
 
 ## Cross-section units
@@ -428,8 +428,10 @@ returned was the `binding_energy.json` difference (Si 2p: 1.0 eV, and
 **It is not what the fitters use.** `core/xps_database.py` keeps its 46
 in-code splittings (*In-code constants* below), and `get_so_info`,
 `AutoFitter` and the templates read those. The reference differs from
-42 of the 46, by up to 0.15 eV where its entry is `provisional` (Ge 3d:
-0.55 in code, 0.7 here from 29.2 and 29.9 printed). A difference of two
+41 of the 45 it has a value for, by up to 0.15 eV where its entry is
+`provisional` (Ge 3d: 0.55 in code, 0.7 here from 28.5 and 29.2
+printed) and by up to 6.7 eV where it is `to_verify` (Hf 4d: 16.8 in
+code, 10.1 here). A difference of two
 energies each printed to 0.1 eV can be 0.1 eV off from rounding alone,
 which is too coarse to hold a doublet at. The in-code values have no
 recorded per-value source. So neither set is derived from the other,
@@ -441,7 +443,8 @@ papers call "Experimental subshell binding energy in eV". Both say the
 values were taken from Kibédi, Burrows, Trzhaskovskaya, Davidson &
 Nestor, *Nucl. Instrum. Methods Phys. Res. A* **589**, 202 (2008). The
 2018 paper holds lines bound by less than 1.5 keV and the 2019 paper
-the others; no line is in both. The bundled JSONs carry that column as
+lines from 1.5 keV to about 10 keV (the deepest it prints is 11103.1
+eV); no line is in both, and deeper lines are in neither. The bundled JSONs carry that column as
 `binding_energy`.
 
 - **Checked against the papers:** the binding energy of every line of
@@ -467,27 +470,42 @@ in the 2018 table, then the 2019 table.
 |---|---|--:|
 | both members found, splitting negative | `to_verify` | 8 |
 | both found, printed equal (Cl 3p, As and Se 4p, Am–Fm 5f) | `provisional`, `unresolved_at_precision` | 9 |
-| both found, positive, another value disagrees beyond tolerance | `to_verify` | 176 |
-| both found, positive, nothing disagrees | `provisional` | 299 |
+| both found, positive, another value disagrees beyond tolerance | `to_verify` | 164 |
+| both found, positive, no other value to compare it with | `to_verify` | 44 |
+| both found, positive, at least one other value agrees and none disagrees | `provisional` | 267 |
 | one member or none found | `not_covered` | 87 |
 
 - Seven doublets lie across 1.5 keV and take the j+ member from the
   2018 table and the j− member from the 2019 table (`source_table`
   `trzh2018+trzh2019`): Sm and Eu 3p, Tm 3d, Bk–Fm 4p.
 - A positive splitting is compared with the `binding_energy.json` pair
-  and the `trzhaskovskaya.json` (2001/2002) pair, tolerance 1.0 eV, and
-  with the in-code value where there is one, tolerance 0.15 eV. The
-  1.0 eV is the most two values each rounded to 1 eV can put their
-  difference off. **A pair those two tables store as one value is not
-  compared**: one number for two members says nothing about the
-  splitting. `binding_energy.json` does this for Np–Fm 4p, among
-  others, where the 2018 and 2019 papers print members 242–363 eV
-  apart; that is a defect of `binding_energy.json`, recorded here and
-  not corrected by this table.
+  and the `trzhaskovskaya.json` (2001/2002) pair, tolerance 1.1 eV, and
+  with the in-code value where there is one, tolerance 0.15 eV.
+  - 1.1 eV: two values each rounded to 1 eV can put their difference
+    1.0 eV off, and the two energies of the reference, each printed to
+    0.1 eV, another 0.1 eV.
+  - 0.15 eV: the 0.1 eV that rounding can put the reference off, plus
+    0.05 eV allowed for the in-code value, whose uncertainty is not
+    recorded. The 0.05 is a convention, not a derived bound; Ge 3d and
+    Mo 3d sit exactly on it and count as agreeing.
+- **A pair those two tables store as one value is not compared.** It is
+  not a splitting of zero: `binding_energy.json` stores one value for
+  Np–Fm 4p, where the 2018 and 2019 papers print members 242–363 eV
+  apart. That is a defect of `binding_energy.json`, recorded here and
+  not corrected by this table. Nor is it agreement: for a level such as
+  Sc 3p (31.5 and 33.8 printed, 2.3 eV) an equal pair elsewhere may
+  mean the level was not resolved, which would bound the splitting from
+  above.
+- **A positive splitting with nothing to compare it with is
+  `to_verify`**, not `provisional` (44 levels: Ne and Na 2p, Ar–Sc 3p,
+  Np–Fm 3p and 3d, and 22 shallow d, f and p levels). Where a
+  comparison could be made it failed for 164 of 431 levels, so passing
+  by default would not be agreement.
 - Agreement does not adopt. `adopted` is assigned by hand and no entry
-  has it. `provisional` means the two energies are the source's and
-  nothing bundled contradicts their difference, with the limits under
-  *Not established* above.
+  has it. `provisional` means the two energies are the source's, at
+  least one other bundled value agrees with their difference and none
+  disagrees, with the limits under *Not established* above. The entry's
+  reason names the values it agreed with.
 - `not_covered`: the Trzhaskovskaya tables print one member only (41
   levels, e.g. Ti 3d3/2 alone) or none (46). The `binding_energy.json`
   pair is carried, still `not_covered`, for the 22 of them where that

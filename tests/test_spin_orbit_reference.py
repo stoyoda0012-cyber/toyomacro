@@ -97,7 +97,7 @@ class TestWholeOutputSpace:
         here."""
         blob = json.dumps(_all_answers(), sort_keys=True, ensure_ascii=False)
         digest = hashlib.sha256(blob.encode("utf-8")).hexdigest()
-        assert digest == "4c1270fa8789efebc4ac99fc91510ad914cfafd34accff25fc8184464638d24e"
+        assert digest == "470ed8adba7f6f9f879dee7652c73915f71076d381d4d593c698b0407d80eac0"
 
     def test_state_and_source_counts(self):
         answers = _all_answers()
@@ -105,7 +105,7 @@ class TestWholeOutputSpace:
         assert len(in_ref) == 579
         assert len(BindingEnergy.spin_orbit_levels()) == 99
         assert Counter(a["state"] for a in in_ref) == {
-            "provisional": 308, "to_verify": 184, "not_covered": 87,
+            "provisional": 276, "to_verify": 216, "not_covered": 87,
         }
         assert Counter(a["source_table"] for a in in_ref) == {
             "trzh2018": 381, "trzh2019": 104, "trzh2018+trzh2019": 7,
@@ -136,6 +136,21 @@ class TestWholeOutputSpace:
                 assert a["split_eV"] >= 0
             if a["source_table"] == "binding_energy":
                 assert a["split_eV"] != 0
+
+    def test_a_positive_provisional_value_was_compared_with_something(self):
+        """Passing by default is not agreement: a positive splitting no
+        other bundled value can be compared with is to_verify."""
+        kinds = Counter()
+        for a in _in_reference(_all_answers()):
+            if a["split_eV"] is None or a["split_eV"] <= 0 or a["state"] == "not_covered":
+                continue
+            head = a["state_reason"].split(":")[0]
+            kinds[(a["state"], head)] += 1
+        assert kinds == {
+            ("provisional", "agrees within tolerance with"): 267,
+            ("to_verify", "another value disagrees beyond tolerance"): 164,
+            ("to_verify", "no other value to compare it with"): 44,
+        }
 
     def test_statistical_ratio(self):
         for a in _all_answers():
@@ -206,6 +221,24 @@ class TestRepresentativeRows:
         assert BindingEnergy.get_spin_orbit_split("Np", "4p") == 0.0
         assert (ref.be_j_plus_eV, ref.be_j_minus_eV, ref.split_eV) == (1086.0, 1327.7, 241.7)
         assert ref.state == "provisional"
+        assert "binding_energy" not in ref.state_reason
+        assert "trzhaskovskaya.json (2001/2002) 242" in ref.state_reason
+
+    def test_nothing_to_compare_with_is_to_verify(self):
+        """Sc 3p: 31.5 and 33.8 printed, and both other tables store one
+        value for the two members."""
+        ref = BindingEnergy.get_spin_orbit("Sc", "3p")
+        assert (ref.be_j_plus_eV, ref.be_j_minus_eV, ref.split_eV) == (31.5, 33.8, 2.3)
+        assert ref.state == "to_verify"
+        assert ref.state_reason.startswith("no other value to compare it with")
+
+    def test_the_integer_tolerance_includes_the_reference_rounding(self):
+        """Rb 3p: 8.9 here, 10 in binding_energy.json. Two energies rounded
+        to 1 eV and two printed to 0.1 eV can differ by that much."""
+        ref = BindingEnergy.get_spin_orbit("Rb", "3p")
+        assert BindingEnergy.get_spin_orbit_split("Rb", "3p") == 10.0
+        assert (ref.split_eV, ref.state) == (8.9, "provisional")
+        assert "binding_energy.json 10" in ref.state_reason
 
     def test_a_carried_pair_is_not_adopted(self):
         ref = BindingEnergy.get_spin_orbit("Lu", "2p")
@@ -275,13 +308,49 @@ class TestFittersDoNotReadTheReference:
         assert all(get_so_info(label) is None for label in outside)
 
     def test_the_two_differ_for_common_levels(self):
-        """Ge 3d: 0.55 in the fitters, 0.7 in the reference (29.2 and 29.9
+        """Ge 3d: 0.55 in the fitters, 0.7 in the reference (28.5 and 29.2
         printed). Both stand; neither is derived from the other."""
         assert get_so_info("Ge3d").so_split == 0.55
-        assert BindingEnergy.get_spin_orbit("Ge", "3d").split_eV == 0.7
-        differing = [k for k, v in xps_database._SO_SPLITS.items()
-                     if BindingEnergy.get_spin_orbit(k[:-2], k[-2:]).split_eV != v]
-        assert len(differing) == 42
+        ge = BindingEnergy.get_spin_orbit("Ge", "3d")
+        assert (ge.be_j_plus_eV, ge.be_j_minus_eV, ge.split_eV) == (28.5, 29.2, 0.7)
+        refs = {k: BindingEnergy.get_spin_orbit(k[:-2], k[-2:])
+                for k in xps_database._SO_SPLITS}
+        assert [k for k, r in refs.items() if r.split_eV is None] == ["Ti3d"]
+        same = [k for k, r in refs.items() if r.split_eV == xps_database._SO_SPLITS[k]]
+        assert same == ["Si2p", "Cl2p", "Co2p", "La3d"]
+        gaps = {k: round(abs(r.split_eV - xps_database._SO_SPLITS[k]), 2)
+                for k, r in refs.items() if r.split_eV is not None}
+        assert max(gaps[k] for k, r in refs.items() if r.state == "provisional") == 0.15
+        assert max(gaps.values()) == gaps["Hf4d"] == 6.7
+
+    @pytest.mark.filterwarnings("ignore:Template peak")
+    def test_fits_and_templates_run_with_the_reference_unreadable(self, monkeypatch):
+        """Whatever a fitting path reads, it is not the reference: with every
+        way into it raising, the fitters still give their in-code values."""
+        from toyomacro.data import paths
+        from toyomacro.fitting.autofitter import AutoFitter
+        from toyomacro.fitting.template_bridge import template_to_configs
+        from toyomacro.fitting.templates import get_template, list_templates
+
+        from .test_fitting_templates import _make_synthetic_si2p_ke
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("a fitting path read the spin-orbit reference")
+
+        monkeypatch.setattr(BindingEnergy, "_spin_orbit_data", None)
+        monkeypatch.setattr(BindingEnergy, "_get_spin_orbit_data", classmethod(refuse))
+        monkeypatch.setattr(BindingEnergy, "get_spin_orbit", classmethod(refuse))
+        monkeypatch.setattr(paths, "load_spin_orbit_data", refuse)
+
+        for key, value in xps_database._SO_SPLITS.items():
+            assert get_so_info(key).so_split == value
+        splits = {}
+        for name in list_templates():
+            for config in template_to_configs(get_template(name), reference_be=100.0):
+                splits[name] = config.so_split
+        assert splits["Ta4f_oxide"] == 1.91  # the reference says 1.9
+        result = AutoFitter().fit_with_template(_make_synthetic_si2p_ke(), "Si2p_oxide")
+        assert result.success
 
     @pytest.mark.parametrize("module", ["toyomacro.core.xps_database",
                                         "toyomacro.fitting.autofitter",
@@ -335,9 +404,32 @@ class TestIntensityRatio:
                                                         table="scofield")
         assert r.ratio is not None and r.status == "extrapolated_above"
 
-    def test_s_label_raises(self):
+    @pytest.mark.parametrize("label", ["2s", "4f3/2", "2p5/2", "8p", "p", "4f ", None, 4])
+    def test_a_label_that_is_not_a_p_d_or_f_level_raises(self, label):
         with pytest.raises(ValueError):
-            CrossSection.get_spin_orbit_intensity_ratio("Si", "2s", 1486.6, table="scofield")
+            CrossSection.get_spin_orbit_intensity_ratio("Au", label, 1486.6, table="scofield")
+
+    def test_a_j_resolved_label_is_read_as_its_subshell(self):
+        bare = CrossSection.get_spin_orbit_intensity_ratio("Au", "4f", 1486.6, table="scofield")
+        for label in ("4f7/2", "4f5/2"):
+            assert CrossSection.get_spin_orbit_intensity_ratio(
+                "Au", label, 1486.6, table="scofield") == bare
+        assert (bare.table, bare.subshell, bare.element) == ("scofield", "4f", "Au")
+
+    def test_the_status_is_that_of_the_first_component_without_a_value(self):
+        """j- is looked up first. Zn 2p at 1030 eV on Scofield: both are
+        below their first cell, for different reasons or the same; the
+        ratio reports j-."""
+        r = CrossSection.get_spin_orbit_intensity_ratio("Zn", "2p", 1048.0, table="scofield")
+        assert r.j_minus.value is None and r.j_plus.value is not None
+        assert r.status == r.j_minus.status
+        both = CrossSection.get_spin_orbit_intensity_ratio("Au", "4f", 50.0, table="scofield")
+        assert both.status == both.j_minus.status
+
+    @pytest.mark.parametrize("energy", ["1486.6", None, True])
+    def test_a_photon_energy_that_is_not_a_number_raises(self, energy):
+        with pytest.raises(ValueError):
+            CrossSection.get_spin_orbit_intensity_ratio("Au", "4f", energy, table="scofield")
 
     @pytest.mark.parametrize("energy", [math.nan, math.inf, -math.inf])
     def test_non_finite_photon_energy_raises(self, energy):

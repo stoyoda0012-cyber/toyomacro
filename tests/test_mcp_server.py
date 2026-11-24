@@ -37,6 +37,56 @@ class TestReferenceDataTools:
         assert s["spin_orbit_split_eV"] is None
         assert s["spin_orbit"]["state"] == "not_covered"
 
+    def test_the_nested_entry_is_the_reference_entry(self):
+        from toyomacro.data import BindingEnergy
+
+        so = json.loads(mcp_server.lookup_binding_energy("Si", "2p"))["spin_orbit"]
+        ref = BindingEnergy.get_spin_orbit("Si", "2p")
+        assert so == {
+            "j_plus": "2p3/2", "j_minus": "2p1/2", "split_eV": 0.6,
+            "precision_eV": 0.1, "source_table": "trzh2018",
+            "be_j_plus_eV": 98.9, "be_j_minus_eV": 99.5,
+            "state": "provisional", "state_reason": ref.state_reason,
+            "unresolved_at_precision": False, "statistical_ratio": 0.5,
+        }
+
+    def test_a_carried_pair_gives_no_headline(self):
+        """Lu 2p: the binding_energy.json pair, not_covered."""
+        out = json.loads(mcp_server.lookup_binding_energy("Lu", "2p"))
+        assert out["spin_orbit_split_eV"] is None
+        assert (out["spin_orbit"]["split_eV"], out["spin_orbit"]["state"]) == (
+            1105.0, "not_covered")
+
+    def test_the_headline_is_never_zero_negative_or_unsettled(self):
+        from toyomacro.data import BindingEnergy
+
+        given = 0
+        for el in BindingEnergy.get_all_elements():
+            for n in range(1, 8):
+                for letter in "spdf":
+                    out = json.loads(mcp_server.lookup_binding_energy(el, f"{n}{letter}"))
+                    head = out.get("spin_orbit_split_eV")
+                    if head is None:
+                        continue
+                    given += 1
+                    so = out["spin_orbit"]
+                    assert head > 0 and head == so["split_eV"]
+                    assert so["state"] == "provisional" and not so["unresolved_at_precision"]
+        assert given == 263
+
+    @pytest.mark.parametrize("label", ["2p ", "2p\t", "2p\n"])
+    def test_a_padded_label_is_still_answered(self, label):
+        out = json.loads(mcp_server.lookup_binding_energy("Si", label))
+        assert out["binding_energy_eV"] == 99.0 and out["spin_orbit_split_eV"] == 0.6
+
+    @pytest.mark.parametrize("label", ["2p3", "2p1"])
+    def test_a_label_the_reference_cannot_read_is_answered_without_it(self, label):
+        """The binding-energy lookup accepts these; the answer must stay a
+        JSON result, not an exception."""
+        out = json.loads(mcp_server.lookup_binding_energy("Si", label))
+        assert out["binding_energy_eV"] == 99.0
+        assert out["spin_orbit_split_eV"] is None and out["spin_orbit"] is None
+
     def test_a_pair_printed_equal_is_not_reported_as_zero(self):
         out = json.loads(mcp_server.lookup_binding_energy("Am", "5f"))
         assert out["spin_orbit_split_eV"] is None

@@ -45,6 +45,7 @@ import csv
 import json
 import math
 import os
+import re
 import warnings
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -1212,7 +1213,8 @@ class CrossSection:
             A :class:`SpinOrbitIntensityRatio`.
 
         Raises:
-            ValueError: if ``subshell`` is not a p, d or f subshell label,
+            ValueError: if ``subshell`` is not a p, d or f subshell label
+                (``'4f'``, or ``'4f7/2'`` with a j that exists for that l),
                 or ``photon_energy`` is not a finite number.
 
         Examples:
@@ -1221,12 +1223,20 @@ class CrossSection:
             >>> round(r.ratio, 3), r.status
             (0.787, 'tabulated')
         """
-        base, _ = _split_orbital(subshell)
-        components = _J_COMPONENTS.get(base[-1:]) if len(base) == 2 else None
-        if components is None or len(components) != 2 or not base[0].isdigit():
+        if not isinstance(subshell, str) or not re.fullmatch(
+            r"[1-7][pdf]([1357]/2)?", subshell
+        ):
             raise ValueError(f"Not a p, d or f subshell label: {subshell!r}")
-        if not math.isfinite(photon_energy):
-            raise ValueError(f"photon_energy must be finite, got {photon_energy!r}")
+        base = subshell[:2]
+        components = _J_COMPONENTS[base[-1]]
+        if subshell[2:] and subshell[2:] not in components:
+            raise ValueError(f"No such level: {subshell!r}")
+        if (
+            isinstance(photon_energy, bool)
+            or not isinstance(photon_energy, (int, float, np.integer, np.floating))
+            or not math.isfinite(photon_energy)
+        ):
+            raise ValueError(f"photon_energy must be a finite number, got {photon_energy!r}")
         j_lo, j_hi = components
         minus = cls.lookup_with_status(element, f"{base}{j_lo}", photon_energy, table)
         plus = cls.lookup_with_status(element, f"{base}{j_hi}", photon_energy, table)

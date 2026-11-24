@@ -956,15 +956,16 @@ energies, each printed to 0.1 eV, so it can be 0.1 eV off from rounding
 alone; it is an elemental value and says nothing about a chemical
 state. **It is not a fit constraint, and the fitters do not read it**:
 `get_so_info`, `AutoFitter` and the templates keep their own in-code
-splittings, which differ from the reference by up to 0.15 eV for
-common levels (Ge 3d: 0.55 in the fitters, 0.7 here). No entry is
+splittings, which differ from `provisional` entries by up to 0.15 eV
+(Ge 3d: 0.55 in the fitters, 0.7 here) and from `to_verify` entries by
+up to 6.7 eV (Hf 4d: 16.8 in the fitters, 10.1 here). No entry is
 `adopted`.
 
 | state | meaning | show the partner's position? |
 |---|---|---|
 | `adopted` | checked and judged fit for the use; assigned by hand, to no entry yet | yes |
-| `provisional` | both binding energies are the source table's, and no other bundled value contradicts the splitting beyond tolerance | only marked as approximate |
-| `to_verify` | negative as printed, or another value disagrees beyond tolerance | no; show the reason |
+| `provisional` | both binding energies are the source table's, at least one other bundled value agrees with the splitting within tolerance and none disagrees; or the two members are printed equal | only marked as approximate |
+| `to_verify` | negative as printed, another value disagrees beyond tolerance, or there is no other value to compare it with | no; show the reason |
 | `not_covered` | the Trzhaskovskaya tables do not hold both members; also an s level, and a level or element the reference does not carry | no; show the reason |
 
 - `source_table` is `trzh2018`, `trzh2019`, `trzh2018+trzh2019` (the
@@ -978,7 +979,9 @@ common levels (Ge 3d: 0.55 in the fitters, 0.7 here). No entry is
   members are printed equal, which is not a splitting of zero.
 - It never raises for a level it cannot settle. It raises `ValueError`
   for a label that is not a subshell (`'2x'`) or names a j that does
-  not exist for its l (`'2p5/2'`).
+  not exist for its l (`'2p5/2'`);
+  `get_spin_orbit_intensity_ratio` does the same, and for a photon
+  energy that is not a finite number.
 
 The field names and the four state names are the supported surface,
 like the `lookup_with_status` statuses. The values, the state of an
@@ -994,7 +997,11 @@ where that table stores one value for both members);
 carries. The MCP tool `lookup_binding_energy` reports the reference
 value as `spin_orbit_split_eV` only for an `adopted` or `provisional`
 entry whose members are not printed equal (`null` otherwise) and the
-whole entry, raw value included, under `spin_orbit`.
+whole entry, raw value included, under `spin_orbit`. The tool answers
+only levels it has a binding energy for: 87 of the 579 reference
+levels, seven of the eight negative pairs among them, return its
+"No binding energy" error and are reachable through
+`get_spin_orbit` only.
 
 `CrossSection.get_spin_orbit_intensity_ratio(element, subshell,
 photon_energy, table=...)` returns σ(j−)/σ(j+), both components read

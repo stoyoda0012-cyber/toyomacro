@@ -60,14 +60,17 @@ archived on Zenodo for a citable DOI.
     free-atom or a solid-state energy, is not established.
   - **It is not a fit constraint, and the fitters do not read it.**
     `get_so_info`, `AutoFitter` and the templates keep their in-code
-    splittings, and no fit result changes. The two differ for 42 of the
-    46 in-code levels, by up to 0.15 eV where the reference entry is
-    `provisional` (Ge 3d: 0.55 in the fitters, 0.7 in the reference).
+    splittings, and no fit result changes. The two differ for 41 of the
+    45 in-code levels the reference has a value for, by up to 0.15 eV
+    where the reference entry is `provisional` (Ge 3d: 0.55 in the
+    fitters, 0.7 in the reference) and by up to 6.7 eV where it is
+    `to_verify` (Hf 4d: 16.8 and 10.1).
   - The new bundled table `spin_orbit.json` holds 579 levels of 99
-    elements: 308 `provisional` (nine of them printed equal), 184
-    `to_verify` (the eight negative pairs, and 176 where another
-    bundled value or the in-code value disagrees beyond tolerance), 87
-    `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
+    elements: 276 `provisional` (267 that another bundled value agrees
+    with and none contradicts, nine printed equal), 216 `to_verify`
+    (the eight negative pairs, 164 where another bundled value or the
+    in-code value disagrees beyond tolerance, 44 with no other value to
+    compare with), 87 `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
     where the two papers divide, and take one member from each. It is
     built by `python -m toyomacro.data._spin_orbit_build` from tables
     already bundled, and a test compares the file with a fresh build.
@@ -89,14 +92,26 @@ archived on Zenodo for a citable DOI.
 ### Changed
 
 - **MCP `lookup_binding_energy`**: `spin_orbit_split_eV` is now the
-  reference value (Si 2p 0.6, was 1.0 from the integer table). It is
-  `null` when the entry is `to_verify` or `not_covered`, for an s level
-  (was `0.0`), and when the two members are printed equal (was `0.0`):
-  Ga 3d, for instance, is `null` where `0.0` was returned. A new
-  `spin_orbit` object carries the whole entry: the raw value with its
-  sign (Zn 3d −0.1), both binding energies, source, state and reason.
-  The value is approximate and is not what the fitters hold a doublet
-  at.
+  reference value, given only for a `provisional` entry whose members
+  are not printed equal, and `null` otherwise. Of the 888 levels the
+  tool answers:
+  - 396 s levels: `0.0` → `null`;
+  - 223 keep a value, 197 of them a different one (Si 2p 1.0 → 0.6)
+    and 26 the same;
+  - 40 gain a value where `0.0` was returned (Mg 2p 0.2; Np 4p 241.7);
+  - 124 lose their value: 102 `to_verify` (Ti 2p, was 6.0) and 22
+    `not_covered` (Lu 2p, was 1105.0);
+  - 85 go from `0.0` to `null`: 64 `to_verify` (Ga 3d) and 21
+    `not_covered`;
+  - 20 were `null` and stay `null`.
+
+  A new `spin_orbit` object carries the whole entry: the raw value with
+  its sign (Zn 3d −0.1), both binding energies, source, state and
+  reason; it is `null` for a label the reference cannot read (`'2p3'`).
+  The tool still answers only levels it has a binding energy for, so 87
+  of the 579 reference levels are reachable through `get_spin_orbit`
+  only. The value is approximate and is not what the fitters hold a
+  doublet at.
 
 ### Known issues
 
