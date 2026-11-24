@@ -72,7 +72,7 @@ class TestReferenceDataTools:
                     so = out["spin_orbit"]
                     assert head > 0 and head == so["split_eV"]
                     assert so["state"] == "provisional" and not so["unresolved_at_precision"]
-        assert given == 263
+        assert given == 258
 
     @pytest.mark.parametrize("label", ["2p ", "2p\t", "2p\n"])
     def test_a_padded_label_is_still_answered(self, label):
@@ -85,14 +85,15 @@ class TestReferenceDataTools:
         JSON result, not an exception."""
         out = json.loads(mcp_server.lookup_binding_energy("Si", label))
         assert out["binding_energy_eV"] == 99.0
-        assert out["spin_orbit_split_eV"] is None and out["spin_orbit"] is None
+        assert out == {"element": "Si", "orbital": label, "binding_energy_eV": 99.0,
+                       "spin_orbit_split_eV": None, "spin_orbit": None}
 
     def test_a_pair_printed_equal_is_not_reported_as_zero(self):
         out = json.loads(mcp_server.lookup_binding_energy("Am", "5f"))
         assert out["spin_orbit_split_eV"] is None
         so = out["spin_orbit"]
         assert (so["split_eV"], so["state"], so["unresolved_at_precision"]) == (
-            0.0, "provisional", True)
+            0.0, "to_verify", True)
 
     def test_a_negative_pair_keeps_its_sign_in_the_nested_object(self):
         out = json.loads(mcp_server.lookup_binding_energy("Zn", "3d"))

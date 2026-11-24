@@ -964,8 +964,8 @@ up to 6.7 eV (Hf 4d: 16.8 in the fitters, 10.1 here). No entry is
 | state | meaning | show the partner's position? |
 |---|---|---|
 | `adopted` | checked and judged fit for the use; assigned by hand, to no entry yet | yes |
-| `provisional` | both binding energies are the source table's, at least one other bundled value agrees with the splitting within tolerance and none disagrees; or the two members are printed equal | only marked as approximate |
-| `to_verify` | negative as printed, another value disagrees beyond tolerance, or there is no other value to compare it with | no; show the reason |
+| `provisional` | both binding energies are the source table's, at least one other bundled value agrees with the splitting, within a tolerance smaller than the splitting, and none disagrees | only marked as approximate |
+| `to_verify` | negative as printed, printed equal, another value disagrees beyond tolerance, or no other value supports it | no; show the reason |
 | `not_covered` | the Trzhaskovskaya tables do not hold both members; also an s level, and a level or element the reference does not carry | no; show the reason |
 
 - `source_table` is `trzh2018`, `trzh2019`, `trzh2018+trzh2019` (the
@@ -975,8 +975,9 @@ up to 6.7 eV (Hf 4d: 16.8 in the fitters, 10.1 here). No entry is
 - `precision_eV` is the resolution the two energies are printed to
   (0.1 for the Trzhaskovskaya tables, `None` otherwise), not the
   uncertainty of the difference.
-- `split_eV == 0.0` comes with `unresolved_at_precision`: the two
-  members are printed equal, which is not a splitting of zero.
+- `split_eV == 0.0` comes with `unresolved_at_precision` and
+  `to_verify`: the two members are printed equal, from which no
+  splitting can be read. It is not a splitting of zero.
 - It never raises for a level it cannot settle. It raises `ValueError`
   for a label that is not a subshell (`'2x'`) or names a j that does
   not exist for its l (`'2p5/2'`);
@@ -996,8 +997,7 @@ where that table stores one value for both members);
 `BindingEnergy.spin_orbit_levels()` lists every level the reference
 carries. The MCP tool `lookup_binding_energy` reports the reference
 value as `spin_orbit_split_eV` only for an `adopted` or `provisional`
-entry whose members are not printed equal (`null` otherwise) and the
-whole entry, raw value included, under `spin_orbit`. The tool answers
+entry (`null` otherwise) and the whole entry, raw value included, under `spin_orbit`. The tool answers
 only levels it has a binding energy for: 87 of the 579 reference
 levels, seven of the eight negative pairs among them, return its
 "No binding energy" error and are reachable through

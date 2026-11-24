@@ -43,8 +43,7 @@ def lookup_binding_energy(element: str, orbital: str) -> str:
     doublet partner. It is approximate, not a measurement of the sample,
     and not the value the fitters hold a doublet at.
     `spin_orbit_split_eV` is given only when the state is "adopted" or
-    "provisional" and the two members are not printed equal; it is null
-    otherwise. The `spin_orbit` object always carries the raw
+    "provisional"; it is null otherwise. The `spin_orbit` object always carries the raw
     BE(j-) - BE(j+) where the reference has one (negative ones with
     their sign), the source table, state and reason. There, 0.0 with
     `unresolved_at_precision` means the two members are printed equal,
@@ -65,24 +64,19 @@ def lookup_binding_energy(element: str, orbital: str) -> str:
     try:
         so = BindingEnergy.get_spin_orbit(element, orbital.strip())
     except ValueError:
-        so = None
-    if so is None:
         return json.dumps({
             "element": element,
             "orbital": orbital,
             "binding_energy_eV": be,
             "spin_orbit_split_eV": None,
             "spin_orbit": None,
-            "Z": BindingEnergy.get_atomic_number(element),
         })
     return json.dumps({
         "element": element,
         "orbital": orbital,
         "binding_energy_eV": be,
         "spin_orbit_split_eV": (
-            so.split_eV
-            if so.state in ("adopted", "provisional") and not so.unresolved_at_precision
-            else None
+            so.split_eV if so.state in ("adopted", "provisional") else None
         ),
         "spin_orbit": {
             "j_plus": so.j_plus,

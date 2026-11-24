@@ -51,7 +51,8 @@ archived on Zenodo for a citable DOI.
   - a state, `adopted`, `provisional`, `to_verify` or `not_covered`,
     with its reason. A level the reference cannot settle is answered
     with its state, never an exception, and a pair printed equal is
-    *unresolved at the table's resolution*, not a splitting of zero.
+    flagged as one no splitting can be read from, not a splitting of
+    zero.
   - **What the value is.** The difference of the two binding energies
     Trzhaskovskaya & Yarzhemsky 2018 and 2019 print for the level, each
     to 0.1 eV, so it can be 0.1 eV off from rounding alone. Both papers
@@ -66,11 +67,12 @@ archived on Zenodo for a citable DOI.
     fitters, 0.7 in the reference) and by up to 6.7 eV where it is
     `to_verify` (Hf 4d: 16.8 and 10.1).
   - The new bundled table `spin_orbit.json` holds 579 levels of 99
-    elements: 276 `provisional` (267 that another bundled value agrees
-    with and none contradicts, nine printed equal), 216 `to_verify`
-    (the eight negative pairs, 164 where another bundled value or the
-    in-code value disagrees beyond tolerance, 44 with no other value to
-    compare with), 87 `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
+    elements: 259 `provisional` (another bundled value supports the
+    splitting and none contradicts it), 233 `to_verify` (the eight
+    negative pairs, nine printed equal, 164 where another bundled value
+    or the in-code value disagrees beyond tolerance, 44 with no other
+    value to compare with, eight compared only with values too coarse
+    to support them), 87 `not_covered`, none `adopted`. Seven doublets lie across 1.5 keV,
     where the two papers divide, and take one member from each. It is
     built by `python -m toyomacro.data._spin_orbit_build` from tables
     already bundled, and a test compares the file with a fresh build.
@@ -92,16 +94,15 @@ archived on Zenodo for a citable DOI.
 ### Changed
 
 - **MCP `lookup_binding_energy`**: `spin_orbit_split_eV` is now the
-  reference value, given only for a `provisional` entry whose members
-  are not printed equal, and `null` otherwise. Of the 888 levels the
-  tool answers:
+  reference value, given only for a `provisional` entry, and `null`
+  otherwise. Of the 888 levels the tool answers:
   - 396 s levels: `0.0` → `null`;
-  - 223 keep a value, 197 of them a different one (Si 2p 1.0 → 0.6)
-    and 26 the same;
-  - 40 gain a value where `0.0` was returned (Mg 2p 0.2; Np 4p 241.7);
-  - 124 lose their value: 102 `to_verify` (Ti 2p, was 6.0) and 22
+  - 219 keep a value, 194 of them a different one (Si 2p 1.0 → 0.6)
+    and 25 the same;
+  - 39 gain a value where `0.0` was returned (Mg 2p 0.2; Np 4p 241.7);
+  - 128 lose their value: 106 `to_verify` (Ti 2p, was 6.0) and 22
     `not_covered` (Lu 2p, was 1105.0);
-  - 85 go from `0.0` to `null`: 64 `to_verify` (Ga 3d) and 21
+  - 86 go from `0.0` to `null`: 65 `to_verify` (Ga 3d) and 21
     `not_covered`;
   - 20 were `null` and stay `null`.
 

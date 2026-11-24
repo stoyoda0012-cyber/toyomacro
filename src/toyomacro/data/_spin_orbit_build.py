@@ -15,10 +15,10 @@ Rules, in the order they are applied to one element and n, l (l = p, d, f):
    in both). A doublet whose members fall on either side of 1.5 keV takes
    one member from each.
 2. With both members: the splitting is BE(j-) - BE(j+), sign kept.
-   Negative: ``to_verify``. Printed equal: ``provisional`` and
+   Negative: ``to_verify``. Printed equal: ``to_verify`` and
    ``unresolved_at_precision``. Positive: ``to_verify`` when another value
-   disagrees beyond tolerance or when there is no other value to compare
-   it with, else ``provisional``.
+   disagrees beyond tolerance or when no other value supports it, else
+   ``provisional``.
 3. Without both members: ``not_covered``. The ``binding_energy.json`` pair
    is carried when that table stores two different values.
 
@@ -30,6 +30,9 @@ Other values a positive splitting is compared with:
   0.1 eV another 0.1 eV. A pair those tables store as one value is not
   compared. It does not say the splitting is zero (for Np 4p the papers
   print members 241.7 eV apart), and it is not counted as agreement.
+  A value agrees only when the tolerance is smaller than the splitting:
+  1 in an integer table "agrees" with any splitting up to 2.1 eV, which
+  cannot tell 0.3 eV from nothing. Such a value can still disagree.
 - the in-code ``_SO_SPLITS`` of ``toyomacro.core.xps_database``, tolerance
   0.15 eV: the 0.1 eV that rounding can put the reference off, plus 0.05
   eV allowed for the in-code value, whose uncertainty is not recorded.
@@ -64,8 +67,8 @@ META = {
         "Spin-orbit splittings, one entry per element and n, l (l = p, d, f). "
         "split_eV = BE(j-) - BE(j+) of the two binding energies as the source "
         "prints them, sign kept. statistical_ratio = (2j- + 1)/(2j+ + 1). "
-        "unresolved_at_precision: the source prints the two members equal, so "
-        "the splitting is below its resolution, not zero. A reference for "
+        "unresolved_at_precision: the source prints the two members equal; "
+        "no splitting can be read from that, and it is not zero. A reference for "
         "showing and assigning a doublet partner, not a fit constraint."
     ),
     "built_by": "python -m toyomacro.data._spin_orbit_build",
@@ -96,15 +99,15 @@ META = {
         "adopted": "checked and judged fit for the use; assigned by hand, to no entry yet",
         "provisional": (
             "both binding energies are those of the source table, and at "
-            "least one other bundled value agrees with the splitting within "
-            "tolerance while none disagrees; or the two members are printed "
-            "equal. Approximate: each energy is printed to 0.1 eV, and "
-            "whether the compiled energies are free-atom or solid-state "
-            "values is not established"
+            "least one other bundled value agrees with the splitting, within "
+            "a tolerance smaller than the splitting, while none disagrees. "
+            "Approximate: each energy is printed to 0.1 eV, and whether the "
+            "compiled energies are free-atom or solid-state values is not "
+            "established"
         ),
         "to_verify": (
-            "negative as printed, another value disagrees beyond tolerance, "
-            "or there is no other value to compare it with"
+            "negative as printed, printed equal, another value disagrees "
+            "beyond tolerance, or no other value supports it"
         ),
         "not_covered": "the Trzhaskovskaya tables do not hold both members",
     },
@@ -193,10 +196,10 @@ def build() -> dict[str, Any]:
                 state = "to_verify"
                 reason = "negative as printed: the j- member is printed less bound than the j+ member"
             elif split == 0:
-                state, unresolved = "provisional", True
+                state, unresolved = "to_verify", True
                 reason = (
-                    "the two members are printed equal at 0.1 eV: unresolved at "
-                    "that resolution, not a splitting of zero"
+                    "the two members are printed equal: no splitting can be "
+                    "read from that, and it is not a splitting of zero"
                 )
             else:
                 named = {k: f"{_OTHER_NAME[k]} {v:g}" for k, v in compared.items()}
@@ -204,6 +207,8 @@ def build() -> dict[str, Any]:
                     named[k] for k, v in compared.items()
                     if round(abs(v - split), 2) > tolerance[k]
                 ]
+                # a tolerance as large as the splitting cannot tell it from none
+                support = [named[k] for k in compared if tolerance[k] < split]
                 if against:
                     state = "to_verify"
                     reason = "another value disagrees beyond tolerance: " + ", ".join(against)
@@ -213,9 +218,16 @@ def build() -> dict[str, Any]:
                         "no other value to compare it with: the other bundled "
                         "tables store one value for both members, or none"
                     )
+                elif not support:
+                    state = "to_verify"
+                    reason = (
+                        "no other value supports it: the tolerance of "
+                        + ", ".join(named.values())
+                        + " is not smaller than the splitting"
+                    )
                 else:
                     state = "provisional"
-                    reason = "agrees within tolerance with: " + ", ".join(named.values())
+                    reason = "agrees within tolerance with: " + ", ".join(support)
             if "+" in source:
                 reason += "; the doublet straddles 1.5 keV, one member from each table"
         else:

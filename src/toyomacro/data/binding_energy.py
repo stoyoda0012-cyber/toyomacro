@@ -29,8 +29,9 @@ SpinOrbitState = Literal[
     "provisional",  # both binding energies are the source table's, another
                     # bundled value agrees with the splitting and none
                     # disagrees: approximate
-    "to_verify",    # negative as printed, another value disagrees beyond
-                    # tolerance, or nothing to compare with: no position to show
+    "to_verify",    # negative as printed, printed equal, another value
+                    # disagrees beyond tolerance, or no other value supports
+                    # it: no position to show
     "not_covered",  # the Trzhaskovskaya tables do not hold both members
 ]
 
@@ -50,7 +51,7 @@ class SpinOrbitReference:
             binding energies, **sign kept** (eight 2018 pairs are
             negative: j- printed less bound than j+). ``0.0`` together with
             ``unresolved_at_precision`` means the two members are printed
-            equal, not that the splitting is zero. None when no bundled
+            equal: no splitting can be read from that, and it is not zero. None when no bundled
             table gives two different members.
         precision_eV: The resolution each binding energy is printed to:
             0.1 for the Trzhaskovskaya tables, None otherwise. It is not
@@ -71,8 +72,10 @@ class SpinOrbitReference:
         statistical_ratio: (2j- + 1)/(2j+ + 1) = l/(l + 1): 0.5 for p,
             2/3 for d, 0.75 for f; None for s. Not a measured area ratio;
             see :meth:`toyomacro.data.CrossSection.get_spin_orbit_intensity_ratio`.
-        unresolved_at_precision: The two members are printed equal, so
-            the splitting is below the table's resolution, not zero.
+        unresolved_at_precision: The two members are printed equal. That
+            may be an unresolved level or one value given for both; either
+            way no splitting can be read from it. Such an entry is
+            ``to_verify``.
     """
 
     element: str

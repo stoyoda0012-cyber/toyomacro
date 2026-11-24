@@ -97,7 +97,7 @@ class TestWholeOutputSpace:
         here."""
         blob = json.dumps(_all_answers(), sort_keys=True, ensure_ascii=False)
         digest = hashlib.sha256(blob.encode("utf-8")).hexdigest()
-        assert digest == "470ed8adba7f6f9f879dee7652c73915f71076d381d4d593c698b0407d80eac0"
+        assert digest == "9dbab694664ecfb47540bbccfcb3666363e3aff686e141879522bf2d5e6c752a"
 
     def test_state_and_source_counts(self):
         answers = _all_answers()
@@ -105,7 +105,7 @@ class TestWholeOutputSpace:
         assert len(in_ref) == 579
         assert len(BindingEnergy.spin_orbit_levels()) == 99
         assert Counter(a["state"] for a in in_ref) == {
-            "provisional": 276, "to_verify": 216, "not_covered": 87,
+            "provisional": 259, "to_verify": 233, "not_covered": 87,
         }
         assert Counter(a["source_table"] for a in in_ref) == {
             "trzh2018": 381, "trzh2019": 104, "trzh2018+trzh2019": 7,
@@ -130,10 +130,10 @@ class TestWholeOutputSpace:
                 assert a["split_eV"] == round(a["be_j_minus_eV"] - a["be_j_plus_eV"], 2)
             assert a["unresolved_at_precision"] == (a["split_eV"] == 0.0)
 
-    def test_a_provisional_value_is_never_negative_and_a_carried_one_never_zero(self):
+    def test_a_provisional_value_is_positive_and_a_carried_one_never_zero(self):
         for a in _all_answers():
             if a["state"] == "provisional":
-                assert a["split_eV"] >= 0
+                assert a["split_eV"] > 0
             if a["source_table"] == "binding_energy":
                 assert a["split_eV"] != 0
 
@@ -142,15 +142,30 @@ class TestWholeOutputSpace:
         other bundled value can be compared with is to_verify."""
         kinds = Counter()
         for a in _in_reference(_all_answers()):
-            if a["split_eV"] is None or a["split_eV"] <= 0 or a["state"] == "not_covered":
-                continue
-            head = a["state_reason"].split(":")[0]
-            kinds[(a["state"], head)] += 1
+            if a["state"] != "not_covered":
+                kinds[(a["state"], a["state_reason"].split(":")[0])] += 1
         assert kinds == {
-            ("provisional", "agrees within tolerance with"): 267,
+            ("provisional", "agrees within tolerance with"): 259,
             ("to_verify", "another value disagrees beyond tolerance"): 164,
             ("to_verify", "no other value to compare it with"): 44,
+            ("to_verify", "no other value supports it"): 8,
+            ("to_verify", "the two members are printed equal"): 9,
+            ("to_verify", "negative as printed"): 8,
         }
+
+    def test_a_tolerance_as_large_as_the_splitting_is_not_support(self):
+        """Cu 3d: 0.3 here, 1 in the 2001/2002 table. At 1.1 eV that 1 agrees
+        with anything up to 2.1 eV, so it does not support 0.3."""
+        ref = BindingEnergy.get_spin_orbit("Cu", "3d")
+        assert (ref.split_eV, ref.state) == (0.3, "to_verify")
+        assert ref.state_reason.startswith("no other value supports it")
+        # the same table does support a splitting larger than the tolerance
+        kr = BindingEnergy.get_spin_orbit("Kr", "3d")
+        assert (kr.split_eV, kr.state) == (1.2, "provisional")
+        # and a value with a tolerance below the splitting supports a small one
+        mg = BindingEnergy.get_spin_orbit("Mg", "2p")
+        assert (mg.split_eV, mg.state) == (0.2, "provisional")
+        assert mg.state_reason == "agrees within tolerance with: the fitters' in-code value 0.28"
 
     def test_statistical_ratio(self):
         for a in _all_answers():
@@ -274,10 +289,10 @@ class TestRepresentativeRows:
 
     def test_printed_equal_is_flagged_unresolved(self):
         ref = BindingEnergy.get_spin_orbit("Cl", "3p")
-        assert (ref.split_eV, ref.precision_eV, ref.state) == (0.0, 0.1, "provisional")
+        assert (ref.be_j_plus_eV, ref.be_j_minus_eV) == (6.7, 6.7)
+        assert (ref.split_eV, ref.precision_eV, ref.state) == (0.0, 0.1, "to_verify")
         assert ref.unresolved_at_precision
         assert "not a splitting of zero" in ref.state_reason
-        assert "positive" not in ref.state_reason
         flagged = {(a["element"], a["subshell"]) for a in _all_answers()
                    if a["unresolved_at_precision"]}
         assert flagged == {
@@ -327,6 +342,8 @@ class TestFittersDoNotReadTheReference:
     def test_fits_and_templates_run_with_the_reference_unreadable(self, monkeypatch):
         """Whatever a fitting path reads, it is not the reference: with every
         way into it raising, the fitters still give their in-code values."""
+        import builtins
+
         from toyomacro.data import paths
         from toyomacro.fitting.autofitter import AutoFitter
         from toyomacro.fitting.template_bridge import template_to_configs
@@ -334,13 +351,21 @@ class TestFittersDoNotReadTheReference:
 
         from .test_fitting_templates import _make_synthetic_si2p_ke
 
-        def refuse(*args, **kwargs):
-            raise AssertionError("a fitting path read the spin-orbit reference")
+        reads = []
+        real_open = builtins.open
+
+        def spying_open(file, *args, **kwargs):
+            # the one place every path into the reference ends, however the
+            # loader was imported
+            if str(file).endswith("spin_orbit.json"):
+                reads.append(str(file))
+            return real_open(file, *args, **kwargs)
 
         monkeypatch.setattr(BindingEnergy, "_spin_orbit_data", None)
-        monkeypatch.setattr(BindingEnergy, "_get_spin_orbit_data", classmethod(refuse))
-        monkeypatch.setattr(BindingEnergy, "get_spin_orbit", classmethod(refuse))
-        monkeypatch.setattr(paths, "load_spin_orbit_data", refuse)
+        monkeypatch.setattr(builtins, "open", spying_open)
+        paths.load_spin_orbit_data()
+        assert len(reads) == 1, "the spy must see a read of the reference"
+        reads.clear()
 
         for key, value in xps_database._SO_SPLITS.items():
             assert get_so_info(key).so_split == value
@@ -349,8 +374,10 @@ class TestFittersDoNotReadTheReference:
             for config in template_to_configs(get_template(name), reference_be=100.0):
                 splits[name] = config.so_split
         assert splits["Ta4f_oxide"] == 1.91  # the reference says 1.9
-        result = AutoFitter().fit_with_template(_make_synthetic_si2p_ke(), "Si2p_oxide")
-        assert result.success
+        spectrum = _make_synthetic_si2p_ke()
+        assert AutoFitter().fit_with_template(spectrum, "Si2p_oxide").success
+        assert AutoFitter().fit(spectrum, use_template=False).success
+        assert reads == []
 
     @pytest.mark.parametrize("module", ["toyomacro.core.xps_database",
                                         "toyomacro.fitting.autofitter",

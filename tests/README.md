@@ -1,11 +1,11 @@
 # Test inventory
 
-This suite has **2,928 automated tests** across **107 files**, in two
+This suite has **2,929 automated tests** across **107 files**, in two
 locations:
 
 | Location | Scope | Files | Tests |
 |---|---|--:|--:|
-| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 69 | 1,765 |
+| `tests/` | Library body — lineshapes, backgrounds, templates, I/O, quantification, meta | 69 | 1,766 |
 | `src/toyomacro/voigtfit/tests/` | VoigtFit engine — solvers, encoders, information theory | 38 | 1,163 |
 
 Every test here runs on a plain `pip install` (no GUI or instrument
@@ -21,7 +21,7 @@ values to copy in, when one of them drifts.
 Tests fall into two purposes. The distinction matters when deciding
 what to run:
 
-- **Contract / regression** (2,496 tests, 85%) — guarantee the library
+- **Contract / regression** (2,497 tests, 85%) — guarantee the library
   behaves correctly: lineshape math, background algorithms, solver
   routing, file readers, template conversion, and the reference-data
   tables. Fast, deterministic.
@@ -49,7 +49,7 @@ pytest -k "not gvrt and not si2p and not encoder and not roundtrip and not multi
 Twelve of the tests counted on this page assert a wall-clock rate or an
 elapsed time, so they fail on hardware slower than the machine their
 thresholds were set on rather than on a defect. They carry the `perf`
-marker; `pytest -m "not perf"` drops them and leaves 2,916. Marking
+marker; `pytest -m "not perf"` drops them and leaves 2,917. Marking
 changes nothing about what is collected, so every count here still
 holds.
 
@@ -98,7 +98,7 @@ numerical source, commit it first and then regenerate, so that
 cannot check `source_commit` and skips that one test; the source digest
 and the bytes are checked everywhere.
 
-## Library body — `tests/` (1,765)
+## Library body — `tests/` (1,766)
 
 ### Claim guards — noise model, versions, backends, comparisons (180)
 | Tests | File | Guards |
@@ -167,7 +167,7 @@ and the bytes are checked everywhere.
 | 33 | `test_provenance_schema.py` | HDF5 provenance layout, versioning, and legacy-file fallback |
 | 7 | `test_chunked_encoding.py` | Chunked vs monolithic `fitpara` encoder |
 
-### Quantification data (805)
+### Quantification data (806)
 | Tests | File | Guards |
 |--:|---|---|
 | 123 | `test_imfp_tpp2m.py` | TPP-2M IMFP — implementation fidelity against the published table, and physical plausibility, kept separate |
@@ -193,7 +193,7 @@ and the bytes are checked everywhere.
 | 5 | `test_cross_section_trzhaskovskaya_transcription.py` | Five Trzhaskovskaya corrections pinned to the printed tables: Eu 5p3/2 at 10 keV (was 10x low), and Er, Tm, Yb 3p3/2 and Os 3d5/2, printed in ADNDT 82 but missing from the bundled file |
 | 6 | `test_cross_section_tables.py` | Bundled cross-section tables load on a clean install |
 | 102 | `test_angular_geometry.py` | θ (measured) vs ψ (derived) vs κ (the beam's own direction): the magic-angle identity, the factor-of-20 cost of confusing θ with ψ, the polarization average that puts the unpolarized angle on **k**, the two incidence-angle warnings and their boundaries, the tabulated fractions of subshells with a negative non-dipole term, and `L_full`'s present values pinned as a record while its convention is unresolved |
-| 80 | `test_spin_orbit_reference.py` | The spin-orbit reference: the bundled file equals its build, binding energies the 2018/2019 papers print, every answer by digest, the rules (signs kept, printed-equal is unresolved, one stored value is no splitting), that the fitters do not read it, and the j-resolved cross-section ratio |
+| 81 | `test_spin_orbit_reference.py` | The spin-orbit reference: the bundled file equals its build, binding energies the 2018/2019 papers print, every answer by digest, the rules (signs kept, printed-equal is unresolved, one stored value is no splitting), that the fitters do not read it, and the j-resolved cross-section ratio |
 | 3 | `test_angular_correction_limits.py` | Angular-correction lookup rejects under-specified input |
 
 ### MCP server (33)

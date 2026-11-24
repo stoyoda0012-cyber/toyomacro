@@ -443,7 +443,7 @@ papers call "Experimental subshell binding energy in eV". Both say the
 values were taken from Kibédi, Burrows, Trzhaskovskaya, Davidson &
 Nestor, *Nucl. Instrum. Methods Phys. Res. A* **589**, 202 (2008). The
 2018 paper holds lines bound by less than 1.5 keV and the 2019 paper
-lines from 1.5 keV to about 10 keV (the deepest it prints is 11103.1
+lines from 1.5 keV to about 11 keV (the deepest it prints is 11103.1
 eV); no line is in both, and deeper lines are in neither. The bundled JSONs carry that column as
 `binding_energy`.
 
@@ -469,10 +469,11 @@ in the 2018 table, then the 2019 table.
 | case | state | entries |
 |---|---|--:|
 | both members found, splitting negative | `to_verify` | 8 |
-| both found, printed equal (Cl 3p, As and Se 4p, Am–Fm 5f) | `provisional`, `unresolved_at_precision` | 9 |
+| both found, printed equal (Cl 3p, As and Se 4p, Am–Fm 5f) | `to_verify`, `unresolved_at_precision` | 9 |
 | both found, positive, another value disagrees beyond tolerance | `to_verify` | 164 |
 | both found, positive, no other value to compare it with | `to_verify` | 44 |
-| both found, positive, at least one other value agrees and none disagrees | `provisional` | 267 |
+| both found, positive, compared only with values whose tolerance is not smaller than the splitting | `to_verify` | 8 |
+| both found, positive, at least one other value supports it and none disagrees | `provisional` | 259 |
 | one member or none found | `not_covered` | 87 |
 
 - Seven doublets lie across 1.5 keV and take the j+ member from the
@@ -483,7 +484,10 @@ in the 2018 table, then the 2019 table.
   with the in-code value where there is one, tolerance 0.15 eV.
   - 1.1 eV: two values each rounded to 1 eV can put their difference
     1.0 eV off, and the two energies of the reference, each printed to
-    0.1 eV, another 0.1 eV.
+    0.1 eV, another 0.1 eV. Twelve levels sit exactly on 1.1 and count
+    as agreeing, which needs all four roundings at their extremes at
+    once: Rb 3p, Sn, Sb and I 4p, Pr 3d, Ho 4p, Au 4d, Po 3p and 5p,
+    Pa 5d, U and Cm 4p.
   - 0.15 eV: the 0.1 eV that rounding can put the reference off, plus
     0.05 eV allowed for the in-code value, whose uncertainty is not
     recorded. The 0.05 is a convention, not a derived bound; Ge 3d and
@@ -501,9 +505,22 @@ in the 2018 table, then the 2019 table.
   Np–Fm 3p and 3d, and 22 shallow d, f and p levels). Where a
   comparison could be made it failed for 164 of 431 levels, so passing
   by default would not be agreement.
+- **A value supports a splitting only when its tolerance is smaller
+  than the splitting.** A 1 in an integer table agrees with anything up
+  to 2.1 eV and cannot tell 0.3 eV from nothing; eight levels have only
+  such values and are `to_verify` (Cu 3d, Pd, Ag, Cd and In 4d, Kr and
+  Rb 4p, Br 3d). For a splitting just above the tolerance the check is
+  still coarse (Kr 3d: 1.2 against 1). For 33 levels the supporting
+  value is, or includes, the in-code value, which has no recorded
+  source; the entry's reason names what it agreed with.
+- **A pair printed equal is `to_verify`** (nine levels). Am–Fm 5f are
+  printed as whole numbers equal to the single value the 2001/2002
+  table stores, which looks like one value given for both members; Cl
+  3p and As and Se 4p may be unresolved levels. In neither case can a
+  splitting be read, and `unresolved_at_precision` marks them.
 - Agreement does not adopt. `adopted` is assigned by hand and no entry
   has it. `provisional` means the two energies are the source's, at
-  least one other bundled value agrees with their difference and none
+  least one other bundled value supports their difference and none
   disagrees, with the limits under *Not established* above. The entry's
   reason names the values it agreed with.
 - `not_covered`: the Trzhaskovskaya tables print one member only (41
